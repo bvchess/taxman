@@ -38,7 +38,9 @@ The search:
   independent at both parities: its vectors over GF(2), split by the parity of Ω, are linearly independent in each part
   ([the parity vectors](../../../docs/theory/parity-bound.md#the-parity-vectors), W1).  So at a node, the heaviest set
   independent at both parities together with the forced picks, and outside the barred numbers, bounds every completion.
-  * It is computed by shortest augmenting paths, a child starting from its parent's set and weight split.
+  * It is computed by shortest augmenting paths, a child starting from its parent's set and weight split.  The child
+    takes the elimination over GF(2) and the circuits that its parent's solve left, less what its own roles change,
+    rather than building them again; they are the same, so the solve and its bound are too.
   * It is reported only with a weight split that satisfies the local optimality conditions of both parities, checked
     explicitly, so the bound rests on the theorem and weak duality, not on the algorithm.
   * It cuts the node, bars the free numbers that depend on the forced picks, and forces the members whose barring alone

@@ -29,7 +29,7 @@
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
-use crate::parity::{Meet, Outcome, Parity, Warm};
+use crate::parity::{Meet, Outcome, Parity, Saved, Warm};
 use crate::primes::{is_prime, maximal_factors};
 use crate::semiprime;
 
@@ -816,13 +816,15 @@ impl Lag {
 }
 
 /// A parent's state for its children: its roles, the optimal matching and dual of each bound, and the parity
-/// bound's certificate (a child starts its parity solve from it).
+/// bound's certificate (a child starts its parity solve from it) with the state its solve left, which a child puts
+/// back to derive its start from (a parent with one child leaves none: the child finds the state still there).
 type Snapshot = (Vec<u32>, Vec<i64>);
 struct Base<'b> {
     roles: &'b [Role],
     plain: &'b Snapshot,
     lag: Option<&'b Snapshot>,
     parity: Option<&'b Warm>,
+    saved: Option<&'b Saved>,
 }
 
 impl<'a> Prover<'a> {
@@ -1151,6 +1153,7 @@ impl<'a> Prover<'a> {
         // start from the last certificate: the parent's, then the node's own.
         let mut warm: Option<Warm> = None;
         let parent_warm = base.as_ref().and_then(|b| b.parity).filter(|_| self.parity_warm);
+        let parent_saved = base.as_ref().and_then(|b| b.saved).filter(|_| self.parity_warm);
         let (value, picks, best, source) = loop {
             let Some((value, picks)) = solved else { return Verdict::Proven };
             if value <= self.target {
@@ -1185,6 +1188,10 @@ impl<'a> Prover<'a> {
             let mut parity_set = None;
             if newly.is_empty() {
                 if let Some(meet) = self.parity.as_mut() {
+                    // The first solve starts from the parent's certificate: the state its solve left, put back.
+                    if let (None, Some(saved)) = (&warm, parent_saved) {
+                        meet.restore(saved);
+                    }
                     match meet.solve_from(&roles, warm.as_ref().filter(|_| self.parity_warm).or(parent_warm)) {
                         Outcome::Infeasible => {
                             self.stats[6] += 1;
@@ -1295,6 +1302,10 @@ impl<'a> Prover<'a> {
         self.stats[3] += decisions.len() as u64;
         let (base_roles, snapshot) = (roles.clone(), self.bound.snapshot());
         let lag_snapshot = self.lag.as_ref().map(|l| l.m.snapshot());
+        let saved = match (&self.parity, &warm) {
+            (Some(meet), Some(warm)) if decisions.len() > 1 && self.parity_warm => meet.save(warm),
+            _ => None,
+        };
         let child = |j: usize, roles: &[Role]| {
             let mut child = roles.to_vec();
             decisions[..j].iter().for_each(|&(d, role)| child[d as usize] = role);
@@ -1309,7 +1320,13 @@ impl<'a> Prover<'a> {
                 (j..branch.len()).for_each(|k| self.pending.push(child(k, &base_roles)));
                 return Verdict::Paused;
             }
-            let base = Base { roles: &base_roles, plain: &snapshot, lag: lag_snapshot.as_ref(), parity: warm.as_ref() };
+            let base = Base {
+                roles: &base_roles,
+                plain: &snapshot,
+                lag: lag_snapshot.as_ref(),
+                parity: warm.as_ref(),
+                saved: saved.as_ref(),
+            };
             match self.node(child(j, &base_roles), Some(base)) {
                 Verdict::Proven => {}
                 Verdict::Paused => {

@@ -47,10 +47,15 @@
 //! found by Dijkstra on costs reduced by potentials, which start from the weight split of the starting set (the
 //! longest prefix of the elements by weight that is independent in both) and are updated by the distances, as in
 //! Frank's weight-splitting algorithm.  Circuits come from an echelon basis over GF(2) kept in reduced form, whose
-//! rows carry the members they sum: reducing a sparse vector takes one row per coordinate of it.
+//! rows carry the members they sum: reducing a sparse vector takes one row per coordinate of it.  A circuit is its
+//! element's unique expression in the set (with the forced elements), so it is reduced again only where an exchange
+//! can change it, and a solve from a parent's certificate takes the rows and circuits that the parent's solve left,
+//! less what the new roles remove, instead of building them ([`Meet::save`]); either way they are the circuits a
+//! reduction gives.
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::game::{Board, Role};
 
@@ -108,10 +113,12 @@ impl Parity {
 }
 
 /// An echelon basis over GF(2) in reduced form (each pivot column is zero in every other row), each row with the
-/// set of tracked elements whose vectors (plus untracked ones) sum to it.
+/// set of tracked elements whose vectors (plus untracked ones) sum to it, a bitset over the elements' tracking bits
+/// ([`Meet`]'s `bit_of`): `cw` words a row, of which only the first `words` are ever nonzero.
 struct Rref {
     vw: usize,
     cw: usize,
+    words: usize,
     vecs: Vec<u64>,
     combos: Vec<u64>,
     pivot: Vec<u32>,
@@ -125,6 +132,7 @@ impl Rref {
         Rref {
             vw,
             cw,
+            words: 1,
             vecs: vec![0; dim.max(1) * vw],
             combos: vec![0; dim.max(1) * cw],
             pivot: vec![NONE; dim.max(1)],
@@ -143,9 +151,9 @@ impl Rref {
     /// Reduces the vector with ones at `coords`: the residue in `v` (zero at every pivot), the rows' combination
     /// in `c`.  True iff the residue is nonzero (the vector is independent of the rows).
     fn reduce(&self, coords: &[u32], v: &mut [u64], c: &mut [u64]) -> bool {
-        let (vw, cw) = (self.vw, self.cw);
+        let (vw, cw, words) = (self.vw, self.cw, self.words);
         v[..vw].fill(0);
-        c[..cw].fill(0);
+        c[..words].fill(0);
         for &k in coords {
             v[k as usize / 64] ^= 1 << (k % 64);
         }
@@ -156,7 +164,7 @@ impl Rref {
                 for (a, b) in v[..vw].iter_mut().zip(&self.vecs[r * vw..(r + 1) * vw]) {
                     *a ^= b;
                 }
-                for (a, b) in c[..cw].iter_mut().zip(&self.combos[r * cw..(r + 1) * cw]) {
+                for (a, b) in c[..words].iter_mut().zip(&self.combos[r * cw..r * cw + words]) {
                     *a ^= b;
                 }
             }
@@ -164,9 +172,30 @@ impl Rref {
         v[..vw].iter().any(|&x| x != 0)
     }
 
-    /// Adds a row: `v` a nonzero residue from [`reduce`](Self::reduce), `c` its combination.
-    fn insert(&mut self, v: &[u64], c: &[u64]) {
-        let (vw, cw) = (self.vw, self.cw);
+    /// Whether the vector with ones at `coords` is independent of the rows ([`reduce`](Self::reduce) without the
+    /// combination; `v` is scratch).
+    fn independent(&self, coords: &[u32], v: &mut [u64]) -> bool {
+        let vw = self.vw;
+        v[..vw].fill(0);
+        for &k in coords {
+            v[k as usize / 64] ^= 1 << (k % 64);
+        }
+        for &k in coords {
+            let r = self.row_of[k as usize];
+            if r != NONE {
+                let r = r as usize;
+                for (a, b) in v[..vw].iter_mut().zip(&self.vecs[r * vw..(r + 1) * vw]) {
+                    *a ^= b;
+                }
+            }
+        }
+        v[..vw].iter().any(|&x| x != 0)
+    }
+
+    /// Adds a row: `v` a nonzero residue from [`reduce`](Self::reduce), `c` its combination (None: zero, a row of
+    /// untracked elements only).
+    fn insert(&mut self, v: &[u64], c: Option<&[u64]>) {
+        let (vw, cw, words) = (self.vw, self.cw, self.words);
         let w0 = v[..vw].iter().position(|&x| x != 0).expect("insert: a nonzero residue");
         let p = w0 * 64 + v[w0].trailing_zeros() as usize;
         let bit = 1u64 << (p % 64);
@@ -175,31 +204,46 @@ impl Rref {
                 for (a, b) in self.vecs[r * vw..(r + 1) * vw].iter_mut().zip(&v[..vw]) {
                     *a ^= b;
                 }
-                for (a, b) in self.combos[r * cw..(r + 1) * cw].iter_mut().zip(&c[..cw]) {
-                    *a ^= b;
+                if let Some(c) = c {
+                    for (a, b) in self.combos[r * cw..r * cw + words].iter_mut().zip(&c[..words]) {
+                        *a ^= b;
+                    }
                 }
             }
         }
         let r = self.rows;
         self.vecs[r * vw..(r + 1) * vw].copy_from_slice(&v[..vw]);
-        self.combos[r * cw..(r + 1) * cw].copy_from_slice(&c[..cw]);
+        match c {
+            Some(c) => self.combos[r * cw..r * cw + words].copy_from_slice(&c[..words]),
+            None => self.combos[r * cw..r * cw + words].fill(0),
+        }
         self.pivot[r] = p as u32;
         self.row_of[p] = r as u32;
         self.rows += 1;
     }
 
-    /// Removes tracked element `e` from the span: eliminates it from every row's combination with one row holding
-    /// it, and drops that row.  False if no row holds it.
-    fn remove(&mut self, e: usize) -> bool {
-        let (vw, cw) = (self.vw, self.cw);
-        let (word, bit) = (e / 64, 1u64 << (e % 64));
+    /// Stops tracking the elements whose bits are flagged in `mask`: they leave every row's combination.
+    fn untrack(&mut self, mask: &[u64]) {
+        let (cw, words) = (self.cw, self.words);
+        for row in self.combos[..self.rows * cw].chunks_exact_mut(cw) {
+            for (a, m) in row[..words].iter_mut().zip(mask) {
+                *a &= !m;
+            }
+        }
+    }
+
+    /// Removes the tracked element of bit `b` from the span: eliminates it from every row's combination with one
+    /// row holding it, and drops that row.  False if no row holds it.
+    fn remove(&mut self, b: usize) -> bool {
+        let (vw, cw, words) = (self.vw, self.cw, self.words);
+        let (word, bit) = (b / 64, 1u64 << (b % 64));
         let Some(r) = (0..self.rows).find(|&r| self.combos[r * cw + word] & bit != 0) else { return false };
         for q in 0..self.rows {
             if q != r && self.combos[q * cw + word] & bit != 0 {
                 for k in 0..vw {
                     self.vecs[q * vw + k] ^= self.vecs[r * vw + k];
                 }
-                for k in 0..cw {
+                for k in 0..words {
                     self.combos[q * cw + k] ^= self.combos[r * cw + k];
                 }
             }
@@ -208,7 +252,7 @@ impl Rref {
         let last = self.rows - 1;
         if r != last {
             self.vecs.copy_within(last * vw..(last + 1) * vw, r * vw);
-            self.combos.copy_within(last * cw..(last + 1) * cw, r * cw);
+            self.combos.copy_within(last * cw..last * cw + words, r * cw);
             self.pivot[r] = self.pivot[last];
             self.row_of[self.pivot[r] as usize] = r as u32;
         }
@@ -263,6 +307,27 @@ pub struct Bound {
 pub struct Warm {
     pub members: Vec<u32>,
     pub w1: Vec<(u32, i64)>,
+    /// The solve that made it (0: none; unique across workspaces), to recognize the state it left ([`Meet::save`]).
+    id: u64,
+}
+
+/// The state a certified solve leaves in a [`Meet`]: its roles, the rows (each class's first `rows` rows), and the
+/// candidates in order with, for those outside the set, whether they are independent in each class and their
+/// circuits (classes 0 and 1 of each in turn, one after the other in `circ`, the ends in `ends`).
+pub struct Saved {
+    id: u64,
+    roles: Vec<Role>,
+    rows: [usize; 2],
+    /// The words of a row's combination kept (the rows' `words` then).
+    words: usize,
+    vecs: [Vec<u64>; 2],
+    combos: [Vec<u64>; 2],
+    pivot: [Vec<u32>; 2],
+    cands: Vec<u32>,
+    in_set: Vec<bool>,
+    indep: Vec<[bool; 2]>,
+    circ: Vec<u32>,
+    ends: Vec<u32>,
 }
 
 /// Counters of [`Meet`].
@@ -287,6 +352,8 @@ pub struct MeetStats {
     /// Warm starts whose forced elements include a candidate of the certificate that was not in its set, and how
     /// many of them fell back.
     pub foreign: [u64; 2],
+    /// Warm starts derived from the state the certificate's solve left ([`Meet::save`]).
+    pub derived: u64,
 }
 
 /// The weighted intersection of a [`Pair`] (see the module comment).
@@ -311,6 +378,11 @@ pub struct MeetStats {
 /// cycle away from the root is negative, in which case they give up.  That, or an exchange that leaves the set
 /// dependent, falls back to a solve from scratch (2-12% of the warm starts at n = 990-1250); the certificate is
 /// checked either way.
+///
+/// The workspace keeps the state its last certified solve left (the rows, candidates, set and circuits) and knows
+/// it by the certificate's id; [`save`](Self::save) copies it and [`restore`](Self::restore) puts it back.  A solve
+/// from a certificate whose state the workspace holds derives its start from it ([`derive`](Self::derive)): the
+/// same start as one built from scratch, so the same exchanges, set and split.
 pub struct Meet {
     pair: Pair,
     cw: usize,
@@ -320,17 +392,38 @@ pub struct Meet {
     /// Potentials of the elements and the two hubs (indices len and len + 1).
     pot: Vec<i64>,
     indep: [Vec<bool>; 2],
-    circ: [Vec<u64>; 2],
+    /// The circuit of each candidate outside the set that is dependent, by class: its members, in the order of their
+    /// bits (a circuit holds one or two members on average, so a list beats a bitset of all the elements).
+    circ: [Vec<Vec<u32>>; 2],
+    /// Scratch: elements flagged for a moment (all clear outside a call).
+    flag: Vec<u8>,
+    /// The tracking bit of each element that has been a candidate (NONE for the others), and the element of each
+    /// bit: the rows' combinations run over the candidates only, given bits in the order they first appear, which
+    /// for a search are its first node's (the later ones' candidates are among them).
+    bit_of: Vec<u32>,
+    elem_of: Vec<u32>,
     dist: Vec<(i64, u32)>,
     prev: Vec<u32>,
     vbuf: Vec<u64>,
     cbuf: Vec<u64>,
+    /// A second residue and combination, for class 1 while class 0's wait to be inserted.
+    vbuf1: Vec<u64>,
+    cbuf1: Vec<u64>,
     out_start: Vec<u32>,
     out_list: Vec<u32>,
     heap: BinaryHeap<Reverse<(i64, u32, u32)>>,
     /// Scratch: w1 of a warm start by element (INF where unknown), and whether an element is a candidate.
     split: Vec<i64>,
     is_cand: Vec<bool>,
+    /// The source's potential when `dist` already holds the distances [`finish`](Self::finish) needs (the last
+    /// search for an improving cycle found none, and nothing changed since).
+    split_ready: Option<i64>,
+    /// The id of the certificate whose state the workspace holds (0: none), and the roles it was solved with.
+    held: u64,
+    held_roles: Vec<Role>,
+    /// What the last exchange changed, if the circuits are those of the set before it: the members that left, and in
+    /// which classes an element independent of the old set entered.
+    exchanged: Option<(Vec<usize>, [bool; 2])>,
     pub stats: MeetStats,
 }
 
@@ -395,16 +488,25 @@ impl Meet {
             in_set: vec![false; len],
             pot: vec![0; len + 2],
             indep: [vec![false; len], vec![false; len]],
-            circ: [vec![0; len * cw], vec![0; len * cw]],
+            circ: [vec![Vec::new(); len], vec![Vec::new(); len]],
+            flag: vec![0; len],
+            bit_of: vec![NONE; len],
+            elem_of: Vec::new(),
             dist: vec![(INF, 0); len + 2],
             prev: vec![NONE; len + 2],
             vbuf: vec![0; vw],
             cbuf: vec![0; cw],
+            vbuf1: vec![0; vw],
+            cbuf1: vec![0; cw],
             out_start: vec![0; len + 1],
             out_list: Vec::new(),
             heap: BinaryHeap::new(),
             split: vec![INF; len],
             is_cand: vec![false; len],
+            split_ready: None,
+            held: 0,
+            held_roles: Vec::new(),
+            exchanged: None,
             stats: MeetStats::default(),
         }
     }
@@ -416,27 +518,45 @@ impl Meet {
         coords.is_empty() || self.rref[q].reduce(coords, &mut self.vbuf, &mut self.cbuf)
     }
 
-    /// Adds element `e` (independent in both classes) to the rows, tracked or not.
-    fn add(&mut self, e: usize, tracked: bool) {
-        for q in 0..2 {
-            if self.pair.coords[q][e].is_empty() {
+    /// Whether element `e` is independent of the rows in class `q` (an element with an empty list is).
+    fn independent(&mut self, q: usize, e: usize) -> bool {
+        let coords = &self.pair.coords[q][e];
+        coords.is_empty() || self.rref[q].independent(coords, &mut self.vbuf)
+    }
+
+    /// Adds element `e` to the rows, tracked or not, if it is independent in both classes; false (nothing added)
+    /// if it is dependent in one.  Class 1 is reduced only if class 0 is independent.  An untracked row has no
+    /// combination, so its reduction needs none and its insertion changes no other row's.
+    fn try_add(&mut self, e: usize, tracked: bool) -> bool {
+        let Meet { pair, rref, vbuf, cbuf, vbuf1, cbuf1, bit_of, .. } = self;
+        let mut bufs = [(vbuf, cbuf), (vbuf1, cbuf1)];
+        for (q, (v, c)) in bufs.iter_mut().enumerate() {
+            let coords = &pair.coords[q][e];
+            let free = coords.is_empty()
+                || if tracked { rref[q].reduce(coords, v, c) } else { rref[q].independent(coords, v) };
+            if !free {
+                return false;
+            }
+        }
+        for (q, (v, c)) in bufs.iter_mut().enumerate() {
+            if pair.coords[q][e].is_empty() {
                 continue;
             }
-            let free = self.reduce(q, e);
-            assert!(free, "add: element {e} is dependent in class {q}");
             if tracked {
-                self.cbuf[e / 64] ^= 1 << (e % 64);
+                let b = bit_of[e] as usize;
+                c[b / 64] ^= 1 << (b % 64);
+                rref[q].insert(v, Some(c));
             } else {
-                self.cbuf.fill(0);
+                rref[q].insert(v, None);
             }
-            self.rref[q].insert(&self.vbuf, &self.cbuf);
         }
+        true
     }
 
     fn take_out(&mut self, e: usize) {
         for q in 0..2 {
             if !self.pair.coords[q][e].is_empty() {
-                let found = self.rref[q].remove(e);
+                let found = self.rref[q].remove(self.bit_of[e] as usize);
                 assert!(found, "take_out: element {e} is not in the span of class {q}");
             }
         }
@@ -457,15 +577,36 @@ impl Meet {
     /// barred whose forced elements were members of its set (otherwise it falls back to a solve from scratch).
     pub fn solve_from(&mut self, roles: &[Role], warm: Option<&Warm>) -> Outcome {
         self.stats.solves += 1;
-        let Some((forced_weight, forced, loops)) = self.setup(roles) else { return Outcome::Infeasible };
+        self.split_ready = None;
+        self.exchanged = None;
+        let held = std::mem::replace(&mut self.held, 0);
+        let derived = match warm {
+            Some(warm) if warm.id != 0 && warm.id == held => self.derive(roles),
+            _ => None,
+        };
+        let from_held = derived.is_some();
+        self.stats.derived += u64::from(from_held);
+        let Some((forced_weight, forced, loops)) = derived.or_else(|| self.setup(roles)) else {
+            return Outcome::Infeasible;
+        };
         if let Some(warm) = warm {
             self.stats.warm += 1;
-            let foreign = forced.iter().any(|&f| warm.w1.iter().any(|&(e, _)| e == f) && !warm.members.contains(&f));
+            // Whether a forced element was a candidate of the certificate but not in its set.
+            for &(e, w1) in &warm.w1 {
+                self.split[e as usize] = w1;
+            }
+            for &e in &warm.members {
+                self.split[e as usize] = INF;
+            }
+            let foreign = forced.iter().any(|&f| self.split[f as usize] < INF);
+            for &(e, _) in &warm.w1 {
+                self.split[e as usize] = INF;
+            }
             let before = self.stats.fallbacks;
             self.stats.foreign[0] += u64::from(foreign);
-            match self.start_warm(warm) {
+            match self.start_warm(warm, from_held) {
                 Ok(()) => match self.finish(forced_weight, &forced, &loops) {
-                    Some(bound) => return Outcome::Bound(bound),
+                    Some(bound) => return self.hold(roles, bound),
                     None => self.stats.fallback_reasons[3] += 1,
                 },
                 Err(reason) => self.stats.fallback_reasons[reason] += 1,
@@ -490,7 +631,7 @@ impl Meet {
             self.stats.augmentations += 1;
         }
         match self.finish(forced_weight, &forced, &loops) {
-            Some(bound) => Outcome::Bound(bound),
+            Some(bound) => self.hold(roles, bound),
             None => {
                 self.stats.uncertified += 1;
                 Outcome::Uncertified
@@ -498,10 +639,198 @@ impl Meet {
         }
     }
 
+    /// Gives `bound` a new id, which the workspace now holds the state of (ids are unique across workspaces, so a
+    /// certificate from another one is never taken for this one's).
+    fn hold(&mut self, roles: &[Role], mut bound: Bound) -> Outcome {
+        static LAST_ID: AtomicU64 = AtomicU64::new(0);
+        let id = LAST_ID.fetch_add(1, Ordering::Relaxed) + 1;
+        bound.warm.id = id;
+        self.held = id;
+        self.held_roles.clear();
+        self.held_roles.extend_from_slice(roles);
+        Outcome::Bound(bound)
+    }
+
+    /// The state the solve that gave `warm` left, if the workspace still holds it, to [`restore`](Self::restore)
+    /// before a later solve from `warm`.
+    pub fn save(&self, warm: &Warm) -> Option<Saved> {
+        if warm.id == 0 || warm.id != self.held {
+            return None;
+        }
+        let (cw, words) = (self.cw, self.rref[0].words);
+        let rows = [self.rref[0].rows, self.rref[1].rows];
+        let combos = |q: usize| -> Vec<u64> {
+            self.rref[q].combos[..rows[q] * cw].chunks_exact(cw).flat_map(|row| &row[..words]).copied().collect()
+        };
+        let mut saved = Saved {
+            id: self.held,
+            roles: self.held_roles.clone(),
+            rows,
+            words,
+            vecs: [0, 1].map(|q| self.rref[q].vecs[..rows[q] * self.rref[q].vw].to_vec()),
+            combos: [combos(0), combos(1)],
+            pivot: [0, 1].map(|q| self.rref[q].pivot[..rows[q]].to_vec()),
+            cands: self.cands.clone(),
+            in_set: self.cands.iter().map(|&e| self.in_set[e as usize]).collect(),
+            indep: Vec::new(),
+            circ: Vec::new(),
+            ends: Vec::new(),
+        };
+        for &e in self.cands.iter().filter(|&&e| !self.in_set[e as usize]) {
+            let e = e as usize;
+            saved.indep.push([self.indep[0][e], self.indep[1][e]]);
+            for q in 0..2 {
+                if !self.indep[q][e] {
+                    saved.circ.extend_from_slice(&self.circ[q][e]);
+                }
+                saved.ends.push(saved.circ.len() as u32);
+            }
+        }
+        Some(saved)
+    }
+
+    /// Puts back the state of `saved` (from [`save`](Self::save)), unless the workspace holds it already: a solve
+    /// from its certificate then derives its start ([`solve_from`](Self::solve_from)).
+    pub fn restore(&mut self, saved: &Saved) {
+        if self.held == saved.id {
+            return;
+        }
+        let cw = self.cw;
+        for q in 0..2 {
+            let rref = &mut self.rref[q];
+            rref.clear();
+            let (rows, vw, words) = (saved.rows[q], rref.vw, rref.words);
+            rref.vecs[..rows * vw].copy_from_slice(&saved.vecs[q]);
+            let kept = saved.combos[q].chunks_exact(saved.words);
+            for (row, from) in rref.combos[..rows * cw].chunks_exact_mut(cw).zip(kept) {
+                row[..saved.words].copy_from_slice(from);
+                row[saved.words..words].fill(0);
+            }
+            rref.pivot[..rows].copy_from_slice(&saved.pivot[q]);
+            for (r, &p) in saved.pivot[q].iter().enumerate() {
+                rref.row_of[p as usize] = r as u32;
+            }
+            rref.rows = rows;
+        }
+        for &e in &self.cands {
+            self.is_cand[e as usize] = false;
+        }
+        self.cands.clone_from(&saved.cands);
+        let (mut outside, mut from) = (0, 0);
+        for (i, &e) in saved.cands.iter().enumerate() {
+            let e = e as usize;
+            self.is_cand[e] = true;
+            self.in_set[e] = saved.in_set[i];
+            if !saved.in_set[i] {
+                for q in 0..2 {
+                    self.indep[q][e] = saved.indep[outside][q];
+                    let to = saved.ends[2 * outside + q] as usize;
+                    self.circ[q][e].clear();
+                    self.circ[q][e].extend_from_slice(&saved.circ[from..to]);
+                    from = to;
+                }
+                outside += 1;
+            }
+        }
+        self.held = saved.id;
+        self.held_roles.clone_from(&saved.roles);
+    }
+
+    /// The start of a solve from the certificate whose state the workspace holds, with more elements forced or
+    /// barred: the rows, candidates, set and circuits that [`setup`](Self::setup) and the start of
+    /// [`start_warm`](Self::start_warm) would build, derived from the held ones instead; and what `setup` returns.
+    /// The held rows span the held forced elements and set.  A member forced now stops being tracked (its bit leaves
+    /// every combination), and a member barred now leaves the span ([`Rref::remove`]); the rows then span the new
+    /// forced elements and the start set, the held set less the members forced or barred.  The circuit of an element
+    /// is its vector's unique expression in a basis, so a candidate outside the set keeps its circuit less the
+    /// members forced now, unless the circuit held a member barred now, which makes it independent (an expression in
+    /// the smaller basis would be another in the larger); it depends on the forced elements alone, a loop, when
+    /// nothing is left of its circuit.  None, with nothing changed, unless every element kept its held role or went
+    /// from free to barred, or from the set to forced.
+    fn derive(&mut self, roles: &[Role]) -> Option<(i64, Vec<u32>, Vec<u32>)> {
+        let cw = self.cw;
+        let mut forced_now: Vec<usize> = Vec::new();
+        let mut barred_now: Vec<usize> = Vec::new();
+        for (e, (&was, &is)) in self.held_roles.iter().zip(roles).enumerate() {
+            let member = self.is_cand[e] && self.in_set[e];
+            match (was, is) {
+                (was, is) if was == is => {}
+                (Role::Free, Role::Barred) => {
+                    if member {
+                        barred_now.push(e);
+                    }
+                }
+                (Role::Free, Role::Pick) if member => forced_now.push(e),
+                _ => return None,
+            }
+        }
+        for &e in &barred_now {
+            self.take_out(e);
+        }
+        if !forced_now.is_empty() {
+            let mut forced_mask = vec![0u64; cw];
+            for &e in &forced_now {
+                let b = self.bit_of[e] as usize;
+                forced_mask[b / 64] |= 1 << (b % 64);
+            }
+            for q in 0..2 {
+                self.rref[q].untrack(&forced_mask);
+            }
+        }
+        const FORCED: u8 = 1;
+        const BARRED: u8 = 2;
+        forced_now.iter().for_each(|&e| self.flag[e] = FORCED);
+        barred_now.iter().for_each(|&e| self.flag[e] = BARRED);
+        let mut cands = std::mem::take(&mut self.cands);
+        cands.retain(|&e| {
+            let e = e as usize;
+            if roles[e] != Role::Free {
+                self.is_cand[e] = false;
+                self.in_set[e] = false;
+                return false;
+            }
+            if self.in_set[e] {
+                return true;
+            }
+            let mut lone = false;
+            for q in 0..2 {
+                if self.indep[q][e] {
+                    continue;
+                }
+                let circ = &mut self.circ[q][e];
+                if circ.iter().any(|&x| self.flag[x as usize] == BARRED) {
+                    self.indep[q][e] = true;
+                } else {
+                    circ.retain(|&x| self.flag[x as usize] != FORCED);
+                    lone |= circ.is_empty();
+                }
+            }
+            if lone {
+                self.is_cand[e] = false;
+            }
+            !lone
+        });
+        self.cands = cands;
+        forced_now.iter().chain(&barred_now).for_each(|&e| self.flag[e] = 0);
+        let (mut forced_weight, mut forced, mut loops) = (0, Vec::new(), Vec::new());
+        for (e, &role) in roles.iter().enumerate() {
+            match role {
+                Role::Pick => {
+                    forced_weight += self.pair.weight[e];
+                    forced.push(e as u32);
+                }
+                Role::Free if !self.is_cand[e] => loops.push(e as u32),
+                _ => {}
+            }
+        }
+        Some((forced_weight, forced, loops))
+    }
+
     /// Clears the rows, adds the forced elements (untracked), and sorts the free ones into candidates (by weight,
     /// heaviest first) and `loops` (those that depend on the forced ones).  None if the forced elements are dependent.
     fn setup(&mut self, roles: &[Role]) -> Option<(i64, Vec<u32>, Vec<u32>)> {
         let len = self.pair.len();
+        self.exchanged = None;
         for q in 0..2 {
             self.rref[q].clear();
         }
@@ -511,22 +840,31 @@ impl Meet {
         let mut forced_weight = 0;
         let mut forced: Vec<u32> = Vec::new();
         for e in (0..len).filter(|&e| roles[e] == Role::Pick) {
-            if !(0..2).all(|q| self.reduce(q, e)) {
+            if !self.try_add(e, false) {
                 self.cands.clear();
                 return None;
             }
-            self.add(e, false);
             forced_weight += self.pair.weight[e];
             forced.push(e as u32);
         }
         let mut cands: Vec<u32> = Vec::new();
         let mut loops: Vec<u32> = Vec::new();
         for e in (0..len).filter(|&e| roles[e] == Role::Free) {
-            if (0..2).all(|q| self.reduce(q, e)) {
+            if (0..2).all(|q| self.independent(q, e)) {
                 cands.push(e as u32);
             } else {
                 loops.push(e as u32);
             }
+        }
+        for &e in &cands {
+            if self.bit_of[e as usize] == NONE {
+                self.bit_of[e as usize] = self.elem_of.len() as u32;
+                self.elem_of.push(e);
+            }
+        }
+        let words = self.elem_of.len().div_ceil(64).max(1);
+        for rref in &mut self.rref {
+            rref.words = words;
         }
         let w = &self.pair.weight;
         cands.sort_unstable_by_key(|&e| (Reverse(w[e as usize]), Reverse(e)));
@@ -547,10 +885,9 @@ impl Meet {
         let mut least = None;
         for i in 0..self.cands.len() {
             let e = self.cands[i] as usize;
-            if !(0..2).all(|q| self.reduce(q, e)) {
+            if !self.try_add(e, true) {
                 break;
             }
-            self.add(e, true);
             self.in_set[e] = true;
             least = Some(w[e]);
         }
@@ -564,24 +901,25 @@ impl Meet {
     /// The start of a solve from a certificate (see the type's comment): its members that are still candidates
     /// and the potentials of its split, then improving paths through the root until none is left.  An error (the
     /// index of [`MeetStats::fallback_reasons`]) if it must fall back to a solve from scratch.
-    fn start_warm(&mut self, warm: &Warm) -> Result<(), usize> {
+    ///
+    /// `derived`: the rows, the set and the circuits are already those of the start ([`derive`](Self::derive)).
+    fn start_warm(&mut self, warm: &Warm, derived: bool) -> Result<(), usize> {
         let w = self.pair.weight.clone();
         for &(e, w1) in &warm.w1 {
             self.split[e as usize] = w1;
         }
         let known = self.cands.iter().all(|&e| self.split[e as usize] < INF);
         let mut ok = known;
-        if ok {
+        if ok && !derived {
             for &e in &warm.members {
                 let e = e as usize;
                 if !self.is_cand[e] {
                     continue;
                 }
-                if !(0..2).all(|q| self.reduce(q, e)) {
+                if !self.try_add(e, true) {
                     ok = false;
                     break;
                 }
-                self.add(e, true);
                 self.in_set[e] = true;
             }
         }
@@ -597,8 +935,16 @@ impl Meet {
         if !ok {
             return Err(0);
         }
+        let mut fresh = derived;
         loop {
-            self.exchange_graph();
+            if fresh {
+                #[cfg(test)]
+                self.check_circuits();
+                self.arcs();
+                fresh = false;
+            } else {
+                self.exchange_graph();
+            }
             match self.improve() {
                 Step::Improved => self.stats.cycles += 1,
                 Step::Optimal => return Ok(()),
@@ -610,7 +956,56 @@ impl Meet {
 
     /// The circuits of the candidates outside the set in both classes, and the circuit arcs x → y of class 0 by x.
     fn exchange_graph(&mut self) {
-        let cw = self.cw;
+        self.circuits();
+        self.arcs();
+    }
+
+    /// The circuits of the candidates outside the set in both classes, by reduction.  After an exchange
+    /// ([`flip`](Self::flip), which leaves what it changed in `exchanged`), only those it can change: a circuit is
+    /// its element's unique expression in the set (with the forced elements), so one without a member that left is
+    /// still an expression in the new set, and the same; and an element independent of the old set is independent of
+    /// the new one in a class where every element that entered depended on the old set (the new set's span lies in
+    /// the old's).  The members that left are reduced, being outside the set now.
+    fn circuits(&mut self) {
+        let exchanged = self.exchanged.take();
+        if let Some((left, _)) = &exchanged {
+            left.iter().for_each(|&x| self.flag[x] = 1);
+        }
+        for i in 0..self.cands.len() {
+            let y = self.cands[i] as usize;
+            if self.in_set[y] {
+                continue;
+            }
+            for q in 0..2 {
+                if let Some((_, grew)) = &exchanged {
+                    let stays = if self.indep[q][y] {
+                        !grew[q]
+                    } else {
+                        self.circ[q][y].iter().all(|&x| self.flag[x as usize] == 0)
+                    };
+                    if stays && self.flag[y] == 0 {
+                        continue;
+                    }
+                }
+                let free = self.reduce(q, y);
+                self.indep[q][y] = free;
+                if !free {
+                    let circ = &mut self.circ[q][y];
+                    circ.clear();
+                    circ.extend(ones(&self.cbuf[..self.rref[q].words]).map(|b| self.elem_of[b]));
+                }
+            }
+        }
+        if let Some((left, _)) = &exchanged {
+            left.iter().for_each(|&x| self.flag[x] = 0);
+        }
+        #[cfg(test)]
+        self.check_circuits();
+    }
+
+    /// Test aid: the circuits kept or derived are those a reduction gives.
+    #[cfg(test)]
+    fn check_circuits(&mut self) {
         for i in 0..self.cands.len() {
             let y = self.cands[i] as usize;
             if self.in_set[y] {
@@ -618,12 +1013,18 @@ impl Meet {
             }
             for q in 0..2 {
                 let free = self.reduce(q, y);
-                self.indep[q][y] = free;
-                if !free {
-                    self.circ[q][y * cw..(y + 1) * cw].copy_from_slice(&self.cbuf);
-                }
+                assert_eq!(free, self.indep[q][y], "element {y}, class {q}: independence");
+                let mut want: Vec<u32> = ones(&self.cbuf[..self.rref[q].words]).map(|b| self.elem_of[b]).collect();
+                let mut got = self.circ[q][y].clone();
+                want.sort_unstable();
+                got.sort_unstable();
+                assert!(free || got == want, "element {y}, class {q}: circuit");
             }
         }
+    }
+
+    /// The circuit arcs x → y of class 0, by x, from the circuits.
+    fn arcs(&mut self) {
         let len = self.pair.len();
         self.out_start[..=len].fill(0);
         let mut arcs = 0u64;
@@ -633,12 +1034,12 @@ impl Meet {
                 continue;
             }
             if !self.indep[0][y] {
-                for x in ones(&self.circ[0][y * cw..(y + 1) * cw]) {
-                    self.out_start[x + 1] += 1;
+                for &x in &self.circ[0][y] {
+                    self.out_start[x as usize + 1] += 1;
                 }
             }
             if !self.indep[1][y] {
-                arcs += self.circ[1][y * cw..(y + 1) * cw].iter().map(|w| u64::from(w.count_ones())).sum::<u64>();
+                arcs += self.circ[1][y].len() as u64;
             }
         }
         for i in 0..len {
@@ -654,9 +1055,9 @@ impl Meet {
             if self.in_set[y] || self.indep[0][y] {
                 continue;
             }
-            for x in ones(&self.circ[0][y * cw..(y + 1) * cw]) {
-                self.out_list[fill[x] as usize] = y as u32;
-                fill[x] += 1;
+            for &x in &self.circ[0][y] {
+                self.out_list[fill[x as usize] as usize] = y as u32;
+                fill[x as usize] += 1;
             }
         }
     }
@@ -676,8 +1077,8 @@ impl Meet {
         drops: bool,
         tolerant: bool,
     ) -> Search {
-        let Meet { pair, cw, cands, in_set, pot, indep, circ, dist, prev, out_start, out_list, heap, .. } = self;
-        let (w, cw, len) = (&pair.weight, *cw, pair.len());
+        let Meet { pair, cands, in_set, pot, indep, circ, dist, prev, out_start, out_list, heap, .. } = self;
+        let (w, len) = (&pair.weight, pair.len());
         let (ha, hb) = (len, len + 1);
         for &e in cands.iter() {
             dist[e as usize] = (INF, 0);
@@ -747,7 +1148,8 @@ impl Meet {
                         relax(dist, prev, heap, &mut negative, u, hb, at, pot[u] - pot[hb], 0);
                     }
                 } else {
-                    for x in ones(&circ[1][u * cw..(u + 1) * cw]) {
+                    for &x in &circ[1][u] {
+                        let x = x as usize;
                         relax(dist, prev, heap, &mut negative, u, x, at, pot[u] + w[x] - pot[x], 1);
                     }
                 }
@@ -774,7 +1176,7 @@ impl Meet {
     /// Test aid: an arc of the exchange graph with a negative reduced cost, if any.
     #[cfg(test)]
     fn violated_arc(&self) -> Option<String> {
-        let (w, cw, len) = (&self.pair.weight, self.cw, self.pair.len());
+        let (w, len) = (&self.pair.weight, self.pair.len());
         let (ha, hb) = (len, len + 1);
         let pot = &self.pot;
         let set: Vec<usize> = self.cands.iter().map(|&e| e as usize).filter(|&e| self.in_set[e]).collect();
@@ -794,7 +1196,8 @@ impl Meet {
                     return Some(format!("A -> {y}: {} {} {}; set {set:?}", pot[ha], w[y], pot[y]));
                 }
             } else {
-                for x in ones(&self.circ[0][y * cw..(y + 1) * cw]) {
+                for &x in &self.circ[0][y] {
+                    let x = x as usize;
                     if pot[x] - w[y] - pot[y] < 0 {
                         return Some(format!("{x} -> {y}: {} {} {}; set {set:?}", pot[x], w[y], pot[y]));
                     }
@@ -805,7 +1208,8 @@ impl Meet {
                     return Some(format!("{y} -> B: {} {}", pot[y], pot[hb]));
                 }
             } else {
-                for x in ones(&self.circ[1][y * cw..(y + 1) * cw]) {
+                for &x in &self.circ[1][y] {
+                    let x = x as usize;
                     if pot[y] + w[x] - pot[x] < 0 {
                         return Some(format!("{y} -> {x}: {} {} {}; set {set:?}", pot[y], w[x], pot[x]));
                     }
@@ -863,6 +1267,9 @@ impl Meet {
             return Step::Negative;
         }
         if last == NONE || best.0 - pi_s + pi_t >= 0 {
+            // These are the distances `finish` asks for: the same sources, no hubs, tolerant, and the sink only
+            // read, not searched for.
+            self.split_ready = Some(pi_s);
             return Step::Optimal;
         }
         if self.flip(best.0, last, false) {
@@ -899,19 +1306,21 @@ impl Meet {
             }
             v = self.prev[e];
         }
+        let grew = [0, 1].map(|q| entering.iter().any(|&y| self.indep[q][y]));
         for &x in &leaving {
             self.take_out(x);
             self.in_set[x] = false;
             self.pot[x] -= w[x];
         }
         for &y in &entering {
-            if !trusted && !(0..2).all(|q| self.reduce(q, y)) {
+            if !self.try_add(y, true) {
+                assert!(!trusted, "flip: element {y} is dependent");
                 return false;
             }
-            self.add(y, true);
             self.in_set[y] = true;
             self.pot[y] += w[y];
         }
+        self.exchanged = Some((leaving, grew));
         true
     }
 
@@ -933,17 +1342,22 @@ impl Meet {
     /// (The distances are the largest potentials meeting the arcs, so if any split satisfies (1)-(3) these do.)
     fn finish(&mut self, forced_weight: i64, forced: &[u32], loops: &[u32]) -> Option<Bound> {
         let w = self.pair.weight.clone();
-        let cw = self.cw;
-        let sources: Vec<(u32, i64)> = self
-            .cands
-            .iter()
-            .filter(|&&e| self.in_set[e as usize] || self.indep[0][e as usize])
-            .map(|&e| (e, if self.in_set[e as usize] { w[e as usize] } else { -w[e as usize] }))
-            .collect();
-        let Search { pi_s, overrun, .. } = self.dijkstra(&sources, None, false, false, true);
-        if overrun {
-            return None;
-        }
+        let pi_s = match self.split_ready.take() {
+            Some(pi_s) => pi_s,
+            None => {
+                let sources: Vec<(u32, i64)> = self
+                    .cands
+                    .iter()
+                    .filter(|&&e| self.in_set[e as usize] || self.indep[0][e as usize])
+                    .map(|&e| (e, if self.in_set[e as usize] { w[e as usize] } else { -w[e as usize] }))
+                    .collect();
+                let Search { pi_s, overrun, .. } = self.dijkstra(&sources, None, false, false, true);
+                if overrun {
+                    return None;
+                }
+                pi_s
+            }
+        };
         let len = self.pair.len();
         // w1 = σ on the set, σ + w off it, σ the true distance; w2 = w − w1.
         let mut w1 = vec![0i64; len];
@@ -970,7 +1384,8 @@ impl Meet {
                 if self.indep[q][e] {
                     ok &= wq <= 0;
                 } else {
-                    for x in ones(&self.circ[q][e * cw..(e + 1) * cw]) {
+                    for &x in &self.circ[q][e] {
+                        let x = x as usize;
                         let wx = if q == 0 { w1[x] } else { w2(x, &w1) };
                         ok &= wq <= wx;
                         best_q[x] = best_q[x].max(wq);
@@ -994,7 +1409,7 @@ impl Meet {
         let mut set: Vec<u32> = forced.iter().chain(&members).copied().collect();
         set.sort_unstable();
         let split = self.cands.iter().map(|&e| (e, w1[e as usize])).collect();
-        Some(Bound { value, set, loops: loops.to_vec(), without, warm: Warm { members, w1: split } })
+        Some(Bound { value, set, loops: loops.to_vec(), without, warm: Warm { members, w1: split, id: 0 } })
     }
 }
 
@@ -1222,6 +1637,144 @@ mod tests {
              reasons {:?}",
             reasons
         );
+    }
+
+    /// The bound in full, but for the certificate's id.
+    fn whole(outcome: &Outcome) -> String {
+        match outcome {
+            Outcome::Bound(b) => {
+                format!("{} {:?} {:?} {:?} {:?} {:?}", b.value, b.set, b.loops, b.without, b.warm.members, b.warm.w1)
+            }
+            other => format!("{other:?}"),
+        }
+    }
+
+    /// A random pair of families of `len` sparse vectors (each element with 1 to 3 coordinates in each class, or
+    /// one of its own one time in eight), weighing 1 to `heaviest`.
+    fn random_pair(rng: &mut Rng, len: usize, dims: [usize; 2], heaviest: u64) -> Pair {
+        let mut coords = [vec![Vec::new(); len], vec![Vec::new(); len]];
+        for q in 0..2 {
+            for e in 0..len {
+                if rng.below(8) == 0 {
+                    continue;
+                }
+                let k = 1 + rng.below(3);
+                let mut c: Vec<u32> = (0..k).map(|_| rng.below(dims[q] as u64) as u32).collect();
+                c.sort_unstable();
+                c.dedup();
+                coords[q][e] = c;
+            }
+        }
+        let weight = (0..len).map(|_| 1 + rng.below(heaviest) as i64).collect();
+        Pair { dims, coords, weight }
+    }
+
+    /// Roles for a child of a node with `roles` and bound `b`, as a search makes them: members of the set forced or
+    /// barred, and now and then an element outside it forced or barred.
+    fn child_roles(rng: &mut Rng, roles: &[Role], b: &Bound) -> Vec<Role> {
+        let mut child = roles.to_vec();
+        for &x in &b.warm.members {
+            match rng.below(5) {
+                0 => child[x as usize] = Role::Pick,
+                1 => child[x as usize] = Role::Barred,
+                _ => {}
+            }
+        }
+        for e in 0..child.len() {
+            if child[e] == Role::Free && !b.set.contains(&(e as u32)) {
+                match rng.below(16) {
+                    0 => child[e] = Role::Pick,
+                    1 | 2 => child[e] = Role::Barred,
+                    _ => {}
+                }
+            }
+        }
+        child
+    }
+
+    /// The tracking bits follow the candidates in the order they first appear, over more words as more come: on
+    /// families of 100 to 200 elements, solves on a workspace that has seen other roles, with fewer candidates, and
+    /// solves derived from a state it put back give the bounds of a fresh workspace's.
+    #[test]
+    fn bounds_do_not_depend_on_what_the_workspace_saw_before() {
+        let mut rng = Rng(0xBB67_AE85_84CA_A73B);
+        let mut words = 0;
+        for _ in 0..30 {
+            let len = 100 + rng.below(100) as usize;
+            let dims = [20 + rng.below(30) as usize, 20 + rng.below(30) as usize];
+            let pair = random_pair(&mut rng, len, dims, 1000);
+            let mut meet = Meet::new(pair.clone());
+            for barred in [9, 6, 3, 0] {
+                let roles: Vec<Role> =
+                    (0..len).map(|_| if rng.below(10) < barred { Role::Barred } else { Role::Free }).collect();
+                let got = meet.solve(&roles);
+                assert_eq!(whole(&got), whole(&Meet::new(pair.clone()).solve(&roles)), "roles {roles:?}");
+                let Outcome::Bound(parent) = got else { continue };
+                let saved = meet.save(&parent.warm).expect("the workspace holds the state of its last solve");
+                for _ in 0..3 {
+                    let child = child_roles(&mut rng, &roles, &parent);
+                    meet.restore(&saved);
+                    let got = meet.solve_from(&child, Some(&parent.warm));
+                    let want = Meet::new(pair.clone()).solve_from(&child, Some(&parent.warm));
+                    assert_eq!(whole(&got), whole(&want), "child {child:?} of {roles:?}");
+                }
+            }
+            words = words.max(meet.rref[0].words);
+        }
+        assert!(words >= 3, "the bits took {words} words at most");
+    }
+
+    /// A solve that derives its start from the state its parent's solve left (put back by `restore` where a sibling's
+    /// solve came between) gives the bound of a solve that builds its start: the same value, set, loops, bounds
+    /// without each member and split.  On the children of random parents (members forced or barred, other elements
+    /// barred, now and then a non-member forced, which is built instead), and on a grandchild derived from each
+    /// child; each value against enumeration too.
+    #[test]
+    fn derived_starts_give_the_bounds_of_built_ones() {
+        let mut rng = Rng(0x6A09_E667_F3BC_C908);
+        let (mut derived, mut solves) = (0u64, 0u64);
+        for round in 0..1000 {
+            let len = 3 + rng.below(10) as usize;
+            let dims = [1 + rng.below(7) as usize, 1 + rng.below(7) as usize];
+            let pair = random_pair(&mut rng, len, dims, if round % 3 == 0 { 4 } else { 100 });
+            let mut meet = Meet::new(pair.clone());
+            let mut built = Meet::new(pair.clone());
+            let roles: Vec<Role> = (0..len)
+                .map(|_| match rng.below(8) {
+                    0 => Role::Barred,
+                    1 => Role::Pick,
+                    _ => Role::Free,
+                })
+                .collect();
+            let Outcome::Bound(parent) = meet.solve(&roles) else { continue };
+            let saved = meet.save(&parent.warm).expect("the workspace holds the state of its last solve");
+            for _ in 0..4 {
+                let child = child_roles(&mut rng, &roles, &parent);
+                meet.restore(&saved);
+                let before = meet.stats.derived;
+                let got = meet.solve_from(&child, Some(&parent.warm));
+                derived += meet.stats.derived - before;
+                solves += 1;
+                let want = built.solve_from(&child, Some(&parent.warm));
+                assert_eq!(whole(&got), whole(&want), "child {child:?} of {roles:?}, pair {:?}", pair.coords);
+                let value = match &got {
+                    Outcome::Bound(b) => Some(b.value),
+                    _ => None,
+                };
+                assert_eq!(value, brute(&pair, &child), "child {child:?} of {roles:?}");
+                let Outcome::Bound(b) = got else { continue };
+                // A grandchild, from the child's state, which the workspace still holds.
+                let grandchild = child_roles(&mut rng, &child, &b);
+                let before = meet.stats.derived;
+                let got = meet.solve_from(&grandchild, Some(&b.warm));
+                derived += meet.stats.derived - before;
+                solves += 1;
+                let want = built.solve_from(&grandchild, Some(&b.warm));
+                assert_eq!(whole(&got), whole(&want), "grandchild {grandchild:?} of {child:?}");
+            }
+        }
+        assert!(derived * 2 > solves, "{derived} of {solves} solves derived");
+        eprintln!("derived {derived} of {solves} solves");
     }
 
     /// The parity bound (W1, docs/theory/parity-bound.md) on small boards: every playable set of 2..=n is independent
