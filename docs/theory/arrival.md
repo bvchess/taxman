@@ -6,11 +6,12 @@ Game n has the numbers of game n − 1 and one more, n, and much of the frame mo
 unchanged.  In plain words, [the arrival lemma (J1)](#the-arrival-lemma) says: *if n joins only closed frames, and they
 stay closed, then opt(n) can quickly be derived from opt(n − 1).*  The root problem does not change, so opt(n) = opt(n −
 1) + ΣU\*(n) − ΣU\*(n − 1), with no search.  [Its corollary (J2)](#the-layer-2-corollary) says that a number with two
-prime factors that joins only closed frames leaves them closed, with no conjecture.  Three measured laws describe what
-is seen: [the shadow law](#the-shadow-law), which move an exchange gives up, [the half law](#the-half-law), which even
-games keep the root problem of the game before, and [the cofactor rule](#the-cofactor-rule), which games pose it.  The
-facts about neighboring games that rest on the rules alone, the ceiling and the half lemma among them, are in
-[neighbors.md](neighbors.md).
+prime factors that joins only closed frames leaves them closed, with no conjecture.  [The semiprime formula
+(J3)](#the-semiprime-formula) proves the score of an odd number with two prime factors from that of the game before, on
+the whole board, with no statement U.  Three measured laws describe what is seen: [the shadow law](#the-shadow-law),
+which move an exchange gives up, [the half law](#the-half-law), which even games keep the root problem of the game
+before, and [the cofactor rule](#the-cofactor-rule), which games pose it.  The facts about neighboring games that rest
+on the rules alone, the ceiling and the half lemma among them, are in [neighbors.md](neighbors.md).
 
 *Words.*  [Frames, layers, moves, freedoms, closed frames, candidates, claims and the root problem
 Π_n](frame-model.md#the-frame-model) are frame-model.md's, and [descending greedy and U\*](sources.md#descending-greedy)
@@ -156,9 +157,93 @@ When the lemma applies, [the repeat lemma (R6)](search-rules.md#the-repeat-lemma
 [statement U](exactness.md#statement-u) at n and at n − 1, opt(n) − opt(n − 1) = ΣU\*(n) − ΣU\*(n − 1), which is n − x
 for odd n, given (♦) or by J2, and n for even n.  For even n, U at n − 1 alone suffices: the optimal game that a
 heaviest promotion set makes plays U\*(n − 1) ∪ L, which leaves n/2 out, and [the half lemma
-(N7)](neighbors.md#the-half-lemma) applies.  Whether x is always the shadow of n is [the shadow law](#the-shadow-law),
-measured.  Nothing that proves a score rests on these results: the solver finds a repeated root problem by comparing
-the problems themselves.
+(N7)](neighbors.md#the-half-lemma) applies.  For odd n with two prime factors, [the semiprime formula
+(J3)](#the-semiprime-formula) proves the difference n − x with no U at all.  Whether x is always the shadow of n is [the
+shadow law](#the-shadow-law), measured.  Nothing that proves a score rests on the arrival lemma and J2: the solver finds
+a repeated root problem by comparing the problems themselves.
+
+## The semiprime formula
+
+At an odd number with two prime factors the best score rises by an exact amount, as it does at a prime: n takes the
+place of one source of layer 2, and the rest of every optimal set stays.  The formula holds on the whole board, with no
+statement U and no conjecture, since [the bottom-layers theorem (F4)](frame-model.md#the-bottom-layers-theorem) fixes
+layer 2 of every optimal set, and the exchange touches no other layer.  So once opt(n − 1) is proven, such a game needs
+no search.
+
+*Words.*  G_n is the graph of F4: its vertices are the primes up to n/2 and one more vertex g, and its edges the
+numbers of layer 2 up to n, pq the edge p–q and p² the edge p–g.  U\*_2(n) is the part of U\*(n) in layer 2, a forest
+in G_n, and S_k the part of a set S in layer k.
+
+**Theorem J3 (the semiprime formula).**  Let n be odd with two prime factors, counted with multiplicity, and suppose
+that n closes a cycle with U\*_2(n − 1) in G_n.  Let x be the smallest member of that cycle other than n.  Then:
+
+1. U\*_2(n) = U\*_2(n − 1) − x + n;
+2. opt(n) = opt(n − 1) + n − x;
+3. S ↦ (S ∖ {n}) ∪ {x} maps the optimal sets of game n one to one onto those of game n − 1, and T ↦ (T ∖ {x}) ∪ {n}
+   is its inverse.
+
+The hypothesis holds for every odd n ≥ 189 with two prime factors.
+
+*Proof.*  F4 makes U\*_2 the sources of layer 2 of every optimal set, part 1 says that U\*_2 changes by the exchange
+of x for n, and no layer but layer 2 can tell the two boards apart.
+
+1. *The two boards.*  Since n is odd, ⌊(n − 1)/2⌋ = ⌊n/2⌋: games n − 1 and n have the same numbers up to n/2, and
+   G_{n−1} and G_n have the same vertices, G_n with the one more edge n.  The sources of layer 2 of game n are those of
+   game n − 1 and n.  The number x is a source of game n − 1, so x > n/2, like n.  And q(n − 1) = q(n) > n/2, since n
+   is composite.
+2. *Part 1.*  Write B = U\*_2(n − 1), and call the cycle less n *the path of n*: the path of B that joins the ends
+   of n, whose smallest member is x.  In layer 2, descending greedy keeps a source y exactly when y closes no cycle
+   with the sources of layer 2 above y (F4, step 3), and in game n − 1 the members of B above y, B_{>y}, join the same
+   pairs of vertices as all those sources do ([part (b) of the greedy
+   algorithm](primer/greedy.md#the-greedy-algorithm)).  Above each y < n, game n has the sources of layer 2 of game
+   n − 1, and n.  So game n keeps n, the largest; it rejects every source that game n − 1 rejects; and it rejects a
+   member y of B exactly when y closes a cycle with B_{>y} + n.  The ends of y lie in two different trees of B_{>y},
+   since B is a forest, so that happens exactly when the ends of n lie one in each: when the ends of n are joined in
+   B_{>y} + y by a path through y.  Such a path lies in B, so it can only be the path of n.  So game n rejects y exactly
+   when the path of n lies in B_{>y} + y and holds y: when y is its smallest member, x.
+3. *The exchange.*  Let S be a set of game n with q(n) its only prime, n ∈ S and x ∉ S, and S′ = (S ∖ {n}) ∪ {x}, a
+   set of game n − 1, such that S_2 and S′_2 are forests in G_n.  At every layer k ≠ 2, S and S′ have the same [layer
+   instance (F3)](frame-model.md#the-layer-theorem): n and x lie in layer 2, so S_k = S′_k, and the pool, the numbers
+   of layer k − 1 up to n/2 outside the set, is the same on both boards (step 1), where the two sets agree.  At layer 2
+   both pools hold every prime up to n/2, since q(n) > n/2, and a set of layer 2 that is a forest in G_n is playable
+   against them ([the two-factor proposition (P11)](playability.md#the-two-factor-proposition), as in step 2 of F4's
+   proof).  So by F3, S is playable in game n exactly when S′ is playable in game n − 1.
+4. *opt(n) ≤ opt(n − 1) + n − x.*  Let S be an optimal set of game n.  By F4, q(n) is its only prime, its sources of
+   layer 2 are U\*_2(n), which holds n and not x by part 1, and S_2 is a forest in G_n.  In S_2 the ends of x are
+   joined by the path of n less x, with n: a path of U\*_2(n), and so the only one in the forest S_2.  So S_2 less n
+   leaves them apart, and S′_2 = S_2 − n + x is a forest too.  By step 3, S′ is playable in game n − 1, so
+   opt(n − 1) ≥ ΣS′ = opt(n) − n + x.
+5. *opt(n) ≥ opt(n − 1) + n − x.*  Let T be an optimal set of game n − 1.  By F4, q(n) is its only prime, its sources
+   of layer 2 are B, which holds x, and T_2 is a forest in G_{n−1}.  In T_2 the ends of n are joined by the path of n,
+   the only path between them, which passes through x.  So T_2 − x + n is a forest in G_n, and step 3, with S′ = T,
+   makes (T ∖ {x}) ∪ {n} playable in game n.  So opt(n) ≥ ΣT − x + n.
+6. *Parts 2 and 3.*  Steps 4 and 5 give part 2.  So the set S′ of step 4 is worth opt(n − 1), an optimal set of game
+   n − 1, and the set that step 5 makes is worth opt(n), an optimal set of game n.  Every optimal set of game n holds n
+   and not x, and every optimal set of game n − 1 holds x and not n, so the two maps undo each other.
+7. *The hypothesis from 189 on.*  For odd n ≥ 189, the frames of layer 2 of game n − 1 are closed ([the square theorem
+   (F10)](frame-model.md#the-square-theorem)), so B is a spanning tree of G_{n−1} (F4, step 7).  The ends of n are
+   vertices of it (step 1), so n closes a cycle with B.  ∎
+
+Game 39 = 3·13 is the example of J2 above.  U\*_2(38) is {21, 22, 25, 26, 33, 34, 35, 38}, and 39, the edge 3–13,
+closes the cycle 3–11–2–13 with 33, 22 and 26, so x = 22.  So opt(39) = opt(38) + 39 − 22 = 486 + 17 = 503, and the
+optimal set of game 38, {18, 20, 21, 22, 24, 25, 26, 27, 28, 30, 32, 33, 34, 35, 36, 37, 38}, with 22 exchanged for
+39, is the optimal set of game 39; both are unique.  [The repeat lemma (R6)](search-rules.md#the-repeat-lemma) gives
+the same bound only given U at 39.  The theorem reaches games that are no repeat too.  In game 50 the frame of layer 2
+that holds 3 and 17 has a freedom, and game 51 = 3·17 poses another root problem than game 50, but 51 closes the cycle
+3–13–2–17 with 39, 26 and 34, so x = 26 and opt(51) = opt(50) + 25 = 833; the optimal set of game 51 is that of game
+50 with 26 exchanged for 51, and both are unique.
+
+The hypothesis is needed: without a cycle there is no x, and the score can rise by n or by less.  Game 21 = 3·7 closes
+no cycle with U\*_2(20) = {14, 15} and falls one short of its ceiling, opt(21) = 144 = opt(20) + 20, while game 33 =
+3·11 closes none with U\*_2(32) = {21, 22, 25, 26} and reaches it.  Nor does 187 = 11·17, which joins the two frames of
+layer 2 of game 186 ([the cofactor rule](#the-cofactor-rule)); from 189 on, every odd number with two prime factors
+closes a cycle (step 7).  The theorem asks for odd n because at an even n = 2p the prime p is a vertex of G_n but not
+of G_{n−1}, and n is its only edge, so n closes no cycle; such a game is at its ceiling by the half lemma, since an
+optimal game of n − 1 plays no prime but q(n − 1) > p ([the prime lemma (N1)](neighbors.md#the-prime-lemma)).
+
+The scores of the examples are those of `results/optimal.jsonl.gz`, which the prover proves on the whole board, and the
+optimal sets of 38, 39, 50 and 51 are those that the exhaustive search of `heuristics/evaluation/certify.py` lists, in
+under two minutes each.
 
 ## The shadow law
 
@@ -245,7 +330,8 @@ Game 3002, of cofactor 38 = 2·19, has the root problem of game 3000, since 3001
 its ceiling.  With the cofactor 1, n is prime and [the prime formula (N5)](neighbors.md#the-prime-formula) gives opt(n).
 So a game whose layer 2 has no freedom, and whose cofactor is 1, a prime, twice a prime or 9, needs no search of its
 own: [the repeat lemma (R6)](search-rules.md#the-repeat-lemma) carries over the score of the game whose root problem it
-shares, given U, and at the ceiling the step theorem gives its optimal sets.
+shares, given U, and at the ceiling the step theorem gives its optimal sets.  Where the cofactor is an odd prime, [the
+semiprime formula (J3)](#the-semiprime-formula) gives the score with no U.
 
 The hypothesis is needed.  Every game from 28 on that breaks the rule has a freedom in layer 2, in game n or in game m:
 25 games, the last 187, whose root problem is not that of 186.  A freedom does not force a break, since 19 games with

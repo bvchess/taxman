@@ -32,7 +32,7 @@ places.
 | [extended-problem.md](theory/extended-problem.md) | E | the extended problem, and the certificates of statement U that search it |
 | [frame-bounds.md](theory/frame-bounds.md) | B | the bounds on the promotions: the frame bound and the decomposition bound |
 | [search-rules.md](theory/search-rules.md) | R | what a search of the frame model proves, every rule it may cut by, and the bounds carried between games |
-| [arrival.md](theory/arrival.md) | J | the frame model from game n − 1 to game n: the arrival lemma, the shadow law, the cofactor rule |
+| [arrival.md](theory/arrival.md) | J | from game n − 1 to game n: the arrival lemma, the semiprime formula, the shadow law, the cofactor rule |
 | [evidence.md](theory/evidence.md) | | the computations behind the statements that are not proved |
 | [writing.md](theory/writing.md) | | how the theory is written, for those who write it |
 
@@ -47,7 +47,7 @@ U\*, and its exactness needs neither (★) nor (♦).
   U, X8](theory/exactness.md#statement-u)); the parity and barred bounds (W1 to W3); the extended problem and its
   certificates (E1 to E6); the bounds on the promotions (B1 to B5, and B6 but its last part); the rules of a search (R1
   to R5, [the near-repeat lemma R7](theory/search-rules.md#the-near-repeat-lemma), and the first part of [the repeat
-  lemma R6](theory/search-rules.md#the-repeat-lemma)); J1 and J2; the relaxation and length propositions (Q2, Q4) and
+  lemma R6](theory/search-rules.md#the-repeat-lemma)); J1 to J3; the relaxation and length propositions (Q2, Q4) and
   the first two parts of [the length lemma (Q3)](theory/uniqueness-and-longest-games.md#the-length-lemma); the
   equivalence in [the cardinality conjecture (S4)](theory/sources.md#the-cardinality-conjecture); and the explanatory
   [victim law](theory/sources.md#the-victim-law), [frontier theorem](theory/sources.md#the-frontier-theorem), [span
