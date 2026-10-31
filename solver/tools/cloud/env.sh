@@ -113,9 +113,11 @@ env_report() {
     fi
     echo "RUSTFLAGS:  ${RUSTFLAGS:-}"
     if command -v git >/dev/null 2>&1 && git -C "$TAXMAN_ROOT" rev-parse HEAD >/dev/null 2>&1; then
-        local dirty=""
-        [ -n "$(git -C "$TAXMAN_ROOT" status --porcelain -- solver/frame/src solver/frame/Cargo.toml solver/frame/Cargo.lock solver/frame/build.rs 2>/dev/null)" ] &&
-            dirty=" (sources modified)"
+        local dirty="" built=(
+            solver/frame/src solver/frame/Cargo.toml solver/frame/Cargo.lock solver/frame/build.rs
+            solver/noframe/src solver/noframe/Cargo.toml solver/noframe/Cargo.lock solver/gzip/src
+        )
+        [ -n "$(git -C "$TAXMAN_ROOT" status --porcelain -- "${built[@]}" 2>/dev/null)" ] && dirty=" (sources modified)"
         echo "commit:     $(git -C "$TAXMAN_ROOT" rev-parse HEAD)$dirty"
     else
         echo "commit:     unknown (not a git checkout)"

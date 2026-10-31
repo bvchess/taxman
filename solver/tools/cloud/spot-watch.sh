@@ -6,11 +6,10 @@
 # It polls the instance metadata service (IMDSv2) every 5 seconds.  When the notice appears it sends SIGTERM to the
 # chain.sh, prover.sh or certify.sh whose pid is in $TAXMAN_WORK/chain.pid, prover.pid or certify_PHASE.pid (the
 # solver writes a final checkpoint and chain.sh ends; so does each `taxman certify` of certify.sh, which ends;
-# prover.sh ends, and the searches of its pass go back to their last checkpoints), waits up to 90 seconds for it,
+# `exact` of prover.sh pauses every search into its checkpoint and prover.sh ends), waits up to 90 seconds for it,
 # then runs save.sh (which copies to S3 if S3_DEST is set).  It also logs a rebalance recommendation, which comes
 # earlier and is only a hint.  Without this script a spot interruption costs at most one checkpoint interval (300 s) of
-# the chain's or the certificates' work, or one pass (PASS_SECONDS) of prover.sh's; with it, nothing for the chain and
-# the certificates.
+# the chain's or the certificates' work, or one pass (PASS_SECONDS) of prover.sh's; with it, nothing.
 #
 # Its messages go to the terminal and to $LOGS/spot-watch.log, so the notice and the save leave a trace after the window
 # is gone (the output of save.sh goes to $LOGS/save.log, as when run.sh runs it).

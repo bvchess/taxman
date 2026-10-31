@@ -31,12 +31,12 @@ their own to start.
   threads takes more or fewer, since each thread keeps nogoods of its own, and how many depends on the timing.  [The
   prover's proofs](../../noframe/docs/proofs.md#a-game-on-several-threads) has the speedup measured.
 * **Passes.**  A search still running when a pass ends (`--seconds`) pauses: it saves the open subtrees of all its
-  threads, and its learned conflicts, to its checkpoint, and the next pass resumes it on any number of threads.  `exact`
-  writes checkpoints only then, and it has no signal handler, so a kill or a SIGTERM sends the searches of the pass in
-  progress back to their last checkpoints.  `prover.sh` therefore runs `exact` in passes of `PASS_SECONDS` until every
-  game has a line.  The end of a pass costs a little: every open subtree restarts cold in the next pass, and every game
-  in flight is set up again.  So the default, 3600 s, suits a machine that nothing interrupts, and 300 s suits spot,
-  where an interruption costs at most one pass of every thread.
+  threads, and its learned conflicts, to its checkpoint, and the next pass resumes it on any number of threads.  A
+  SIGTERM or SIGINT pauses every search the same way, so a stop loses nothing; only a kill -9, a crash or a lost machine
+  sends the searches of the pass in progress back to their last checkpoints.  `prover.sh` runs `exact` in passes of
+  `PASS_SECONDS` until every game has a line.  The end of a pass costs a little: every open subtree restarts cold in the
+  next pass, and every game in flight is set up again.  So the default, 3600 s, suits a machine that nothing
+  interrupts, and 300 s suits spot, where an instance lost without a stop costs at most one pass of every thread.
 * **The dearest games first.**  The games go in the order of the nodes that the solver's search of each took in the
   committed chain (`summarize.py order`), so that the long games start at once.  The order is made once and kept in
   `$TAXMAN_WORK/prover-order_A_B.txt`.  A game that repeats the search of a game settled at its ceiling records no
@@ -145,8 +145,9 @@ cat solver/noframe/data/exact_parity_2_1300.jsonl solver/noframe/data/exact_pari
 
 `prover.sh` reads `BASELINE` only in that check, so a run without it ends in a failed check after the whole run; with
 `S3_DEST` the results are saved, and `--verify` with the file runs the check again.  The joined file is also the first
-file of `summarize.py exact` ([Bring the data home, verify, commit](#bring-the-data-home-verify-commit)).  `prover.sh
---list`, a measurement on chosen games, is in the script's header.
+file of `summarize.py exact` ([Bring the data home, verify, commit](#bring-the-data-home-verify-commit)).  A range from
+2 needs no `BASELINE`, and `prover.sh` refuses one: its check reads the output alone ([On a machine of your
+own](#on-a-machine-of-your-own)).  `prover.sh --list`, a measurement on chosen games, is in the script's header.
 
 The guardrails are those of [launch.md](launch.md#cost-guardrails), with these differences:
 
@@ -155,56 +156,90 @@ The guardrails are those of [launch.md](launch.md#cost-guardrails), with these d
   yourself ([Bring the data home, verify, commit](#bring-the-data-home-verify-commit)) before the timer ends.
 * **`POWEROFF=always`** powers the machine off whenever the script ends: the range complete and checked, the deadline,
   or an error.  `POWEROFF=done` powers it off only when the range is complete.
-* **`DEADLINE_HOURS`** stops the run after that many hours, and `prover.sh` exits with status 3.  The stop is a SIGTERM,
-  so the searches of the pass in progress go back to their last checkpoints ([How `exact` uses the
-  CPUs](#how-exact-uses-the-cpus)).
+* **`DEADLINE_HOURS`** stops the run after that many hours, and `prover.sh` exits with status 3.  The stop is a
+  SIGTERM, which pauses every search into its checkpoint ([Watch, stop, resume](#watch-stop-resume)).
 * **`SAVE_EVERY`** defaults to `PASS_SECONDS` (300 s in the command above).  A save takes about 80 s at the lowest
   priority ([Surviving a spot interruption](launch.md#surviving-a-spot-interruption)).
 * **`THREADS`** defaults to every vCPU.
 
 ## On a machine of your own
 
-On a machine that nothing interrupts, `prover.sh` runs as on EC2 without the parts for the cloud: no `S3_DEST`, no
-`POWEROFF` and no `spot-watch.sh`, in passes of the default 3600 s, on every CPU.  Prove a range already proven first,
-as a calibration: the cost of a node and the wall time on this machine then compare with the committed proofs, and the
-check at its end tests the build and the scripts on a whole range.
+**Make the proofs of 2..B in one run, `prover.sh 2 B`.**  A range that starts at 2 is made by one build into one
+output file, and its check reads that file alone, so every proof comes from the build that ran.  A range from A > 2
+relies on the proofs of 2..A − 1 that `BASELINE` names ([Run](#run)), which earlier builds made.  On a machine that
+nothing interrupts, `prover.sh` runs as on EC2 without the parts for the cloud: no `S3_DEST`, no `POWEROFF` and no
+`spot-watch.sh`, in passes of the default 3600 s, on every CPU.  The steps for 2..2530 follow, with `W` the work
+directory (the results, the checkpoints and the logs), on a disk that survives a reboot.
 
-1. **Build** `exact` for this machine's CPU, in a clean checkout at the commit to run, where `prover.sh` takes it from
-   (`EXACT_BIN`):
+1. **Clone** the commit to run and **build** `exact` for this machine's CPU, where `prover.sh` takes it from
+   (`EXACT_BIN`).  The commands that follow run from the clone, which stays as it is until the run ends: a rebuild
+   between a stop and its resume mixes two builds.  On a machine shared with other work, put `nice -n 19` before
+   `cargo` and set `CARGO_BUILD_JOBS` below the number of CPUs.
 
    ```
+   git clone https://github.com/bvchess/taxman.git ~/taxman-prover && cd ~/taxman-prover
+   git checkout COMMIT                                  # the commit to run
    RUSTFLAGS="-C target-cpu=native" cargo build --release --bin exact --manifest-path solver/noframe/Cargo.toml
    ```
 
-2. **Rehearse** as [Run](#run), step 2, says, which takes a few minutes.
+2. **Rehearse** (minutes) on a range that needs searches, in a work directory of its own: a stop in the middle, the
+   resume, and the check.  It tests the build and the scripts on this machine.
 
-3. **The calibration**, 1301-2175, whose check needs no `BASELINE`.  `TAXMAN_WORK` holds the results, the checkpoints
-   and the logs, on a disk that survives a reboot (`W` below); `OUT` names a file other than the committed one of the
-   range.  The settings go in tmux's command, since a tmux server already running keeps its own environment:
+   ```
+   R=~/prover-rehearsal
+   TAXMAN_WORK=$R THREADS=3 PASS_SECONDS=30 solver/tools/cloud/prover.sh 2 1300 &
+   sleep 75; kill -TERM $(cat $R/prover.pid); wait $!; echo $?     # "ended: stopped", status 143
+   ls $R/ckpt                                                      # exact_N_low.ckpt, a paused search each
+   TAXMAN_WORK=$R THREADS=3 PASS_SECONDS=30 solver/tools/cloud/prover.sh 2 1300      # resumes, finishes, checks
+   OUT=$R/results/exact_parity_2_1300.jsonl solver/tools/cloud/prover.sh --verify 2 1301   # must FAIL
+   rm -rf $R
+   ```
+
+   The second `prover.sh` ends with `OK: opt(n) is proven equal to the recorded score for every n in 2..1300` and status
+   0, and the last command prints `without a line: 1301` and `FAILED`.
+
+3. **Run,** in tmux.  The settings go inside tmux's command, since a tmux server already running keeps its own
+   environment.  `chrt -i 0` gives the run the idle scheduling policy (Linux), which all its threads inherit, so that
+   it takes only the CPUs that nothing else wants, as a run beside other work should; leave it out on a machine that is
+   the run's alone.  `THREADS` defaults to every CPU.
 
    ```
    W=~/prover-work
-   tmux new-session -d -s pv \
-       "TAXMAN_WORK=$W OUT=$W/results/exact_threads_1301_2175.jsonl solver/tools/cloud/prover.sh 1301 2175"
+   tmux new-session -d -s pv "cd ~/taxman-prover && TAXMAN_WORK=$W chrt -i 0 solver/tools/cloud/prover.sh 2 2530"
    ```
 
-   It ends with `OK: opt(n) is proven equal to the recorded score for every n in 2..2175`.  Compare `summarize.py cost
-   --band 100` of its file with the table of [the prover's
-   proofs](../../noframe/docs/proofs.md#to-2175-on-a-cloud-machine), which searched from the plain root ([What it
-   costs](#what-it-costs)).
+   The output is `$W/results/exact_parity_2_2530.jsonl`, one line a game; the logs are in `$W/logs` and the checkpoints
+   in `$W/ckpt`.
 
-4. **A new range,** 2176-2530 for instance, with the `BASELINE` of [Run](#run) that covers 2..2175:
+4. **Watch.**
 
    ```
-   cat solver/noframe/data/exact_parity_2_1300.jsonl solver/noframe/data/exact_parity_1301_2175.jsonl \
-       > $W/baseline_2_2175.jsonl
-   tmux new-session -d -s pv \
-       "TAXMAN_WORK=$W BASELINE=$W/baseline_2_2175.jsonl solver/tools/cloud/prover.sh 2176 2530"
+   tail -f $W/logs/prover.log                       # a line a pass: games done, searches paused, the exit status
+   tail -n 20 $W/logs/prover.err                    # finished games and paused searches, with their nodes
+   grep -c . $W/results/exact_parity_2_2530.jsonl   # games done, of 2529
+   ls $W/ckpt                                       # a checkpoint per paused search
+   grep '^commit:' $W/logs/prover.log | sort | uniq -c    # one commit, never "(sources modified)": one build
    ```
 
-On a machine shared with other work, set `THREADS` below the number of CPUs and start the script under `nice -n 19`.
-Watch and stop the run with the commands for the instance in [Watch, stop, resume](#watch-stop-resume), with `$W` for
-`~/taxman-work`, and commit its file as [Bring the data home, verify, commit](#bring-the-data-home-verify-commit) says.
+5. **Stop and resume.**  A stop pauses every search into its checkpoint and keeps the line of every finished game, so
+   it loses nothing ([Watch, stop, resume](#watch-stop-resume)).  Resume with the step 3 command, with the same or
+   another `THREADS`.
+
+   ```
+   kill -TERM $(cat $W/prover.pid)                  # or Ctrl-C after `tmux attach -t pv`
+   while [ -e $W/prover.pid ]; do sleep 1; done     # the seconds that writing the checkpoints takes
+   tail -n 3 $W/logs/prover.log                     # "ended: stopped"
+   ```
+
+6. **Check.**  `prover.sh` runs the check when every game has its line, and exits with status 0 only if it passes.  To
+   run it again:
+
+   ```
+   TAXMAN_WORK=$W solver/tools/cloud/prover.sh --verify 2 2530     # OK: opt(n) is proven ... for every n in 2..2530
+   ```
+
+   Then commit the file as [Bring the data home, verify, commit](#bring-the-data-home-verify-commit) says: `cp
+   $W/results/exact_parity_2_2530.jsonl solver/noframe/data/`.
 
 ## Watch, stop, resume
 
@@ -228,8 +263,12 @@ ls -l ~/taxman-work/ckpt                         # a checkpoint per unfinished s
 ```
 
 * **Stop** with Ctrl-C in tmux, or `kill -TERM $(cat ~/taxman-work/prover.pid)`; through SSM, which runs as root, the
-  pid file is `/home/ec2-user/taxman-work/prover.pid`.  The searches of the pass in progress go back to their last
-  checkpoints.  **Resume** with the same command; `THREADS` and `S3_DEST` may differ.
+  pid file is `/home/ec2-user/taxman-work/prover.pid`.  `prover.sh` forwards the signal once to `exact`, which pauses
+  every search into its checkpoint (the open subtrees of all its threads, and its nogoods), keeps the line of every
+  finished game, and exits with status 130 (SIGINT) or 143 (SIGTERM); `prover.sh` then logs `ended: stopped` and exits
+  with 143.  Nothing is lost, and the stop takes the seconds that writing the checkpoints takes; the pid file is gone
+  once it has ended.  A second signal ends `exact` at once; a search not yet saved goes back to its checkpoint of an
+  earlier pass, or to its start.  **Resume** with the same command; `THREADS` and `S3_DEST` may differ.
 * **A spot interruption:** `spot-watch.sh` stops the run, which saves as it exits.  On a replacement machine run
   `PROVER_ONLY=1 solver/tools/cloud/setup.sh`, then `S3_DEST=... solver/tools/cloud/save.sh --restore`, then the same
   `prover.sh` command, minding the two cautions of [launch.md](launch.md#surviving-a-spot-interruption) (the logs and
@@ -256,14 +295,16 @@ OUT=solver/noframe/data/exact_parity_A_B.jsonl solver/tools/cloud/prover.sh --ve
 
 The check (`summarize.py check A B`, which `prover.sh` also ran at the end) passes only if two things hold:
 
-* every n in 2..B is proven: each n of A..B has a line, and with `BASELINE` each is proven by a bound, a search run to
-  the end, or the ceiling, the prime formula or the semiprime formula from a proven predecessor;
+* every n in 2..B is proven: each n of A..B has a line, and each is proven (with `BASELINE` for the n below A) by a
+  bound, a search run to the end, or the ceiling, the prime formula or the semiprime formula from a proven
+  predecessor;
 * every line's score is the score that `results/optimal.jsonl.gz` records.
 
 It then exits with status 0 and prints `OK: opt(n) is proven equal to the recorded score for every n in 2..B`;
 anything else prints which n failed.  Then, on your machine, count the proofs and their cost by bands of 100 in n:
 
 ```
+# BASELINE from A = 1302 on; for A = 2, the file alone
 python3 solver/noframe/tools/summarize.py exact BASELINE solver/noframe/data/exact_parity_A_B.jsonl
 python3 solver/noframe/tools/summarize.py cost --band 100 solver/noframe/data/exact_parity_A_B.jsonl
 ```

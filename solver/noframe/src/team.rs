@@ -20,8 +20,9 @@
 //! child the worker runs and the open children of the nodes above it), which a pause returns to the pool before the
 //! worker leaves.  A worker gives a child away by putting it in the pool, under the lock, and marking it taken in its
 //! node, which then never runs it.  The game ends, under the lock, only when no worker runs: proven if its pool is
-//! empty, and otherwise paused at the deadline (the pool, with the game's nogoods, saved in its one checkpoint, which
-//! a later run resumes on any number of threads) or stopped by a worker (a set beating the target, or the budget).
+//! empty, and otherwise paused at the deadline or at a stop signal ([`stop`]; the pool, with the game's nogoods, saved
+//! in its one checkpoint, which a later run resumes on any number of threads) or stopped by a worker (a set beating the
+//! target, or the budget).
 //!
 //! **Nogoods** are facts of the board (minimal unplayable sets), valid in every unit of a game whatever its roles.
 //! Every 256 nodes each worker adds those it learned to the game's table, which the checkpoint holds and the game's
@@ -39,6 +40,7 @@ use std::time::{Duration, Instant};
 
 use crate::game::{Board, Prover, Role, Team, Verdict};
 use crate::jsonl::Ledger;
+use crate::stop;
 
 /// A game's search, as its setup gives it.
 pub struct Search {
@@ -304,7 +306,8 @@ impl Drop for Alarm<'_> {
 /// Searches the games of `items` not yet recorded in `out` on `threads` threads, appending each game's line as it
 /// ends ([`Ledger`]); starts no game and no unit after `seconds`, when every search pauses.  `start(n)` sets game n up.
 /// With `share`, a thread joining a game starts from the game's nogoods, and takes those the game's other workers
-/// learned every `share`.
+/// learned every `share`.  A stop signal ([`stop::on_signals`]) ends the campaign as `seconds` does, at once: every
+/// search pauses into its checkpoint, every finished game has its line, and no game starts.
 pub fn campaign<F>(
     name: &str,
     items: &[u64],
@@ -335,6 +338,9 @@ pub fn campaign<F>(
                 .expect("spawn a worker");
         }
     });
+    if let Some(signum) = stop::requested() {
+        eprintln!("{name}: stopped by signal {signum}: every search in flight is paused in its checkpoint");
+    }
     ledger.close();
 }
 
@@ -343,7 +349,13 @@ impl Hub {
         self.state.lock().expect("the campaign's lock")
     }
 
-    /// Thread `me`: jobs until none is left or the deadline passes.
+    /// Whether the run is ending: the deadline has passed, or a stop signal has come.  No game or unit starts then, and
+    /// every search pauses.
+    fn ending(&self) -> bool {
+        Instant::now() >= self.deadline || stop::requested().is_some()
+    }
+
+    /// Thread `me`: jobs until none is left or the run ends.
     fn thread<F: Fn(u64) -> Plan>(&self, me: usize, todo: &[u64], start: &F, ledger: &Ledger) {
         let _alarm = Alarm(self);
         let mut asked = None;
@@ -375,7 +387,7 @@ impl Hub {
         let mut st = self.lock();
         loop {
             let now = Instant::now();
-            let job = if now >= self.deadline || self.failed.load(Ordering::Relaxed) {
+            let job = if self.ending() || self.failed.load(Ordering::Relaxed) {
                 Some(Job::Done)
             } else if st.next < todo.len() {
                 st.next += 1;
@@ -506,7 +518,7 @@ impl Hub {
         self.wake.notify_all();
         loop {
             let verdict = prover.run_units(vec![unit]);
-            if verdict == Verdict::Paused && warming.is_some() && Instant::now() < self.deadline {
+            if verdict == Verdict::Paused && warming.is_some() && !self.ending() {
                 warming = None;
                 let mut units = prover.take_units(self.deadline);
                 prover.enable_lagrangian(200);
@@ -518,7 +530,7 @@ impl Hub {
             let pool = st.pool(game);
             match verdict {
                 Verdict::Proven => {
-                    if !game.halted() && Instant::now() < self.deadline {
+                    if !game.halted() && !self.ending() {
                         if let Some(next) = pool.units.pop_back() {
                             unit = next;
                             continue;
@@ -547,9 +559,9 @@ impl Hub {
             pool.branching += branching;
             pool.barring += barring;
             pool.found.append(&mut prover.found);
-            // A worker leaves with units in the pool only at the deadline or when the search stops.
+            // A worker leaves with units in the pool only when the run ends or the search stops.
             debug_assert!(
-                pool.running > 0 || pool.units.is_empty() || game.halted() || Instant::now() >= self.deadline,
+                pool.running > 0 || pool.units.is_empty() || game.halted() || self.ending(),
                 "n={}: the last worker left open units",
                 game.n
             );
@@ -622,7 +634,7 @@ struct Link<'h> {
 
 impl Team for Link<'_> {
     fn halted(&self) -> bool {
-        self.game.halted() || self.hub.failed.load(Ordering::Relaxed)
+        self.game.halted() || self.hub.failed.load(Ordering::Relaxed) || stop::requested().is_some()
     }
 
     fn asked(&self) -> bool {

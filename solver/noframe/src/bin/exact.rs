@@ -44,10 +44,18 @@
 //! (`--lagrangian 0` turns that off, `--lagrangian 1` turns it on with the parity bound too), on one thread.  Only a
 //! search that will turn it on pauses for the warm-up; any other runs to its end or to `--seconds`, so that its tree
 //! does not depend on the clock (a pause restarts the open subtrees without their parents' bounds, and a solve from
-//! scratch can pick another of two heaviest sets that tie).  `--segments 1` turns on the segment cuts, which make a
-//! game's proof rest on the smaller games' bounds (recorded as `"segments":1`); they are off by default, so that each
-//! search stands alone.  A proof's `"matching_nodes"` are its nodes searched without the parity bound (a search resumed
-//! from a checkpoint of such a run); its `"nodes"` count all of them.
+//! scratch can pick another of two heaviest sets that tie).
+//!
+//! A SIGINT or SIGTERM stops the run as `--seconds` does (`src/stop.rs`): every search pauses into its checkpoint, all
+//! its threads' open subtrees and its nogoods, every finished game has its line, and `exact` exits with status 128 plus
+//! the signal's number (130 for SIGINT, 143 for SIGTERM), the status that `solver/tools/cloud/prover.sh` takes for a
+//! stop by a signal.  A second signal ends it at once, with the same status; the checkpoints and lines already written
+//! stay valid.
+//!
+//! `--segments 1` turns on the segment cuts, which make a game's proof rest on the smaller games' bounds (recorded as
+//! `"segments":1`); they are off by default, so that each search stands alone.  A proof's `"matching_nodes"` are its
+//! nodes searched without the parity bound (a search resumed from a checkpoint of such a run); its `"nodes"` count all
+//! of them.
 //!
 //! What the sources of layer 3 and up cost (study E6): `--fix-upper 1` (it needs `--fix-low 1`) also fixes the whole
 //! upper part to U\*, every source in it forced and every other barred, "D" below, which is the frame model's problem
@@ -67,6 +75,7 @@ use taxman_prover::game::{relation, Board, Prover, Role, Verdict};
 use taxman_prover::jsonl::{committed_chain, parse_items, recorded_games_to, Obj};
 use taxman_prover::parity::{Meet, Outcome, Parity};
 use taxman_prover::primes::smallest_prime_factors;
+use taxman_prover::stop;
 use taxman_prover::team::{campaign, Plan, Search, Tally};
 use taxman_prover::upper::{low_roles, obeys, recorded_ustar, upper_fixed_roles, watched};
 
@@ -116,6 +125,8 @@ impl Head {
 }
 
 fn main() {
+    // First, so that a signal during the start-up (the recorded games take seconds to read) is a clean stop too.
+    stop::on_signals().expect("install the handlers of SIGINT and SIGTERM");
     let (items, flags) = parse_items(std::env::args().skip(1));
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let (mut threads, mut seconds, mut share, mut budget) = (1usize, f64::INFINITY, None, u64::MAX);
@@ -275,4 +286,8 @@ fn main() {
         });
         Plan::Search(search, finish)
     });
+    // Every search is paused in its checkpoint and every finished game has its line.
+    if let Some(status) = stop::status() {
+        std::process::exit(status);
+    }
 }

@@ -3,6 +3,9 @@
 #
 #   solver/tools/cloud/prover.sh A B             prove opt(n) = V(n) for n = A..B  (V: results/optimal.jsonl.gz)
 #   solver/tools/cloud/prover.sh --verify A B    check the output: every n in 2..B proven, every score the recorded one
+#
+# A = 2 is the way to make a set of proofs by one build: one run, one output file, and a check of that file alone.  A
+# range from A > 2 builds on the proofs of 2..A-1 that BASELINE names (below).
 #   OUT=FILE solver/tools/cloud/prover.sh --list N1,N2,...   a measurement on exactly those games (list mode, below)
 #
 # It runs `exact` of the prover (solver/noframe/docs/proofs.md), which knows nothing of the solver's frame
@@ -15,13 +18,15 @@
 # of F4 (`exact`'s default; EXTRA_ARGS='--fix-low 0' for the plain root).
 #
 # Safe to run again at any time, after a crash, a reboot, a spot interruption or a SIGTERM: finished games are in the
-# output file (one line each, appended and synced), unfinished ones in their checkpoints.  `exact` has no stop handler,
-# so a stop or a kill loses the work of the pass in progress (at most PASS_SECONDS of each thread) and nothing else.
-# THREADS may differ between runs.  A second prover.sh is refused.
+# output file (one line each, appended and synced), unfinished ones in their checkpoints.  A SIGTERM or SIGINT to this
+# script (or Ctrl-C) is forwarded once to `exact`, which pauses every search into its checkpoint as the end of a pass
+# does, and loses nothing; a second signal to `exact` ends it at once.  A kill -9, a crash, a power loss or a spot
+# reclaim loses the work of the pass in progress (at most PASS_SECONDS of each thread) and nothing else.  THREADS may
+# differ between runs.  A second prover.sh is refused.
 #
 # What it does with `exact`'s exit status:
 #   0        a pass ended (the pause, or all games done): go on, or finish when every game of the range has its line
-#   130/143  stopped by SIGINT/SIGTERM: the script ends
+#   130/143  `exact` stopped by SIGINT/SIGTERM (128 + the signal), after pausing every search: the script ends
 #   124      the deadline (DEADLINE_HOURS) stopped it: the script ends
 #   1, 2, 101, 134
 #            the prover reported an error: a recorded game that does not replay, or (the finding to look for) a playable
@@ -44,8 +49,8 @@
 #                   open subtree cold, and a stop or a kill loses the pass in progress.  300 on spot.
 #   OUT             the output file (required in list mode)
 #   STRICT          the recorded optima, default results/optimal.jsonl.gz (committed)
-#   BASELINE        the proofs of the smaller games the check builds on (default: the prover's
-#                   data/exact_parity_2_1300.jsonl)
+#   BASELINE        for A > 2: the proofs of the smaller games the check builds on (default: the prover's
+#                   data/exact_parity_2_1300.jsonl).  A = 2 needs none, and is refused with one
 #   EXTRA_ARGS      more flags for `exact`
 #   MAX_FAILS       default 5
 #   DEADLINE_HOURS, POWEROFF, S3_DEST, SAVE_EVERY: as in run.sh (SAVE_EVERY defaults to PASS_SECONDS here)
@@ -58,7 +63,6 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$here/env.sh"
 
 STRICT="${STRICT:-$TAXMAN_ROOT/results/optimal.jsonl.gz}"
-BASELINE="${BASELINE:-$PROVER/data/exact_parity_2_1300.jsonl}"
 SUMMARIZE=("python3" "$PROVER/tools/summarize.py")
 
 usage() {
@@ -92,15 +96,26 @@ else
     to="$2"
     case "$from$to" in *[!0-9]*) usage ;; esac
     [ "$from" -ge 2 ] && [ "$to" -ge "$from" ] || usage
+    # A range from 2 stands alone: the check reads the output file only, so that every proof is of one build.
+    if [ "$from" -eq 2 ]; then
+        [ -z "${BASELINE:-}" ] || die "a range from 2 needs no BASELINE (its check reads the output alone): unset it"
+    else
+        BASELINE="${BASELINE:-$PROVER/data/exact_parity_2_1300.jsonl}"
+    fi
     total=$((to - from + 1))
     OUT="${OUT:-$TAXMAN_WORK/results/exact_parity_${from}_${to}.jsonl}"
     label="$from-$to"
     all_of="games of $from-$to"
 fi
 
-# The check: a line for every n in A..B, each with the recorded score, every n in 2..B proven.
+# The check: a line for every n in A..B, each with the recorded score, every n in 2..B proven (for A > 2, from the proofs
+# of the smaller games in BASELINE).
 verify() {
-    "${SUMMARIZE[@]}" check "$from" "$to" "$BASELINE" "$OUT"
+    if [ "$from" -eq 2 ]; then
+        "${SUMMARIZE[@]}" check "$from" "$to" "$OUT"
+    else
+        "${SUMMARIZE[@]}" check "$from" "$to" "$BASELINE" "$OUT"
+    fi
 }
 if [ "$verify_only" = 1 ]; then
     [ -r "$OUT" ] || die "$OUT is not readable (OUT=... names the output file)"
@@ -182,7 +197,7 @@ while :; do
             break
             ;;
         130 | 143)
-            log "stopped by a signal (the searches of this pass go back to their last checkpoints)"
+            log "stopped by a signal (every search of this pass is paused in its checkpoint)"
             outcome="stopped"
             break
             ;;

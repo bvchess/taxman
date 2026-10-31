@@ -2,12 +2,19 @@
 //! (docs/theory/frame-model.md) (`fix_low`, on by default), and the roles change what is searched from, not what is
 //! proven or which games are searched.  Boards 187..=300 (their frames of layer 2 are closed, and the games that need a
 //! search take a second).  And its relations: a game that meets the semiprime formula (J3, docs/theory/arrival.md) is
-//! named and not searched.
+//! named and not searched.  And its stop: a SIGTERM pauses every search into its checkpoint, and a rerun finishes them.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
-use std::process::Command;
-use taxman_prover::jsonl::{field_str, field_u64};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
+use taxman_prover::jsonl::{committed_chain, field_str, field_u64, recorded_games_to};
+
+extern "C" {
+    fn kill(pid: i32, signum: i32) -> i32;
+}
+
+const SIGTERM: i32 = 15;
 
 /// `exact` over the games `games` (flags that name them, such as `--from 187 --to 300`) with `args` more, its lines by
 /// n.
@@ -105,4 +112,88 @@ fn a_semiprime_game_is_named_and_not_searched() {
     }
     assert_eq!(field_str(&by_default[&21], "relation"), Some("none"));
     assert_eq!(field_str(&by_default[&33], "relation"), Some("chain"));
+}
+
+/// The complete lines of the output file (the last line of a file being appended may be torn), by n.
+fn written(out: &Path) -> BTreeMap<u64, String> {
+    let text = std::fs::read_to_string(out).unwrap_or_default();
+    let complete = &text[..text.rfind('\n').map_or(0, |i| i + 1)];
+    complete.lines().map(|line| (field_u64(line, "n").expect("a line has its n"), line.to_owned())).collect()
+}
+
+/// The checkpoint of game n's search from the roles of F4, if the run left one.
+fn checkpoint_text(checkpoints: &Path, n: u64) -> Option<String> {
+    std::fs::read_to_string(checkpoints.join(format!("exact_{n}_low.ckpt"))).ok()
+}
+
+/// A SIGTERM during a run pauses every search in flight into its checkpoint, writes the lines of the games finished, and
+/// ends `exact` with status 143 (128 + the signal); a rerun resumes the searches from their checkpoints, and the games
+/// come out proven at the recorded scores, one line each.  Game 576 takes 0.2 s of CPU in this profile, and 620 and 624
+/// about 0.4 s each, on a thread each: when the line of 576 appears, the others have searched for a tenth of a second
+/// and have 10 to 25 open subtrees (the more a pause leaves open, the more a resume costs, since each starts cold).
+#[test]
+fn a_sigterm_pauses_every_search_into_its_checkpoint_and_a_rerun_finishes_them() {
+    let games: [u64; 3] = [576, 620, 624];
+    let list = games.map(|n| n.to_string()).join(",");
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("exact_stop_{}", std::process::id()));
+    let (out, checkpoints) = (dir.join("out.jsonl"), dir.join("checkpoints"));
+    let command = || {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_exact"));
+        command.args(["--list", &list, "--threads", "3", "--checkpoints"]).arg(&checkpoints);
+        command.arg("--out").arg(&out);
+        command
+    };
+    let mut child = command().stderr(Stdio::piped()).spawn().expect("run exact");
+    let waiting = Instant::now();
+    while written(&out).is_empty() {
+        assert!(child.try_wait().unwrap().is_none(), "exact ended before it wrote a line");
+        assert!(waiting.elapsed() < Duration::from_secs(60), "exact wrote no line in a minute");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    // SAFETY: `kill` has no preconditions; the child is still ours to reap.
+    assert_eq!(unsafe { kill(child.id() as i32, SIGTERM) }, 0, "send the SIGTERM");
+    let stopped = child.wait_with_output().expect("exact stops");
+    let stderr = String::from_utf8_lossy(&stopped.stderr);
+    assert_eq!(stopped.status.code(), Some(128 + SIGTERM), "exact exits with 128 + the signal: {stderr}");
+    assert!(stderr.contains("stopped by signal 15"), "{stderr}");
+
+    // Each game has a line or a checkpoint with open units, and none has both.
+    let finished = written(&out);
+    let mut nodes_at_stop = BTreeMap::new();
+    for n in games {
+        let checkpoint = checkpoint_text(&checkpoints, n);
+        match (finished.contains_key(&n), checkpoint) {
+            (true, None) => {}
+            (true, Some(_)) => panic!("n={n}: a line and a checkpoint"),
+            (false, None) => panic!("n={n}: neither a line nor a checkpoint: {stderr}"),
+            (false, Some(text)) => {
+                assert!(text.lines().any(|line| line.starts_with("unit ")), "n={n}: no open unit in\n{text}");
+                assert!(stderr.contains(&format!("n={n} not finished: paused")), "n={n}: {stderr}");
+                let nodes = text.lines().find_map(|line| line.strip_prefix("nodes ")).expect("the nodes so far");
+                nodes_at_stop.insert(n, nodes.parse::<u64>().unwrap());
+            }
+        }
+    }
+    assert!(!nodes_at_stop.is_empty(), "every game finished before the SIGTERM took effect: {stderr}");
+    assert!(nodes_at_stop.values().any(|&nodes| nodes > 0), "the SIGTERM came before any search began: {stderr}");
+
+    // The rerun finishes the paused games from their checkpoints.
+    let resumed = command().output().expect("run exact again");
+    assert!(resumed.status.success(), "{}", String::from_utf8_lossy(&resumed.stderr));
+    let text = std::fs::read_to_string(&out).unwrap();
+    assert_eq!(text.lines().count(), games.len(), "a line for every game, none twice:\n{text}");
+    let lines = written(&out);
+    let recorded = recorded_games_to(&[committed_chain()], games.into_iter().max().unwrap());
+    for n in games {
+        let line = &lines[&n];
+        assert_eq!(field_str(line, "search"), Some("proven"), "n={n}: {line}");
+        assert_eq!(field_u64(line, "score"), Some(recorded[&n].0), "n={n}: the recorded optimum");
+        if let Some(at_stop) = nodes_at_stop.get(&n) {
+            assert!(field_u64(line, "nodes").unwrap() > *at_stop, "n={n}: the search resumed: {line}");
+        } else {
+            assert_eq!(Some(line), finished.get(&n), "n={n}: a finished game is not searched again");
+        }
+        assert!(checkpoint_text(&checkpoints, n).is_none(), "n={n}: a finished game keeps no checkpoint");
+    }
+    std::fs::remove_dir_all(&dir).expect("remove the output directory");
 }

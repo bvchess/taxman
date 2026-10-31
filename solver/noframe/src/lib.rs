@@ -36,6 +36,7 @@
 //! * [`adversary`]: synthetic Taxman-shaped instances for the adversarial search.
 //! * [`jsonl`]: the resumable result files every campaign writes, and the reading of the recorded games.
 //! * [`team`]: `exact`'s campaign, which searches a game on several threads when fewer games are left than threads.
+//! * [`stop`]: the clean stop of that campaign on SIGINT and SIGTERM.
 
 pub mod adversary;
 pub mod bounds;
@@ -51,5 +52,6 @@ pub mod primes;
 pub mod semiprime;
 pub mod span;
 pub mod star;
+pub mod stop;
 pub mod team;
 pub mod upper;

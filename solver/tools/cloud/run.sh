@@ -42,9 +42,9 @@
 #                    600) and when the script ends; see save.sh.  Every save runs at the lowest priority (`nice -n 19`,
 #                    and `ionice -c 3` where there is an ionice, on Linux), so that it never competes with the workers
 #
-# SIGTERM and SIGINT are forwarded, once, to the command: the solver of chain.sh writes a final checkpoint and exits
-# (a second stop signal would make it exit at once, without one), and exact of prover.sh has no handler, so the
-# games in its pass are lost back to their last checkpoint.
+# SIGTERM and SIGINT are forwarded, once, to the command: the solver of chain.sh writes a final checkpoint and exits,
+# and exact of prover.sh pauses every search into its checkpoint and exits (a second stop signal would make either exit
+# at once, without one).
 
 : "${POWEROFF:=never}"
 : "${SAVE_EVERY:=600}"
