@@ -20,13 +20,13 @@ priority.  The committed chain is also the table built into the frame solver: th
 
 ## In flight
 
-* **The full run.**  The chain runs from game 1 to 5060 on a friend's machine of 88 threads with the build of commit
+* **The Nov 1 run.**  The chain runs from game 1 to 5060 on a friend's machine of 88 threads with the build of commit
   aaba59b and the solver's default policy: a fixed gate of conflict branching of 300 and no gate trial, which beat the
   previous policy (a gate of 1200 with the trial) by 1.5 to 5.5 times on whole games
   ([gate-trial.md](design/gate-trial.md)), with `price_reuse` and `warm_start` on and a finder of 900 seconds.  It started
   on 2026-11-01 at 08:24 PST as `chain.sh 5060` with only the flags of the machine and the run (`--background`,
   `--carried-dir`, `--profile`) and no `--use-prev`.  Each line records the game's CPU, active and waiting seconds and its
-  start and finish in UTC.  When it completes, its file replaces `results/optimal.jsonl.gz`.  The re-run it replaces
+  start and finish in UTC.  When it completes, its file replaces `results/optimal.jsonl.gz`.  The Oct 29 run it replaces
   (tag `rerun-2026-10`, commit 3ca11bf, gate 1200 with the trial) stopped at game 4879 and is kept as a record on that
   machine.
 * **The cleanup of the frame solver.**  The project's owner decided on 2026-10-29 to remove the lab, the studies and the
@@ -34,7 +34,7 @@ priority.  The committed chain is also the table built into the frame solver: th
   to leave the prover alone.  The code is done: the removals and the defaults are on master, and a consistency pass has
   brought the docs and the code left behind into line.  The lab notebook and the agenda files have moved, with their
   history, to the repository [bvchess/taxman-notebook](https://github.com/bvchess/taxman-notebook).  One step remains.
-  * **The retirement of the bounds store and the certificates.**  It waits for the full run.  When the run's file
+  * **The retirement of the bounds store and the certificates.**  It waits for the Nov 1 run.  When its file
     replaces `results/optimal.jsonl.gz`, the games have no `known` lines, so the bounds store, the ledger, `--use-prev`
     and `check_bounds.py` retire, with the readers of older line formats and `REFERENCE.md`'s keys of older lines.  The
     certificates of statement U retire too (`taxman certify`, `verify-certificates`, the extended mode they need, the
