@@ -318,7 +318,8 @@ scenario_status() {
         ' 42 1h10m00s 0.0s 63 341,541 suspended'
     check "a game whose search is done waits for the game before" has_line "$tmp/s1.norm" \
         ' 43 30m30s 0.0s 5,000 777 search done, waiting for the game before'
-    check "a game with no line has no state to tell" has_line "$tmp/s1.norm" ' 44 - - - - no recent progress line'
+    check "a game with no line has no search yet" has_line "$tmp/s1.norm" \
+        ' 44 - - - - no search yet (being set up, or settled without one)'
     check "and a game whose last line three of another's follow" has_line "$tmp/s1.norm" \
         ' 45 - - - - no recent progress line'
     check "the table has the last 6 games recorded, then the window after them, in order" equals \
@@ -450,7 +451,7 @@ its best" has_line "$tmp/s1.norm" \
     check "it says no progress line is there" has_line "$tmp/b1.out" '  no progress line yet: no logs/chain.err'
     check "it says no game is recorded" has_line "$tmp/b1.out" '  recorded through: no game yet'
     check "and the games in flight have the note for it" equals "$(tail -n 1 "$tmp/b1.out")" '  no progress lines yet'
-    check "in place of their rows" lacks "$tmp/b1.out" 'no recent progress line'
+    check "in place of their rows" lacks "$tmp/b1.out" 'no search yet'
 
     # No game recorded yet (only an incomplete line), and a progress line: the table has no recorded game, and its
     # heading claims none.
@@ -492,7 +493,7 @@ its best" has_line "$tmp/s1.norm" \
         ' the last 3 games recorded and the 5 in flight (window 5):'
     check "and the note for the games in flight follows" equals "$(tail -n 1 "$tmp/q1.out")" \
         '  no progress lines yet'
-    check "in place of their rows" lacks "$tmp/q1.out" 'no recent progress line'
+    check "in place of their rows" lacks "$tmp/q1.out" 'no search yet'
 
     # A node count of 14,000,000,000 has its commas and ends under the header's right-aligned nodes; the window is the
     # chain.log's.
@@ -507,7 +508,7 @@ its best" has_line "$tmp/s1.norm" \
     check "the table has the game of chain.out, the game in flight with its times, and the window of chain.log" equals \
         "$(grep -c -e ' 2 1.5s 3.0s 5 18 recorded, score 20 (search, exhausted)$' \
             -e ' 4 1h40m00s 0.0s 14,000,000,000 341,541 running, 250.0k nodes/s$' \
-            -e ' 6 - - - - no recent progress line$' "$tmp/w1.norm")" 3
+            -e ' 6 - - - - no search yet (being set up, or settled without one)$' "$tmp/w1.norm")" 3
     check "a node count of 14,000,000,000 has its commas and ends under the header's right-aligned nodes" equals \
         "$(awk '/ active / {head = index($0, "nodes") + 4}
             /14,000,000,000/ {row = index($0, "14,000,000,000") + 13}

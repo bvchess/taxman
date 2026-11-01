@@ -178,7 +178,12 @@ games_table() {
                     if (h != g && h >= first && h <= last && !finished[i] && ++printed[h] >= 3) stale = 1
                 }
             }
-            if (!(g in at) || stale) {
+            # A game without a progress line has no search going: it is being set up, or was settled without one.
+            if (!(g in at)) {
+                row(g, "-", "-", "-", "-", "no search yet (being set up, or settled without one)")
+                continue
+            }
+            if (stale) {
                 row(g, "-", "-", "-", "-", "no recent progress line")
                 continue
             }

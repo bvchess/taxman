@@ -174,8 +174,8 @@ host user@machine
    4870  0.0s        0.0s                      0    538,760  recorded, score 7,459,353 (repeat, same_search of 4868)
    4871  0.0s        0.0s                      0          -  recorded, score 7,461,794 (prime, prime_formula)
    4872  1h15m00s    97h30m00s     1,086,013,550    341,541  running, 242.8k nodes/s
-   4873  -           -                         -          -  no recent progress line
-   4874  -           -                         -          -  no recent progress line
+   4873  -           -                         -          -  no search yet (being set up, or settled without one)
+   4874  -           -                         -          -  no search yet (being set up, or settled without one)
    4875  1h02m11s    10h22m09s                63    341,541  suspended
 ```
 
@@ -200,8 +200,9 @@ The state of a game in flight is told from its last progress line in `logs/chain
 * `search done`: the line says `done` or `optimal` and the game is not recorded yet (`being recorded` for the oldest
   game, else `waiting for the game before`);
 * `search stopped` or `failed`;
-* `no recent progress line`: the game has no line, or three lines of another game follow its line.  A setup, a prime or
-  repeated game and a search not started look alike in the logs.
+* `no search yet (being set up, or settled without one)`: the game has no line.  A game being set up, a search not
+  started, and a prime or repeated game waiting to be recorded look alike in the logs;
+* `no recent progress line`: three lines of another game follow the game's last line, so its search went quiet.
 
 For a game in flight, `active` and `cpu` are the times of its last progress line (`-` for a game without one), and
 `best` its sum of promotions so far.  The progress line also has the time the game waited, which the table leaves out.
