@@ -1,6 +1,6 @@
 # Status
 
-Updated 2026-10-30.
+Updated 2026-11-01.
 
 The state of the work as of the date above: the priority, and the projects in flight.  This page is rewritten, not
 appended to, when the state changes.  What was done and why is in the [lab
@@ -11,33 +11,34 @@ notebook](https://github.com/bvchess/taxman-notebook/blob/main/README.md), how f
 ## The priority
 
 The hunt for a larger n ended on 2026-10-29: the project's owner ended it at 17:20 PDT, and the chain was stopped at
-18:01 PDT, after game 5060.  The committed chain, `results/optimal.jsonl.gz`, reaches game 5060.  The work in flight is
-the re-run of the chain, and the cleanup of the frame solver around it; the next steps are to be planned with the owner.
+18:01 PDT, after game 5060.  The committed chain, `results/optimal.jsonl.gz`, reaches game 5060.  The priority is a
+run of the full chain, 1 to 5060, with one build and the one policy that makes the whole run the fastest; other work
+(the last cleanup step, the prover's run to 2530, the unsound mode) waits until it ends.
 Certifying [statement U](../../docs/theory/exactness.md#statement-u), for particular games or in general, is not a
 priority.  The committed chain is also the table built into the frame solver: the chain's games are appended to it
 ([the runbook](runbook/chain.md)), and a rebuild takes them into the table.
 
 ## In flight
 
-* **The re-run.**  The chain runs again from game 1 to 5060 on a friend's machine of 88 threads, with one build (the tag
-  `rerun-2026-10`, commit 3ca11bf) and one policy, so that its timings come from one machine and one build.  It started
-  on 2026-10-29 at 19:55 PDT as `chain.sh 5060` with `--gate 1200 --gate-trial 1000,800,600 --tactic price_reuse=on
-  --tactic warm_start=on --finder-seconds 900 --background --carried-dir DIR --profile DIR` (DIR is a folder of the run)
-  and no `--use-prev`.  That build needs the policy flags; the solver of the master branch has its own policy as its
-  defaults (a fixed gate of 300 with no gate trial, which beat the re-run's gate of 1200 with the trial on whole games:
-  [gate-trial.md](design/gate-trial.md); `price_reuse` and `warm_start` on, a finder of 900 seconds), so a plain `taxman
-  solve` searches as the re-run did except for the gate.  Only the flags that depend on the machine and the run
-  (`--background`, `--carried-dir`, `--profile`) are still given.  When it completes, its file replaces
-  `results/optimal.jsonl.gz`.
+* **The full run.**  The chain runs from game 1 to 5060 on a friend's machine of 88 threads with the build of commit
+  aaba59b and the solver's default policy: a fixed gate of conflict branching of 300 and no gate trial, which beat the
+  previous policy (a gate of 1200 with the trial) by 1.5 to 5.5 times on whole games
+  ([gate-trial.md](design/gate-trial.md)), with `price_reuse` and `warm_start` on and a finder of 900 seconds.  It started
+  on 2026-11-01 at 08:24 PST as `chain.sh 5060` with only the flags of the machine and the run (`--background`,
+  `--carried-dir`, `--profile`) and no `--use-prev`.  Each line records the game's CPU, active and waiting seconds and its
+  start and finish in UTC.  When it completes, its file replaces `results/optimal.jsonl.gz`.  The re-run it replaces
+  (tag `rerun-2026-10`, commit 3ca11bf, gate 1200 with the trial) stopped at game 4879 and is kept as a record on that
+  machine.
 * **The cleanup of the frame solver.**  The project's owner decided on 2026-10-29 to remove the lab, the studies and the
   idle experiments, to make the production policy the default, to split the notebook into a repository of its own, and
   to leave the prover alone.  The code is done: the removals and the defaults are on master, and a consistency pass has
   brought the docs and the code left behind into line.  The lab notebook and the agenda files have moved, with their
   history, to the repository [bvchess/taxman-notebook](https://github.com/bvchess/taxman-notebook).  One step remains.
-  * **The retirement of the bounds store.**  It waits for the re-run.  When the re-run's file replaces
-    `results/optimal.jsonl.gz`, the games have no `known` lines, so the bounds store, the ledger, `--use-prev` and
-    `check_bounds.py` retire, with the readers of older line formats, `REFERENCE.md`'s keys of older lines and
-    the certificates of games 600 to 1300, which are made again with the current build or dropped.
+  * **The retirement of the bounds store and the certificates.**  It waits for the full run.  When the run's file
+    replaces `results/optimal.jsonl.gz`, the games have no `known` lines, so the bounds store, the ledger, `--use-prev`
+    and `check_bounds.py` retire, with the readers of older line formats and `REFERENCE.md`'s keys of older lines.  The
+    certificates of statement U retire too (`taxman certify`, `verify-certificates`, the extended mode they need, the
+    certificates of games 600 to 1300): the prover's own proofs, from game 2 up, replace them.
 * **The documentation.**  Every long document is a folder of files with an index, and every doc follows
   [docs/WRITING.md](../../docs/WRITING.md), whose docs test checks the links, the citations, the sizes and the words.
   The project's owner reviews the docs one file at a time, and each review's changes land as they are decided.
