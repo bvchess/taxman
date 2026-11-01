@@ -424,8 +424,8 @@ fn background_is_a_switch_that_is_recorded_and_changes_no_score() {
 
 /// `--gate GAP` is a flag of `solve`: a whole number from 0 to `MAX_GATE`, refused with conflict branching off, where a
 /// gate does nothing.  A line records it in `options.gate` where it was given, beside the gates of the trial
-/// (`options.gate_trial`: by default 1000, 800 and 600, and none with `--gate-trial none`, which a run that needs its
-/// gate to stay says), and the game ends with the score of the table.
+/// (`options.gate_trial`: none by default, as with `--gate-trial none`; the gates `--gate-trial` lists, and 1000, 800
+/// and 600 where only `--gate-trial-plan` asks for a trial), and the game ends with the score of the table.
 #[test]
 fn gate_is_a_flag_of_solve_that_is_recorded_and_changes_no_score() {
     let over = (MAX_GATE + 1).to_string();
@@ -456,12 +456,15 @@ fn gate_is_a_flag_of_solve_that_is_recorded_and_changes_no_score() {
     let options = |line: &Json| line.get("options").unwrap().clone();
     assert_eq!(options(&plain).get("gate"), None, "a line without the flag has no record of it");
     let trial = |line: &Json| options(line).get("gate_trial").map(Json::to_string);
-    assert_eq!(trial(&plain).as_deref(), Some("[1000,800,600]"), "the default trial");
+    assert_eq!(trial(&plain), None, "no trial by default");
     assert_eq!(plain.get("score").and_then(Json::as_u64), Optimal::built_in().score(900));
-    // The gate at its least with no trial, and at its most with one: the trial's gates are recorded beside it.
+    // The gate at its least with no trial, and at its most with one: the trial's gates are recorded beside it.  A plan
+    // alone asks for the trial of the default gates.
     let zero = line("zero.jsonl", &["--gate", "0", "--gate-trial", "none"]);
     let widest = line("widest.jsonl", &["--gate", &MAX_GATE.to_string(), "--gate-trial", "0,600"]);
-    for (name, gated) in [("zero", &zero), ("widest", &widest)] {
+    let planned = line("planned.jsonl", &["--gate-trial-plan", "units=3"]);
+    assert_eq!(trial(&planned).as_deref(), Some("[1000,800,600]"), "a plan alone asks for the default trial");
+    for (name, gated) in [("zero", &zero), ("widest", &widest), ("planned", &planned)] {
         assert_eq!(gated.get("score"), plain.get("score"), "{name}");
         assert_eq!(gated.get("optimal_match"), Some(&Json::Bool(true)), "{name}");
     }

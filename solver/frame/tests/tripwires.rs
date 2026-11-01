@@ -46,9 +46,10 @@ use taxman::with_width;
 const EXPECTED: [(u32, &str, u64, u64); 20] = [
     // The default, the GF(2) bound with the rule of the root's symmetric pairs, the reuse of prices and the warm start:
     // trees of tens to thousands of nodes; `symmetry=off` (the default before the rule) makes them larger with the same
-    // answers.  Conflict branching is on by default and acts where a node's gap passes the gate, 1,200, which no node
-    // of these games' searches reaches, so these trees are those of the search's own conflict at every node: [`GATED`]
-    // has the trees of the games under gates that make conflict branching act.
+    // answers.  Conflict branching is on by default and acts where a node's gap passes the gate, 300.  The trees of
+    // 1000 are those it makes (those of [`GATED`]'s 1000 under 300, as the default's); the others have the node counts
+    // that they have under the gate 1,200, so they are the search's own conflict at every node.  [`GATED`] has the
+    // trees of games under other gates that make conflict branching act.
     (480, "default", 5350, 37),
     (600, "default", 8507, 365),
     (600, "fix_forced=off", 8507, 530),
@@ -63,10 +64,10 @@ const EXPECTED: [(u32, &str, u64, u64); 20] = [
     (936, "fix_forced=off", 20507, 830),
     (936, "nogoods=off", 20507, 345),
     (936, "symmetry=off", 20507, 652),
-    (1000, "default", 24168, 2026),
+    (1000, "default", 24168, 2841),
     (1000, "fix_forced=off", 24168, 4000),
-    (1000, "nogoods=off", 24168, 2991),
-    (1000, "symmetry=off", 24168, 2432),
+    (1000, "nogoods=off", 24168, 5361),
+    (1000, "symmetry=off", 24168, 3801),
     (1133, "default", 28690, 41),
     (1133, "nogoods=off", 28690, 34),
 ];
@@ -80,7 +81,7 @@ const EXPECTED: [(u32, &str, u64, u64); 20] = [
 /// the rule).  The promotion sums are those of [`EXPECTED`]: Π⁺(∅) has the frame model's promotion sets, and the sum is
 /// the answer.  The rows `extended` are the frame model's trees, node for node, where [`EXPECTED`] has the same tactics
 /// (its rows `symmetry=off` for 600, 936 and 1000); the rows `default` differ from those of [`EXPECTED`] (408 against
-/// 365 nodes at 600, 366 against 449 at 936, 2,107 against 2,026 at 1000), so what differs is what the rule of the
+/// 365 nodes at 600, 366 against 449 at 936, 3,094 against 2,841 at 1000), so what differs is what the rule of the
 /// symmetric pairs reads from the two models, not the search.  Both are also held to the default engine's search of the
 /// same frames and candidates ([`extended_searches`]), whatever the table says.
 const EXTENDED: [(u32, &str, u64, u64); 16] = [
@@ -96,20 +97,20 @@ const EXTENDED: [(u32, &str, u64, u64); 16] = [
     (760, "extended", 14170, 184),
     (936, "default", 20507, 366),
     (936, "extended", 20507, 652),
-    (1000, "default", 24168, 2107),
-    (1000, "extended", 24168, 2432),
+    (1000, "default", 24168, 3094),
+    (1000, "extended", 24168, 3801),
     (1133, "default", 28690, 41),
     (1133, "extended", 28690, 41),
 ];
 
 /// (board, tactics, promotion sum, nodes): the game searched from the frame builder on one thread, as [`EXPECTED`]'s,
 /// with a gate named among the assignments, `gate=N`: the gap from which conflict branching chooses.  [`EXPECTED`]'s
-/// rows have the default gate, 1,200, which no node of their games reaches, so these rows hold the trees of the tactics
-/// that act only where conflict branching chooses (`conflict_look`, `price_reuse`, and the conflicts themselves), and
-/// those of a tactic that changes a tree by a node (`warm_start`: the games 775 to 777 take one node fewer without it).
-/// The games 760 and 1133 under the gate 0, which chooses at every check; 775 under the default gate; and 1000 under
-/// 300, the default gate before the policy of the chain became the default, whose row `price_reuse=off,warm_start=off`
-/// is that default's tree (3,319 nodes, the row of [`EXPECTED`] then).
+/// rows have the default gate, 300, which changes the tree of only one of their games (1000), so these rows hold the
+/// trees of the tactics that act only where conflict branching chooses (`conflict_look`, `price_reuse`, and the
+/// conflicts themselves), and those of a tactic that changes a tree by a node (`warm_start`: the games 775 to 777 take
+/// one node fewer without it).  The games 760 and 1133 under the gate 0, which chooses at every check; 775 under the
+/// gate 1,200, which no node of it reaches; and 1000 under 300, the default gate, whose first row is [`EXPECTED`]'s
+/// default and whose others have the reuse of prices and the warm start off in turn.
 const GATED: [(u32, &str, u64, u64); 10] = [
     (760, "gate=0", 14170, 159),
     (760, "gate=0,conflict_look=off", 14170, 157),
@@ -424,7 +425,7 @@ fn a_search_with_the_symmetry_rule_on_one_thread_is_deterministic() {
 }
 
 /// (game, nodes forgetting the nogoods every 200 steps, nodes never forgetting) for [`forgetting_search`].
-const FORGETTING: (u32, u64, u64) = (800, 1550, 1401);
+const FORGETTING: (u32, u64, u64) = (800, 1640, 1424);
 
 /// The tree below the root of a game of more than a thousand nodes (the trees of the smaller games are too small for
 /// forgetting to matter), searched by one searcher that forgets its nogoods every `period` steps (`None`: never), from

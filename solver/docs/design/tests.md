@@ -121,9 +121,10 @@ every second line of the Java fixtures), and the comment on each says what the w
   assertion on answers sees it (a mutant that ignored the result of `Nogoods::ruled_out` takes 27 to 67% more nodes).
   With one thread the tree is deterministic, so the test asserts the exact node count of a fixed game under fixed
   tactics: n = 480 to 1133, every tactic off or changed in turn, and the tree of game 800 with the searchers
-  forgetting their nogoods every 200 steps.  The default gate, 1,200, is above every gap of these games, so the table
-  `GATED` has the trees under the gates that make conflict branching act (the games 760 and 1133 under a gate of 0, 1000
-  under 300), with the look and the reuse of prices off in turn, and the game 775 with and without the warm start.  The
+  forgetting their nogoods every 200 steps.  The default gate, 300, changes the trees of only two of these games
+  (800 and 1000), so the table `GATED` has the trees under the gates that make conflict branching act (the games 760
+  and 1133 under a gate of 0, 1000 under 300), with the look and the reuse of prices off in turn, and the game 775
+  under a gate of 1,200 with and without the warm start.  The
   table `NEAR_REPEATS` counts the trees of the games 768, 1083 and 1101, solved as the solver solves them from the
   committed game of n − 1, with the near-repeat cut and without it, and checks that the line of each counts the nodes
   the cut cut (`stats.near_repeat_cut`) if it was armed, and has no such key if it was not.  The rows `symmetry=off`
@@ -219,9 +220,10 @@ every second line of the Java fixtures), and the comment on each says what the w
   `src/search/branching.rs`): the run's `--gate` reaches the searchers of game 780, which takes the steps of conflict
   branching off under a gate wider than every gap and other steps under a gate of 0, and ends with the score of the
   table either way; three gates (0, 100 and 4,000) give each of the small games one answer and some of them other
-  trees; a new gate raises the generation and is read back.  The gate trial is on by default, and a test
-  that needs the gate to stay says `--gate-trial none`; `tests/cli.rs` checks that a line records the default trial's
-  gates (1000, 800 and 600) and none with `none`, and refuses a plan with `none`.
+  trees; a new gate raises the generation and is read back.  The gate trial is off by default, so a gate stays
+  unless a test asks for a trial; `tests/cli.rs` checks that a line records no trial by default and with `none`, the
+  gates of `--gate-trial GATES`, and the trial of 1000, 800 and 600 that a plan alone asks for, and refuses a plan
+  with `none`.
 * **The cloud scripts** have tests of their own that need no cloud: the scripts that run the chain unattended
   (`solver/tools/cloud/test/run.sh`: the date and the ledger through `chain.sh`, the lock of `run.sh`, and `status.sh`
   on a chain on another machine, against stand-ins for the aws CLI and ssh), and the build cache

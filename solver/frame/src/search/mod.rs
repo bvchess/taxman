@@ -137,11 +137,15 @@ pub const NOGOOD_PERIOD: u64 = 50_000;
 
 /// With the tactic `conflict_branching`, a check chooses the conflict it branches on only where its gap, the GF(2) bound
 /// less the need, is at least this (below it the search's own conflict is kept), unless a caller sets another gate
-/// (`solve --gate`, and the gate trial).  On units of the games 4991, 4992 and 4995 a gate of 1,200 took 0.90 to 0.92
-/// of the CPU of conflict branching off, and a gate of 300 took 2.03 of it on those of 4991
-/// (solver/docs/design/search.md); 300, the gate before, was the best of 0, 200, 300 and 400 on the whole game 4050 and
-/// two units of 4548 and 4875 (solver/docs/design/search.md).
-pub const CONFLICT_BRANCHING_GAP: u64 = 1200;
+/// (`solve --gate`, and the gate trial, which is off unless `solve --gate-trial` asks for it).  On whole games on 88
+/// threads with the build of the chain's re-run, a fixed gate of 300 from the root took a quarter to a third of the
+/// time of a gate of 1,200 followed by the gate trial: 4875 in 0.29 hours against 1.25, 4879 in 0.28 against 1.27, 4893
+/// in 0.40 against 1.11, and 5052 in 1.97 hours where the other had not finished in 3.  The trial chose 600 every time,
+/// and it misleads: it measures 24 small subtrees from deep in the search, after 50 million steps, where a low gate
+/// costs more than it saves (on 22 of the costliest games its pieces put a fixed gate of 300 at 1.70 times the CPU of
+/// 1,200), while the gate matters most at the top of the tree, which the trial never sees and which is built at 1,200
+/// before it runs (solver/docs/design/gate-trial.md).
+pub const CONFLICT_BRANCHING_GAP: u64 = 300;
 
 /// The widest gate a caller may give conflict branching in place of [`CONFLICT_BRANCHING_GAP`]: `solve --gate` and the
 /// gates of `solve --gate-trial` take whole numbers from 0 to this.  Any gate keeps the search exact: below it a check

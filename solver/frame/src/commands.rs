@@ -126,18 +126,18 @@ fn trial_gates(list: &str) -> Result<Vec<u64>, CliError> {
     Ok(gates)
 }
 
-/// The gate trial that `--gate-trial` and `--gate-trial-plan` ask for: the trial of the default gates
-/// ([`gate_trial::GATES`]) where neither says, that of the gates `--gate-trial` lists, and none where it says `none`
-/// (a search with the one gate it starts with).
+/// The gate trial that `--gate-trial` and `--gate-trial-plan` ask for: none where neither is given or `--gate-trial`
+/// says `none` (a search with the one gate it starts with), the trial of the gates `--gate-trial` lists, and the trial
+/// of the gates [`gate_trial::GATES`] where only `--gate-trial-plan` is given.
 fn run_gate_trial(args: &Args) -> Result<Option<gate_trial::Plan>, CliError> {
     let spec = args.value("--gate-trial-plan");
-    let gates = match args.value("--gate-trial") {
-        Some("none") if spec.is_some() => {
+    let gates = match (args.value("--gate-trial"), spec) {
+        (Some("none"), Some(_)) => {
             return Err(CliError::Usage("--gate-trial-plan sets the trial, and --gate-trial none is no trial".into()))
         }
-        Some("none") => return Ok(None),
-        Some(gates) => trial_gates(gates)?,
-        None => gate_trial::GATES.to_vec(),
+        (Some("none") | None, None) => return Ok(None),
+        (Some(gates), _) => trial_gates(gates)?,
+        (None, Some(_)) => gate_trial::GATES.to_vec(),
     };
     let plan = gate_trial::Plan::of(gates).with(spec.unwrap_or_default());
     plan.map(Some).map_err(|e| CliError::Usage(format!("--gate-trial-plan: {e}")))

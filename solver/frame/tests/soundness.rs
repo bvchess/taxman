@@ -37,7 +37,7 @@ use taxman::search::{search, Reuse, SearchTactics};
 /// with the nogoods forgotten at every step (5 to 7), then conflict branching (tactic `conflict_branching`) at every
 /// check, whatever its gap, without the look at the last child of the search's own conflict (tactic `conflict_look`, on
 /// by default), on one thread and on two (8 and 9), the search's own conflict everywhere (10; the default chooses from
-/// a gap of 1,200), and conflict branching at every check with the look, on one thread and on two (11 and 12), then the
+/// a gap of 300), and conflict branching at every check with the look, on one thread and on two (11 and 12), then the
 /// search without the near-repeat cut (13; tactic `near_repeat`, which the others have, and which acts where a game
 /// has the cut of a game before it, [`game_after`], and the incumbent reaches its bound), then conflict branching at
 /// every check without the reuse of its prices (tactic `price_reuse`, which the standard configuration has, with

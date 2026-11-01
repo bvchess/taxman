@@ -221,7 +221,7 @@ changed"](https://github.com/bvchess/taxman-notebook/blob/main/terms-changed.md)
   heaviest set where that certifies it and solved where not.
 * **conflict branching**: how a node chooses the conflict it branches on, before strong branching chooses the member:
   of the conflicts within its heaviest set, the one whose members cost the bound most to leave out, so that every child
-  falls furthest below the node's gap.  With the tactic `conflict_branching`, on by default, a node whose gap is 1,200
+  falls furthest below the node's gap.  With the tactic `conflict_branching`, on by default, a node whose gap is 300
   (the gate) or more chooses so; otherwise it branches on the smallest conflict the search knows
   ([solver/docs/design/search.md, "Conflict branching"](../solver/docs/design/search.md#conflict-branching)).
 * **look**: with the tactic `conflict_look`, on by default, a node that conflict branching would send to another

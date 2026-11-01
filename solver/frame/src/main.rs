@@ -62,11 +62,12 @@ commands:
                                checkpoint; refused with conflict_branching off
       --gate-trial GATES       once a game's search has taken {trial_after} steps, try each of the gates GATES (comma
                                separated, each from 0 to {max_gate}) and the search's own on a sample of its units,
-                               and branch with the one that took the least CPU (default {trial_gates}; none: no
-                               trial, and a search that keeps its gate).  It runs only with --checkpoint-dir
+                               and branch with the one that took the least CPU (default none: no trial, and a
+                               search that keeps its gate).  It runs only with --checkpoint-dir
       --gate-trial-plan SPEC   the trial's numbers, NAME=VALUE separated by commas: after ({trial_after}), units
                                ({trial_units}), steps ({trial_steps}, the most of each solve), threads
-                               ({trial_threads}) and least_gap ({trial_least_gap})
+                               ({trial_threads}) and least_gap ({trial_least_gap}).  Without --gate-trial it asks
+                               for a trial of the gates {trial_gates}
       --mem-cap UNITS          search units kept in memory before spilling to disk
       --force-search           search even where the previous game or an earlier search gives the answer
       --use-prev               draw on the known games: the built-in table's, the committed chain's

@@ -181,8 +181,8 @@ pub struct SolveOptions {
     /// The gate trial (`--gate-trial`): each game's search with conflict branching on tries these gates on a sample
     /// of its own units once it has taken the plan's steps, and branches with the one that took the least CPU
     /// ([`search::gate_trial`]).  It changes only the gate, which changes no answer, and is no tactic and no part of a
-    /// checkpoint.  It needs a checkpoint, so a search without one runs no trial.  By default the trial of the gates
-    /// [`search::gate_trial::GATES`]; `None` (`--gate-trial none`) is no trial, and a search with a fixed gate.
+    /// checkpoint.  It needs a checkpoint, so a search without one runs no trial.  None by default (`--gate-trial none`
+    /// says so): a search with a fixed gate, [`search::CONFLICT_BRANCHING_GAP`] unless `gate` is set.
     pub gate_trial: Option<search::gate_trial::Plan>,
 }
 
@@ -210,7 +210,7 @@ impl Default for SolveOptions {
             profile_depth: search::PROFILE_DEPTH,
             carried_dir: None,
             gate: None,
-            gate_trial: Some(gate_trial::Plan::default()),
+            gate_trial: None,
         }
     }
 }

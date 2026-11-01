@@ -1,5 +1,6 @@
 //! The gate trial: a search measures, on a sample of its own units, which gate of conflict branching makes the least
-//! work, and branches with that gate from then on ([`Plan`]).
+//! work, and branches with that gate from then on ([`Plan`]).  It is off unless `solve --gate-trial` asks for it: on
+//! whole games a fixed gate of 300 from the root beat the trial's choices (solver/docs/design/gate-trial.md).
 //!
 //! The gate is the gap from which a node branches on the conflict that `conflict_branching` chooses.  Which gate is
 //! best differs from game to game far more than within a game: on the units of game 5052 a gate of 600 took 0.68 of
@@ -31,8 +32,9 @@ use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
-/// The gates a trial tries, by default, besides the search's own (the default gate, [`super::CONFLICT_BRANCHING_GAP`],
-/// unless a caller sets another): the gates of the chain's re-run.
+/// The gates a trial tries where `--gate-trial-plan` asks for one and `--gate-trial` names none, besides the search's
+/// own (the default gate, [`super::CONFLICT_BRANCHING_GAP`], unless a caller sets another): the gates of the chain's
+/// re-run.
 pub const GATES: [u64; 3] = [1000, 800, 600];
 /// The steps a search takes before its trial, by default: a few minutes of a search of 88 threads near n = 5000,
 /// enough for a checkpoint of thousands of units.
@@ -67,13 +69,6 @@ pub struct Plan {
     pub threads: usize,
     /// The least gap of a unit it picks.
     pub least_gap: u64,
-}
-
-impl Default for Plan {
-    /// A trial of [`GATES`], with the defaults for the rest.
-    fn default() -> Self {
-        Plan::of(GATES.to_vec())
-    }
 }
 
 impl Plan {

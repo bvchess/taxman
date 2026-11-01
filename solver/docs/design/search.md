@@ -203,8 +203,9 @@ search knows often has a member whose price is a few points, and the child that 
 gap, so the subtree hardly shrinks.  A conflict whose members all have high prices makes every child's gap fall, and is
 often a set of forced members, which closes the node at step 3.
 
-*The choice.*  At step 2, where the gap, the bound less `need`, is at least `CONFLICT_BRANCHING_GAP` (1,200; the *gate*,
-which the run's `--gate` may set from 0 to `MAX_GATE`, 4,000, and the [gate trial](gate-trial.md) may change), the
+*The choice.*  At step 2, where the gap, the bound less `need`, is at least `CONFLICT_BRANCHING_GAP` (300; the *gate*,
+which the run's `--gate` may set from 0 to `MAX_GATE`, 4,000, and a [gate trial](gate-trial.md), if asked for, may
+change), the
 check weighs:
 
 * `K`, the conflict the search found;
@@ -219,9 +220,8 @@ for the members that a failing frame's conflict can hold (`FrameGraph::conflict_
 split's estimate.  A child that inherits its parent's heaviest set takes most of its prices from its parent's pricing
 with no search ([gf2-bound.md](gf2-bound.md)), and the tactic `price_reuse` keeps prices from check to check
 ([price-reuse.md](price-reuse.md)).  Below the gate the search's own `K` is kept, since a small subtree does not repay
-the pricing.  On units of the games 4991, 4992 and 4995, a gate of 1,200 took 0.90 to 0.92 of the CPU of conflict
-branching off, and a gate of 300 took 2.03 of it on those of 4991 ([the settings
-checks](https://github.com/bvchess/taxman-notebook/blob/main/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-settings-checks-on-games-4991-4992-and-4995)).
+the pricing, but a gate of 300 repays it at the top of the tree: on whole games near n = 5000 it took a quarter to a
+third of the time of a gate of 1,200 with a gate trial ([gate-trial.md](gate-trial.md)).
 
 *Why it is exact.*  It changes only which conflict a node branches on, and the second fact of [the default
 step's](#the-default-step) exactness holds for any conflict.  Each conflict made here is one: with its members alone
@@ -292,7 +292,7 @@ subtree to the end.  So a search whose units branch differently is exhaustive un
 `conflict_branching` chooses among is a true conflict, and the children of any true conflict cover every completion of
 their node ("Conflict branching", the paragraphs "Why it is exact" and "Why the look is exact").  The gate is the gap
 from which a node chooses a conflict at all, and below it the node branches on the search's own conflict, so every
-gate from 0 to `MAX_GATE` keeps the search exact, and the gate trial may change it between units
+gate from 0 to `MAX_GATE` keeps the search exact, and a gate trial, if asked for, may change it between units
 ([gate-trial.md](gate-trial.md)).  The nogoods learned on the way are conflicts whichever conflict a node chose, and
 they hold at every node (fact 4 of [the default step's](#the-default-step) exactness).
 
