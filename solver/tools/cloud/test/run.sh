@@ -192,8 +192,8 @@ scenario_lock() {
 
 # The solver's line for a game it recorded (solver.rs, summary_line): recorded_line N SCORE METHOD NODES SECONDS OPTIMAL
 # PROOF [MORE], where OPTIMAL is the word after `optimal` (ok or unknown) and MORE is any text after the proof: what the
-# proof assumes, and the fields that end the line, `  own=3011.250 s  best=341541` (a line of an older solver has
-# neither).
+# proof assumes, and the fields that end the line, `  active=3011.250 s  cpu=98123.500 s  best=341541` (a line of an
+# older solver has none of them).
 recorded_line() {
     printf 'n=%-5d score=%-9d %-7s nodes=%-11d %9.3f s  optimal %s  proof=%s%s\n' "$1" "$2" "$3" "$4" "$5" "$6" "$7" \
         "${8:-}"
@@ -204,11 +204,13 @@ table_games() {
     sed -n 's/^ \([0-9][0-9]*\) .*/\1/p' "$1" | tr '\n' ' '
 }
 
-# A progress line of the solver (engine.rs, progress_line): the game, the time since its search began, the nodes, the
-# rate or how the search ended, and the best sum of promotions.
+# A progress line of the solver (engine.rs, progress_line): progress N ACTIVE NODES HOW BEST [CPU], the game, the time
+# it has been active (and the time it waited, 25m00s), the nodes, the rate or how the search ended, the best sum of
+# promotions, and the CPU time (default 0.0s), after the UTC time of day.
 progress() {
-    printf 'n=%s %s nodes %s (%s) best %s queue 3 spilled 0 | eff 99.9%% idle 0.0%% lock 0.0%% splits 1 steals 0 %s\n' \
-        "$1" "$2" "$3" "$4" "$5" 'full 0.3ms ramp 0.0% tail 0.0% rebuild 0.0% first 0.0%'
+    printf '12:34:56Z n=%s active %s waited 25m00s cpu %s nodes %s (%s) best %s ' "$1" "$2" "${6:-0.0s}" "$3" "$4" "$5"
+    printf 'queue 3 spilled 0 | eff 99.9%% idle 0.0%% lock 0.0%% splits 1 steals 0 %s\n' \
+        'full 0.3ms ramp 0.0% tail 0.0% rebuild 0.0% first 0.0%'
 }
 
 # Sets the modification time of the file $1 to the epoch time $2 (touch -t reads UTC here).
@@ -260,39 +262,40 @@ scenario_status() {
     # The chain: recorded through 40, and its window of 5 holds 41..45.  The games 35 to 40 are of every kind; a
     # replacement machine printed 37 and 38 again after an interruption (the first lines of 37 and 38 are the earlier
     # machine's); the search of 41 was stopped, and its line is incomplete.  The lines of 35 to 37, 39 and 40 end with
-    # the own search time and the best sum, as a solver prints them now; those of 38 and the earlier line of 41 are an
-    # older solver's, with neither.  The progress lines (the oldest game, 41, runs; 42 is suspended; 43's search is
-    # done; 44 has no line; 45's only line is from before three of 41's) and the clock of 41, which is the oldest game
-    # with its search running.
+    # the active time, the CPU time and the best sum, as a solver prints them now; those of 38 and the earlier line of
+    # 41 are an older solver's, with none of them.  The progress lines (the oldest game, 41, runs; 42 is suspended; 43's
+    # search is done; 44 has no line; 45's only line is from before three of 41's).
     fake_chain 100
     fake_results 40
     fake_recorded 34
     {
-        recorded_line 35 350 search 1133462769 4636.026 unknown exhausted "  own=3011.250 s  best=341541"
-        recorded_line 36 360 repeat 0 0.240 unknown "same_search of 34" "  own=0.000 s  best=34"
+        recorded_line 35 350 search 1133462769 4636.026 unknown exhausted \
+            "  active=3011.250 s  cpu=98123.500 s  best=341541"
+        recorded_line 36 360 repeat 0 0.240 unknown "same_search of 34" "  active=0.000 s  cpu=0.000 s  best=34"
         recorded_line 37 370 search 7 123.456 unknown exhausted
         recorded_line 38 380 search 9 1.5 unknown exhausted
-        recorded_line 37 370 prime 0 0.055 unknown prime_formula "  own=0.000 s  best=-"
+        recorded_line 37 370 prime 0 0.055 unknown prime_formula "  active=0.000 s  cpu=0.000 s  best=-"
         recorded_line 38 380 known 0 0.003 ok "known from the committed chain"
-        recorded_line 39 7466640 search 0 0.247 unknown cap "  assumes statement U  own=0.247 s  best=566640"
-        recorded_line 40 400 search 248002917 812.5 unknown exhausted "  own=697.250 s  best=40000"
+        recorded_line 39 7466640 search 0 0.247 unknown cap \
+            "  assumes statement U  active=0.247 s  cpu=0.000 s  best=566640"
+        recorded_line 40 400 search 248002917 812.5 unknown exhausted "  active=697.250 s  cpu=22318.000 s  best=40000"
         printf 'n=41    score=410       search  nodes=1000000000  6000.000 s  incomplete\n'
-        printf 'n=41    score=410       search  nodes=1000000000  6000.000 s  incomplete  own=5000.000 s  best=410\n'
+        printf 'n=41    score=410       search  nodes=1000000000  6000.000 s  incomplete  %s\n' \
+            'active=5000.000 s  cpu=1.000 s  best=410'
     } >>"$work/logs/chain.out"
     {
         progress 40 9m00s 100 done 1
         echo 'note: a line of the solver that is not a progress line'
         progress 45 2m00s 63 240.0k/s 500
-        progress 41 1h38m00s 900000000 250.0k/s 341541
+        progress 41 1h38m00s 900000000 250.0k/s 341541 96.1h
         progress 42 1h08m00s 63 0/s 341541
         progress 43 30m00s 4000 230.0k/s 777
-        progress 41 1h39m00s 925000000 250.0k/s 341541
+        progress 41 1h39m00s 925000000 250.0k/s 341541 96.9h
         progress 42 1h09m00s 63 0/s 341541
         progress 43 30m30s 5000 done 777
-        progress 41 1h40m00s 1000000000 250.0k/s 341541
+        progress 41 1h40m00s 1000000000 250.0k/s 341541 97.5h
         progress 42 1h10m00s 63 0/s 341541
     } >"$work/logs/chain.err"
-    printf '4500.036\n' >"$work/ckpt/n0041.clock"
     # The last progress line, 261 seconds ago.
     stamp "$work/logs/chain.err" $((now - 261))
     saved="$(local_text $((now - 261)))"
@@ -309,36 +312,37 @@ scenario_status() {
         "$tmp/s1.norm" ' recorded through 40 (score 400)'
     check "the last progress line is in Pacific time, with how long ago" matches "$tmp/s1.norm" \
         "^ last progress line: $saved, 4 min [0-9]* s ago$"
-    check "the oldest game runs, with its clock" has_line "$tmp/s1.norm" \
-        ' 41 1h15m00s 1,000,000,000 341,541 running, 250.0k nodes/s'
+    check "the oldest game runs, with its active time and CPU time (97.5h) from its last line" has_line "$tmp/s1.norm" \
+        ' 41 1h40m00s 97h30m00s 1,000,000,000 341,541 running, 250.0k nodes/s'
     check "a game whose threads are another's is suspended" has_line "$tmp/s1.norm" \
-        ' 42 - 63 341,541 suspended'
+        ' 42 1h10m00s 0.0s 63 341,541 suspended'
     check "a game whose search is done waits for the game before" has_line "$tmp/s1.norm" \
-        ' 43 - 5,000 777 search done, waiting for the game before'
-    check "a game with no line has no state to tell" has_line "$tmp/s1.norm" ' 44 - - - no recent progress line'
+        ' 43 30m30s 0.0s 5,000 777 search done, waiting for the game before'
+    check "a game with no line has no state to tell" has_line "$tmp/s1.norm" ' 44 - - - - no recent progress line'
     check "and a game whose last line three of another's follow" has_line "$tmp/s1.norm" \
-        ' 45 - - - no recent progress line'
+        ' 45 - - - - no recent progress line'
     check "the table has the last 6 games recorded, then the window after them, in order" equals \
         "$(table_games "$tmp/s1.norm")" '35 36 37 38 39 40 41 42 43 44 45 '
     check "its heading says what it holds" has_line "$tmp/s1.norm" \
         ' the last 6 games recorded and the 5 in flight (window 5):'
-    check "one header line of columns stands over both, with no elapsed time" equals \
-        "$(grep -c '^ n own search nodes best state$' "$tmp/s1.norm")" 1
-    check "a searched game has its nodes, its own search time (50m11s, not the 1h17m16s its line counts) and its best" \
-        has_line "$tmp/s1.norm" ' 35 50m11s 1,133,462,769 341,541 recorded, score 350 (search, exhausted)'
-    check "a repeat has the game whose search it repeats, and a game that ran no search has no time" has_line \
-        "$tmp/s1.norm" ' 36 0.0s 0 34 recorded, score 360 (repeat, same_search of 34)'
+    check "one header line of columns stands over both, with no time waited" equals \
+        "$(grep -c '^ n active cpu nodes best state$' "$tmp/s1.norm")" 1
+    check "a searched game has its nodes, its active time (50m11s, not the 1h17m16s its line counts), its CPU time and \
+its best" has_line "$tmp/s1.norm" \
+        ' 35 50m11s 27h15m23s 1,133,462,769 341,541 recorded, score 350 (search, exhausted)'
+    check "a repeat has the game whose search it repeats, and a game that ran no search has no CPU time" has_line \
+        "$tmp/s1.norm" ' 36 0.0s 0.0s 0 34 recorded, score 360 (repeat, same_search of 34)'
     check "a game printed again is the last of its lines: a prime game, with no best sum" has_line "$tmp/s1.norm" \
-        ' 37 0.0s 0 - recorded, score 370 (prime, prime_formula)'
-    check "a line of an older solver has no own search time or best sum, and a known game has the words of its proof" \
+        ' 37 0.0s 0.0s 0 - recorded, score 370 (prime, prime_formula)'
+    check "a line of an older solver has no times or best sum, and a known game has the words of its proof" \
         has_line "$tmp/s1.norm" \
-        ' 38 - 0 - recorded, score 380 (known, known from the committed chain, optimal ok)'
+        ' 38 - - 0 - recorded, score 380 (known, known from the committed chain, optimal ok)'
     check "the proof ends at what the solver adds to it, and the fields come after it" has_line "$tmp/s1.norm" \
-        ' 39 0.2s 0 566,640 recorded, score 7,466,640 (search, cap)'
-    check "a recorded game's own search time is formatted as an in-flight game's, its best with commas" has_line \
-        "$tmp/s1.norm" ' 40 11m37s 248,002,917 40,000 recorded, score 400 (search, exhausted)'
+        ' 39 0.2s 0.0s 0 566,640 recorded, score 7,466,640 (search, cap)'
+    check "a recorded game's times are formatted as an in-flight game's, its best with commas" has_line \
+        "$tmp/s1.norm" ' 40 11m37s 6h11m58s 248,002,917 40,000 recorded, score 400 (search, exhausted)'
     check "an incomplete line, with the fields or without, is not a recorded game" lacks "$tmp/s1.norm" 'score 410'
-    check "no column has the time a game waited" lacks "$tmp/s1.norm" 'elapsed'
+    check "no column has the time a game waited" lacks "$tmp/s1.norm" 'waited\|elapsed'
     check "none is in UTC" lacks "$tmp/s1.out" 'UTC\|[0-9]Z'
 
     # The same time in other zones: the progress file was last written on 2026-01-15 at 03:30:00 UTC, the evening before
@@ -362,11 +366,11 @@ scenario_status() {
     TZ=America/Los_Angeles "$status" --host "$host" >"$tmp/s5.out" 2>&1
     sed 's/  */ /g' "$tmp/s5.out" >"$tmp/s5.norm"
     check "the oldest game, searched, is being recorded" has_line "$tmp/s5.norm" \
-        ' 41 1h15m00s 1,001,000,000 341,541 search done, being recorded'
+        ' 41 1h41m00s 0.0s 1,001,000,000 341,541 search done, being recorded'
     check "a suspended game is still current after the oldest game's last line" has_line "$tmp/s5.norm" \
-        ' 42 - 63 341,541 suspended'
+        ' 42 1h10m00s 0.0s 63 341,541 suspended'
     check "a stopped search says so" has_line "$tmp/s5.norm" \
-        ' 44 - 70 9 search stopped, its checkpoint kept'
+        ' 44 5m00s 0.0s 70 9 search stopped, its checkpoint kept'
 
     # --recorded N: how many of the games recorded the table shows, before the host or after it.
     TZ=America/Los_Angeles "$status" --host "$host" --recorded 2 >"$tmp/r1.out" 2>&1
@@ -435,7 +439,7 @@ scenario_status() {
     TZ=America/Los_Angeles "$status" --host "$host" --recorded 0 >"$tmp/e2.out" 2>&1
     check "with --recorded 0 an ended chain's status succeeds" equals $? 0
     check "and has the note" matches "$tmp/e2.out" '^  no game in flight: the range to 40 is recorded$'
-    check "without a table" lacks "$tmp/e2.out" 'own search'
+    check "without a table" lacks "$tmp/e2.out" ' active '
     check "or a heading" lacks "$tmp/e2.out" '^  the last .* recorded'
     check "or a recorded game" lacks "$tmp/e2.out" 'recorded, score'
 
@@ -452,8 +456,8 @@ scenario_status() {
     # heading claims none.
     fake_chain 100
     fake_results 0
-    printf 'n=1     score=10        search  nodes=5          2.000 s  incomplete  own=1.500 s  best=10\n' \
-        >"$work/logs/chain.out"
+    printf 'n=1     score=10        search  nodes=5          2.000 s  incomplete  %s\n' \
+        'active=1.500 s  cpu=3.000 s  best=10' >"$work/logs/chain.out"
     progress 1 1m00s 5000 120.0k/s 0 >"$work/logs/chain.err"
     "$status" --host "$host" >"$tmp/n1.out" 2>&1
     check "a chain with no game recorded succeeds" equals $? 0
@@ -461,7 +465,7 @@ scenario_status() {
     check "it says no game is recorded" has_line "$tmp/n1.out" '  recorded through: no game yet'
     check "the table is the games in flight" equals "$(table_games "$tmp/n1.norm")" '1 2 3 4 5 '
     check "under their heading" has_line "$tmp/n1.out" '  games in flight (window 5):'
-    check "with a game that runs" has_line "$tmp/n1.norm" ' 1 - 5,000 0 running, 120.0k nodes/s'
+    check "with a game that runs" has_line "$tmp/n1.norm" ' 1 1m00s 0.0s 5,000 0 running, 120.0k nodes/s'
     check "and no game recorded" lacks "$tmp/n1.out" 'recorded, score\|^  the last'
 
     # Fewer games recorded than the table shows: those there are.
@@ -496,17 +500,16 @@ scenario_status() {
     printf '%s chain 1-100; threads: all available; window 3; results x; checkpoints y\n' 2026-10-21T00:00:00Z \
         >"$work/logs/chain.log"
     fake_results 3
-    recorded_line 2 20 search 5 1.5 unknown exhausted "  own=1.500 s  best=18" >"$work/logs/chain.out"
+    recorded_line 2 20 search 5 1.5 unknown exhausted "  active=1.500 s  cpu=3.000 s  best=18" >"$work/logs/chain.out"
     progress 4 1h40m00s 14000000000 250.0k/s 341541 >"$work/logs/chain.err"
-    printf '7200.5\n' >"$work/ckpt/n0004.clock"
     TZ=America/Los_Angeles "$status" --host "$host" >"$tmp/w1.out" 2>&1
     sed 's/  */ /g' "$tmp/w1.out" >"$tmp/w1.norm"
-    check "the table has the game of chain.out, the game in flight with its clock, and the window of chain.log" equals \
-        "$(grep -c -e ' 2 1.5s 5 18 recorded, score 20 (search, exhausted)$' \
-            -e ' 4 2h00m00s 14,000,000,000 341,541 running, 250.0k nodes/s$' \
-            -e ' 6 - - - no recent progress line$' "$tmp/w1.norm")" 3
+    check "the table has the game of chain.out, the game in flight with its times, and the window of chain.log" equals \
+        "$(grep -c -e ' 2 1.5s 3.0s 5 18 recorded, score 20 (search, exhausted)$' \
+            -e ' 4 1h40m00s 0.0s 14,000,000,000 341,541 running, 250.0k nodes/s$' \
+            -e ' 6 - - - - no recent progress line$' "$tmp/w1.norm")" 3
     check "a node count of 14,000,000,000 has its commas and ends under the header's right-aligned nodes" equals \
-        "$(awk '/ own search / {head = index($0, "nodes") + 4}
+        "$(awk '/ active / {head = index($0, "nodes") + 4}
             /14,000,000,000/ {row = index($0, "14,000,000,000") + 13}
             END {print (head > 0 && head == row) ? "ok" : "head " head " row " row}' "$tmp/w1.out")" ok
 }

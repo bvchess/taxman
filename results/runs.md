@@ -155,7 +155,8 @@ entry](https://github.com/bvchess/taxman-notebook/blob/main/the-run-past-5000-20
 
 **The sixth run, games 4875–5060.**  The command was `solver/tools/cloud/chain.sh 8191`, which runs `taxman solve 1-8191
 --use-prev` with a window of 4 games in flight and [the wall](../docs/GLOSSARY.md#the-search) at 48 hours of a game's
-own search (the details below say where the window and the wall changed), on a friend's machine of 88 threads: two Intel
+own search, the time its search ran while it was the oldest of the window (the details below say where the window and
+the wall changed), on a friend's machine of 88 threads: two Intel
 Xeon E5-2699 v4 (x86_64, Ubuntu).  It continued the fifth run's results file and its checkpoints, which were copied from
 the cloud machine.  It took games 1–4874 from the file and each game the bounds store had proven from the store, with no
 search, and searched the others, from 4875 on.  Its own file started with `known` copies of games 1–4874.  The lines of
@@ -243,8 +244,9 @@ searched 5049 and wrote only an incomplete line):
   one 159 M nodes or more.  The dearest by nodes were 4893 (614 M nodes, 17,593 s), 4880 (290 M), 4890 (283 M) and 4895
   (272 M, 17,633 s).  The queue of work units never held more than 9,429, and none spilled.  The 21 searches of
   4901–4949 took 4.65 G nodes, 81.5 M or more each; the dearest by nodes were 4929 (400 M), 4925 (394 M), 4921 (386 M)
-  and 4928 (384 M), and by `seconds.own`, the game's own search time ([glossary](../docs/GLOSSARY.md#the-search)), 4921
-  (6,803 s), 4929 (5,744 s) and 4913 (5,670 s).  The 12 searches of 4950–4983 took 18.33 G nodes, 502 M or more each;
+  and 4928 (384 M), and by `seconds.own`, the time the game's search ran while it was the oldest of the window (a key
+  of this run's build; later builds record `seconds.active` and `cpu`), 4921 (6,803 s), 4929 (5,744 s) and 4913
+  (5,670 s).  The 12 searches of 4950–4983 took 18.33 G nodes, 502 M or more each;
   the dearest, by nodes and by `seconds.own`, were 4983 (8.77 G nodes, 160,387 s or 44.6 h, under the 48 hours of the
   wall, which the invocations from the eleventh on did not have), 4968 (1.39 G, 19,448 s), 4970 (1.29 G, 18,269 s) and
   4980 (1.24 G, 17,252 s).  The queue of work units never held more than 10,549, and none spilled.  The 6 searches of

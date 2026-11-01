@@ -191,10 +191,14 @@ every second line of the Java fixtures), and the comment on each says what the w
     checkpointed, stopped, or ended by a ceiling) give the exact answer; and the conservation test runs with a
     controller that sets 0 to 4 workers every millisecond or so while the run checkpoints, spills and resumes;
   * the counters: capacity is wall × threads when the workers do not change, and a searcher that sleeps before its
-    first and second polls shows in the rebuild and first-step times.
+    first and second polls shows in the rebuild and first-step times;
+  * the time a run has spent: the workers' CPU time grows in the status of a running search and is whole in the counters
+    at the end, no more than the workers' lifetimes; a run's account is its own (active throughout, never waiting)
+    until the caller reports another through the control, which the checkpoint hooks and the outcome then carry.
 * **The profile of a search** (`src/search/profile.rs`, games 800 and 1020): the same steps, counters and answer with
   it and without; every step counted once, on four threads with a checkpoint every millisecond and all the ids made,
-  and through a resume past a block a crash left, behind a lost block, or with no profile.  Debug builds place every
+  and through a resume past a block a crash left, behind a lost block, or with no profile; its `start`, `steps` and
+  `end` lines carry the active and CPU time of the search.  Debug builds place every
   unit a searcher hands over.  The folder of `--profile`, like that of `--carried-dir`, is made when the run starts, and
   a folder that cannot be made fails the run before its first game (`tests/solver.rs`).
 * **The window** (`tests/window.rs`; the policy's unit tests in `src/solver/window/allot.rs`):
@@ -206,8 +210,13 @@ every second line of the Java fixtures), and the comment on each says what the w
   * a range stopped by a node limit ends at its first unfinished game, with the lines before it in order, and completes
     when run again;
   * a game stopped by a node limit keeps its checkpoint and its clock, stops again from the clock it left, and
-    completes under no limit, leaving no clock, with a line whose `seconds.own` is no less than the clock it went on
-    from (the clock file's unit tests are in `src/solver/clock.rs`);
+    completes under no limit, leaving no clock, with a line whose `seconds.cpu_all_runs` and `active_all_runs` are no
+    less than the clock it went on from (the clock file's unit tests are in `src/solver/clock.rs`);
+  * every line has `started` and `finished`, UTC stamps, and `cpu`, `active` and `waiting`, whose active and waiting
+    seconds add up to the span between the stamps, with windows of 1, 2 and 4; a game that ran no search used no CPU
+    time in workers, and a search that took steps did; and the driver's sorting of a game's time (unit tests in
+    `src/solver/window.rs`): a game with a worker is active, a search suspended for older games is waiting, and one
+    whose workers are still retiring is active;
   * a score that is not the table's fails the range at that game, with the lines before it, as a window of one does;
   * the near-repeat cut of a search that runs when the game before it is concluded (unit tests in
     `src/solver/window.rs`): game 1083, held at no worker beside 1082, is armed by the conclusion of 1082, picks the cut
@@ -233,9 +242,9 @@ every second line of the Java fixtures), and the comment on each says what the w
   what it says is refused; an assumption travels down a chain; a score that is not the table's is a hard error; a
   tampered results file, or one whose line contradicts itself or is of another schema, is refused by both verifiers,
   naming the line; a torn last line is dropped; the committed results pass the verifier and the built-in table holds
-  their games; a game stopped by a node limit and resumed reads back assuming nothing; a game's line has its own search
-  time (`seconds.own`, zero for a game that runs no search), and its summary line ends with that time and its best
-  promotion sum.  Both verifiers refuse forged repeats (another game
+  their games; a game stopped by a node limit and resumed reads back assuming nothing; a game's line has the CPU time
+  of its workers (`seconds.cpu`, zero for a game that runs no search) and its active time, and its summary line ends
+  with those over all its runs and its best promotion sum.  Both verifiers refuse forged repeats (another game
   named; the digests, promotions or promotion sum changed; the game repeated unfinished, after the repeat, or settling
   no search; its assumptions dropped), and `verify-results` refuses two more that only setting the problems up again can
   catch (the Python referee accepts them, as its docstring says).  A search that took no step is the method `start`:

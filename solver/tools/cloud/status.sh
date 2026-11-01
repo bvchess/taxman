@@ -50,8 +50,8 @@ span_text() {
 
 # What the line of a game that is not recorded has (an extended regular expression, for grep -E): the solver prints one
 # for a game whose search a limit stopped, with `incomplete` where a recorded game has `optimal`, and the line ends
-# there or, from a solver that prints the own search time, goes on to `own=`.
-INCOMPLETE_LINE=' incomplete($|  own=)'
+# there or, from a solver that prints the game's times, goes on to `active=`.
+INCOMPLETE_LINE=' incomplete($|  active=)'
 
 # The last line of each of the COUNT highest games up to THROUGH among the lines of recorded games on stdin
 # (logs/chain.out), the lowest game first.  A replacement machine may print a game again after an interruption: the last
@@ -67,29 +67,47 @@ recorded_games() {
 
 # The games, a line each: the recorded games, then those in flight.  The text on stdin is the lines of the recorded
 # games (recorded_games), then the progress lines of the solver (logs/chain.err).  A recorded game's line, `n=4864
-# score=7437375   search  nodes=1133462769   4636.026 s  optimal unknown  proof=exhausted  own=3011.250 s  best=341541`,
-# gives the columns of the row: `nodes`; `own search`, the line's own search time (`own=`, the game's clock over every
-# run of it); and `best`, its best sum of promotions (`best=`, the score less `in_the_bag`, or `-`).  A line that an
-# older solver printed has neither field, and its row shows `-` for both.  The seconds of the line are not shown: they
-# count the time the game waited behind others.  A game in flight whose search has started prints one progress line
-# every PROGRESS seconds, `n=3930 1h45m00s nodes 1086013550 (242.8k/s) best 341541 queue ...` (the time since the search
-# began, which the table does not show; the nodes so far; the nodes a second in the last interval, or `done`,
-# `optimal`, `stopped`, `failed` or `panicked` in the last line; the best sum of promotions so far), and nothing else
-# says where a game is: a game with no recent line has no state to tell (a setup, a prime or repeated game, a search
-# not started).  Its `own search` is its clock (ckpt/nNNNN.clock).  Arguments: the first game in flight, how many
-# games are in flight, and the games' clocks as "n seconds n seconds ...".  A line is recent unless three lines of
-# another game in flight follow it (a game that still searches prints once an interval).  The state of a game in flight
-# is told from its last line:
+# score=7437375   search  nodes=1133462769   4636.026 s  optimal unknown  proof=exhausted  active=3011.250 s
+# cpu=98123.500 s  best=341541`, gives the columns of the row: `nodes`; `active`, the seconds the game had a worker, and
+# `cpu`, the CPU seconds of its search's workers (`active=` and `cpu=`, both over every run of the game); and `best`,
+# its best sum of promotions (`best=`, the score less `in_the_bag`, or `-`).  A line that an older solver printed has
+# none of the three, and its row shows `-` for them.  The seconds of the line are not shown: they count the time the
+# game waited behind others.  A game in flight whose search has started prints one progress line every PROGRESS
+# seconds, `12:34:56Z n=3930 active 1h45m00s waited 0.0s cpu 97.5h nodes 1086013550 (242.8k/s) best 341541 queue ...`
+# (the UTC time of day, which the table does not show; the game's active time and CPU time over every run of it, the
+# columns of the row, and the time it waited, which the table does not show; the nodes so far; the nodes a second in
+# the last interval, or `done`, `optimal`, `stopped`, `failed` or `panicked` in the last line; the best sum of
+# promotions so far), and nothing else says where a game is: a game with no recent line has no state to tell (a setup, a
+# prime or repeated game, a search not started).  Arguments: the first game in flight and how many games are in flight.
+# A line is recent unless three lines of another game in flight follow it (a game that still searches prints once an
+# interval).  The state of a game in flight is told from its last line:
 #   running      the nodes grow (1000 a second or more in the last interval)
 #   suspended    the search has started, but the threads are another game's, and the nodes do not grow
 #   search done  the search has ended (`done` or `optimal`) and the game is not recorded yet: the oldest game is being
 #                recorded, any other waits for the games before it
 games_table() {
-    awk -v first="$1" -v flight="$2" -v clocks="$3" "$AWK_COMMAS"'
+    awk -v first="$1" -v flight="$2" "$AWK_COMMAS"'
     function duration(s) {
         if (s < 60) return sprintf("%.1fs", s)
         if (s < 3600) return sprintf("%dm%02ds", s / 60, s % 60)
         return sprintf("%dh%02dm%02ds", s / 3600, s / 60 % 60, s % 60)
+    }
+    # The seconds in a time of a progress line: 12.3s, 5m03s, 1h20m05s, or 112.3h (hours, for a CPU time).
+    function seconds(text,    part) {
+        if (text ~ /^[0-9]+([.][0-9]+)?h$/) {
+            sub(/h$/, "", text)
+            return text * 3600
+        }
+        if (text ~ /^[0-9]+m[0-9]+s$/) {
+            split(text, part, /[ms]/)
+            return part[1] * 60 + part[2]
+        }
+        if (text ~ /^[0-9]+h[0-9]+m[0-9]+s$/) {
+            split(text, part, /[hms]/)
+            return part[1] * 3600 + part[2] * 60 + part[3]
+        }
+        sub(/s$/, "", text)
+        return text + 0
     }
     # Nodes a second, from the rate of a line: 0, 1, 236.5k, 1.20M, ...
     function rate(text,    unit) {
@@ -101,20 +119,18 @@ games_table() {
         else if (unit == "G") text *= 1e9
         return text
     }
-    function row(n, own, nodes, best, state) {
-        printf "  %5s  %-10s  %14s  %9s  %s\n", n, own, commas(nodes), commas(best), state
+    function row(n, active, cpu, nodes, best, state) {
+        printf "  %5s  %-10s  %-10s  %14s  %9s  %s\n", n, active, cpu, commas(nodes), commas(best), state
     }
     BEGIN {
         first += 0
         last = first + flight - 1
-        count = split(clocks, c, " ")
-        for (i = 1; i < count; i += 2) held[c[i] + 0] = c[i + 1] + 0
-        row("n", "own search", "nodes", "best", "state")
+        row("n", "active", "cpu", "nodes", "best", "state")
     }
     # A recorded game, a row at once, so that the recorded games come above those in flight.  Its state is its score,
     # its method, its proof (the text after `proof=` up to the next two spaces) and `optimal ok`, if the solver found
-    # the game in its table of optimal games.  Its own search time and its best sum are the last two fields of the line
-    # (`  own=3011.250 s  best=341541`), if the solver that printed it had them.
+    # the game in its table of optimal games.  Its active time, CPU time and best sum are the last three fields of the
+    # line (`  active=3011.250 s  cpu=98123.500 s  best=341541`), if the solver that printed it had them.
     $1 ~ /^n=[0-9]+$/ && $2 ~ /^score=[0-9]+$/ && $4 ~ /^nodes=[0-9]+$/ && $6 == "s" {
         detail = $3
         where = index($0, "  proof=")
@@ -124,30 +140,34 @@ games_table() {
             detail = detail ", " proof
         }
         if ($7 == "optimal" && $8 != "unknown") detail = detail ", optimal " $8
-        own_time = "-"
+        active_time = "-"
+        cpu_time = "-"
         best_sum = "-"
-        if (match($0, /  own=[0-9]+([.][0-9]+)? s  best=([0-9]+|-)$/)) {
+        if (match($0, /  active=[0-9]+([.][0-9]+)? s  cpu=[0-9]+([.][0-9]+)? s  best=([0-9]+|-)$/)) {
             split(substr($0, RSTART + 2), ends, " ")
-            own_time = duration(substr(ends[1], 5) + 0)
-            best_sum = substr(ends[3], 6)
+            active_time = duration(substr(ends[1], 8) + 0)
+            cpu_time = duration(substr(ends[3], 5) + 0)
+            best_sum = substr(ends[5], 6)
         }
-        row(substr($1, 3), own_time, substr($4, 7), best_sum,
+        row(substr($1, 3), active_time, cpu_time, substr($4, 7), best_sum,
             "recorded, score " commas(substr($2, 7)) " (" detail ")")
     }
-    $1 ~ /^n=[0-9]+$/ && $3 == "nodes" && $4 ~ /^[0-9]+$/ && $5 ~ /^\(.*\)$/ && $6 == "best" && $8 == "queue" {
-        n = substr($1, 3) + 0
-        how = substr($5, 2, length($5) - 2)
+    $1 ~ /^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z$/ && $2 ~ /^n=[0-9]+$/ && $3 == "active" && $5 == "waited" && $7 == "cpu" \
+        && $9 == "nodes" && $10 ~ /^[0-9]+$/ && $11 ~ /^\(.*\)$/ && $12 == "best" && $14 == "queue" {
+        n = substr($2, 3) + 0
+        how = substr($11, 2, length($11) - 2)
         lines++
         game[lines] = n
         finished[lines] = (how !~ /\/s$/)
         at[n] = lines
-        nodes[n] = $4
-        best[n] = $7
+        active[n] = $4
+        cpu[n] = $8
+        nodes[n] = $10
+        best[n] = $13
         last_how[n] = how
     }
     END {
         for (g = first; g <= last; g++) {
-            own = (g in held) ? duration(held[g]) : "-"
             how = (g in at) ? last_how[g] : ""
             searching = (how != "done" && how != "optimal")
             stale = 0
@@ -159,7 +179,7 @@ games_table() {
                 }
             }
             if (!(g in at) || stale) {
-                row(g, own, "-", "-", "no recent progress line")
+                row(g, "-", "-", "-", "-", "no recent progress line")
                 continue
             }
             if (!searching) {
@@ -175,7 +195,7 @@ games_table() {
                 sub("/s$", " nodes/s", state)
                 state = "running, " state
             }
-            row(g, own, nodes[g], best[g], state)
+            row(g, duration(seconds(active[g])), duration(seconds(cpu[g])), nodes[g], best[g], state)
         }
     }'
 }
@@ -202,7 +222,7 @@ table_heading() {
 # SHOW_RECORDED games recorded and the games in flight after the game recorded through.
 chain_games() {
     local recorded="$1" score="$2" window="$3" chain_to="$4" lines="$5" have_progress="$6"
-    local first_n last_n in_flight shown shown_count name n seconds clocks=""
+    local first_n last_n in_flight shown shown_count
     if [ -n "$recorded" ]; then
         printf '  recorded through %s (score %s)\n' "$recorded" "$(commas "$score")"
     else
@@ -214,21 +234,13 @@ chain_games() {
     [ "$last_n" -le "$chain_to" ] || last_n="$chain_to"
     in_flight=$((last_n - first_n + 1))
     [ "$in_flight" -gt 0 ] || in_flight=0
-    while read -r name seconds; do
-        [ -n "$name" ] || continue
-        n="${name#n}"
-        n=$((10#${n%.clock}))
-        if [ "$n" -ge "$first_n" ] && [ "$n" -le "$last_n" ] && [ -n "$seconds" ]; then
-            clocks="$clocks $n $seconds"
-        fi
-    done <<<"$HOST_CLOCKS"
     shown="$(printf '%s\n' "$lines" | recorded_games "$SHOW_RECORDED" "$recorded")"
     shown_count="$(printf '%s\n' "$shown" | grep -c .)"
     table_heading "$shown_count" "$in_flight" "$window"
     if [ "$in_flight" -gt 0 ] && [ "$have_progress" = 1 ]; then
-        { printf '%s\n' "$shown"; host_section err; } | games_table "$first_n" "$in_flight" "$clocks"
+        { printf '%s\n' "$shown"; host_section err; } | games_table "$first_n" "$in_flight"
     else
-        [ "$shown_count" -eq 0 ] || printf '%s\n' "$shown" | games_table "$first_n" 0 ""
+        [ "$shown_count" -eq 0 ] || printf '%s\n' "$shown" | games_table "$first_n" 0
         if [ "$in_flight" -gt 0 ]; then
             printf '  no progress lines yet\n'
         else
@@ -265,10 +277,6 @@ tail -n 100 "$work/results/strict.jsonl" 2>/dev/null | grep '"completed":true' |
     grep -o '"n":[0-9]*,"score":[0-9]*' | head -n 1
 echo @@out
 grep '^n=' "$work/logs/chain.out" 2>/dev/null | grep -Ev "$incomplete_line"
-echo @@clocks
-for f in "$work"/ckpt/n*.clock; do
-    [ -f "$f" ] && echo "$(basename "$f") $(awk '{print $1; exit}' "$f")"
-done
 true
 EOF
 }
@@ -318,7 +326,6 @@ status_host() {
     result="$(host_section result)"
     recorded="$(printf '%s\n' "$result" | sed -n 's/^"n":\([0-9]*\),.*/\1/p')"
     score="$(printf '%s\n' "$result" | sed -n 's/.*"score":\([0-9]*\)$/\1/p')"
-    HOST_CLOCKS="$(host_section clocks)"
     chain_games "$recorded" "$score" "$window" "$chain_to" "$(host_section out)" "$have_progress"
 }
 

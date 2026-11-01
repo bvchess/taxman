@@ -10,11 +10,14 @@ use common::{Rng, TempDir, QUICK};
 use std::fs;
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use taxman::engine::{self, Control, Ctx, EngineConfig, Outcome, Poll, Searcher, Start, Status, Unit};
+use taxman::engine::{
+    self, CheckpointEvent, CheckpointHook, Control, Ctx, EngineConfig, Outcome, Poll, Searcher, Spent, Start, Status,
+    Unit,
+};
 
 // ------------------------------------------------------------------------------------------------------------
 // The toy problem
@@ -881,6 +884,74 @@ fn an_untouched_control_changes_nothing() {
     assert_accounting(c);
     assert_eq!(control.best(), Some((out.best, out.payload.clone())));
     assert!(control.status().is_none());
+}
+
+/// The workers' CPU time is counted: a run's status has what the workers had published by then, which grows while they
+/// search, and the counters of the run have all of it at the end, no more than the workers' lifetimes (and a little for
+/// the clock's grain).  A search that cannot end by itself is stopped when the status has shown the time grow.
+#[test]
+fn the_workers_cpu_time_is_counted() {
+    let inst = long_instance();
+    let control = Control::new();
+    let cfg = controlled(config(2), &control);
+    let (out, seen) = alongside(
+        || {
+            let first = wait_for(&control, |status| status.cpu > Duration::ZERO).map(|status| status.cpu);
+            let later = first.and_then(|first| wait_for(&control, |status| status.cpu > first));
+            control.stop();
+            (first, later.map(|status| status.cpu))
+        },
+        || solve(&cfg, fresh(), &inst),
+    );
+    assert!(!out.completed, "stopped");
+    let (first, later) = seen;
+    let (first, later) = (first.expect("a reading above zero"), later.expect("a later, larger reading"));
+    let c = &out.counters;
+    assert!(first < later && later <= c.cpu && c.cpu <= c.capacity + Duration::from_millis(50), "{c:?}");
+    assert_eq!(out.spent.cpu, c.cpu);
+}
+
+/// What a run has spent is its own account (active throughout, never waiting, the CPU time of its workers) unless the
+/// caller reports another through the control, which is then what the checkpoint hooks are told and the outcome has.
+#[test]
+fn a_run_has_spent_its_own_time_unless_the_caller_reports_another() {
+    let inst = instance();
+    let told = |cfg: EngineConfig| {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let hook = {
+            let seen = Arc::clone(&seen);
+            CheckpointHook(Arc::new(move |event| {
+                if let CheckpointEvent::Writing { spent, .. } = event {
+                    seen.lock().unwrap().push(spent);
+                }
+            }))
+        };
+        let dir = TempDir::new("spent");
+        let cfg = EngineConfig {
+            checkpoint: Some((dir.join("ckpt.bin"), Duration::from_millis(2))),
+            checkpoint_hook: Some(hook),
+            ..cfg
+        };
+        let out = solve(&cfg, fresh(), &inst);
+        let seen = seen.lock().unwrap().clone();
+        (out, seen)
+    };
+
+    let (out, seen) = told(config(2));
+    assert_eq!(out.spent, Spent { cpu: out.counters.cpu, active: out.elapsed, waiting: Duration::ZERO });
+    assert!(!seen.is_empty(), "a checkpoint every 2 ms in a run of {:?}", out.elapsed);
+    assert!(seen.iter().all(|spent| spent.waiting == Duration::ZERO && spent.active <= out.elapsed));
+    assert!(seen.windows(2).all(|pair| pair[0].active <= pair[1].active && pair[0].cpu <= pair[1].cpu), "{seen:?}");
+
+    let control = Control::new();
+    assert_eq!(control.reported(), None);
+    let secs = Duration::from_secs;
+    let account = Spent { cpu: secs(7), active: secs(5), waiting: secs(3) };
+    control.report(account);
+    assert_eq!(control.reported(), Some(account));
+    let (out, seen) = told(controlled(config(2), &control));
+    assert_eq!(out.spent, account);
+    assert!(!seen.is_empty() && seen.iter().all(|&spent| spent == account), "{seen:?}");
 }
 
 /// The best value given as the ceiling before the run ends it as soon as the incumbent reaches it; the lowest

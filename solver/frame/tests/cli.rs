@@ -393,6 +393,32 @@ fn solve_writes_its_results_skips_what_is_done_and_resumes_what_was_stopped() {
     assert!(!ckpt.join("n1000.ckpt").exists(), "a finished game removes its checkpoint");
 }
 
+/// A search prints a progress line at its end (`--progress` asks for more while it runs), which starts with the UTC
+/// time of day, the game, and what the game has spent over all its invocations: the time it was active, the time it
+/// waited and the CPU time of its workers; the summary line on stdout ends with the active and CPU seconds.
+#[test]
+fn the_progress_line_has_the_time_of_day_and_what_the_game_has_spent() {
+    let run = taxman(&["solve", "1000", "--force-search", "--threads", "2", "--progress", "60"]);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let line = run.stderr.lines().find(|line| line.contains(" nodes ")).unwrap_or_else(|| panic!("{}", run.stderr));
+    let words: Vec<&str> = line.split(' ').collect();
+    // 12:34:56Z n=1000 active 0.3s waited 0.0s cpu 0.5s nodes 2708 (done) best 24175 queue 0 spilled 0 | eff ...
+    let time_of_day = |word: &str| {
+        let digits: Vec<&str> = word.strip_suffix('Z').unwrap_or("").split(':').collect();
+        digits.len() == 3 && digits.iter().all(|part| part.len() == 2 && part.bytes().all(|b| b.is_ascii_digit()))
+    };
+    assert!(time_of_day(words[0]), "{line}");
+    let spent = |word: &str| word.ends_with('s') || word.ends_with('h');
+    assert_eq!((words[1], words[2], words[4], words[6], words[8]), ("n=1000", "active", "waited", "cpu", "nodes"));
+    assert!(spent(words[3]) && spent(words[5]) && spent(words[7]) && words[10] == "(done)", "{line}");
+    let summary = run.stdout.lines().find(|line| line.starts_with("n=1000 ")).expect("the summary line");
+    let seconds = |key: &str| -> f64 {
+        let word = summary.split_whitespace().find_map(|word| word.strip_prefix(key)).expect(key);
+        word.parse().unwrap_or_else(|e| panic!("{key} in {summary}: {e}"))
+    };
+    assert!(seconds("active=") > 0.0 && seconds("cpu=") > 0.0, "{summary}");
+}
+
 /// `--background` is a switch that `solve` and `certify` take, which changes no score, which a line records in its
 /// `options` where it was given, and which says on stderr, once, that it does nothing where there is no idle policy.
 #[test]

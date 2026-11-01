@@ -19,7 +19,8 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 3. `src/bits.rs`: `Bits<W>`, the fixed-width bitsets of game numbers that everything above is generic over, and the set
    widths.  The module comment is enough at first.
 4. `src/json.rs`: the small JSON reader and writer.  Skim it; it matters once you read results lines.  `src/rng.rs`
-   is the seeded generator that the finder draws its neighborhoods with.
+   is the seeded generator that the finder draws its neighborhoods with, and `src/utc.rs` the UTC timestamps of a
+   run's records.
 
 **The frame model.**
 

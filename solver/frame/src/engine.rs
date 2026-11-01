@@ -244,10 +244,22 @@
 //! keeps a running total of the idle waits, so that the ramp's and the tail's idle times are snapshots of it.
 //! [`Counters::summary`] is the compact form that ends every progress line.
 //!
+//! **CPU time.**  Each worker reads the CPU clock of its thread ([`thread_cpu`]) when it starts, and publishes what the
+//! thread has used since its last reading every `POLL_BATCH` polls (with the node counts), at the end of every unit and
+//! when it leaves, into one total for the run ([`Counters::cpu`], [`Status::cpu`]).  So the total counts everything
+//! the workers' threads did, searching and the engine's bookkeeping beside it, and trails the threads by at most a
+//! batch of polls; the coordinator's thread, the caller's and the searcher's own helper threads are not in it.
+//!
+//! **The caller's account.**  A caller that runs the search beside others, and knows when it had its workers and when
+//! it had none, tells the control how long it has had them ([`Control::report`]: a [`Spent`], its CPU time, the time it
+//! was active and the time it waited).  The engine prints that in its progress lines and hands it to the checkpoint
+//! hooks and in the [`Outcome`]; without a report it is active throughout, never waits, and has used the CPU time of
+//! its workers in this invocation.
+//!
 //! # Platforms
 //!
-//! The engine uses only `std` (plus the POSIX `signal`, `kill` and `_exit`, declared in `sys`, and on Linux
-//! `sched_setscheduler`, declared in `idle`) and behaves the same on Linux and macOS, but for
+//! The engine uses only `std` (plus the POSIX `signal`, `kill`, `_exit` and `clock_gettime`, declared in `sys` and
+//! `cpu`, and on Linux `sched_setscheduler`, declared in `idle`) and behaves the same on Linux and macOS, but for
 //! [`EngineConfig::background`], which does nothing on macOS.  Checkpoints are durable on both: the file is
 //! written, `sync_all`ed (`fsync` on Linux, `F_FULLFSYNC` on macOS) and renamed over the old one, and the directory
 //! is then synced so the
@@ -268,7 +280,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, Once, PoisonError, Weak};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
+
+use crate::utc;
 
 // ------------------------------------------------------------------------------------------------------------
 // Public API
@@ -297,6 +311,25 @@ pub trait Searcher<U: Unit> {
     /// When it returns [`Poll::Yield`], push ALL remaining unexplored work with `ctx.push`, shallowest first
     /// and deepest last, and return promptly.  Pushes made without a yield are allowed and treated the same.
     fn run(&mut self, unit: U, ctx: &mut Ctx<'_, U>);
+}
+
+/// What a search has spent, in the three times a record of a game gives: the CPU time of its workers' threads (thread
+/// seconds, which can pass the wall time by as many times as it had workers), the wall time it was active, with at
+/// least one worker, and the wall time it was waiting, in flight with none (suspended for other searches, or not yet
+/// started).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Spent {
+    pub cpu: Duration,
+    pub active: Duration,
+    pub waiting: Duration,
+}
+
+impl std::ops::Add for Spent {
+    type Output = Spent;
+
+    fn add(self, other: Spent) -> Spent {
+        Spent { cpu: self.cpu + other.cpu, active: self.active + other.active, waiting: self.waiting + other.waiting }
+    }
 }
 
 /// Search statistics, summed over workers and across resumed runs.
@@ -389,14 +422,15 @@ impl Default for EngineConfig {
 }
 
 /// What a [`CheckpointHook`] is told, with every worker parked, so that the search stands still: `nodes` is the steps of
-/// every run of the search so far, as the checkpoint records them, and `elapsed` its time.
+/// every run of the search so far, as the checkpoint records them, and `spent` what the search has spent over all its
+/// runs (the caller's account if it reported one, else the engine's own for this run: [`Spent`]).
 #[derive(Clone, Copy, Debug)]
 pub enum CheckpointEvent<'a> {
     /// The checkpoint is about to be written: what the caller records of the search can be made durable first, so that
     /// it is never behind a checkpoint on disk.
-    Writing { nodes: u64, elapsed: Duration },
+    Writing { nodes: u64, spent: Spent },
     /// The checkpoint has been written to `path`, which the caller may open and read (the next checkpoint replaces it).
-    Written { path: &'a Path, nodes: u64, elapsed: Duration },
+    Written { path: &'a Path, nodes: u64, spent: Spent },
 }
 
 /// A caller's hook on the checkpoints ([`EngineConfig::checkpoint_hook`]), called by the coordinator with the engine's
@@ -428,6 +462,9 @@ impl std::fmt::Debug for ProgressNote {
 /// it is attached to one run at a time, and a stop it was given holds for every run it is attached to later.
 pub struct Control {
     state: Mutex<ControlState>,
+    /// What the caller last reported of the search ([`Control::report`]); a lock of its own, which nothing is taken
+    /// under, since the engine reads it while it holds its `state` lock.
+    reported: Mutex<Option<Spent>>,
 }
 
 /// What a [`Control`] has been told, and the run it is attached to.
@@ -449,7 +486,21 @@ impl Control {
     /// A control that has been told nothing.
     #[must_use]
     pub fn new() -> Arc<Control> {
-        Arc::new(Control { state: Mutex::new(ControlState::default()) })
+        Arc::new(Control { state: Mutex::new(ControlState::default()), reported: Mutex::new(None) })
+    }
+
+    /// Tells the engine what the caller has accounted for the search so far, over all its runs: the engine puts it in
+    /// its progress lines and in what it tells a [`CheckpointHook`] and returns in the [`Outcome`], in place of its own
+    /// figures ("The caller's account" in the module docs).  The last report counts, and it can be made before the run,
+    /// while it runs and after it.
+    pub fn report(&self, spent: Spent) {
+        *lock(&self.reported) = Some(spent);
+    }
+
+    /// The last [`report`](Control::report), if the caller has made one.
+    #[must_use]
+    pub fn reported(&self) -> Option<Spent> {
+        *lock(&self.reported)
     }
 
     /// A ceiling: a value the incumbent can never exceed (a proven upper bound on the best value).  Once the incumbent
@@ -613,6 +664,8 @@ pub struct Status {
     pub idle_time: Duration,
     /// The workers' lifetimes so far (see [`Counters::capacity`]).
     pub capacity: Duration,
+    /// The CPU time of the workers' threads so far in this invocation, as they last published it ([`Counters::cpu`]).
+    pub cpu: Duration,
     /// The incumbent's value.
     pub best: u64,
     /// Nodes published in this invocation.
@@ -665,6 +718,10 @@ pub struct Counters {
     pub wall: Duration,
     /// Time workers spent in [`Searcher::run`].
     pub busy: Duration,
+    /// The CPU time of the workers' threads, from the start of each to its exit (so that it counts the engine's
+    /// bookkeeping beside the searching; "CPU time" in the module docs).  It can be more than `wall`, by as many times
+    /// as there were workers.
+    pub cpu: Duration,
     /// Time workers spent waiting for work outside pauses.
     pub idle: Duration,
     /// Time workers spent parked in pauses.
@@ -726,6 +783,7 @@ impl Counters {
             (&mut self.first_step, other.first_step),
             (&mut self.wall, other.wall),
             (&mut self.busy, other.busy),
+            (&mut self.cpu, other.cpu),
             (&mut self.idle, other.idle),
             (&mut self.parked, other.parked),
             (&mut self.lock_wait, other.lock_wait),
@@ -810,6 +868,9 @@ pub struct Outcome {
     pub stats: Stats,
     /// Total wall time across all runs of this search, including those before a resume.
     pub elapsed: Duration,
+    /// What the search has spent over all its runs: the caller's last report ([`Control::report`]), else the engine's
+    /// own ([`Spent`]).
+    pub spent: Spent,
     /// This invocation's engine activity.
     pub counters: Counters,
 }
@@ -1069,6 +1130,13 @@ pub fn stop_signal() -> Option<i32> {
     }
 }
 
+/// The CPU time that the calling thread has used so far (user and system), from the CPU clock of the thread.  Where the
+/// system has no such clock, the time since the first call to this function in the process.
+#[must_use]
+pub fn thread_cpu() -> Duration {
+    cpu::thread()
+}
+
 /// Puts the calling thread under the kernel's idle scheduling policy (Linux `SCHED_IDLE`): any other process, whatever
 /// its nice value, runs before it, so the thread takes exactly the CPU that nothing else wants.  A worker calls it as
 /// it starts when [`EngineConfig::background`] is set.  It is set for the thread, not the process: a thread cannot
@@ -1111,12 +1179,15 @@ pub struct Ctx<'a, U: Unit> {
     split_claimed: bool,
     /// `stats.nodes` already added to `shared.nodes`.
     published: u64,
+    /// The thread's CPU time already added to `shared.cpu`.
+    cpu_mark: Duration,
     stats: Stats,
     pushed: Vec<U>,
 }
 
 impl<'a, U: Unit> Ctx<'a, U> {
-    fn new(shared: &'a Shared<U>, worker: usize) -> Self {
+    /// The context of worker `worker`, whose thread had used `cpu_mark` of CPU time when it began.
+    fn new(shared: &'a Shared<U>, worker: usize, cpu_mark: Duration) -> Self {
         Ctx {
             shared,
             worker,
@@ -1131,6 +1202,7 @@ impl<'a, U: Unit> Ctx<'a, U> {
             yielding: false,
             split_claimed: false,
             published: 0,
+            cpu_mark,
             stats: Stats::default(),
             pushed: Vec::new(),
         }
@@ -1182,6 +1254,7 @@ impl<'a, U: Unit> Ctx<'a, U> {
                 gate.pass();
             }
             let total = self.flush_nodes();
+            self.publish_cpu();
             if self.shared.node_limit.is_some_and(|limit| total >= limit) {
                 self.shared.request_stop();
             }
@@ -1247,6 +1320,14 @@ impl<'a, U: Unit> Ctx<'a, U> {
         let delta = self.stats.nodes.wrapping_sub(self.published);
         self.published = self.stats.nodes;
         self.shared.nodes.0.fetch_add(delta, Ordering::Relaxed).wrapping_add(delta)
+    }
+
+    /// Publish the CPU time this worker's thread has used since it last did ("CPU time" in the module docs).
+    fn publish_cpu(&mut self) {
+        let now = thread_cpu();
+        let used = now.saturating_sub(self.cpu_mark);
+        self.cpu_mark = now;
+        self.shared.cpu.0.fetch_add(u64::try_from(used.as_nanos()).unwrap_or(u64::MAX), Ordering::Relaxed);
     }
 }
 
@@ -1321,6 +1402,10 @@ struct Shared<U: Unit> {
     best: Line<AtomicU64>,
     /// Nodes published by workers in this invocation.
     nodes: Line<AtomicU64>,
+    /// CPU time published by workers in this invocation, in nanoseconds.
+    cpu: Line<AtomicU64>,
+    /// The run's control, if it has one, for what the caller reports through it ([`Control::report`]).
+    control: Option<Arc<Control>>,
     /// The control's ceiling ([`NO_CEILING`]: none), read when an offer raises `best` (see "Ceiling").
     ceiling: AtomicU64,
     payload: Mutex<Vec<u8>>,
@@ -1516,6 +1601,8 @@ impl<U: Unit> Shared<U> {
             signal: Line(AtomicU64::new(0)),
             best: Line(AtomicU64::new(init.best)),
             nodes: Line(AtomicU64::new(0)),
+            cpu: Line(AtomicU64::new(0)),
+            control: cfg.control.clone(),
             ceiling: AtomicU64::new(NO_CEILING),
             payload: Mutex::new(init.payload),
             state: Mutex::new(State {
@@ -1762,8 +1849,9 @@ impl<U: Unit> Shared<U> {
 
     fn worker<S: Searcher<U>, F: Fn(usize) -> S>(&self, i: usize, make: &F) {
         let _guard = PanicGuard(self);
+        let began = thread_cpu();
         let mut searcher = make(i);
-        let mut ctx = Ctx::new(self, i);
+        let mut ctx = Ctx::new(self, i, began);
         let mut next = self.acquire(self.lock(), &mut ctx);
         while let Some(unit) = next {
             let turn = self.gate.as_ref().map(Gate::turn);
@@ -1771,6 +1859,7 @@ impl<U: Unit> Shared<U> {
             drop(turn);
             next = self.finish_run(&mut ctx);
         }
+        ctx.publish_cpu();
     }
 
     /// Count the worker of `ctx` as running a unit from now on.
@@ -1869,6 +1958,7 @@ impl<U: Unit> Shared<U> {
     /// Take over the units a searcher pushed and decide what this worker runs next.
     fn finish_run(&self, ctx: &mut Ctx<'_, U>) -> Option<U> {
         ctx.flush_nodes();
+        ctx.publish_cpu();
         ctx.yielding = false;
         let claimed = std::mem::take(&mut ctx.split_claimed);
         let i = ctx.worker;
@@ -2024,17 +2114,17 @@ impl<U: Unit> Shared<U> {
                     continue;
                 }
                 if let Some((path, _)) = plan.checkpoint {
-                    let (nodes, elapsed) = (self.total_stats(st).nodes, self.prior + self.t0.elapsed());
+                    let (nodes, spent) = (self.total_stats(st).nodes, self.spent(self.prior + self.t0.elapsed()));
                     let tell = |event| {
                         if let Some(hook) = plan.hook {
                             (hook.0)(event);
                         }
                     };
-                    tell(CheckpointEvent::Writing { nodes, elapsed });
+                    tell(CheckpointEvent::Writing { nodes, spent });
                     match self.write_checkpoint(st, path, plan.header) {
                         Ok(()) => {
                             st.counters.checkpoints += 1;
-                            tell(CheckpointEvent::Written { path, nodes, elapsed });
+                            tell(CheckpointEvent::Written { path, nodes, spent });
                         }
                         Err(e) => {
                             st.error.get_or_insert(e);
@@ -2104,17 +2194,22 @@ impl<U: Unit> Shared<U> {
         }
     }
 
+    /// The line `HH:MM:SSZ LABEL active A waited W cpu C nodes N (NOTE) best B queue Q spilled S | COUNTERS`, then the
+    /// caller's note if it has one: the UTC time of day, the label, what the run has spent (`spent`) and its counts.
     fn progress_line(&self, st: &State<U>, plan: &Plan<'_>, note: &str) -> String {
         let nodes = self.base.nodes + self.nodes.0.load(Ordering::Relaxed);
-        let label = plan.label;
+        let label = if plan.label.is_empty() { String::new() } else { format!("{} ", plan.label) };
+        let Spent { cpu, active, waiting } = self.spent(self.prior + self.t0.elapsed());
         let line = format!(
-            "{label}{}{} nodes {nodes} ({note}) best {} queue {} spilled {} | {}",
-            if label.is_empty() { "" } else { " " },
-            fmt_elapsed(self.prior + self.t0.elapsed()),
+            "{} {label}active {} waited {} cpu {} nodes {nodes} ({note}) best {} queue {} spilled {} | {}",
+            utc::time_of_day(SystemTime::now()),
+            fmt_elapsed(active),
+            fmt_elapsed(waiting),
+            fmt_cpu(cpu),
             self.best.0.load(Ordering::Relaxed),
             st.mem.len(),
             st.spill.units,
-            Self::counters_at(st, Instant::now()).summary(),
+            self.counters_at(st, Instant::now()).summary(),
         );
         match plan.note {
             Some(extra) => format!("{line} | {}", (extra.0)()),
@@ -2122,10 +2217,23 @@ impl<U: Unit> Shared<U> {
         }
     }
 
+    /// The CPU time that the workers have published so far in this invocation.
+    fn cpu(&self) -> Duration {
+        Duration::from_nanos(self.cpu.0.load(Ordering::Relaxed))
+    }
+
+    /// What the run has spent, given its `elapsed` time over all its runs: what the caller last reported through the
+    /// control, else the run's own account (active throughout, never waiting, and the CPU time of this invocation).
+    fn spent(&self, elapsed: Duration) -> Spent {
+        let reported = self.control.as_ref().and_then(|control| control.reported());
+        reported.unwrap_or(Spent { cpu: self.cpu(), active: elapsed, waiting: Duration::ZERO })
+    }
+
     /// The counters with the workers' times summed up to `now` (also for lifetimes, runs and waits still going on).
-    fn counters_at(st: &State<U>, now: Instant) -> Counters {
+    fn counters_at(&self, st: &State<U>, now: Instant) -> Counters {
         let mut c = st.counters;
         c.wall = now.saturating_duration_since(st.began);
+        c.cpu = self.cpu();
         c.idle = st.idle_done;
         for clock in &st.clocks {
             c.capacity += clock.gone.unwrap_or(now).saturating_duration_since(clock.born);
@@ -2228,7 +2336,8 @@ impl<U: Unit> Shared<U> {
             payload,
             stats: self.total_stats(&st),
             elapsed,
-            counters: Self::counters_at(&st, ended),
+            spent: self.spent(elapsed),
+            counters: self.counters_at(&st, ended),
         })
     }
 }
@@ -2311,7 +2420,7 @@ impl<U: Unit> Remote for Shared<U> {
     fn status(&self) -> Status {
         let st = self.lock();
         let nodes = self.nodes.0.load(Ordering::Relaxed);
-        let c = Self::counters_at(&st, Instant::now());
+        let c = self.counters_at(&st, Instant::now());
         Status {
             live: st.live,
             running: st.running,
@@ -2319,6 +2428,7 @@ impl<U: Unit> Remote for Shared<U> {
             queued: st.queued(),
             idle_time: c.idle,
             capacity: c.capacity,
+            cpu: c.cpu,
             best: self.best.0.load(Ordering::Relaxed),
             nodes,
         }
@@ -2539,6 +2649,48 @@ mod idle {
 
     pub fn set() -> io::Result<()> {
         Err(io::ErrorKind::Unsupported.into())
+    }
+}
+
+// ------------------------------------------------------------------------------------------------------------
+// The CPU clock of a thread: the one more POSIX function `std` does not wrap
+// ------------------------------------------------------------------------------------------------------------
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+mod cpu {
+    use std::time::Duration;
+
+    /// `struct timespec` on 64-bit Linux and macOS: two `long`s.
+    #[repr(C)]
+    struct Timespec {
+        seconds: i64,
+        nanoseconds: i64,
+    }
+
+    extern "C" {
+        fn clock_gettime(clock: i32, time: *mut Timespec) -> i32;
+    }
+
+    /// `CLOCK_THREAD_CPUTIME_ID`: 3 on Linux, 16 on macOS.
+    const CLOCK_THREAD_CPUTIME_ID: i32 = if cfg!(target_os = "linux") { 3 } else { 16 };
+
+    pub fn thread() -> Duration {
+        let mut time = Timespec { seconds: 0, nanoseconds: 0 };
+        // SAFETY: `time` is writable and has the layout of `struct timespec`, which `clock_gettime` fills in.
+        let rc = unsafe { clock_gettime(CLOCK_THREAD_CPUTIME_ID, &mut time) };
+        assert_eq!(rc, 0, "clock_gettime failed");
+        Duration::new(time.seconds as u64, time.nanoseconds as u32)
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+mod cpu {
+    use std::sync::OnceLock;
+    use std::time::{Duration, Instant};
+
+    pub fn thread() -> Duration {
+        static START: OnceLock<Instant> = OnceLock::new();
+        START.get_or_init(Instant::now).elapsed()
     }
 }
 
@@ -2804,6 +2956,15 @@ fn fmt_elapsed(d: Duration) -> String {
     }
 }
 
+/// CPU time, which a run with many workers piles up faster than the clock: as `fmt_elapsed` below an hour, then hours.
+fn fmt_cpu(d: Duration) -> String {
+    if d < Duration::from_secs(3600) {
+        fmt_elapsed(d)
+    } else {
+        format!("{:.1}h", d.as_secs_f64() / 3600.0)
+    }
+}
+
 /// A short duration: milliseconds below a second.
 fn fmt_short(d: Duration) -> String {
     if d < Duration::from_secs(1) {
@@ -2870,6 +3031,11 @@ mod tests {
         assert_eq!(fmt_elapsed(Duration::from_millis(12_340)), "12.3s");
         assert_eq!(fmt_elapsed(Duration::from_secs(125)), "2m05s");
         assert_eq!(fmt_elapsed(Duration::from_secs(3 * 3600 + 7 * 60 + 9)), "3h07m09s");
+        // CPU time reads like elapsed time up to an hour, and then in hours.
+        assert_eq!(fmt_cpu(Duration::from_secs(125)), "2m05s");
+        assert_eq!(fmt_cpu(Duration::from_secs(3599)), "59m59s");
+        assert_eq!(fmt_cpu(Duration::from_secs(3600)), "1.0h");
+        assert_eq!(fmt_cpu(Duration::from_secs(404_280)), "112.3h");
         assert_eq!(si(12_345_678.0), "12.35M");
         assert_eq!(si(999.0), "999");
     }

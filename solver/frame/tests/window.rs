@@ -4,9 +4,10 @@
 //! thread the window is one, and the lines are those of a window of one but for the times and the build; a repeat of
 //! a game still in flight names it, on a later line; a range stopped by a limit stops at its first unfinished game with
 //! the lines before it in order, keeps the checkpoints of the games searched ahead of it and completes when run again;
-//! a game stopped by a limit keeps its clock beside its checkpoint and goes on from it when run again; and a score that
-//! is not the table's fails the range at that game, with the lines before it, as a window of one does.  The policy
-//! that shares the threads is tested on its own in `src/solver/window/allot.rs`.  Small boards, at most 4 threads.
+//! a game stopped by a limit keeps its clock beside its checkpoint and goes on from it when run again; every line has
+//! the times of its game, whose active and waiting seconds add up to its span; and a score that is not the table's
+//! fails the range at that game, with the lines before it, as a window of one does.  The policy that shares the threads
+//! is tested on its own in `src/solver/window/allot.rs`.  Small boards, at most 4 threads.
 
 mod common;
 
@@ -14,10 +15,12 @@ use common::{committed_text, options, TempDir};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
+use std::time::{Duration, SystemTime};
 use taxman::game::Optimal;
 use taxman::json::Json;
 use taxman::results::{rejected_path, verify_files};
 use taxman::solver::{self, SolveOptions};
+use taxman::utc;
 
 /// The lines of a results file.
 fn lines(path: &Path) -> Vec<Json> {
@@ -61,7 +64,8 @@ fn provenance(line: &Json, window: usize) -> String {
 
 /// A line without the fields that differ from run to run whatever the window: the times and the build.
 fn without_times(line: &Json) -> Json {
-    let fields = line.as_obj().expect("an object").iter().filter(|(key, _)| key != "seconds" && key != "build");
+    let times = ["started", "finished", "seconds", "build"];
+    let fields = line.as_obj().expect("an object").iter().filter(|(key, _)| !times.contains(&key.as_str()));
     Json::object(fields.cloned())
 }
 
@@ -232,18 +236,21 @@ fn a_range_stopped_by_a_limit_completes_when_run_again(lo: u32, hi: u32, threads
     assert!(left(&checkpoints).is_empty() && !checkpoints.join("spill").exists());
 }
 
-/// The seconds in the clock file of game `n`.
-fn clock_of(checkpoints: &Path, n: u32) -> f64 {
+/// The CPU, active and waiting seconds in the clock file of game `n`, in that order.
+fn clock_of(checkpoints: &Path, n: u32) -> [f64; 3] {
     let text = fs::read_to_string(checkpoints.join(format!("n{n:04}.clock"))).unwrap_or_else(|e| panic!("n={n}: {e}"));
-    text.trim().parse().unwrap_or_else(|e| panic!("n={n}: {text:?}: {e}"))
+    ["cpu", "active", "waiting"].map(|key| {
+        let value = text.split_whitespace().find_map(|word| word.strip_prefix(key)?.strip_prefix('='));
+        value.and_then(|value| value.parse().ok()).unwrap_or_else(|| panic!("n={n}: no {key} in {text:?}"))
+    })
 }
 
-/// The clock of a game's own search (`seconds.own`; "The clock" in `src/solver/window.rs`): a node limit stops the head
-/// of the window before its search can complete (no seed and no ceiling make the search of 998 on two threads take
-/// more than four times the 1,024 steps of a worker that the limit is looked at after), and the head keeps a checkpoint
-/// and a clock; a run with the same limits stops at the same game from the clock it was left with (which is never
-/// smaller); and a run with no node limit completes every game from the checkpoint and the clock, records the head's
-/// own search time over its invocations, and leaves no clock behind.
+/// The clock of a game's search (`seconds.cpu_all_runs` and `active_all_runs`; "The clock" in `src/solver/window.rs`):
+/// a node limit stops the head of the window before its search can complete (no seed and no ceiling make the search of
+/// 998 on two threads take more than four times the 1,024 steps of a worker that the limit is looked at after), and the
+/// head keeps a checkpoint and a clock; a run with the same limits stops at the same game from the clock it was left
+/// with (which is never smaller); and a run with no node limit completes every game from the checkpoint and the clock,
+/// records the head's times over its invocations, and leaves no clock behind.
 #[test]
 #[cfg_attr(
     debug_assertions,
@@ -281,11 +288,12 @@ fn a_stopped_game_goes_on_from_its_clock(lo: u32, hi: u32, threads: usize) {
     assert_eq!(summary.stopped_at, Some(lo), "the first game of the range is the head");
     assert!(checkpoints.join(format!("n{lo:04}.ckpt")).exists());
     let kept = clock_of(&checkpoints, lo);
+    assert!(kept[0] > 0.0 && kept[1] > 0.0, "the head searched and was active: {kept:?}");
 
     // The same limits again: the head goes on from its checkpoint and its clock, which is no smaller.
     let again = solver::solve_range_each(lo, hi, &stopping, Some(&results), |_| {}).unwrap();
     assert_eq!(again.stopped_at, Some(lo));
-    assert!(clock_of(&checkpoints, lo) >= kept);
+    assert!(clock_of(&checkpoints, lo).iter().zip(kept).all(|(now, before)| *now >= before));
 
     // No node limit: the game resumes from its checkpoint and its clock, and the range completes; no clock is left.
     let finishing = SolveOptions { node_limit: None, ..stopping };
@@ -298,16 +306,62 @@ fn a_stopped_game_goes_on_from_its_clock(lo: u32, hi: u32, threads: usize) {
         chain.iter().filter(|line| line.get("completed").and_then(Json::as_bool) == Some(true)).collect();
     assert_eq!(completed.iter().map(|line| n_of(line)).collect::<Vec<_>>(), (lo..=hi).collect::<Vec<_>>());
     verify_files(std::slice::from_ref(&results), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
-    // The game's line records its own search time over every invocation, which is no less than the clock it went on from.
+    // The game's line records its times over every invocation, which are no less than the clock it went on from, and
+    // those of this invocation alone are less.
     let head = completed.iter().find(|line| n_of(line) == lo).unwrap();
-    let own = head.get("seconds").and_then(|seconds| seconds.get("own")).and_then(Json::as_f64).expect("seconds.own");
-    assert!(own >= kept, "{own} {kept}");
+    let seconds = |key: &str| head.get("seconds").and_then(|seconds| seconds.get(key)).and_then(Json::as_f64);
+    let (cpu, active) = (seconds("cpu_all_runs").expect("cpu_all_runs"), seconds("active_all_runs").expect("active"));
+    assert!(cpu >= kept[0] && active >= kept[1], "{cpu} {active} {kept:?}");
+    assert!(seconds("cpu").unwrap() < cpu && seconds("active").unwrap() < active, "{head}");
     let left: Vec<String> = fs::read_dir(&checkpoints)
         .unwrap()
         .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
         .filter(|name| name != "taxman.lock")
         .collect();
     assert!(left.is_empty(), "{left:?}");
+}
+
+/// Every line has the times of its game, with any window: `started` and `finished`, UTC stamps of the start of its
+/// setup and of its line; `cpu`, `active` and `waiting`, which for a game not resumed are the same over all its runs;
+/// the active and the waiting seconds add up to the span between the stamps (the game is in flight from the one to the
+/// other, and has a worker or has none); no game that ran no search used a worker's CPU time, and a search that took
+/// steps did.
+#[test]
+fn every_line_has_the_times_of_its_game_with_any_window() {
+    for window in [1, 2, 4] {
+        let before = SystemTime::now();
+        let games = solver::solve_range(280, 320, &SolveOptions { window, ..options(4) }, None).unwrap();
+        let after = SystemTime::now();
+        assert_eq!(games.len(), 41);
+        for game in &games {
+            let (once, all) = (game.phases.spent, game.phases.spent_all_runs);
+            let n = game.n;
+            assert_eq!(once, all, "window {window}, n={n}: not resumed");
+            assert!(once.active > Duration::ZERO, "window {window}, n={n}: the setup has a worker: {once:?}");
+            let span = game.finished.duration_since(game.started).unwrap_or_else(|e| panic!("n={n}: {e}"));
+            let accounted = once.active + once.waiting;
+            let off = span.abs_diff(accounted);
+            assert!(off < Duration::from_millis(250), "window {window}, n={n}: span {span:?}, spent {once:?}");
+            assert!(game.started >= before && game.finished <= after, "window {window}, n={n}");
+            match game.method.as_str() {
+                "search" => assert!(once.cpu > Duration::ZERO, "window {window}, n={n}: {once:?}"),
+                "prime" | "trivial" | "repeat" => assert_eq!(once.cpu, Duration::ZERO, "window {window}, n={n}"),
+                _ => {}
+            }
+            // The line has them: the stamps to the second, and the seconds as the game has them.
+            let line = game.to_json();
+            let stamps = ["started", "finished"].map(|key| line.get(key).and_then(Json::as_str).expect(key).to_owned());
+            assert_eq!(stamps, [utc::rfc3339(game.started), utc::rfc3339(game.finished)]);
+            let shaped = |stamp: &String| stamp.len() == 20 && stamp.ends_with('Z') && stamp.as_bytes()[10] == b'T';
+            assert!(stamps.iter().all(shaped) && stamps[0] <= stamps[1], "n={n}: {stamps:?}");
+            assert!(utc::rfc3339(before) <= stamps[0] && stamps[1] <= utc::rfc3339(after), "n={n}: {stamps:?}");
+            let seconds = |key: &str| line.get("seconds").and_then(|seconds| seconds.get(key)).and_then(Json::as_f64);
+            for (key, time) in [("cpu", once.cpu), ("active", once.active), ("waiting", once.waiting)] {
+                assert_eq!(seconds(key), Some(time.as_secs_f64()), "n={n}: {key}");
+                assert_eq!(seconds(&format!("{key}_all_runs")), Some(time.as_secs_f64()), "n={n}: {key}_all_runs");
+            }
+        }
+    }
 }
 
 /// A table that is wrong about one game fails a range at that game, with the lines of the games before it and the game

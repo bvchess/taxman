@@ -59,7 +59,10 @@ the design in outline.
   and tiny runs; when all workers first ran at once; the workers added and retired; the idle time of the ramp and of
   the tail; the time from a unit's start to its first step (the rebuild) and the time in that step; and the pauses and
   the longest wait for the workers to park.  Every progress line ends with them in short ([REFERENCE.md, "Reading the
-  output"](../REFERENCE.md#3-reading-the-output)).
+  output"](../REFERENCE.md#3-reading-the-output)).  The engine also counts the CPU time of its workers' threads, which
+  each publishes with its node counts, and prints in every progress line the time the run has spent: its own (active
+  throughout, never waiting) or the account that the caller reports through the control, the window's
+  ([the clock](#the-window-games-in-flight)).
 
 ## Per-game pipeline (`solver`)
 
@@ -189,13 +192,19 @@ starts with the final seed and the ceiling, on every thread.
   oldest, so a run fails or stops at the game, and with the lines before it, where a range solved in order would.  It
   then stops the searches still in flight with a final checkpoint (the next run resumes them), and drops what they
   found.
-* *The clock.*  Every game has a clock, its own search ([glossary](../../../docs/GLOSSARY.md#the-search)), which is not
-  the time the game waited behind an older one, as its checkpoint's elapsed time counts it: a younger search is
-  suspended while the oldest keeps the threads busy, so a game that follows a dear one would arrive at its own search
-  with that time already on its clock.  The driver keeps the clock in `nNNNN.clock` beside the checkpoint, every
-  checkpoint interval and when the search stops, reads it back when a search starts from a checkpoint, and writes it in
-  the game's line as `seconds.own` ([reference](../REFERENCE.md#a-results-line---out-schema-5)).  A game that restarts
-  from its beginning starts its clock again, and a finished game's clock goes with its checkpoint.
+* *The clock.*  Every game has a clock ([glossary](../../../docs/GLOSSARY.md#the-search)) with three times: its CPU
+  time, the thread seconds that its search's workers used; its active time, the wall seconds in which it had at least
+  one worker; and its waiting time, the wall seconds in which it was in flight with none.  A game is in flight from the
+  start of its setup to its line, so the active and the waiting time add up to its span, which the line's `started` and
+  `finished` bound.  A younger search that the oldest has suspended is waiting, and a younger search that shares the
+  threads is active, with CPU time of its own, so what a game cost is its CPU time whatever the other games did.  The
+  driver sorts the time between its looks into active and waiting by what each game has at that moment, takes the CPU
+  time from the engine (`Control::status` while the search runs, the count of the finished engine after), and tells the
+  search's control the sums (`Control::report`), which the progress line and the profile print.  It keeps the clock of
+  each running search in `nNNNN.clock` beside the checkpoint, every checkpoint interval and when the search stops,
+  reads it back when a search starts from a checkpoint, and writes the sums over all the runs in the game's line next
+  to the times of the last ([reference](../REFERENCE.md#a-results-line---out-schema-5)).  A game that restarts from
+  its beginning starts its clock again, and a finished game's clock goes with its checkpoint.
 * *Trace.*  With `TAXMAN_WINDOW_TRACE` set, the driver prints its events on stderr: setups, the starts of searches with
   their seeds and ceilings, workers given and taken back, hints, deferrals and conclusions.
 
@@ -254,11 +263,11 @@ ends (`search::profile`, `Tags`).
 | line | when | what |
 |---|---|---|
 | `profile` | first | n, the set width, the depth D and the most ids |
-| `start` | each run | whether it resumed, whether the file has the tree from the root (`rooted`), the steps before, the threads, the incumbent, `unplaced` (steps the profile did not see), `frozen` (see "Resuming") |
+| `start` | each run | whether it resumed, whether the file has the tree from the root (`rooted`), the steps before, `active` and `cpu` (what the game had spent in the runs before: its seconds with a worker and the CPU seconds of its workers), the threads, the incumbent, `unplaced` (steps the profile did not see), `frozen` (see "Resuming") |
 | `node` | at the checkpoint after the node is made | `id`, `parent`, `depth`, `child` (its index among its parent's tagged children), `branch` (`default`: the search's own conflict; `conflict`: the conflict that conflict branching chose; `forced`: the parent's forced members), `added` (the promotions it added to its parent's), `promotions`, `sum`, `cands`, `bound`, `need`, `gap`, `t` (the search's time) |
-| `steps` | each checkpoint, and the end of a run | `seq`, `nodes` (the search's steps, as the checkpoint records them), `counted`, `elapsed`, `ids` (each id's own steps in the interval), `unplaced`, `promotions` (the steps by number of promotions in the interval), `made` (ids so far), `full`, `phases` (see "The phases of a step") |
+| `steps` | each checkpoint, and the end of a run | `seq`, `nodes` (the search's steps, as the checkpoint records them), `counted`, `active` and `cpu` (as in `start`, so far), `ids` (each id's own steps in the interval), `unplaced`, `promotions` (the steps by number of promotions in the interval), `made` (ids so far), `full`, `phases` (see "The phases of a step") |
 | `open` | after each checkpoint | its units by id, the spread of the gaps of a sample of them (at most `OPEN_BOUNDED` of `src/search/profile.rs`), and the seconds the summary took |
-| `end` | the end of a run | `nodes`, `completed`, `best`, `elapsed`, `made`, `full` |
+| `end` | the end of a run | `nodes`, `completed`, `best`, `active`, `cpu`, `made`, `full` |
 
 A node's `bound`, `need` and `gap` are the GF(2) bound of what the node's completions add, the incumbent's sum less the
 node's plus one, and the difference.  The bound is the one the node's own

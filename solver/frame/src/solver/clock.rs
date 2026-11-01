@@ -1,49 +1,59 @@
-//! The clock of a game: how long its own search has run, kept between invocations (a line records it as `seconds.own`;
-//! "The clock" in [`window`](super::window)).
+//! The clock of a game: what its search has spent, kept between invocations (a line records it in `seconds`, as
+//! `cpu_all_runs`, `active_all_runs` and `waiting_all_runs`; "The clock" in [`window`](super::window)).
 //!
-//! The clock is a file beside the game's checkpoint, `n<NNNN>.clock`, holding the seconds the game has been the head of
-//! the window with its search running, summed over every invocation that searched it.  The checkpoint holds the
-//! search's own elapsed time too, but that counts the time a search waited behind an older game, suspended in the
-//! window, and `seconds.own` is about the time the chain waited for the game; so the clock is the driver's and the
-//! checkpoint's format is left as it is.  A clock is valid only beside the checkpoint it was kept with: a game that
-//! restarts from its beginning (no checkpoint) starts its clock again, so deleting a checkpoint by hand needs no second
-//! deletion.  A finished game's clock goes with its checkpoint ([`forget`], from `discard_checkpoint`).
+//! The clock is a file beside the game's checkpoint, `n<NNNN>.clock`, holding the CPU time of the game's workers, the
+//! time it was active (with a worker) and the time it waited (in flight with none), summed over every invocation that
+//! searched it: one line, `cpu=112.300 active=80.100 waiting=15.000`, in seconds.  The checkpoint holds the search's
+//! own elapsed time too, but that counts the time a search waited behind an older game, suspended in the window, as
+//! active; so the clock is the driver's, which tells the two apart, and the checkpoint's format is left as it is.  A
+//! clock is valid only beside the checkpoint it was kept with: a game that restarts from its beginning (no checkpoint)
+//! starts its clock again, so deleting a checkpoint by hand needs no second deletion.  A finished game's clock goes
+//! with its checkpoint ([`forget`], from `discard_checkpoint`).
 
 use super::SolveOptions;
+use crate::engine::Spent;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
 
-/// The longest clock a file may claim (a hundred years of seconds); anything else is taken for garbage.
+/// The longest time a file may claim (a hundred years of seconds); anything else is taken for garbage.
 const MAX_SECONDS: f64 = 3.2e9;
 
 /// Game `n`'s clock as its search starts: what the last invocation kept, if the game has a checkpoint to resume, else
-/// zero (also for a file that does not say a number of seconds: the clock only reports the time, and a lost reading
-/// makes `seconds.own` too small).
-pub(super) fn resume(opts: &SolveOptions, n: u32) -> Duration {
-    let (Some(checkpoint), Some(clock)) = (opts.checkpoint_file(n), opts.clock_file(n)) else { return Duration::ZERO };
+/// nothing spent (also for a file that does not say the three times: the clock only reports, and a lost reading makes
+/// the times in the line too small).
+pub(super) fn resume(opts: &SolveOptions, n: u32) -> Spent {
+    let (Some(checkpoint), Some(clock)) = (opts.checkpoint_file(n), opts.clock_file(n)) else {
+        return Spent::default();
+    };
     if !checkpoint.exists() {
-        return Duration::ZERO;
+        return Spent::default();
     }
     read(&clock)
 }
 
-/// The seconds in the file `path`, or zero.
-fn read(path: &Path) -> Duration {
-    let seconds = fs::read_to_string(path).ok().and_then(|text| text.trim().parse::<f64>().ok());
-    match seconds {
-        Some(seconds) if seconds.is_finite() && (0.0..=MAX_SECONDS).contains(&seconds) => {
-            Duration::from_secs_f64(seconds)
-        }
-        _ => Duration::ZERO,
-    }
+/// The times in the file `path`, or none.
+fn read(path: &Path) -> Spent {
+    fs::read_to_string(path).ok().and_then(|text| parse(&text)).unwrap_or_default()
 }
 
-/// Keeps `held` as game `n`'s clock, replacing the file whole (written aside and renamed, so a crash leaves the old
+/// The times in `text`, `cpu=S active=S waiting=S` in that order, each a number of seconds that is neither negative nor
+/// absurd.
+fn parse(text: &str) -> Option<Spent> {
+    let mut words = text.split_whitespace();
+    let mut time = |key: &str| -> Option<Duration> {
+        let seconds: f64 = words.next()?.strip_prefix(key)?.strip_prefix('=')?.parse().ok()?;
+        (seconds.is_finite() && (0.0..=MAX_SECONDS).contains(&seconds)).then(|| Duration::from_secs_f64(seconds))
+    };
+    let spent = Spent { cpu: time("cpu")?, active: time("active")?, waiting: time("waiting")? };
+    words.next().is_none().then_some(spent)
+}
+
+/// Keeps `spent` as game `n`'s clock, replacing the file whole (written aside and renamed, so a crash leaves the old
 /// reading or the new, never half of one).  Nothing happens without a checkpoint directory.  A failure is reported on
 /// stderr and the run goes on: the clock is a report and not a result.
-pub(super) fn keep(opts: &SolveOptions, n: u32, held: Duration) {
+pub(super) fn keep(opts: &SolveOptions, n: u32, spent: Spent) {
     let Some(path) = opts.clock_file(n) else { return };
     let aside = path.with_extension("clock.tmp");
     // The directory may not exist yet: the first checkpoint of a run is written after its first interval.
@@ -52,7 +62,14 @@ pub(super) fn keep(opts: &SolveOptions, n: u32, held: Duration) {
         .map_or(Ok(()), fs::create_dir_all)
         .and_then(|()| fs::File::create(&aside))
         .and_then(|mut file| {
-            writeln!(file, "{:.3}", held.as_secs_f64())?;
+            let seconds = |time: Duration| time.as_secs_f64();
+            writeln!(
+                file,
+                "cpu={:.3} active={:.3} waiting={:.3}",
+                seconds(spent.cpu),
+                seconds(spent.active),
+                seconds(spent.waiting)
+            )?;
             file.sync_all()
         })
         .and_then(|()| fs::rename(&aside, &path));
@@ -80,48 +97,69 @@ mod tests {
         SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..SolveOptions::default() }
     }
 
+    fn ms(cpu: u64, active: u64, waiting: u64) -> Spent {
+        let ms = Duration::from_millis;
+        Spent { cpu: ms(cpu), active: ms(active), waiting: ms(waiting) }
+    }
+
     #[test]
     fn a_clock_is_kept_beside_its_checkpoint_and_read_back_from_it() {
         let dir = TempDir::new("clock");
         let opts = options(&dir);
         fs::create_dir_all(dir.join("ckpt")).unwrap();
-        keep(&opts, 3441, Duration::from_millis(86_400_123));
+        keep(&opts, 3441, ms(9_000_456, 86_400_123, 7));
         assert!(dir.join("ckpt/n3441.clock").exists() && !dir.join("ckpt/n3441.clock.tmp").exists());
+        assert_eq!(
+            fs::read_to_string(dir.join("ckpt/n3441.clock")).unwrap(),
+            "cpu=9000.456 active=86400.123 waiting=0.007\n"
+        );
         // No checkpoint to resume: the game starts over, and so does its clock.
-        assert_eq!(resume(&opts, 3441), Duration::ZERO);
+        assert_eq!(resume(&opts, 3441), Spent::default());
         fs::write(dir.join("ckpt/n3441.ckpt"), b"x").unwrap();
-        assert_eq!(resume(&opts, 3441), Duration::from_millis(86_400_123));
+        assert_eq!(resume(&opts, 3441), ms(9_000_456, 86_400_123, 7));
         // Another game's clock is its own.
-        assert_eq!(resume(&opts, 3442), Duration::ZERO);
-        keep(&opts, 3441, Duration::from_secs(5));
-        assert_eq!(resume(&opts, 3441), Duration::from_secs(5));
+        assert_eq!(resume(&opts, 3442), Spent::default());
+        keep(&opts, 3441, ms(5_000, 5_000, 0));
+        assert_eq!(resume(&opts, 3441), ms(5_000, 5_000, 0));
         forget(&opts, 3441);
         assert!(!dir.join("ckpt/n3441.clock").exists());
-        assert_eq!(resume(&opts, 3441), Duration::ZERO);
+        assert_eq!(resume(&opts, 3441), Spent::default());
     }
 
     #[test]
-    fn a_clock_that_says_no_number_of_seconds_reads_as_zero() {
+    fn a_clock_that_says_no_three_times_reads_as_nothing_spent() {
         let dir = TempDir::new("clock-garbage");
         let opts = options(&dir);
         fs::create_dir_all(dir.join("ckpt")).unwrap();
         fs::write(dir.join("ckpt/n0007.ckpt"), b"x").unwrap();
-        // A reading that is a number, to show that the files are found.
-        fs::write(dir.join("ckpt/n0007.clock"), "9\n").unwrap();
-        assert_eq!(resume(&opts, 7), Duration::from_secs(9));
-        for text in ["", "soon\n", "-5\n", "NaN\n", "inf\n", "1e300\n", "12 seconds"] {
+        // A reading, to show that the files are found.
+        fs::write(dir.join("ckpt/n0007.clock"), "cpu=9 active=3 waiting=1\n").unwrap();
+        assert_eq!(resume(&opts, 7), ms(9_000, 3_000, 1_000));
+        for text in [
+            "",
+            "soon\n",
+            "9\n",
+            "cpu=9 active=3\n",
+            "active=3 cpu=9 waiting=1\n",
+            "cpu=9 active=3 waiting=1 extra=1\n",
+            "cpu=-5 active=3 waiting=1\n",
+            "cpu=NaN active=3 waiting=1\n",
+            "cpu=inf active=3 waiting=1\n",
+            "cpu=9 active=1e300 waiting=1\n",
+            "cpu=9 active=3 waiting=12 seconds",
+        ] {
             fs::write(dir.join("ckpt/n0007.clock"), text).unwrap();
-            assert_eq!(resume(&opts, 7), Duration::ZERO, "{text:?}");
+            assert_eq!(resume(&opts, 7), Spent::default(), "{text:?}");
         }
-        fs::write(dir.join("ckpt/n0007.clock"), " 42.5 \n").unwrap();
-        assert_eq!(resume(&opts, 7), Duration::from_millis(42_500));
+        fs::write(dir.join("ckpt/n0007.clock"), " cpu=42.5   active=40 \n waiting=2.25 \n").unwrap();
+        assert_eq!(resume(&opts, 7), ms(42_500, 40_000, 2_250));
     }
 
     #[test]
     fn without_a_checkpoint_directory_there_is_nothing_to_keep() {
         let opts = SolveOptions::default();
-        keep(&opts, 7, Duration::from_secs(1));
+        keep(&opts, 7, ms(1_000, 1_000, 0));
         forget(&opts, 7);
-        assert_eq!(resume(&opts, 7), Duration::ZERO);
+        assert_eq!(resume(&opts, 7), Spent::default());
     }
 }

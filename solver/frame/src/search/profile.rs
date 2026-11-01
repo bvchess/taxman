@@ -22,7 +22,7 @@ use super::dual::NodeBound;
 use super::setup::Prepared;
 use super::TaxUnit;
 use crate::bits::Bits;
-use crate::engine::{self, CheckpointEvent, Unit};
+use crate::engine::{self, CheckpointEvent, Spent, Unit};
 use crate::gf2::Gf2Graph;
 use crate::json::Json;
 use crate::rng::Rng;
@@ -336,7 +336,10 @@ pub(super) enum Begin {
     },
     Resumed {
         nodes: u64,
+        /// The search's time over its earlier runs, the engine's wall time (the base of the time of a node).
         elapsed: Duration,
+        /// What the search has spent over its earlier runs.
+        spent: Spent,
     },
 }
 
@@ -355,9 +358,11 @@ impl SearchProfile {
         incumbent: u64,
     ) -> Result<SearchProfile, String> {
         let at = |e: io::Error| format!("{}: {e}", plan.file.display());
-        let (resumed, prior) = match begin {
-            Begin::Fresh { .. } => (None, Duration::ZERO),
-            Begin::Resumed { nodes, elapsed } => (read_resumed(&plan.file, prepared.n, W, *nodes), *elapsed),
+        let (resumed, prior, spent) = match begin {
+            Begin::Fresh { .. } => (None, Duration::ZERO, Spent::default()),
+            Begin::Resumed { nodes, elapsed, spent } => {
+                (read_resumed(&plan.file, prepared.n, W, *nodes), *elapsed, *spent)
+            }
         };
         // What this run starts with that the steps it counts will not show: the steps of a search that the profile
         // joins after it began, or those of the checkpoint that a profile behind it does not have.
@@ -403,17 +408,22 @@ impl SearchProfile {
             Begin::Fresh { .. } => (false, 0),
             Begin::Resumed { nodes, .. } => (true, *nodes),
         };
-        header.push(Json::object([
-            ("kind", Json::from("start")),
-            ("resumed", Json::from(resumed)),
-            ("rooted", Json::from(rooted)),
-            ("nodes", Json::from(nodes_before)),
-            ("elapsed", Json::Num(round3(prior.as_secs_f64()))),
-            ("threads", Json::from(threads)),
-            ("incumbent", Json::from(incumbent)),
-            ("unplaced", Json::from(unseen)),
-            ("frozen", Json::from(tree.frozen)),
-        ]));
+        header.push(Json::object(
+            [
+                ("kind", Json::from("start")),
+                ("resumed", Json::from(resumed)),
+                ("rooted", Json::from(rooted)),
+                ("nodes", Json::from(nodes_before)),
+            ]
+            .into_iter()
+            .chain(spent_json(spent))
+            .chain([
+                ("threads", Json::from(threads)),
+                ("incumbent", Json::from(incumbent)),
+                ("unplaced", Json::from(unseen)),
+                ("frozen", Json::from(tree.frozen)),
+            ]),
+        ));
         let mut pending = Pending::default();
         if let Begin::Fresh { bound, need, candidates } = begin {
             pending.nodes.push(NodeLine {
@@ -558,7 +568,7 @@ impl SearchProfile {
     /// writes what it has and syncs it; after, it hands the checkpoint to the summary of the open work.
     pub(super) fn checkpoint(&self, event: CheckpointEvent<'_>) {
         match event {
-            CheckpointEvent::Writing { nodes, elapsed } => self.flush(nodes, elapsed),
+            CheckpointEvent::Writing { nodes, spent } => self.flush(nodes, spent),
             CheckpointEvent::Written { path, .. } => {
                 let seq = lock(&self.out).seq;
                 if let (Some(jobs), Ok(file)) = (lock(&self.jobs).as_ref(), File::open(path)) {
@@ -568,10 +578,10 @@ impl SearchProfile {
         }
     }
 
-    /// Writes the nodes tagged since the last flush and a `steps` line, at the search's `nodes` steps and `elapsed`
-    /// time, and syncs them.  Every searcher has handed its counts over (the workers are parked, or the run is over),
-    /// so what the file counts is `nodes`.
-    fn flush(&self, nodes: u64, elapsed: Duration) {
+    /// Writes the nodes tagged since the last flush and a `steps` line, at the search's `nodes` steps and what it has
+    /// `spent`, and syncs them.  Every searcher has handed its counts over (the workers are parked, or the run is
+    /// over), so what the file counts is `nodes`.
+    fn flush(&self, nodes: u64, spent: Spent) {
         let mut pending = std::mem::take(&mut *lock(&self.pending));
         let (made, full) = {
             let tree = self.tree.read().unwrap_or_else(PoisonError::into_inner);
@@ -587,37 +597,42 @@ impl SearchProfile {
         out.counted += steps.iter().map(|&(_, count)| count).sum::<u64>() + pending.unplaced;
         debug_assert_eq!(out.counted, nodes, "the profile counts the steps of the checkpoint");
         out.seq += 1;
-        let line = Json::object([
-            ("kind", Json::from("steps")),
-            ("seq", Json::from(out.seq)),
-            ("nodes", Json::from(nodes)),
-            ("counted", Json::from(out.counted)),
-            ("elapsed", Json::Num(round3(elapsed.as_secs_f64()))),
-            ("ids", Json::array(steps.iter().map(|&(id, count)| Json::array([u64::from(id), count])))),
-            ("unplaced", Json::from(pending.unplaced)),
-            (
-                "promotions",
-                Json::array(
-                    pending
-                        .promotions
-                        .iter()
-                        .enumerate()
-                        .filter(|&(_, &count)| count > 0)
-                        .map(|(k, &count)| Json::array([k as u64, count])),
+        let line = Json::object(
+            [
+                ("kind", Json::from("steps")),
+                ("seq", Json::from(out.seq)),
+                ("nodes", Json::from(nodes)),
+                ("counted", Json::from(out.counted)),
+            ]
+            .into_iter()
+            .chain(spent_json(spent))
+            .chain([
+                ("ids", Json::array(steps.iter().map(|&(id, count)| Json::array([u64::from(id), count])))),
+                ("unplaced", Json::from(pending.unplaced)),
+                (
+                    "promotions",
+                    Json::array(
+                        pending
+                            .promotions
+                            .iter()
+                            .enumerate()
+                            .filter(|&(_, &count)| count > 0)
+                            .map(|(k, &count)| Json::array([k as u64, count])),
+                    ),
                 ),
-            ),
-            ("made", Json::from(made)),
-            ("full", Json::from(full)),
-            (
-                "phases",
-                Json::object(
-                    [("timed", pending.timed)]
-                        .into_iter()
-                        .chain(PHASE_NAMES.into_iter().zip(pending.phases))
-                        .map(|(name, x)| (name, Json::from(x))),
+                ("made", Json::from(made)),
+                ("full", Json::from(full)),
+                (
+                    "phases",
+                    Json::object(
+                        [("timed", pending.timed)]
+                            .into_iter()
+                            .chain(PHASE_NAMES.into_iter().zip(pending.phases))
+                            .map(|(name, x)| (name, Json::from(x))),
+                    ),
                 ),
-            ),
-        ]);
+            ]),
+        );
         let written = (|| -> io::Result<()> {
             for node in &pending.nodes {
                 writeln!(out.file, "{}", node.json())?;
@@ -649,37 +664,35 @@ impl SearchProfile {
     }
 
     /// The end of the search's run: the summary of the open work under way is dropped, the last counts are written with
-    /// the run's `nodes`, and an `end` line says how the run ended (`completed`, the best promotion sum `best`, the
-    /// search's time `elapsed`; `error` if the engine failed, when the nodes are what the profile counted).
-    pub(super) fn finish(
-        &self,
-        nodes: Option<u64>,
-        completed: bool,
-        best: u64,
-        elapsed: Duration,
-        error: Option<&str>,
-    ) {
+    /// the run's `nodes`, and an `end` line says how the run ended (`completed`, the best promotion sum `best`, what
+    /// the search has `spent`; `error` if the engine failed, when the nodes are what the profile counted).
+    pub(super) fn finish(&self, nodes: Option<u64>, completed: bool, best: u64, spent: Spent, error: Option<&str>) {
         self.end();
         let nodes = nodes.unwrap_or_else(|| {
             let pending = lock(&self.pending);
             lock(&self.out).counted + pending.steps.values().sum::<u64>() + pending.unplaced
         });
-        self.flush(nodes, elapsed);
+        self.flush(nodes, spent);
         let (made, full, frozen) = {
             let tree = self.tree.read().unwrap_or_else(PoisonError::into_inner);
             (tree.nodes.len(), tree.full, tree.frozen)
         };
-        self.append(&Json::object([
-            ("kind", Json::from("end")),
-            ("nodes", Json::from(nodes)),
-            ("completed", Json::from(completed)),
-            ("best", Json::from(best)),
-            ("elapsed", Json::Num(round3(elapsed.as_secs_f64()))),
-            ("made", Json::from(made)),
-            ("full", Json::from(full)),
-            ("frozen", Json::from(frozen)),
-            ("error", error.map_or(Json::Null, Json::from)),
-        ]));
+        self.append(&Json::object(
+            [
+                ("kind", Json::from("end")),
+                ("nodes", Json::from(nodes)),
+                ("completed", Json::from(completed)),
+                ("best", Json::from(best)),
+            ]
+            .into_iter()
+            .chain(spent_json(spent))
+            .chain([
+                ("made", Json::from(made)),
+                ("full", Json::from(full)),
+                ("frozen", Json::from(frozen)),
+                ("error", error.map_or(Json::Null, Json::from)),
+            ]),
+        ));
     }
 
     /// The checkpoints for [`open_work`], taken once by the thread that summarizes them.
@@ -993,6 +1006,12 @@ fn round3(x: f64) -> f64 {
     (x * 1000.0).round() / 1000.0
 }
 
+/// What a search has spent, as the profile's `start`, `steps` and `end` lines record it: `active`, the seconds it has
+/// had workers, and `cpu`, the thread seconds of its workers.
+fn spent_json(spent: Spent) -> [(&'static str, Json); 2] {
+    [("active", Json::Num(round3(spent.active.as_secs_f64()))), ("cpu", Json::Num(round3(spent.cpu.as_secs_f64())))]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1116,6 +1135,17 @@ mod tests {
         };
         assert_eq!(phases("timed"), with.stats.nodes / u64::from(PHASE_EVERY));
         assert!(phases("bound") > 0 && PHASE_NAMES.iter().map(|name| phases(name)).sum::<u64>() > 0);
+        // Its start, steps and end lines say how long the search was active and what its workers' CPU time was, the
+        // end's of the whole search (a search outside a window is active throughout).
+        for kind in ["start", "steps", "end"] {
+            for line in of_kind(&lines, kind) {
+                let time = |key: &str| line.get(key).and_then(Json::as_f64);
+                assert!(time("active").is_some() && time("cpu").is_some() && time("elapsed").is_none(), "{line}");
+            }
+        }
+        let end = of_kind(&lines, "end").last().expect("an end line");
+        assert!(end.get("cpu").and_then(Json::as_f64) > Some(0.0), "{end}");
+        assert!(end.get("active").and_then(Json::as_f64) > Some(0.0), "{end}");
     }
 
     /// Several threads, a checkpoint every millisecond: every steps line counts the steps of its checkpoint, every step

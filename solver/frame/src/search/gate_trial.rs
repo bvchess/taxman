@@ -398,9 +398,10 @@ struct Timed<'a, 's, const W: usize> {
 
 impl<const W: usize> Searcher<TaxUnit<W>> for Timed<'_, '_, W> {
     fn run(&mut self, unit: TaxUnit<W>, ctx: &mut Ctx<'_, TaxUnit<W>>) {
-        let began = thread_cpu_ns();
+        let began = engine::thread_cpu();
         self.inner.run(unit, ctx);
-        self.cpu.fetch_add(thread_cpu_ns().saturating_sub(began), Ordering::Relaxed);
+        let used = engine::thread_cpu().saturating_sub(began);
+        self.cpu.fetch_add(u64::try_from(used.as_nanos()).unwrap_or(u64::MAX), Ordering::Relaxed);
     }
 }
 
@@ -425,33 +426,6 @@ fn choose(scores: &[Score], from: u64) -> u64 {
         Some(best) if best.cpu <= (1.0 - MARGIN) * base.cpu => best.gate,
         _ => from,
     }
-}
-
-/// The CPU time this thread has used so far, in nanoseconds (`clock_gettime` of `CLOCK_THREAD_CPUTIME_ID`).
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-fn thread_cpu_ns() -> u64 {
-    #[repr(C)]
-    struct Timespec {
-        seconds: i64,
-        nanoseconds: i64,
-    }
-    unsafe extern "C" {
-        fn clock_gettime(clock: i32, time: *mut Timespec) -> i32;
-    }
-    // CLOCK_THREAD_CPUTIME_ID: 3 on Linux, 16 on macOS.
-    let clock = if cfg!(target_os = "linux") { 3 } else { 16 };
-    let mut time = Timespec { seconds: 0, nanoseconds: 0 };
-    // SAFETY: `time` is writable and has the layout of `struct timespec` (two `long`s) on 64-bit Linux and macOS.
-    let rc = unsafe { clock_gettime(clock, &mut time) };
-    assert_eq!(rc, 0, "clock_gettime failed");
-    (time.seconds as u64) * 1_000_000_000 + time.nanoseconds as u64
-}
-
-/// Without a clock for a thread's CPU time, the time since the first call.
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
-fn thread_cpu_ns() -> u64 {
-    static START: OnceLock<Instant> = OnceLock::new();
-    START.get_or_init(Instant::now).elapsed().as_nanos() as u64
 }
 
 #[cfg(test)]
@@ -510,7 +484,7 @@ mod tests {
         checkpoints.event(CheckpointEvent::Written {
             path: &path,
             nodes: stopped.stats.nodes,
-            elapsed: Duration::ZERO,
+            spent: engine::Spent::default(),
         });
         let report = run(&trial, &taken, &AtomicBool::new(false), &Mutex::new(Vec::new())).expect("the trial's report");
         // The search's gate first, each gate once; the steps of each gate are the same every time (one thread each).

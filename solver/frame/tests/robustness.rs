@@ -769,7 +769,9 @@ fn solve_signaled(dir: &TempDir, signal: Option<&str>) -> (ExitStatus, String) {
         let line = std::iter::from_fn(|| rx.recv_timeout(Duration::from_secs(60)).ok())
             .find(|line| !line.starts_with("note: "))
             .expect("a progress line");
-        assert!(line.starts_with(&format!("n={SIGNALED} ")) && line.contains(" nodes "), "{line}");
+        // A progress line starts with its UTC time of day: `12:34:56Z n=1000 active ...`.
+        let game = line.split_once("Z ").map(|(_, rest)| rest).unwrap_or_default();
+        assert!(game.starts_with(&format!("n={SIGNALED} ")) && line.contains(" nodes "), "{line}");
         let pid = child.id().to_string();
         assert!(Command::new("kill").args([signal, &pid]).status().unwrap().success());
     }

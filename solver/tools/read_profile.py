@@ -121,7 +121,8 @@ def summary(p):
           f"{len(p.starts)} run(s); {si(p.unplaced)} steps unplaced ({percent(p.unplaced, p.total)})")
     if p.ends:
         end = p.ends[-1]
-        print(f"  last run: completed {end['completed']}, best {end['best']}, {end['elapsed']:.0f} s of search")
+        print(f"  last run: completed {end['completed']}, best {end['best']}, active {end['active']:.0f} s, "
+              f"{end['cpu']:.0f} s of CPU")
     if any(not s['rooted'] for s in p.starts):
         print('  the profile joined the search after it began: its steps before then, and the units it found, are '
               'unplaced')
@@ -223,7 +224,7 @@ def timeline(p, depth, top):
     extra = ['rest', 'above'] + (['unplaced'] if p.unplaced else [])
     print(f'\ntimeline at depth {depth}: the steps of each checkpoint interval in the largest subtrees '
           f'(rest: the other subtrees; above: the steps of the nodes above depth {depth}):')
-    print(f"  {'seq':>4} {'elapsed':>8} {'steps':>8} " + ' '.join(f'{n:>7}' for n in nodes + extra))
+    print(f"  {'seq':>4} {'active':>8} {'steps':>8} " + ' '.join(f'{n:>7}' for n in nodes + extra))
     for line in p.steps:
         cells = defaultdict(int)
         for n, count in line['ids']:
@@ -233,7 +234,7 @@ def timeline(p, depth, top):
         total = sum(cells.values())
         if total == 0:
             continue
-        print(f"  {line['seq']:>4} {line['elapsed']:>8.0f} {si(total):>8} "
+        print(f"  {line['seq']:>4} {line['active']:>8.0f} {si(total):>8} "
               + ' '.join(f'{si(cells[n]):>7}' for n in nodes + extra))
 
 

@@ -252,14 +252,18 @@ changed"](https://github.com/bvchess/taxman-notebook/blob/main/terms-changed.md)
   tagged node when it is made, the own steps of each id in each checkpoint interval, the steps by number of
   promotions, and the open units at each checkpoint.  It observes the search and changes nothing of it
   ([solver/docs/design/engine.md, "The profile of a search"](../solver/docs/design/engine.md#the-profile-of-a-search)).
-* **own search**: the time a game's search has run while the game was the oldest of the window, summed over every run
-  of it.  The time it waited behind an older game, suspended while that game held the threads, is not in it, and
-  neither is the time a speculative search ran before the game became the oldest.  The driver keeps it as the game's
-  *clock*, in `nNNNN.clock` beside the checkpoint ([solver/docs/design/engine.md, "The window: games in
-  flight"](../solver/docs/design/engine.md#the-window-games-in-flight), the item "The clock").  A result line records it
-  as `seconds.own`, the summary line as `own=`, and `status.sh` shows it as the `own search` column.
-* **the wall**: the first game whose own search takes longer than the project's limit (2026-10-16): 24 hours of the
-  game's own search on one `c8g.16xlarge` with the run's build and settings.  No program stops at it.
+* **active, waiting, CPU time**: the three times of a game's *clock*.  A game is in flight from the start of its setup
+  to its line.  It is *active* while it has at least one worker (its setup, and its search while the search has
+  workers) and *waiting* while it has none: for a thread, for the game before it, or suspended while an older game's
+  search holds the threads.  The two add up to the game's span.  Its *CPU time* is the thread seconds that the workers
+  of its search used, which no other game's work changes.  The driver keeps the clock in `nNNNN.clock` beside the
+  checkpoint, summed over every run of the game ([solver/docs/design/engine.md, "The window: games in
+  flight"](../solver/docs/design/engine.md#the-window-games-in-flight), the item "The clock").  A result line records
+  them as `seconds.cpu`, `active` and `waiting` for its run and `cpu_all_runs`, `active_all_runs` and
+  `waiting_all_runs` for all, the summary line as `active=` and `cpu=`, and `status.sh` shows the active time as its
+  `active` column.
+* **the wall**: the first game that is active for longer than the project's limit (2026-10-16): 24 hours on one
+  `c8g.16xlarge` with the run's build and settings.  No program stops at it.
 
 ## Bounds
 

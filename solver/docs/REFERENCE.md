@@ -89,11 +89,11 @@ $ taxman tables 85 8 45                         # the maximal factors and compos
 Five lines from different runs:
 
 ```
-n=250   score=19533     search  nodes=34   0.003 s  optimal ok  proof=exhausted  own=0.003 s  best=1213
-n=1220  score=468662    search  nodes=1375952   8.209 s  incomplete  own=8.151 s  best=35959
-n=1299  score=531389    repeat  nodes=0               0.079 s  optimal ok  proof=same_search of 1298  own=0.000 s  best=40571
-n=1301  score=532272    prime   nodes=0               0.016 s  optimal ok  proof=prime_formula  assumes the game of 1300 in results/optimal.jsonl.gz is optimal  own=0.000 s  best=-
-n=4754  score=7106699   known   nodes=0               0.147 s  optimal ok  proof=known from the bounds store (bounds.jsonl)  assumes statement U holds at n=4753  own=0.000 s  best=-
+n=250   score=19533     search  nodes=34   0.003 s  optimal ok  proof=exhausted  active=0.003 s  cpu=0.005 s  best=1213
+n=1220  score=468662    search  nodes=1375952   8.209 s  incomplete  active=8.151 s  cpu=31.402 s  best=35959
+n=1299  score=531389    repeat  nodes=0               0.079 s  optimal ok  proof=same_search of 1298  active=0.079 s  cpu=0.000 s  best=40571
+n=1301  score=532272    prime   nodes=0               0.016 s  optimal ok  proof=prime_formula  assumes the game of 1300 in results/optimal.jsonl.gz is optimal  active=0.016 s  cpu=0.000 s  best=-
+n=4754  score=7106699   known   nodes=0               0.147 s  optimal ok  proof=known from the bounds store (bounds.jsonl)  assumes statement U holds at n=4753  active=0.147 s  cpu=0.000 s  best=-
 ```
 
 The fields, in order:
@@ -107,10 +107,11 @@ The fields, in order:
    game past its end); or `incomplete`.  A score that differs is a hard error, which stops the run, naming the game;
 7. the proof, with the game whose search a `same_search` repeats and the source that a `known` cites;
 8. what the proof assumes, if anything (section 4);
-9. `own=`, the game's own search time ([glossary](../../docs/GLOSSARY.md#the-search)) in seconds, over every invocation
-   of the game, where the fifth field counts this invocation only: the `seconds.own` of its results line, 0.000 for a
-   game with no search to run (a `trivial`, `prime`, `repeat` or `known` game);
-10. `best=`, the game's best promotion sum: the score less `in_the_bag`, which for an incomplete game is the best so far,
+9. `active=`, the seconds the game had a worker, over every invocation of the game, where the fifth field counts this
+   invocation only: the `seconds.active_all_runs` of its results line ([the clock](design/engine.md#the-window-games-in-flight));
+10. `cpu=`, the CPU seconds of the game's search workers, over every invocation (`seconds.cpu_all_runs`), 0.000 for a
+    game with no search to run (a `trivial`, `prime`, `repeat` or `known` game);
+11. `best=`, the game's best promotion sum: the score less `in_the_bag`, which for an incomplete game is the best so far,
     or `-` for a game that has no `in_the_bag` (a `prime` or `known` game).
 
 The line of an incomplete game ends with them, after `incomplete`.
@@ -118,12 +119,13 @@ The line of an incomplete game ends with them, after `incomplete`.
 ### The progress line (stderr, every `--progress` seconds and at the end)
 
 ```
-n=992 0.3s nodes 4095 (stopped) best 24175 queue 12 spilled 0 | eff 94.3% idle 0.0% lock 0.0% splits 0 steals 0 full 0.2ms ramp 0.0% tail 0.0% rebuild 0.0% first 0.3% pauses 1 (5.6%) max 14.0ms park 0.0ms | nogoods learned 356 lookups 2975 hit 87.9% ruled out 1402 forgot 0 (table 0) largest 356
+12:34:56Z n=992 active 0.3s waited 0.0s cpu 0.5s nodes 4095 (stopped) best 24175 queue 12 spilled 0 | eff 94.3% idle 0.0% lock 0.0% splits 0 steals 0 full 0.2ms ramp 0.0% tail 0.0% rebuild 0.0% first 0.3% pauses 1 (5.6%) max 14.0ms park 0.0ms | nogoods learned 356 lookups 2975 hit 87.9% ruled out 1402 forgot 0 (table 0) largest 356
 ```
 
 | field | meaning |
 |---|---|
-| `n=992 0.3s` | the game, and the time its search has run over all invocations (`1m05s`, `1h02m03s` later) |
+| `12:34:56Z` | the UTC time of day the line was printed |
+| `n=992 active 0.3s waited 0.0s cpu 0.5s` | the game, and what it has spent over all invocations: the time it has been active (had a worker), the time it has waited (in flight with none), and the CPU time of its search's workers ([the clock](design/engine.md#the-window-games-in-flight)).  Times read `12.3s`, `1m05s`, `1h02m03s`, and CPU time from an hour on `112.3h`.  A search outside a window is active throughout and never waits |
 | `nodes 4095 (stopped)` | steps taken; in the middle of a run the rate (`164.6k/s`), at the end `done`, `optimal` or `stopped` |
 | `best 24175` | the incumbent: the largest *promotion sum* so far (the score is `in_the_bag` plus this) |
 | `queue 12 spilled 0` | work units in the shared in-memory deque, and spilled to disk |
@@ -152,7 +154,9 @@ threads, with the moves cut short, the fields regrouped and comments added, so i
  "engine":{"splits":0,"checkpoints":0,"spilled_units":0,"max_queue":1},
  "setup":{"frames":4,"candidates":48,"max_total":11,"greedy_sum":1194,"cap":1312,
           "digest":"fe5e05eb67406e98"},
- "seconds":{"frames":0.0002,"greedy":0.00001,"search":0.0008,"search_all_runs":0.0008,"own":0.0008,"total":0.0015},
+ "started":"2026-10-14T09:12:03Z", "finished":"2026-10-14T09:12:03Z",
+ "seconds":{"frames":0.0002,"greedy":0.00001,"cpu":0.0011,"active":0.0013,"waiting":0.0003,
+            "cpu_all_runs":0.0011,"active_all_runs":0.0013,"waiting_all_runs":0.0003,"total":0.0015},
  "invocations":1, "threads":2,
  "tactics":"default",
  "tactic_switches":{"prime_shortcut":true,"same_search":true,"fix_forced":true,"nogoods":true,
@@ -185,7 +189,8 @@ Game 249 of that run repeated the search of 248.  Its line has `"method":"repeat
 | `nodes`, `stats` | the search's steps over all invocations, and the searcher's counters (`match_bounds` counts the node bounds computed); `stats.near_repeat_cut`, a key that only the line of a search armed with the [near-repeat cut](design/search.md#the-near-repeat-cut) has, counts the nodes the cut cut in the last invocation, 0 if it was armed and cut none |
 | `engine` | this invocation's splits, checkpoints written, units spilled and largest in-memory queue; and, only on a line whose search started a finder (`--finder-after`), `finder`: `at_nodes` (the search's steps then), `from` (the incumbent's promotion sum then), `best` (the best promotion sum the finder reached), `improved` (its sets that became the incumbent), `refused` (its sets the checks refused: 0), `seconds` (how long it ran) and `found_seconds` (when it reached `best`); and, only on a line whose search ran a gate trial to its end (`--gate-trial`), `gate_trial`: `at_nodes` (the search's steps at the checkpoint it took its units from), `units`, `from` (the gate then), `scores` (for each gate tried: `gate`, `steps`, `cpu_seconds`, `stopped`), `chosen` and `seconds` |
 | `setup` | null on a `trivial`, `prime` or `known` line, which set up no search; otherwise the frames and candidates found, `max_total` (the most promotions the freedoms allow), the greedy start, `cap` (the ceiling as a promotion sum, `n + score(n-1) - in_the_bag`; null on a repeat, which ran no search to stop), and `digest`, a digest of the search problem the setup poses ([solver/docs/design/same-search.md](design/same-search.md)), by which a later game finds this one to repeat |
-| `seconds` | per phase, this invocation (`search_all_runs`: the search over every invocation of a resumed game); and `own`, the game's own search time ([glossary](../../docs/GLOSSARY.md#the-search)) over every invocation ([design/engine.md, "The window: games in flight"](design/engine.md#the-window-games-in-flight), the item "The clock").  It is 0 for a game with no search to run (a `trivial`, `prime`, `repeat` or `known` game), and for a search that ran only before its game was the oldest of the window.  A line written before 2026-10-22 lacks `own`; the readers ignore it, and the schema is 5 still |
+| `started`, `finished` | the UTC times, to the second (RFC 3339, `2026-10-14T09:12:03Z`), at which this invocation started the game's setup and made its line |
+| `seconds` | what the game spent: `frames` and `greedy`, the setup's phases; `cpu`, `active` and `waiting` ([the clock](design/engine.md#the-window-games-in-flight)); and `total`, the time the game's thread spent in its setup, repeat lookup, search (the wait of a suspended search included) and conclusion up to the replay.  `cpu` is the CPU seconds of the search's workers, 0 for a game with no search to run (a `trivial`, `prime`, `repeat` or `known` game); `active` the wall seconds the game had at least one worker, its setup included; `waiting` the wall seconds it was in flight with none, so that `active` and `waiting` add up to the time from `started` to `finished`.  Each is this invocation's, and `cpu_all_runs`, `active_all_runs` and `waiting_all_runs` add the invocations before it that a resumed game's clock kept.  The lines of `results/optimal.jsonl.gz` come from builds that wrote `search`, `search_all_runs` and `own` in their place, and no `started` or `finished` |
 | `invocations` | how many invocations ran the search (a resumed game has more than one) |
 | `lab` | a key that only older lines have, those of a game whose search a lab changed (the lab, a program that steered the games in flight through a command folder, is gone from the solver; [its design](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/design/lab.md) is as of 3ca11bf): `restarts`, each restart's time `at`, the game's `own_seconds` then, the `nodes` of the search abandoned, its `tactics` and the checkpoint put `aside`; `conflict_branching` and `conflict_look`, the lab's last setting of each (`"on"`, `"off"` or null), and `gate`, its last gap from which conflict branching chooses (a number or null); `branching_changes`, how many `branching` commands the lab gave; and `policy`, the policy for the games to come that reached it (`from` and the three settings), or null.  `tactics` and `tactic_switches` are then those the search ran with, its branching as it ended |
 | `threads`, `tactics`, `tactic_switches`, `limits`, `options` | what the last invocation ran with; `tactics` is `default` or the changes from the defaults, `options` the flags `--force-search` and `--use-prev`, `gate_trial` (the gates of the gate trial, only where one was asked for) and, only where given, `background` (true), `finder_after` and `finder_seconds` (the numbers of the finder flags, recorded where the finder is on) and `gate` (the number `--gate` was given); older lines may also have `keep_going`, `retry` and `retry_improved` (true) and `pass` (a number), which a `solve` that is gone wrote, and in `tactic_switches` the tactics of the matching path, which the GF(2) bound replaced: `gf2` (the GF(2) bound, true from the build that brought it, false on the matching path), `match_refine` and `lagrange`, and the knobs of the GF(2) search and of the nogood table, now fixed at the values that the chain ran with: `nogood_period` (50000), `nogood_keep` (`"none"`), `nogood_limit` (0), `force_window` (`"all"`), `branching` (`"exact"`), `strong_limit` and `strong_depth` (`"all"`), `deep_branching` (`"split"`) and `more_forced` (true) |

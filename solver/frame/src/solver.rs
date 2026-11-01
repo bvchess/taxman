@@ -85,7 +85,7 @@ mod window;
 use crate::accelerate::{prime_shortcut, solution_for_promotions};
 use crate::bits::{words_for, Bits};
 use crate::board::{promotion_cap, search_problem, Board};
-use crate::engine::{self, Control, Counters, EngineConfig, Stats};
+use crate::engine::{self, Control, Counters, EngineConfig, Spent, Stats};
 use crate::frames::BoardFrames;
 use crate::game::{replay, replay_finished, Optimal};
 use crate::json::Json;
@@ -100,6 +100,7 @@ use crate::search::{
     SearchTactics,
 };
 use crate::tactics::{on_off, Tactics};
+use crate::utc;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -107,7 +108,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// The largest board the set widths cover: 8191, at the widest of [`crate::bits::WIDTHS`] (128 words).
 pub const MAX_N: u32 = 64 * crate::bits::WIDTHS[crate::bits::WIDTHS.len() - 1] as u32 - 1;
@@ -456,20 +457,21 @@ pub fn parse_digest(text: &str) -> Option<u64> {
     (digest_text(digest) == text).then_some(digest)
 }
 
-/// Wall time of each phase of a game.
+/// The time of a game: its phases, and what it spent.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Phases {
     /// Forming, numbering and merging the frames, and the search model.
     pub frames: Duration,
     pub greedy: Duration,
-    /// The branch and bound (this invocation only).
-    pub search: Duration,
-    /// The branch and bound over every invocation of a resumed search (see `SearchResult::time_all_runs`).
-    pub search_all_runs: Duration,
-    /// The game's own search time, over every invocation: the time its search ran while the game was the oldest of the
-    /// window (`window`, "The clock"), which leaves out the time a search waited behind an older game.  Zero for a
-    /// game with no search to run (a prime, trivial, repeated or known game).
-    pub own: Duration,
+    /// What the game spent in this invocation (`window`, "The clock"): the CPU time of its search's workers, the wall
+    /// time it was active (with a worker: its setup and its search) and the wall time it waited (in flight with none:
+    /// for a thread, for the game before it, suspended for older games).  Active and waiting together are the game's
+    /// span, from the start of its setup to its line.  A game with no search to run (a prime, trivial, repeated or known
+    /// game) used no CPU time in workers.
+    pub spent: Spent,
+    /// What the game spent in every invocation of a resumed search: this invocation's, and the earlier ones' as the
+    /// clock they left beside the checkpoint says.
+    pub spent_all_runs: Spent,
     /// The whole game (this invocation only).
     pub total: Duration,
 }
@@ -477,12 +479,16 @@ pub struct Phases {
 impl Phases {
     pub fn to_json(&self) -> Json {
         let secs = |d: Duration| Json::Num(d.as_secs_f64());
+        let (once, all) = (self.spent, self.spent_all_runs);
         Json::object([
             ("frames", secs(self.frames)),
             ("greedy", secs(self.greedy)),
-            ("search", secs(self.search)),
-            ("search_all_runs", secs(self.search_all_runs)),
-            ("own", secs(self.own)),
+            ("cpu", secs(once.cpu)),
+            ("active", secs(once.active)),
+            ("waiting", secs(once.waiting)),
+            ("cpu_all_runs", secs(all.cpu)),
+            ("active_all_runs", secs(all.active)),
+            ("waiting_all_runs", secs(all.waiting)),
             ("total", secs(self.total)),
         ])
     }
@@ -550,9 +556,13 @@ pub struct GameResult {
     pub counters: Counters,
     pub setup: Option<SearchSetup>,
     pub phases: Phases,
+    /// When the game's setup started and when its line was made (this invocation's), written to the second as UTC
+    /// timestamps ([`crate::utc`]).
+    pub started: SystemTime,
+    pub finished: SystemTime,
     /// The invocations that ran this game's search: 1, plus those of an interrupted search it resumed (as many
     /// as the results file records, at least 1; an invocation that was killed leaves no record, but its work up
-    /// to its last checkpoint is in `nodes` and `phases.search_all_runs`).
+    /// to its last checkpoint is in `nodes` and `phases.spent_all_runs`).
     pub invocations: u32,
     /// Of the last invocation.
     pub threads: usize,
@@ -604,6 +614,8 @@ impl GameResult {
             counters: Counters::default(),
             setup: None,
             phases: Phases::default(),
+            started: UNIX_EPOCH,
+            finished: UNIX_EPOCH,
             invocations: 1,
             threads: opts.threads,
             tactics: opts.tactics,
@@ -743,6 +755,8 @@ impl GameResult {
                 ("stats", self.stats_json()),
                 ("engine", engine),
                 ("setup", setup),
+                ("started", Json::from(utc::rfc3339(self.started))),
+                ("finished", Json::from(utc::rfc3339(self.finished))),
                 ("seconds", self.phases.to_json()),
                 ("invocations", Json::from(self.invocations)),
                 ("threads", Json::from(self.threads)),
@@ -757,8 +771,9 @@ impl GameResult {
     }
 
     /// One line for a person: n, score, method, nodes, time, the comparison with the table, the proof,
-    /// and what it assumes, if anything; then the game's own search time and its best promotion sum (the score less
-    /// `in_the_bag`, or `-` for a game that has no `in_the_bag`).
+    /// and what it assumes, if anything; then the seconds the game was active and the CPU seconds of its workers, both
+    /// over every invocation, and its best promotion sum (the score less `in_the_bag`, or `-` for a game that has no
+    /// `in_the_bag`).
     pub fn summary_line(&self) -> String {
         let optimal = match (self.completed, self.optimal_match) {
             (false, _) => "incomplete",
@@ -781,13 +796,15 @@ impl GameResult {
             .and_then(|bag| self.score.checked_sub(bag))
             .map_or_else(|| "-".to_owned(), |sum| sum.to_string());
         format!(
-            "n={:<5} score={:<9} {:<7} nodes={:<11} {:>9.3} s  {optimal}{proof}{assumes}  own={:.3} s  best={best}",
+            "n={:<5} score={:<9} {:<7} nodes={:<11} {:>9.3} s  {optimal}{proof}{assumes}  active={:.3} s  cpu={:.3} s  \
+             best={best}",
             self.n,
             self.score,
             self.method.as_str(),
             self.nodes,
             self.phases.total.as_secs_f64(),
-            self.phases.own.as_secs_f64()
+            self.phases.spent_all_runs.active.as_secs_f64(),
+            self.phases.spent_all_runs.cpu.as_secs_f64()
         )
     }
 }
@@ -949,10 +966,8 @@ struct Outcome {
     /// The search finished, or reached a ceiling it was given; false when a limit or a stop stopped it.
     completed: bool,
     stats: Stats,
+    /// Of this invocation.
     counters: Counters,
-    /// Of this invocation, and over every invocation of a resumed search.
-    time: Duration,
-    time_all_runs: Duration,
     /// What the finder did, if it started.
     finder: Option<finder::Report>,
     /// What the gate trial did, if it ran to its end.
@@ -1122,8 +1137,6 @@ impl<const W: usize> Job for SearchJob<W> {
             completed: found.completed,
             stats: found.stats,
             counters: found.counters,
-            time: found.time,
-            time_all_runs: found.time_all_runs,
             finder: found.finder,
             gate_trial: found.gate_trial,
             near_repeat_cut: self.near.get().map(NearRepeat::nodes_cut),
@@ -1350,8 +1363,6 @@ fn conclude_game(
             result.counters = searched.counters;
             result.finder = searched.finder;
             result.gate_trial = searched.gate_trial.clone();
-            result.phases.search = searched.time;
-            result.phases.search_all_runs = searched.time_all_runs;
             if set.job.resuming() {
                 // At least one invocation made the checkpoint, even if it left no line in a results file.
                 result.invocations = earlier_runs.max(1) + 1;
@@ -1380,11 +1391,15 @@ fn conclude_game(
 struct Context<'a> {
     prev: Option<&'a Prev>,
     optimal: &'a Optimal,
-    /// The game's own time before its conclusion: its setup, its repeat lookup and its search, not the time it
-    /// waited in the window.
+    /// The time of the game's own thread before its conclusion: its setup, its repeat lookup and its search (a
+    /// suspended search's wait included), not the time it waited for the games before it.
     own: Duration,
-    /// The game's own search time over every invocation: its clock (`Phases::own`).
-    own_search: Duration,
+    /// What the game spent in this invocation, and in the invocations before it (its clock): `Phases::spent` and the
+    /// rest of `Phases::spent_all_runs`.
+    spent: Spent,
+    earlier: Spent,
+    /// When its setup started (`GameResult::started`).
+    started: SystemTime,
     /// When its conclusion began.
     since: Instant,
 }
@@ -1401,7 +1416,10 @@ fn conclude(
     result.moves = moves;
     result.promotions = promotions;
     result.phases.total = context.own + context.since.elapsed();
-    result.phases.own = context.own_search;
+    result.phases.spent = context.spent;
+    result.phases.spent_all_runs = context.earlier + context.spent;
+    result.started = context.started;
+    result.finished = SystemTime::now();
     let method = result.method.as_str();
     // A completed game claims to be optimal, so it must be over and open with the largest prime.
     let refereed = if result.completed { replay_finished(n, &result.moves) } else { replay(n, &result.moves) };

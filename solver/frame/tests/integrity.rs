@@ -288,7 +288,8 @@ fn a_failure_after_the_search_keeps_the_checkpoint_and_records_the_game() {
     // the checkpoint goes.
     let games = solver::solve_range(600, 600, &unlimited, Some(&results)).unwrap();
     assert_eq!((games[0].score, games[0].completed, games[0].invocations), (truth, true, 2));
-    assert!(games[0].phases.search_all_runs >= games[0].phases.search);
+    let phases = &games[0].phases;
+    assert!(phases.spent_all_runs.active >= phases.spent.active && phases.spent_all_runs.cpu >= phases.spent.cpu);
     assert!(!checkpoint.exists());
     assert_eq!(completed_line(&results, 600).get("invocations").and_then(Json::as_u32), Some(2));
 }
@@ -326,7 +327,13 @@ fn result_lines_carry_their_provenance() {
     assert!(done.get("in_the_bag").and_then(Json::as_u64).is_some());
     assert_eq!(done.get("invocations").and_then(Json::as_u32), Some(1));
     let seconds = done.get("seconds").unwrap();
-    assert!(seconds.get("search").is_some() && seconds.get("search_all_runs").is_some());
+    for key in ["cpu", "active", "waiting", "cpu_all_runs", "active_all_runs", "waiting_all_runs"] {
+        assert!(seconds.get(key).and_then(Json::as_f64).is_some(), "seconds.{key}: {seconds}");
+    }
+    assert!(seconds.get("search").is_none() && seconds.get("own").is_none(), "{seconds}");
+    for key in ["started", "finished"] {
+        assert!(done.get(key).and_then(Json::as_str).is_some_and(|stamp| stamp.len() == 20), "{key}: {done}");
+    }
     let limits = done.get("limits").unwrap();
     assert_eq!((limits.get("nodes"), limits.get("seconds")), (Some(&Json::Null), Some(&Json::Null)));
     let options = done.get("options").unwrap();
@@ -356,10 +363,11 @@ fn result_lines_carry_their_provenance() {
     assert_eq!(ResultsFile::open(&results, Optimal::built_in(), 1).unwrap().earlier_runs(600), 1);
 }
 
-/// A game's own search time, `seconds.own` of its line, and its best promotion sum end its summary line: a game with no
-/// search to run has no own search time, and a game with no `in_the_bag` (a prime one) has `-` for its best sum.
+/// The seconds a game was active and the CPU seconds of its workers, both over every invocation (`seconds.cpu_all_runs`
+/// and `active_all_runs` of its line), and its best promotion sum end its summary line: a game with no search to run
+/// used no CPU time in workers, and a game with no `in_the_bag` (a prime one) has `-` for its best sum.
 #[test]
-fn a_summary_line_ends_with_the_games_own_search_time_and_its_best_promotion_sum() {
+fn a_summary_line_ends_with_the_games_active_and_cpu_seconds_and_its_best_promotion_sum() {
     let games = solver::solve_range(1, 60, &options(1), None).unwrap();
     let methods: Vec<&str> = games.iter().map(|g| g.method.as_str()).collect();
     for kind in ["trivial", "prime", "repeat", "search"] {
@@ -367,15 +375,17 @@ fn a_summary_line_ends_with_the_games_own_search_time_and_its_best_promotion_sum
     }
     for game in &games {
         let line = game.to_json();
-        let own = line.get("seconds").and_then(|seconds| seconds.get("own")).and_then(Json::as_f64);
-        assert_eq!(own, Some(game.phases.own.as_secs_f64()), "n={}", game.n);
+        let time = |key: &str| line.get("seconds").and_then(|seconds| seconds.get(key)).and_then(Json::as_f64);
+        let all = game.phases.spent_all_runs;
+        let (active, cpu) = (all.active.as_secs_f64(), all.cpu.as_secs_f64());
+        assert_eq!((time("active_all_runs"), time("cpu_all_runs")), (Some(active), Some(cpu)), "n={}", game.n);
         match game.method.as_str() {
-            "trivial" | "prime" | "repeat" => assert_eq!(game.phases.own, Duration::ZERO, "n={}", game.n),
-            "search" => assert!(game.phases.own > Duration::ZERO, "n={}", game.n),
+            "trivial" | "prime" | "repeat" => assert_eq!(all.cpu, Duration::ZERO, "n={}", game.n),
+            "search" => assert!(all.cpu > Duration::ZERO, "n={}", game.n),
             _ => {}
         }
         let best = game.in_the_bag.map_or_else(|| "-".to_owned(), |bag| (game.score - bag).to_string());
-        let ends = format!("  own={:.3} s  best={best}", game.phases.own.as_secs_f64());
+        let ends = format!("  active={active:.3} s  cpu={cpu:.3} s  best={best}");
         assert!(game.summary_line().ends_with(&ends), "n={}: {}", game.n, game.summary_line());
         assert_eq!(best == "-", game.method.as_str() == "prime", "n={}", game.n);
     }
@@ -404,7 +414,9 @@ fn a_resumed_game_counts_its_invocations_and_its_time() {
     };
     assert!(runs >= 3, "only {runs} invocations");
     assert_eq!(last.invocations, runs);
-    assert!(last.phases.search_all_runs > last.phases.search, "{:?}", last.phases);
+    let phases = &last.phases;
+    assert!(phases.spent_all_runs.active > phases.spent.active, "{phases:?}");
+    assert!(phases.spent_all_runs.cpu > phases.spent.cpu, "{phases:?}");
     let lines = lines(&results);
     assert_eq!(lines.len(), runs as usize);
     let recorded: Vec<u32> = lines.iter().map(|l| l.get("invocations").and_then(Json::as_u32).unwrap()).collect();

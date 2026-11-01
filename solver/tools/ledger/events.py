@@ -112,9 +112,9 @@ def main(directory, chain=None):
     if chain:
         games = lines(chain)
         total = sum(g["seconds"]["total"] for g in games)
-        search = sum(g["seconds"]["search"] for g in games)
+        cpu = sum(g["seconds"]["cpu"] for g in games)
         methods = Counter(g["method"] for g in games)
-        print(f"the chain: {len(games)} games, {total:.1f} s ({search:.1f} s of search), {dict(methods)}")
+        print(f"the chain: {len(games)} games, {total:.1f} s ({cpu:.1f} s of CPU), {dict(methods)}")
 
 
 if __name__ == "__main__":

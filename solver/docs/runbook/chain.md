@@ -166,17 +166,17 @@ host user@machine
   last progress line: 2026-10-18 15:17 PDT, 5 min 24 s ago
   recorded through 4871 (score 7,461,794)
   the last 6 games recorded and the 4 in flight (window 4):
-      n  own search           nodes       best  state
-   4866  0.0s                     0    537,485  recorded, score 7,446,689 (repeat, same_search of 4865)
-   4867  1m49s           34,218,766    538,284  recorded, score 7,449,976 (search, exhausted)
-   4868  50m11s       1,133,462,769    538,760  recorded, score 7,453,452 (search, exhausted)
-   4869  0.0s                     0    538,745  recorded, score 7,456,914 (start, cap)
-   4870  0.0s                     0    538,760  recorded, score 7,459,353 (repeat, same_search of 4868)
-   4871  0.0s                     0          -  recorded, score 7,461,794 (prime, prime_formula)
-   4872  1h15m00s     1,086,013,550    341,541  running, 242.8k nodes/s
-   4873  -                        -          -  no recent progress line
-   4874  -                        -          -  no recent progress line
-   4875  -                       63    341,541  suspended
+      n  active      cpu                   nodes       best  state
+   4866  0.0s        0.0s                      0    537,485  recorded, score 7,446,689 (repeat, same_search of 4865)
+   4867  1m49s       2h37m12s         34,218,766    538,284  recorded, score 7,449,976 (search, exhausted)
+   4868  50m11s      81h05m17s     1,133,462,769    538,760  recorded, score 7,453,452 (search, exhausted)
+   4869  0.0s        0.0s                      0    538,745  recorded, score 7,456,914 (start, cap)
+   4870  0.0s        0.0s                      0    538,760  recorded, score 7,459,353 (repeat, same_search of 4868)
+   4871  0.0s        0.0s                      0          -  recorded, score 7,461,794 (prime, prime_formula)
+   4872  1h15m00s    97h30m00s     1,086,013,550    341,541  running, 242.8k nodes/s
+   4873  -           -                         -          -  no recent progress line
+   4874  -           -                         -          -  no recent progress line
+   4875  1h02m11s    10h22m09s                63    341,541  suspended
 ```
 
 The recorded games come first, in increasing n, and the games in flight follow.  Scores, nodes and best sums have
@@ -185,10 +185,10 @@ thousands separators; game numbers and times do not.  A recorded game's row come
 printed the game again after an interruption.  That file holds only the games that the host's own run recorded, so a run
 that has recorded none shows the games in flight alone:
 
-* `own search` and `best`: the line's `own=` and `best=`, the game's own search time over every run of it
-  ([glossary](../../../docs/GLOSSARY.md#the-search)) and its best promotion sum, the score less `in_the_bag`.  Both are
-  `-` where the solver that printed the line did not print them, and `best` is `-` for a prime or known game; a game that
-  ran no search has an own search of 0.0s;
+* `active`, `cpu` and `best`: the line's `active=`, `cpu=` and `best=`, the seconds the game had a worker and the CPU
+  seconds of its search's workers, both over every run of it ([glossary](../../../docs/GLOSSARY.md#the-search)), and its
+  best promotion sum, the score less `in_the_bag`.  All are `-` where the solver that printed the line did not print
+  them, and `best` is `-` for a prime or known game; a game that ran no search has a cpu of 0.0s;
 * `nodes`: the line's nodes;
 * `state`: `recorded`, the score, and in parentheses the line's method and proof, then `optimal ok` when the score is
   the one in the built-in table.
@@ -203,9 +203,9 @@ The state of a game in flight is told from its last progress line in `logs/chain
 * `no recent progress line`: the game has no line, or three lines of another game follow its line.  A setup, a prime or
   repeated game and a search not started look alike in the logs.
 
-For a game in flight, `own search` is the clock that the oldest game keeps in `ckpt/nNNNN.clock` (up to a checkpoint
-interval old; `-` for a game without one), and `best` the progress line's sum of promotions so far.  Times are in the
-local time zone (`TZ`) with its abbreviation.
+For a game in flight, `active` and `cpu` are the times of its last progress line (`-` for a game without one), and
+`best` its sum of promotions so far.  The progress line also has the time the game waited, which the table leaves out.
+Times of day are in the local time zone (`TZ`) with its abbreviation.
 
 ## Verifying, and bringing the results home
 

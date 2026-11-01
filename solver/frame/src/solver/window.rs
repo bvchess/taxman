@@ -37,8 +37,10 @@
 //!    game of that game may be below B when it is armed; the seed of the final game, for a search that takes a seed,
 //!    or the search's own finds raise it.
 //!
-//! A game's `phases.total` is its own work: its setup, its repeat lookup, its search with its start and moves, and its
-//! conclusion up to the replay; not the time it waited in the window.
+//! A game's `phases.total` is the time its own thread spent: its setup, its repeat lookup, its search with its start
+//! and moves (a suspended search's wait included), and its conclusion up to the replay; not the time it waited for the
+//! games before it.  What it cost is its CPU time, and how long it took is its span, from the start of its setup to its
+//! line (see "The clock").
 //!
 //! # Seeds
 //!
@@ -108,17 +110,29 @@
 //!
 //! # The clock
 //!
-//! A game's own search is the time it has been the head of the window with its search running, summed over the
-//! invocations that searched it; its line records it as `seconds.own`.  The chain waits for the head and for no other
-//! game; a search behind it is suspended, or shares the threads that the head leaves free, so the time it spends there
-//! is not what the game costs, and the search's elapsed time in its checkpoint (which counts it) would overstate the
-//! cost of a game that follows a dear one.  The driver keeps the head's clock ([`clock`](super::clock)): it adds the
-//! time between its looks while the head's search runs, writes it beside the game's checkpoint every checkpoint
-//! interval and when the search ends without completing, and reads it back when a search starts with a checkpoint to
-//! resume, so that a spot interruption, a new machine or a rerun goes on from it.
+//! A game is in flight from the start of its setup (its line's `started`) to its line (`finished`).  The driver sorts
+//! that time into the time the game was *active*, with at least one worker, and the time it was *waiting*, with none,
+//! so that the two add up to its span.  A game is active in its setup, which holds one thread, and in a search that has
+//! live workers or is in its start (the dive and the local search, which run on the search's own thread).  It waits for
+//! a thread to set up on; as a search set up and not started (deferred, or waiting for a seed or for threads), a
+//! repeat, or a prime, trivial or known game, until the head concludes it; as a search suspended for older games, with
+//! no worker left; and as a search done, until it is the head.  The workers' CPU time is the engine's count
+//! ([`Counters::cpu`](crate::engine::Counters::cpu)), which the driver reads as it samples the search and takes whole
+//! when the search ends.  So what a game cost is its CPU time, whichever game is the head: a younger game that shares
+//! the threads is active, and so is the head, but each has its own CPU time.  A line records the three times of its
+//! invocation as `seconds.cpu`, `active` and `waiting`, and the sums over the invocations that searched it as
+//! `cpu_all_runs`, `active_all_runs` and `waiting_all_runs`.
 //!
-//! At each look the driver counts the time since the last look as the head's search before it takes in the event that
-//! woke it, so a search whose end arrives is counted up to the moment the driver wakes, however late that is.
+//! The driver keeps the clock of every search that runs ([`clock`](super::clock)): the three times over every
+//! invocation, written beside the game's checkpoint every checkpoint interval of the game's active time and when the
+//! search ends without completing, and read back when a search starts with a checkpoint to resume, so that a spot
+//! interruption, a new machine or a rerun goes on from it.  The search's control carries them too
+//! ([`Control::report`](crate::engine::Control::report)), for the engine's progress lines and the profile.
+//!
+//! At each look (every event, and every tick while a search runs or a game waits for a thread) the driver sorts the
+//! time since the last look by the state the game was in before it takes in the event that woke it, so a search whose
+//! end arrives is counted up to the moment the driver wakes, however late that is.  A search's workers are counted at
+//! the ticks, so the time is sorted to about a tick.
 //!
 //! # Tracing
 //!
@@ -141,7 +155,7 @@ use super::{
     SolveOptions,
 };
 use crate::accelerate::prime_shortcut;
-use crate::engine::{self, Status, WORKER_STACK_SIZE};
+use crate::engine::{self, Spent, Status, WORKER_STACK_SIZE};
 use crate::game::Optimal;
 use crate::known::Known as KnownGames;
 use crate::results::ResultsFile;
@@ -154,7 +168,7 @@ use std::mem;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Arc;
 use std::thread::{self, Scope};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// A range of games for [`solve`].
 pub(super) struct Range<'a> {
@@ -244,13 +258,77 @@ struct Game {
     stage: Stage,
     /// Its own time so far: its setup, its repeat lookup and its search.
     own: Duration,
-    /// Its clock, its own search time: the time it has been the head with its search running, over every invocation
-    /// (see "The clock").  The game's line (`seconds.own`) reads it.
-    headed: Duration,
-    /// What was last written to its clock file.
-    headed_kept: Duration,
+    /// When its setup started (`None` while it waits for a thread: it is not in flight yet), and when its time was
+    /// last sorted into `spent`.
+    started: Option<SystemTime>,
+    mark: Instant,
+    /// What it has spent in this invocation, and in the ones before it as its clock says, read when its search starts
+    /// (see "The clock").  The game's line reads them.
+    spent: Spent,
+    earlier: Spent,
+    /// What was last written to its clock file (`earlier` plus `spent` of then).
+    kept: Spent,
     /// The sender of its go while its thread may wait for one; dropping it cancels the game's search.
     go: Option<Sender<Go>>,
+}
+
+impl Game {
+    /// A game that has entered the window.
+    fn new(before: Before) -> Game {
+        Game {
+            before,
+            stage: Stage::Waiting,
+            own: Duration::ZERO,
+            started: None,
+            mark: Instant::now(),
+            spent: Spent::default(),
+            earlier: Spent::default(),
+            kept: Spent::default(),
+            go: None,
+        }
+    }
+
+    /// Whether the game has a worker now: `None` before its setup starts, when it is not in flight.
+    fn has_workers(&self) -> Option<bool> {
+        match &self.stage {
+            Stage::Waiting => None,
+            Stage::SettingUp => Some(true),
+            Stage::Search(_, Plan::Search(Search::Running(run))) => Some(run.has_workers()),
+            Stage::Failed(_) | Stage::Derived(_) | Stage::Search(..) => Some(false),
+        }
+    }
+
+    /// Sorts the time up to `now` since the last look into the time the game was active and the time it waited, by the
+    /// state it was in; takes the CPU time of a running search from its last sample; and tells the search's control
+    /// what the game has spent over all its invocations.
+    fn account(&mut self, now: Instant) {
+        let since = now.saturating_duration_since(self.mark);
+        self.mark = self.mark.max(now);
+        match self.has_workers() {
+            None => {}
+            Some(true) => self.spent.active += since,
+            Some(false) => self.spent.waiting += since,
+        }
+        if let Stage::Search(_, Plan::Search(Search::Running(run))) = &self.stage {
+            if let Some(status) = run.last {
+                self.spent.cpu = status.cpu;
+            }
+            self.report();
+        }
+    }
+
+    /// What the game has spent over all its invocations.
+    fn total(&self) -> Spent {
+        self.earlier + self.spent
+    }
+
+    /// Tells the control of the game's search what the game has spent over all its invocations, for the progress lines
+    /// and the profile.
+    fn report(&self) {
+        if let Stage::Search(set, _) = &self.stage {
+            set.job.control().report(self.total());
+        }
+    }
 }
 
 /// Where a game of the window is.
@@ -358,6 +436,13 @@ impl Run {
         }
     }
 
+    /// Whether the search has a worker: it is told to have some, or its engine had some at the last sample, or has not
+    /// been seen to run yet (the search is in its start, on its own thread).  A search told to have none keeps its
+    /// workers until they retire, one by one, as they come idle.
+    fn has_workers(&self) -> bool {
+        self.target > 0 || self.last.is_none_or(|status| status.live > 0)
+    }
+
     /// The policy has run with the last sample, which is not acted on again.
     fn used(&mut self) {
         if let Load::Starting { fresh } | Load::Sampled { fresh, .. } = &mut self.load {
@@ -450,8 +535,6 @@ struct Window<'a> {
     /// When the range began, and whether `TAXMAN_WINDOW_TRACE` asks for the trace on stderr.
     began: Instant,
     trace: bool,
-    /// When the head's clock was last brought up to date.
-    clock_at: Instant,
 }
 
 impl<'a> Window<'a> {
@@ -480,7 +563,6 @@ impl<'a> Window<'a> {
             events,
             began: Instant::now(),
             trace: std::env::var_os("TAXMAN_WINDOW_TRACE").is_some(),
-            clock_at: Instant::now(),
         }
     }
 
@@ -512,10 +594,10 @@ impl<'a> Window<'a> {
             } else {
                 received.recv().ok()
             };
-            // The time since the last look was spent with the head's search as it was before this event, which may be
-            // its end: the clock is brought up to date before the event is taken in.
+            // The time since the last look was spent by the games as they were before this event, which may be the end
+            // of a search: the clocks are brought up to date before the event is taken in.
             let now = Instant::now();
-            self.advance_clock(now);
+            self.account(now);
             if let Some(event) = event {
                 self.handle(event);
             }
@@ -560,15 +642,7 @@ impl<'a> Window<'a> {
             let n = self.entering;
             self.entering += 1;
             if !self.in_file(n) {
-                let game = Game {
-                    before: self.before(n),
-                    stage: Stage::Waiting,
-                    own: Duration::ZERO,
-                    headed: Duration::ZERO,
-                    headed_kept: Duration::ZERO,
-                    go: None,
-                };
-                self.games.insert(n, game);
+                self.games.insert(n, Game::new(self.before(n)));
             }
         }
     }
@@ -632,8 +706,6 @@ impl<'a> Window<'a> {
             let prev = Prev::from_result(&result);
             self.tell(n + 1, &prev);
             self.last = Some(prev);
-            // The conclusion was the old head's: the next head's clock counts from here.
-            self.advance_clock(Instant::now());
             self.next += 1;
         }
     }
@@ -641,7 +713,10 @@ impl<'a> Window<'a> {
     /// The result of the head `n`, if it can be concluded now: it has been found, or has failed.  A failure is
     /// reported here, and a game that a check rejects after it was found goes to the results file's rejected games.
     fn conclude_head(&mut self, n: u32) -> Result<Option<GameResult>, String> {
-        let Some(game) = self.games.get(&n) else { return Ok(None) };
+        let Some(game) = self.games.get_mut(&n) else { return Ok(None) };
+        // The game's time ends here if it is concluded: its active and waiting time add up to its span.
+        game.account(Instant::now());
+        let game = &*game;
         let found = match &game.stage {
             Stage::Failed(message) => return Err(message.clone()),
             Stage::Derived(derived) => Found::Derived(derived),
@@ -654,7 +729,9 @@ impl<'a> Window<'a> {
             prev: self.last.as_ref(),
             optimal: self.optimal,
             own: game.own,
-            own_search: game.headed,
+            spent: game.spent,
+            earlier: game.earlier,
+            started: game.started.unwrap_or(UNIX_EPOCH),
             since: Instant::now(),
         };
         let concluded = conclude_game(n, found, self.earlier, earlier_runs, self.opts, context);
@@ -882,6 +959,9 @@ impl<'a> Window<'a> {
             Ok(_) => {
                 game.stage = Stage::SettingUp;
                 game.go = Some(go);
+                // The game is in flight from here.
+                game.started = Some(SystemTime::now());
+                game.mark = Instant::now();
                 self.trace(format_args!("setup n={n}"));
             }
             Err(e) => game.stage = Stage::Failed(format!("n={n}: cannot start a thread for the game: {e}")),
@@ -917,10 +997,6 @@ impl<'a> Window<'a> {
             }
         };
         self.trace(format_args!("start n={n} threads={threads} seed={} cap={cap:?}", seed.is_some()));
-        // The head's own search begins here: the clock counts from now, not from its last look.
-        if n == self.next {
-            self.advance_clock(now);
-        }
         // The game before it, if it is concluded: the game of the near-repeat cut (`near_repeat`).  A search started
         // before then does not cut by it.
         let concluded = match self.known_before(n) {
@@ -928,9 +1004,12 @@ impl<'a> Window<'a> {
             _ => None,
         };
         let Some(game) = self.games.get_mut(&n) else { return };
+        // The game has been waiting until now, and is active from here.
+        game.account(now);
         // A search that resumes from its checkpoint goes on from the clock the last invocation kept.
-        game.headed = clock::resume(self.opts, n);
-        game.headed_kept = game.headed;
+        game.earlier = clock::resume(self.opts, n);
+        game.kept = game.earlier;
+        game.report();
         if let Some(go) = game.go.take() {
             // The game's thread waits for it.
             let _ = go.send(Go { seed, finder_seed, cap, threads, concluded });
@@ -978,18 +1057,23 @@ impl<'a> Window<'a> {
                 self.trace(format_args!("setup-done n={n} took={took:?} kind={kind}"));
             }
             Event::Searched { n, outcome, took } => {
-                // A search that stops (a signal, a limit) is resumed with its clock; a finished one's goes with its
-                // checkpoint.
-                if !matches!(&outcome, Ok(outcome) if outcome.completed) {
-                    self.keep_clock(n);
-                }
                 let Some(game) = self.games.get_mut(&n) else { return };
                 game.own += took;
+                // The engine's count of the CPU time is whole, where the samples trail it.
+                if let Ok(outcome) = &outcome {
+                    game.spent.cpu = outcome.counters.cpu;
+                }
+                // A search that stops (a signal, a limit) is resumed with its clock; a finished one's goes with its
+                // checkpoint.
+                let stopped = !matches!(&outcome, Ok(outcome) if outcome.completed);
                 let cut = outcome.as_ref().ok().and_then(|outcome| outcome.near_repeat_cut);
                 match (outcome, &mut game.stage) {
                     (Ok(outcome), Stage::Search(_, plan)) => *plan = Plan::Search(Search::Done(outcome)),
                     (Ok(_), _) => {}
                     (Err(message), stage) => *stage = Stage::Failed(message),
+                }
+                if stopped {
+                    self.keep_clock(n);
                 }
                 self.trace(format_args!("searched n={n} took={took:?} near_repeat_cut={cut:?}"));
             }
@@ -1001,18 +1085,19 @@ impl<'a> Window<'a> {
         }
     }
 
-    /// Brings the head's clock up to `now` if its search runs (the time since the last look is its own search), and
-    /// keeps it in its file once a checkpoint interval has passed since it was last kept.
-    fn advance_clock(&mut self, now: Instant) {
-        let since = now.saturating_duration_since(self.clock_at);
-        self.clock_at = self.clock_at.max(now);
-        let n = self.next;
-        let Some(game) = self.games.get_mut(&n) else { return };
-        if !matches!(game.stage, Stage::Search(_, Plan::Search(Search::Running(_)))) {
-            return;
+    /// Brings the clock of every game up to `now` (the time since the last look is sorted into the time the game was
+    /// active and the time it waited), and keeps the clock of each running search in its file once a checkpoint
+    /// interval of the game's active time has passed since it was last kept.
+    fn account(&mut self, now: Instant) {
+        let mut due = Vec::new();
+        for (&n, game) in &mut self.games {
+            game.account(now);
+            let running = matches!(game.stage, Stage::Search(_, Plan::Search(Search::Running(_))));
+            if running && game.total().active >= game.kept.active + self.opts.checkpoint_interval {
+                due.push(n);
+            }
         }
-        game.headed += since;
-        if game.headed >= game.headed_kept + self.opts.checkpoint_interval {
+        for n in due {
             self.keep_clock(n);
         }
     }
@@ -1020,9 +1105,9 @@ impl<'a> Window<'a> {
     /// Writes game `n`'s clock to its file, if it has run since it was last written.
     fn keep_clock(&mut self, n: u32) {
         let Some(game) = self.games.get_mut(&n) else { return };
-        if game.headed > game.headed_kept {
-            game.headed_kept = game.headed;
-            clock::keep(self.opts, n, game.headed);
+        if game.total() != game.kept {
+            game.kept = game.total();
+            clock::keep(self.opts, n, game.kept);
         }
     }
 
@@ -1075,7 +1160,8 @@ mod tests {
     /// which they waited `idle_time` ms.
     fn status(live: usize, idle: usize, capacity: u64, idle_time: u64) -> Status {
         let (capacity, idle_time) = (ms(capacity), ms(idle_time));
-        Status { live, running: live - idle, idle, queued: 0, idle_time, capacity, best: 0, nodes: 0 }
+        let cpu = Duration::ZERO;
+        Status { live, running: live - idle, idle, queued: 0, idle_time, capacity, cpu, best: 0, nodes: 0 }
     }
 
     /// A near repeat: game 1083 poses nearly the problem of 1082, and the near-repeat cut by 1082 shortens its search
@@ -1199,6 +1285,79 @@ mod tests {
             concluded: Some(prev.clone()),
         };
         assert_eq!(set.job.search(go, &off).unwrap().near_repeat_cut, None);
+    }
+
+    /// A game's time is sorted by whether it has a worker (see "The clock"): not at all before its setup starts,
+    /// active in its setup, waiting as a search not started or as a repeat, active as a search in its start or with
+    /// live workers, and waiting only as a search suspended, told to have none and with none left at the last sample,
+    /// which is active while its workers retire and as soon as it is told to have one again.  A running search's CPU
+    /// time is its last sample's, and what the control is told is the game's time over all its invocations.
+    #[test]
+    fn a_games_time_is_active_with_a_worker_and_waiting_without_one() {
+        let prev = concluded(NEAR - 1);
+        let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
+        let mut game = Game::new(Before::None);
+        let start = game.mark;
+        let mut now = start;
+        let mut sort = |game: &mut Game, millis: u64| {
+            now += ms(millis);
+            game.account(now);
+        };
+
+        // Waiting for a thread to set up on: in flight in neither time.
+        sort(&mut game, 10);
+        assert_eq!(game.spent, Spent::default());
+        game.stage = Stage::SettingUp;
+        sort(&mut game, 20);
+        assert_eq!((game.spent.active, game.spent.waiting), (ms(20), Duration::ZERO));
+
+        // Set up, a search not started, and then a repeat: waiting.
+        let set = search_set_up(NEAR, &prev, &opts);
+        game.stage = Stage::Search(Box::new(set), Plan::Search(Search::NotStarted(Weighed::default())));
+        sort(&mut game, 5);
+        game.stage = match mem::replace(&mut game.stage, Stage::Waiting) {
+            Stage::Search(set, _) => Stage::Search(set, Plan::Repeat(NEAR - 1)),
+            stage => stage,
+        };
+        sort(&mut game, 5);
+        assert_eq!((game.spent.active, game.spent.waiting), (ms(20), ms(10)));
+
+        // A search in its start, which no sample has seen yet, has a worker; so has one with live workers.
+        let Stage::Search(set, _) = mem::replace(&mut game.stage, Stage::Waiting) else { unreachable!() };
+        game.earlier = Spent { cpu: ms(1_000), active: ms(2_000), waiting: ms(3_000) };
+        game.stage = Stage::Search(set, Plan::Search(Search::Running(Run::new(2, start, None))));
+        sort(&mut game, 10);
+        assert_eq!(game.spent.active, ms(30));
+        let sampled = |live, cpu| Some(Status { cpu: ms(cpu), ..status(live, 0, 10, 0) });
+        let run_of = |game: &mut Game, change: &dyn Fn(&mut Run)| {
+            if let Stage::Search(_, Plan::Search(Search::Running(run))) = &mut game.stage {
+                change(run);
+            }
+        };
+        run_of(&mut game, &|run| run.last = sampled(2, 123));
+        sort(&mut game, 10);
+        assert_eq!((game.spent.active, game.spent.cpu), (ms(40), ms(123)));
+
+        // Told to have none, its workers retire one by one: active until none is left, then waiting.
+        run_of(&mut game, &|run| run.target = 0);
+        sort(&mut game, 10);
+        run_of(&mut game, &|run| run.last = sampled(1, 130));
+        sort(&mut game, 10);
+        assert_eq!((game.spent.active, game.spent.waiting), (ms(60), ms(10)));
+        run_of(&mut game, &|run| run.last = sampled(0, 135));
+        sort(&mut game, 25);
+        sort(&mut game, 5);
+        assert_eq!((game.spent.active, game.spent.waiting, game.spent.cpu), (ms(60), ms(40), ms(135)));
+
+        // Told to have one again, it is active before its engine has started the worker.
+        run_of(&mut game, &|run| run.target = 1);
+        sort(&mut game, 10);
+        assert_eq!((game.spent.active, game.spent.waiting), (ms(70), ms(40)));
+
+        // The control is told what the game has spent over all its invocations.
+        let Stage::Search(set, _) = &game.stage else { unreachable!() };
+        assert_eq!(set.job.control().reported(), Some(game.earlier + game.spent));
+        assert_eq!(game.total().waiting, ms(3_040));
     }
 
     #[test]

@@ -115,7 +115,7 @@ pub use tactics::SearchTactics;
 
 use crate::bits::Bits;
 use crate::engine::{
-    self, CheckpointEvent, CheckpointHook, Control, Counters, EngineConfig, ProgressNote, Start, Stats,
+    self, CheckpointEvent, CheckpointHook, Control, Counters, EngineConfig, ProgressNote, Spent, Start, Stats,
 };
 use crate::matchbound::MatchGraph;
 use crate::model::{store_file, CarriedNogoods, Harvest, NogoodStats};
@@ -454,7 +454,11 @@ fn search_forgetting<const W: usize>(
     };
     let profile = profile.and_then(|plan| {
         let begin = match &resumed {
-            Some((_, head)) => Begin::Resumed { nodes: head.stats.nodes, elapsed: head.elapsed },
+            Some((_, head)) => Begin::Resumed {
+                nodes: head.stats.nodes,
+                elapsed: head.elapsed,
+                spent: control.reported().unwrap_or(Spent { active: head.elapsed, ..Spent::default() }),
+            },
             None => Begin::Fresh {
                 bound: {
                     let root = TaxUnit { promoted: Bits::EMPTY, cands: prepared.candidates };
@@ -568,10 +572,12 @@ fn search_forgetting<const W: usize>(
             let ending = profile::Ending(profile);
             let ran = run();
             match &ran.0 {
-                Ok(o) => profile.finish(Some(o.stats.nodes), o.completed, o.best, o.elapsed, None),
+                Ok(o) => profile.finish(Some(o.stats.nodes), o.completed, o.best, o.spent, None),
                 Err(e) => {
-                    let elapsed = earlier + engine_start.elapsed();
-                    profile.finish(None, false, best.1, elapsed, Some(&e.to_string()));
+                    // The engine failed and says nothing of what it spent: the caller's account, else the time it ran.
+                    let active = earlier + engine_start.elapsed();
+                    let spent = control.reported().unwrap_or(Spent { active, ..Spent::default() });
+                    profile.finish(None, false, best.1, spent, Some(&e.to_string()));
                 }
             }
             drop(ending);

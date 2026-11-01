@@ -176,21 +176,22 @@ The games 1 to 22 show every way the solver finds and proves a game but one.  Fr
 
 ```
 $ taxman solve 1-22 --threads 1 --progress 0 --out first.jsonl
-n=1     score=0         trivial nodes=0               0.000 s  optimal ok  proof=trivial  own=0.000 s  best=0
-n=2     score=2         prime   nodes=0               0.000 s  optimal ok  proof=prime_formula  own=0.000 s  best=-
-n=3     score=3         prime   nodes=0               0.000 s  optimal ok  proof=prime_formula  own=0.000 s  best=-
-n=4     score=7         trivial nodes=0               0.000 s  optimal ok  proof=trivial  own=0.000 s  best=0
+n=1     score=0         trivial nodes=0               0.000 s  optimal ok  proof=trivial  active=0.000 s  cpu=0.000 s  best=0
+n=2     score=2         prime   nodes=0               0.000 s  optimal ok  proof=prime_formula  active=0.000 s  cpu=0.000 s  best=-
+n=3     score=3         prime   nodes=0               0.000 s  optimal ok  proof=prime_formula  active=0.000 s  cpu=0.000 s  best=-
+n=4     score=7         trivial nodes=0               0.000 s  optimal ok  proof=trivial  active=0.000 s  cpu=0.000 s  best=0
 ...
-n=17    score=93        prime   nodes=0               0.000 s  optimal ok  proof=prime_formula  own=0.000 s  best=-
-n=18    score=111       start   nodes=0               0.000 s  optimal ok  proof=cap  own=0.000 s  best=9
-n=19    score=113       prime   nodes=0               0.000 s  optimal ok  proof=prime_formula  own=0.000 s  best=-
-n=20    score=124       search  nodes=1               0.007 s  optimal ok  proof=exhausted  own=0.006 s  best=10
-n=21    score=144       search  nodes=1               0.015 s  optimal ok  proof=exhausted  own=0.014 s  best=9
-n=22    score=166       repeat  nodes=0               0.000 s  optimal ok  proof=same_search of 21  own=0.000 s  best=9
+n=17    score=93        prime   nodes=0               0.000 s  optimal ok  proof=prime_formula  active=0.000 s  cpu=0.000 s  best=-
+n=18    score=111       start   nodes=0               0.000 s  optimal ok  proof=cap  active=0.000 s  cpu=0.000 s  best=9
+n=19    score=113       prime   nodes=0               0.000 s  optimal ok  proof=prime_formula  active=0.000 s  cpu=0.000 s  best=-
+n=20    score=124       search  nodes=1               0.007 s  optimal ok  proof=exhausted  active=0.007 s  cpu=0.001 s  best=10
+n=21    score=144       search  nodes=1               0.015 s  optimal ok  proof=exhausted  active=0.015 s  cpu=0.001 s  best=9
+n=22    score=166       repeat  nodes=0               0.000 s  optimal ok  proof=same_search of 21  active=0.000 s  cpu=0.000 s  best=9
 ```
 
 Each line is one game: n, its score, how the solver found it, the search's steps, the seconds, a check against the
-built-in table, the proof, the game's own search time and its best promotion sum.  [The reference, section
+built-in table, the proof, the seconds the game had a worker, the CPU seconds of its search's workers and its best
+promotion sum.  [The reference, section
 3](../docs/REFERENCE.md#3-reading-the-output) reads a line field by field.  The methods:
 
 * `trivial` (games 1, 4, 6 and others): the game has no candidate to promote, so the game with no promotions is the
@@ -211,7 +212,7 @@ ok" says that the score equals the built-in table's: a check, not a proof.
 ```
 $ taxman solve 21 --show --progress 0
 note: no previous game for n=21 (the game of 20 is neither in this run nor in the results file): solving it standalone, with no seed and no ceiling, which costs more; to chain, give --out with the earlier games, or --use-prev to take the known game of 20
-n=21    score=144       search  nodes=1               0.001 s  optimal ok  proof=exhausted  own=0.001 s  best=9
+n=21    score=144       search  nodes=1               0.001 s  optimal ok  proof=exhausted  active=0.001 s  cpu=0.000 s  best=9
   promotions: [9]
   moves: [19, 9, 15, 21, 14, 18, 12, 20, 16]
 ```
@@ -269,11 +270,11 @@ changes the answer.  [The reference](../docs/REFERENCE.md#1-the-flags-of-solve) 
 
 ```
 $ taxman solve 480 --use-prev --force-search --show
-n=480   score=73120     search  nodes=37              0.005 s  optimal ok  proof=exhausted  own=0.004 s  best=5350
+n=480   score=73120     search  nodes=37              0.005 s  optimal ok  proof=exhausted  active=0.005 s  cpu=0.007 s  best=5350
   promotions: [68, 138, 147, 153, 168, 175, 180, 182, 190, 195, 196, 198, 200, 207, 208, 210, 220, 222, 224, ...]
   moves: [479, 361, 437, 299, 403, 341, 473, 301, 469, 335, 445, 267, 471, 314, 478, 466, 458, 454, 446, ...]
 $ taxman solve 480 --use-prev
-n=480   score=73120     known   nodes=0               0.001 s  optimal ok  proof=known from the committed chain  own=0.000 s  best=-
+n=480   score=73120     known   nodes=0               0.001 s  optimal ok  proof=known from the committed chain  active=0.001 s  cpu=0.000 s  best=-
 ```
 
 `--use-prev` draws on the *known games*, the games the repository has already proven (below, "Known games").  The known
@@ -289,12 +290,12 @@ the built-in table's, not that it is proven
 
 ```
 $ taxman solve 1-12 --show
-n=1     score=0         trivial nodes=0               0.000 s  optimal ok  proof=trivial  own=0.000 s  best=0
+n=1     score=0         trivial nodes=0               0.000 s  optimal ok  proof=trivial  active=0.000 s  cpu=0.000 s  best=0
   promotions: []
   moves: []
-n=2     score=2         prime   nodes=0               0.000 s  optimal ok  proof=prime_formula  own=0.000 s  best=-
+n=2     score=2         prime   nodes=0               0.000 s  optimal ok  proof=prime_formula  active=0.000 s  cpu=0.000 s  best=-
   ...
-n=12    score=50        trivial nodes=0               0.000 s  optimal ok  proof=trivial  own=0.000 s  best=0
+n=12    score=50        trivial nodes=0               0.000 s  optimal ok  proof=trivial  active=0.000 s  cpu=0.000 s  best=0
 ```
 
 Each game of a range is built from the one before it.  Moving from one game to the next often leaves the search
@@ -328,10 +329,10 @@ range past the known games does, `--force-search` leaves them to their searches:
 ```
 $ taxman solve 1301-1302 --use-prev --force-search --threads 2 \
       --out mine.jsonl --checkpoint-dir ckpt --node-limit 4000 --progress 4
-n=1301 0.0s nodes 1 (done) best 40800 queue 0 spilled 0 | eff 6.4% idle 0.0% lock 0.0% ...
-n=1301  score=532272    search  nodes=1               0.151 s  optimal ok  proof=exhausted  own=0.144 s  best=40800
-n=1302 0.1s nodes 3868 (done) best 41436 queue 0 spilled 0 | eff 96.2% idle 2.8% lock 0.0% ...
-n=1302  score=533559    search  nodes=3868            0.125 s  optimal ok  proof=exhausted  own=0.118 s  best=41436
+12:34:56Z n=1301 active 0.1s waited 0.0s cpu 0.0s nodes 1 (done) best 40800 queue 0 spilled 0 | eff 6.4% idle 0.0% lock 0.0% ...
+n=1301  score=532272    search  nodes=1               0.151 s  optimal ok  proof=exhausted  active=0.144 s  cpu=0.021 s  best=40800
+12:34:56Z n=1302 active 0.1s waited 0.0s cpu 0.2s nodes 3868 (done) best 41436 queue 0 spilled 0 | eff 96.2% idle 2.8% lock 0.0% ...
+n=1302  score=533559    search  nodes=3868            0.125 s  optimal ok  proof=exhausted  active=0.118 s  cpu=0.226 s  best=41436
 ```
 
 Game 1301 is a prime, but `--force-search` also skips the prime formula.  Its search takes one node, since [the
@@ -431,15 +432,15 @@ With `--checkpoint-dir DIR`, a game's search writes `DIR/nNNNN.ckpt` every `--ch
 
 ```
 $ taxman solve 992 --use-prev --force-search --threads 1 --node-limit 4000 --progress 1 --out r992.jsonl --checkpoint-dir c992
-n=992 0.1s nodes 4095 (stopped) best 24175 queue 12 spilled 0 | eff 92.3% ... pauses 1 (7.6%) max 10.8ms park 0.0ms | nogoods learned 356 ...
-n=992   score=310675    search  nodes=4095            0.184 s  incomplete  own=0.180 s  best=24175
+09:41:07Z n=992 active 0.1s waited 0.0s cpu 0.1s nodes 4095 (stopped) best 24175 queue 12 spilled 0 | eff 92.3% ... pauses 1 (7.6%) max 10.8ms park 0.0ms | nogoods learned 356 ...
+n=992   score=310675    search  nodes=4095            0.184 s  incomplete  active=0.180 s  cpu=0.171 s  best=24175
 stopped: the search for n=992 hit a limit before it finished; run the same command to resume it
 $ taxman solve 992 --use-prev --force-search --threads 1 --node-limit 4000 --out r992.jsonl --checkpoint-dir c992   # resumes, stops again
 $ taxman solve 992 --use-prev --force-search --threads 1 --out r992.jsonl --checkpoint-dir c992   # resumes and finishes
-n=992   score=310690    search  nodes=14789           0.316 s  optimal ok  proof=exhausted  own=0.681 s  best=24190
+n=992   score=310690    search  nodes=14789           0.316 s  optimal ok  proof=exhausted  active=0.681 s  cpu=0.652 s  best=24190
 ```
 
-The last line is the third invocation of the game: its `nodes` and its `own` cover all three, its seconds only the last.  The results
+The last line is the third invocation of the game: its `nodes`, `active` and `cpu` cover all three, its seconds only the last.  The results
 file then holds two incomplete lines and one completed line for game 992, and `taxman verify-results r992.jsonl` counts
 them.
 
@@ -455,9 +456,10 @@ them.
 * **Limits.**  `--time-limit S` and `--node-limit N` bound one game's search in one invocation, not the whole range.  A
   game that a limit stops gets an incomplete result line (`completed` false, with `best_so_far`), and the range stops
   there with the exit status 0.
-* **The clock.**  A game's own search time, which a line records as `seconds.own`, is summed over every invocation and
-  counted only while the game is the oldest of the window with its search running, not while it waits behind another.
-  It is kept beside the game's checkpoint (`nNNNN.clock`), so a resumed game goes on from it
+* **The clock.**  A game's line records the CPU seconds of its search's workers (`seconds.cpu`), the seconds it had a
+  worker (`active`) and the seconds it was in flight with none (`waiting`, behind another game, say), and the sums of
+  each over every invocation (`cpu_all_runs`, `active_all_runs`, `waiting_all_runs`).  They are kept beside the game's
+  checkpoint (`nNNNN.clock`), so a resumed game goes on from them
   ([design/engine.md](../docs/design/engine.md#the-window-games-in-flight)).
 * **A finder beside a long search.**  `--finder-after NODES` starts a thread of its own, beside the workers, once a game's
   search has taken NODES steps (over all its invocations; default 1000000, and 0 starts none), which looks for a better

@@ -57,6 +57,7 @@
 //! | | [`bits`] | fixed-width bitsets `Bits<W>` for sets of game numbers; the set widths, dispatched |
 //! | | [`json`] | a small JSON reader and writer (the table of optimal games, golden data, results lines) |
 //! | | [`rng`] | a seeded generator, for the finder's random neighborhoods |
+//! | | [`utc`] | UTC timestamps of the records of a run (RFC 3339), written by hand |
 //! | frame model | [`frames`] | the frames of a board: formed, simplified, numbered from the front and merged |
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
 //! | | [`accelerate`] | the prime shortcut (the game of a prime `n` from the game of `n − 1`); promotions → moves |
@@ -105,6 +106,7 @@ pub mod search;
 pub mod solver;
 pub mod store;
 pub mod tactics;
+pub mod utc;
 
 /// Helpers the unit tests share with the integration tests (`tests/common/support.rs`: temporary directories and a
 /// random number generator).
