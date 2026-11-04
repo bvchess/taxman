@@ -27,7 +27,7 @@ export const ALONG = [
       they score less.`,
   },
   {
-    title: 'Three numbers for tax on one move', where: 'game 40', id: 'game-40', at: 1, href: 'sets.html#game-40',
+    title: 'Three numbers for tax on one move isn\'t impossible', where: 'game 40', id: 'game-40', at: 1, href: 'sets.html#game-40',
     line: `In an optimal game a move usually gives the taxman one or two numbers, but there are places where an optimal game can give three.  In game 40, an
       optimal game can claim 30 while 6, 10 and 15 are all still in the pot.`,
   },

@@ -593,10 +593,8 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
 /* ---- the front page ------------------------------------------------------------------------------------------ */
 
 /* The front page is laid out as a chapter is: its sections are chapters of the page, the game comes first after the
-   headline, and the findings spread across the story and the margin, where no note sits beside them. */
-.front-along .finding-cards {
-  max-width: none; margin-right: calc(-1 * (var(--gutter) + var(--margin))); clear: right; position: relative; background: var(--paper);
-}
+   headline, and the findings stand in the story's column, below any note of the section before. */
+.front-along .finding-cards { clear: right; }
 
 /* What is left to choose, chapter by chapter: a row a step, its title and point at the left and its bar at
    the right, every bar from one baseline.  A bar is ink for a written chapter and a quieter gray for the others. */
@@ -637,8 +635,8 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
 .shrink-row.is-written a:focus-visible { outline: none; }
 .shrink-row.is-written:has(a:focus-visible) { outline: 2.5px solid var(--ink); outline-offset: 2px; }
 
-/* The findings along the way: a card each, raised, since each is a link. */
-.finding-cards { list-style: none; margin: 22px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+/* The findings along the way: a card each, raised, since each is a link, two to a row. */
+.finding-cards { list-style: none; margin: 22px 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .finding-cards li { display: flex; min-width: 0; }
 .finding-cards a {
   flex: 1; display: flex; flex-direction: column; padding: 14px 16px 13px; border: 1.5px solid var(--tray-edge);
@@ -739,7 +737,6 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
   .note.is-open > :not(.note-fold) { padding: 0 0.8rem; }
   .legend { grid-template-columns: 1fr; }
   .legend-head-2 { display: none; }
-  .front-along .finding-cards { margin-right: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* A phone's width of essay: the figure of the chapters sets each bar under its title, the findings and the way on
