@@ -3,6 +3,7 @@
 // their mark in a figure.
 
 import { AFTER, ALONG, INTRO, REFERENCE, STORY, hrefOf } from './site.js';
+import { iconSVG } from './icon.js';
 import { numberSVG } from './vocab.js';
 
 const figures = new Map();
@@ -57,7 +58,8 @@ export function contentsHTML({ here = herePage(), part = 'both' } = {}) {
   return `${first}<hr class="toc-rule">${reference}`;
 }
 
-export const homeMark = () => numberSVG('', { rendering: 'raised', looks: ['player'], size: 24, pad: 2 }).outerHTML;
+/** The site's icon beside its name, in the page's colors. */
+export const homeMark = () => iconSVG({ size: 26 });
 
 function mountContents() {
   const rail = document.querySelector('.rail');
@@ -248,7 +250,7 @@ export function mountProvenance(games, { model = true } = {}) {
     model ? ', and from the project\'s model of the game, which every figure runs in the page' : ''}.`;
 }
 
-// The way on at the foot of a chapter: the link to the front page wears the home token, as in the contents.
+// The way on at the foot of a chapter: the link to the front page wears the site's icon, as in the contents.
 function mountChapterNav() {
   for (const a of document.querySelectorAll('.chapter-nav a[href="index.html"]')) a.insertAdjacentHTML('afterbegin', homeMark());
 }

@@ -3,9 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Walking up the chain · Playing optimal games of Taxman</title>
+<title>Walking up the chain · Taxman</title>
 <meta name="description" content="Most games of Taxman are easy if you know an optimal game of the one before: n fits at the ceiling, a prime takes the place of the prime below it, and a repeat carries an earlier answer over.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2718%27 r=%2713%27 fill=%27%2314478c%27/%3E%3Ccircle cx=%2716%27 cy=%2715%27 r=%2713%27 fill=%27%232166c4%27/%3E%3C/svg%3E">
+<meta name="author" content="Brian Chess">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <script src="js/tone.js"></script>
 <link rel="stylesheet" href="css/site.css">
 <link rel="stylesheet" href="css/chain.css">
@@ -233,8 +234,8 @@
     </aside>
     <p>Of games 2 to 100, <span data-walk="ceiling">…</span> are at the ceiling, <span data-walk="prime">…</span> are
     prime and <span data-walk="repeat">…</span> are repeats.  <span data-walk="search">…</span> needed a
-    <a class="gloss" href="glossary.html#search">search</a>, and the other <span data-walk="nothing">…</span> had nothing
-    to choose once the numbers above n/2 were chosen.</p>
+    <a class="gloss" href="glossary.html#search">search</a>, and in <span data-walk="nothing">…</span> of those nothing
+    was left to choose once the numbers above n/2 were chosen.</p>
   </div>
 </section>
 
@@ -243,14 +244,16 @@
   <div class="para">
     <aside class="note tech" aria-label="How the chart counts">
       <div class="note-head"><span class="note-name">How the chart counts</span></div>
-      <p>A game counts under the first rule that settles it, in the order prime, ceiling, repeat, and a game whose search
-      ran counts as a search.  So the ceiling holds <span data-settled="ceilingRepeat">…</span> games the chain records
-      as repeats and <span data-settled="ceilingStore">…</span> from the bounds store, which proves upper bounds apart
-      from the chain.</p>
+      <p>A game counts under the first rule that applies, in the order prime, ceiling, repeat, search.  So the ceiling
+      holds <span data-settled="recordRepeatAtCeiling">…</span> games the chain records as repeats, since the ceiling
+      proves them from the game before alone.  A game of the bounds store, which proves bounds apart from the chain,
+      counts by the bound it cites: <span data-settled="storeBefore">…</span> by the ceiling or the prime formula,
+      <span data-settled="storeRepeat">…</span> as repeats and <span data-settled="storeSearch">…</span> by searches.
+      The searches include <span data-settled="searchNothing">…</span> small games with nothing to choose.</p>
     </aside>
     <p>The same rules carry the <a class="gloss" href="glossary.html#chain">chain</a> to its end.  Of its
-    <span data-settled="total">…</span> games, <span data-settled="noSearch">…</span> were settled with no search, or
-    <span data-settled="share">…</span>: <span data-settled="ceiling">…</span> at the ceiling,
+    <span data-settled="total">…</span> games, <span data-settled="noSearch">…</span> were proven with no search of
+    their own, or <span data-settled="share">…</span>: <span data-settled="ceiling">…</span> at the ceiling,
     <span data-settled="prime">…</span> by the prime formula and <span data-settled="repeat">…</span> as repeats.</p>
   </div>
 

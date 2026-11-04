@@ -1,6 +1,6 @@
 # The website
 
-This folder is the project's explanatory website, *Playing optimal games of Taxman*.  Every page has three columns:
+This folder is the project's explanatory website, *Taxman: Playing optimal games*.  Every page has three columns:
 navigation on the left, the story in the center, and the technical layer on the right.  The pages are plain HTML, CSS
 and ES modules, and need no build step.  [OUTLINE.md](OUTLINE.md) is the plan of the pages.
 
@@ -15,7 +15,8 @@ and ES modules, and need no build step.  [OUTLINE.md](OUTLINE.md) is the plan of
 * `figures/` holds one file for each figure, `css/` and `fonts/` the look.
 * `data/` holds `games.json`, a column for every field of every game in the chain, and `small.json`, the moves and
   promotions of games 1 to 100.
-* `tools/` holds `export.mjs`, `results.mjs` and `test.mjs`.
+* `tools/` holds `export.mjs`, `results.mjs`, `test.mjs` and `icon.mjs`, which writes `icon.svg`, the favicon, from
+  `js/icon.js`; run it after changing the icon.
 * `img/` holds the pictures that the repository's README and the wiki link to.  Leave it as it is.
 
 ## Serve it

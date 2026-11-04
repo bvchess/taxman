@@ -1,6 +1,6 @@
 # Outline of the site
 
-The plan of the site *Playing optimal games of Taxman*, page by page.  Each entry below is one page of the site: the
+The plan of the site *Taxman: Playing optimal games*, page by page.  Each entry below is one page of the site: the
 introduction, which is the front page, then one page for each chapter of the story.  An entry says the point of its
 page, the beats of its story, its figures, what its right column holds and the findings it carries as asides.  The
 entries are meant to be moved, merged and cut.
@@ -65,7 +65,7 @@ The chain settles 60% of the games with no search at all, which the chain's char
 **Point.**  Taxman is easy to play well and hard to play perfectly; we play an optimal game for every n up to the
 chain's end, and this site explains how.
 
-* **Headline:** *Playing optimal games of Taxman.*
+* **Headline:** *Taxman*, with the subtitle *Playing optimal games*.
 * **Lede:** what we did: an optimal game for every n from 1 to the chain's end; this site explains how.
 * **The game:** the rules as a list, ending with what it means to beat the taxman, then a game to play (n from 2 to 30,
   with a button that plays an optimal game).
