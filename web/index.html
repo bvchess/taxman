@@ -47,11 +47,15 @@
   <div class="game-host" id="game"></div>
 
   <div class="para">
-    <aside class="note tech" aria-label="Playing well">
-      <div class="note-head"><span class="note-name">Playing well</span></div>
-      <p>The strategy called Solvent needs no search and scores 99.85% of the optimal points over the games 1 to
-      1000, and never below 99.08% in any of them
-      (<a href="https://github.com/bvchess/taxman/blob/master/heuristics/README.md">the heuristics</a>, measured).</p>
+    <aside class="note tech" aria-label="Heuristic strategies">
+      <div class="note-head"><span class="note-name">Heuristic strategies</span></div>
+      <p>A heuristic strategy plays a good game quickly, by rules such as taking the largest prime first or the number
+      that costs the least tax, without proving that the game is the best.  Many have been proposed, and judging one
+      needs the best score to measure it against.  That is one reason to know opt(n).  Against it, the strategy
+      called Solvent, which needs no search, scores 99.85% of the optimal points over the games 1 to 1000, and never
+      less than 99.08% in any of them (measured).  The repository holds
+      <a href="https://github.com/bvchess/taxman/blob/master/heuristics/README.md">our strategies and how they were
+      measured</a>, and <a href="https://github.com/bvchess/taxman/tree/master/moniot">Robert Moniot's seven</a>.</p>
     </aside>
     <p>The button plays an optimal game, the best you can do.  For game 10 you can find one by hand.  Playing well is
     easy even in large games: a simple strategy with no search comes within a fraction of a percent of the best
