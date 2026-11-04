@@ -92,7 +92,6 @@
     following its lines.</p>
   </div>
 
-  <!-- Figure "graph-game", new: the playable game drawn on the maximal-factor graph.  See the builder's brief. -->
   <div class="game-host graph-game-host" id="graph-game"></div>
 
   <p>You can see what each move will cost before you make it, and what it will leave for the moves after it.  That
@@ -267,6 +266,7 @@ import { initEssay, registerFigure, mountProvenance } from './js/essay.js';
 import { loadGames, loadSmall } from './js/data.js';
 import { fmt } from './js/vocab.js';
 import { mountOrders } from './figures/orders.js';
+import { mountGraphGame } from './figures/graph-game.js';
 import { mountPeel } from './figures/peel.js';
 import { mountLoop } from './figures/loop.js';
 import { mountGame40 } from './figures/game40.js';
@@ -279,6 +279,7 @@ mountProvenance(games);
 const orders = mountOrders(document.getElementById('orders'), { small });
 registerFigure('orders', orders);
 document.querySelector('[data-orders-21]').textContent = fmt(orders.count);
+registerFigure('graph-game', mountGraphGame(document.getElementById('graph-game'), { small }));
 registerFigure('peel-fig', mountPeel(document.getElementById('peel-fig'), { small }));
 registerFigure('loop', mountLoop(document.getElementById('loop')));
 const g40 = mountGame40(document.getElementById('game-40-fig'), { small });

@@ -8,7 +8,8 @@ and ES modules, and need no build step.  [OUTLINE.md](OUTLINE.md) is the plan of
   prototype that chapters 3 and 4 will grow from, no longer linked from the navigation; and `style.html` shows the
   site's look.
 * `js/` holds the site's modules: `model.js` is the game, the frame model and playability, with names from the
-  [glossary](../docs/GLOSSARY.md); `site.js` lists the pages, and every navigation draws from it.
+  [glossary](../docs/GLOSSARY.md); `play.js` is the game the reader plays, apart from its board, which
+  `figures/game.js` and `figures/graph-game.js` draw; `site.js` lists the pages, and every navigation draws from it.
 * `figures/` holds one file for each figure, `css/` and `fonts/` the look.
 * `data/` holds `games.json`, a column for every field of every game in the chain, and `small.json`, the moves and
   promotions of games 1 to 100.

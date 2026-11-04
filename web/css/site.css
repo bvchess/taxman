@@ -278,10 +278,10 @@ table, .nums, output { font-variant-numeric: tabular-nums lining-nums; }
 .standing.is-certified { background: repeating-linear-gradient(135deg, var(--kept) 0 3px, var(--paper) 3px 6px); }
 .standing.is-measured { border-style: dotted; border-width: 2px; }
 .standing.is-open { border-style: dashed; }
-/* A standing that is a link keeps its look and answers the pointer: it lifts a little, with an underline, and shows a
-   focus ring. */
-a.standing { text-decoration: none; transition: box-shadow 0.12s, transform 0.12s; }
-a.standing:hover { text-decoration: underline; text-underline-offset: 2px; box-shadow: 0 2px 0 var(--ink-3); transform: translateY(-1px); }
+/* A standing that is a link keeps its look and its size, and answers the pointer with an underline inside the pill, in
+   the color of its words; it shows a focus ring. */
+a.standing { text-decoration: none; }
+a.standing:hover { text-decoration: underline; text-decoration-color: currentColor; text-underline-offset: 2px; }
 a.standing:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; }
 
 /* ---- asides from "Along the way" -------------------------------------------------------------- */
@@ -344,7 +344,7 @@ figure { margin: 30px 0 34px; }
 .tk.is-takeable { cursor: pointer; }
 .tk.is-takeable:hover .tk-hover, .tk.is-takeable:focus-visible .tk-hover { transform: translateY(-4px); }
 .tk:focus-visible .tk-body > g { outline: none; }
-.tk:focus-visible circle:nth-child(2), .tk:focus-visible rect:nth-child(2) { stroke: var(--ink) !important; stroke-width: 3px !important; }
+.tk:focus-visible .tk-face { stroke: var(--ink) !important; stroke-width: 3px !important; }
 .v-box-raised rect { stroke-linejoin: round; }
 
 /* The game-21 figure */
@@ -482,6 +482,21 @@ figure { margin: 30px 0 34px; }
 .game-status strong { color: var(--ink); }
 @keyframes nudge { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 .piece.is-refused svg { animation: nudge 0.28s 2; }
+
+/* The game on the maximal-factor graph (figures/graph-game.js): the board is one tray, and its header holds the two
+   scores, since the graph itself shows who has what.  graph-game.js gives the board the height of game n at the
+   present width. */
+.graph-board { padding-bottom: 4px; }
+.graph-board header .player, .graph-board header .taxman { display: inline-flex; align-items: baseline; gap: 10px; }
+.graph-board header .score { font-size: 1.1rem; }
+.graph-board .player .who { color: var(--player-ink); }
+.graph-board .player .who::before { background: var(--player); }
+.graph-board .taxman .who { color: var(--taxman-ink); }
+.graph-board .taxman .who::before { background: var(--taxman); border-radius: 2px; }
+.graph-wrap svg { display: block; }
+.graph-board .tk.is-stuck { cursor: not-allowed; }
+.graph-board .tk.is-takeable.is-pointed .tk-hover { transform: translateY(-4px); }
+.tk.is-refused .tk-hover { animation: nudge 0.28s 2; }
 
 /* Small figures the reader plays or steps through */
 .fig-panel { max-width: 30rem; }

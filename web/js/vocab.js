@@ -116,8 +116,9 @@ export function look(...parts) {
 }
 
 /** The look of a line: draw is the share of it drawn from its start; sag, how far a string hangs below the straight
- *  line (raised figures hang their strings). */
-export const LINE_LOOK = { opacity: 1, draw: 1, halo: 0, faded: 0, sag: 0 };
+ *  line (raised figures hang their strings); bend, from 0 to 1, how far it leaves its start and reaches its end level,
+ *  curving between, so that a line between two columns of numbers never crosses a number of either column. */
+export const LINE_LOOK = { opacity: 1, draw: 1, halo: 0, faded: 0, sag: 0, bend: 0 };
 
 /** The kinds of line.  Each differs by weight, tone and dash, never by color alone.
  *    thin   a number and one of its maximal factors
@@ -265,14 +266,16 @@ function shapeParts(group, shape) {
   const h = SIZE.square;
   const parts = {};
   if (shape === 'coin') {
+    parts.halo = el('circle', { r: r + 1.5, fill: 'none' }, group);
     parts.side = el('circle', { r }, group);
-    parts.face = el('circle', { r }, group);
+    parts.face = el('circle', { r, class: 'tk-face' }, group);
     parts.inner = el('circle', { r: r - 3.4, fill: 'none', 'stroke-width': 0.9 }, group);
     parts.ring = el('circle', { r: r + SIZE.ring, fill: 'none' }, group);
   } else {
     const rect = (s, rx) => ({ x: -s, y: -s, width: 2 * s, height: 2 * s, rx });
+    parts.halo = el('rect', { ...rect(h + 1.5, 6), fill: 'none' }, group);
     parts.side = el('rect', rect(h, 4.5), group);
-    parts.face = el('rect', rect(h, 4.5), group);
+    parts.face = el('rect', { ...rect(h, 4.5), class: 'tk-face' }, group);
     parts.inner = el('rect', { ...rect(h - 3.2, 2.5), fill: 'none', 'stroke-width': 0.9 }, group);
     parts.ring = el('rect', { ...rect(h + SIZE.ring, 7.5), fill: 'none' }, group);
   }
@@ -317,6 +320,10 @@ export function setToken(node, p) {
   const depth = SIZE.depth * (p.depth ?? 1);
   const c = raisedColors(p);
   const parts = t.parts[shape];
+  // The halo of ink round the face, as a flat number wears it.
+  parts.halo.style.stroke = v('--ink');
+  parts.halo.style.strokeWidth = 8;
+  parts.halo.style.strokeOpacity = round(0.16 * p.halo, 3);
   parts.side.setAttribute('transform', `translate(0 ${round(depth)})`);
   parts.side.style.fill = c.side;
   parts.side.style.opacity = round(Math.min(1, 0.25 + p.depth), 3);
@@ -362,6 +369,17 @@ export function lineMark(parent, style, rendering = 'flat') {
   return { kind: 'line', style, spec, rendering, g, path, head };
 }
 
+// The part of the cubic curve [p0, p1, p2, p3] from its start to the share t of the way, as a cubic of its own.
+function firstPart([p0, p1, p2, p3], t) {
+  const at = (a, b) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t)];
+  const a = at(p0, p1);
+  const b = at(p1, p2);
+  const c = at(p2, p3);
+  const ab = at(a, b);
+  const bc = at(b, c);
+  return [p0, a, ab, at(ab, bc)];
+}
+
 /** Draw a line from a to b, each a point { x, y } or a number's look, which the line stops short of. */
 export function setLine(mark, a, b, p) {
   const dx = b.x - a.x;
@@ -375,26 +393,50 @@ export function setLine(mark, a, b, p) {
   const full = Math.max(0, length - startGap - endGap);
   const x1 = a.x + ux * startGap;
   const y1 = a.y + uy * startGap;
-  const x2 = x1 + ux * full * p.draw;
-  const y2 = y1 + uy * full * p.draw;
+  let x2 = x1 + ux * full * p.draw;
+  let y2 = y1 + uy * full * p.draw;
+  let hx = ux; // the direction of the line where it ends, for the arrowhead
+  let hy = uy;
   const tone = mark.rendering === 'raised' && mark.spec.raisedTone ? mark.spec.raisedTone : mark.spec.tone;
   const color = mix(mix(v(tone), '--faint', p.faded), '--ink', 0.75 * p.halo);
-  // A string sags below the straight line, the way a string hangs; a straight line has no sag.
-  const sag = (p.sag ?? 0) * Math.min(1, full / 90);
-  const side = ux >= 0 ? 1 : -1;
-  const cx = (x1 + x2) / 2 - uy * sag * side;
-  const cy = (y1 + y2) / 2 + ux * sag * side;
-  mark.path.setAttribute('d', sag > 0.05
-    ? `M${round(x1)} ${round(y1)}Q${round(cx)} ${round(cy)} ${round(x2)} ${round(y2)}`
-    : `M${round(x1)} ${round(y1)}L${round(x2)} ${round(y2)}`);
+  const bend = p.bend ?? 0;
+  if (bend > 0.001) {
+    // A bent line runs from the side of its start that faces its end to the side of its end that faces its start,
+    // leaving and arriving level, as a cubic whose handles are level; drawn in part, it is the cubic's first part.
+    const along = Math.sign(dx) || 1;
+    const sideGap = 'shape' in a ? reach(a, along, 0) : 0;
+    const endSide = ('shape' in b ? reach(b, -along, 0) : 0) + (mark.head ? SIZE.head : 0);
+    const p0 = [lerp(x1, a.x + along * sideGap, bend), lerp(y1, a.y, bend)];
+    const p3 = [lerp(x1 + ux * full, b.x - along * endSide, bend), lerp(y1 + uy * full, b.y, bend)];
+    const handle = 0.5 * bend * (p3[0] - p0[0]);
+    let curve = [p0, [p0[0] + handle, p0[1]], [p3[0] - handle, p3[1]], p3];
+    if (p.draw < 0.999) curve = firstPart(curve, p.draw);
+    const [q0, q1, q2, q3] = curve;
+    const xy = ([x, y]) => `${round(x)} ${round(y)}`;
+    mark.path.setAttribute('d', `M${xy(q0)}C${xy(q1)} ${xy(q2)} ${xy(q3)}`);
+    [x2, y2] = q3;
+    const tx = q3[0] - q2[0];
+    const ty = q3[1] - q2[1];
+    const t = Math.hypot(tx, ty);
+    if (t > 1e-6) [hx, hy] = [tx / t, ty / t];
+  } else {
+    // A string sags below the straight line, the way a string hangs; a straight line has no sag.
+    const sag = (p.sag ?? 0) * Math.min(1, full / 90);
+    const side = ux >= 0 ? 1 : -1;
+    const cx = (x1 + x2) / 2 - uy * sag * side;
+    const cy = (y1 + y2) / 2 + ux * sag * side;
+    mark.path.setAttribute('d', sag > 0.05
+      ? `M${round(x1)} ${round(y1)}Q${round(cx)} ${round(cy)} ${round(x2)} ${round(y2)}`
+      : `M${round(x1)} ${round(y1)}L${round(x2)} ${round(y2)}`);
+  }
   mark.path.style.stroke = color;
   mark.path.style.strokeWidth = mark.spec.width + (mark.style === 'pay' ? 0 : 0.9 * p.halo);
   if (mark.head) {
     const s = SIZE.head;
-    const tipX = x2 + ux * s;
-    const tipY = y2 + uy * s;
-    const px = -uy * s * 0.45;
-    const py = ux * s * 0.45;
+    const tipX = x2 + hx * s;
+    const tipY = y2 + hy * s;
+    const px = -hy * s * 0.45;
+    const py = hx * s * 0.45;
     mark.head.setAttribute('d', `M${round(tipX)},${round(tipY)} L${round(x2 + px)},${round(y2 + py)} L${round(x2 - px)},${round(y2 - py)} Z`);
     mark.head.style.fill = color;
     mark.head.style.opacity = p.draw > 0.98 ? 1 : 0;
