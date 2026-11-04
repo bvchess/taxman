@@ -26,24 +26,34 @@
     the scores</a>).</p>
   </aside>
   <h1>Playing optimal games of Taxman</h1>
-  <p class="lede">Taxman is a game on the numbers 1 to n.  You take a number and score it, and the taxman takes every
-  divisor of it still in play.  We play an optimal game, one with the best possible score, for every n from 1 to
-  <span data-last-n>the end of our chain</span>.  This site explains how we found them, and why we can trust them.</p>
+  <p class="lede">Taxman is a number game played against a taxman.  We play an optimal game, one with the best
+  possible score, for every n from 1 to <span data-last-n>the end of our chain</span>.  Every score up to 2175 is
+  proven outright, and every score past it is proven given one statement that is still open.  This site explains how
+  we found the games, and why we can trust them.</p>
 </header>
 
-<section class="chapter front-play" id="play" data-toc="play" aria-label="Play a game">
+<section class="chapter front-play" id="the-game" data-toc="the-game" aria-labelledby="h-game">
+  <h2 id="h-game">The game</h2>
   <div class="para">
     <aside class="note tech" aria-label="The rules, precisely">
       <div class="note-head"><span class="note-name">The rules, precisely</span></div>
-      <p>A move takes a number that still has a proper divisor in play; the taxman takes all of its proper divisors
-      still in play.  When no move is left, the taxman takes the rest.  The best score of game n is opt(n), and
-      opt(1), opt(2), opt(3), … is the Taxman sequence, <a href="https://oeis.org/A019312">A019312</a> in the OEIS.
-      The rules in full are in <a href="https://github.com/bvchess/taxman/blob/master/docs/GLOSSARY.md#the-game">the
-      glossary</a>.</p>
+      <p>A move takes a number that still has a proper divisor in the pot, and the taxman takes all of its proper
+      divisors still in the pot.  When no move is left, the taxman takes the rest.  The best score of game n is
+      opt(n), and opt(1), opt(2), opt(3), … is the Taxman sequence, <a href="https://oeis.org/A019312">A019312</a> in
+      the OEIS.  The rules in full are in
+      <a href="https://github.com/bvchess/taxman/blob/master/docs/GLOSSARY.md#the-game">the glossary</a>.</p>
     </aside>
-    <p>Try game 10.  Take a number, and the taxman takes its divisors.  You may take only a number that still has a
-    divisor in play, so the taxman always gets something, and when you can take nothing more, he takes the rest.</p>
+    <p>Taxman is played on the numbers 1 to n, which start in the <em>pot</em>.</p>
   </div>
+  <ul class="rules">
+    <li>You take a number from the pot and score it.  That number is your <em>move</em>.</li>
+    <li>The taxman then takes every divisor of your move still in the pot: its <em>tax</em>.</li>
+    <li>You may take only a number that has a divisor left in the pot, so the taxman always gets something.</li>
+    <li>When no number you could take is left, the taxman takes the rest.</li>
+    <li>You beat the taxman when your total is higher than the total he collects.</li>
+  </ul>
+  <p>The best total you can reach in game n is written opt(n), and a game that reaches it is an <em>optimal
+  game</em>.  Try game 10.</p>
 
   <div class="game-host" id="game"></div>
 
@@ -56,8 +66,7 @@
     </aside>
     <p>The button plays an optimal game, the best you can do.  For game 10 you can find one by hand.  Playing well is
     easy even in large games: a simple strategy with no search comes within a fraction of a percent of the best
-    score.  But only a perfect game is optimal, and only a proof shows that a game is perfect.  The published table of
-    best scores stopped at game 1000.</p>
+    score.  But only a perfect game is optimal, and only a proof shows that a game is perfect.</p>
   </div>
 </section>
 
@@ -66,14 +75,13 @@
   <div class="para">
     <aside class="note tech" aria-label="The counts, precisely">
       <div class="note-head"><span class="note-name">The counts, precisely</span></div>
-      <p>The counts are rough sizes, not counts of legal games.  The orders are n!, the orders of all n numbers.
-      The sets are 2<sup>n</sup>, every subset of the board.  Once the top half is settled, 2<sup>⌊n/2⌋</sup> subsets
-      of the numbers up to n/2 are left, and once the board is in frames, 2<sup>c</sup> subsets of its c candidates.
-      The last is the number of nodes the recorded search of the game explored.</p>
+      <p>Rough sizes, not counts of legal games: n! orders, 2<sup>n</sup> subsets of the board, 2<sup>⌊n/2⌋</sup>
+      subsets of the numbers up to n/2, and 2<sup>c</sup> subsets of the c candidates.  The last row is the nodes
+      that the game's recorded search explored.</p>
     </aside>
-    <p>Game <span data-last-n>n</span>'s numbers can be put in about 10<sup data-orders-exp>…</sup> orders.  No
-    computer could try them all, and we never try them.  Each chapter of the main story takes away part of the
-    problem, until what is left is small enough for a search to finish.</p>
+    <p>The published table of best scores stopped at game 1000.  Game <span data-last-n>n</span>'s numbers can be
+    put in about 10<sup data-orders-exp>…</sup> orders.  No computer could try them all, and we never try them.  Each
+    chapter of the story takes away part of the problem, until what is left is small enough for a search to finish.</p>
   </div>
 
   <figure class="fig wide shrink" id="shrink" aria-label="The problem of playing the last game of the chain, shrinking from chapter to chapter."></figure>
@@ -113,11 +121,11 @@
     points</span><span class="line">Every optimal game makes <span data-833="moves">362</span> moves, but some games make
     <span data-833="longestMoves">363</span>.</span></a></li>
     <li><a href="sets.html#game-40"><span class="where">Game 40</span><span class="title">Three factors of
-    tax</span><span class="line">An optimal game can take 30 while 6, 10 and 15 are all still in play.</span></a></li>
+    tax</span><span class="line">An optimal game can take 30 while 6, 10 and 15 are all still in the
+    pot.</span></a></li>
     <li><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#where-exchange-breaks"><span class="where">Game
-    2873</span><span class="title">The greedy that shouldn't work</span><span class="line">The usual guarantee for a
-    greedy choice fails here, yet greedy still chooses the best numbers above n/2 in every game we checked, to
-    100,000.</span></a></li>
+    2873</span><span class="title">The greedy that shouldn't work</span><span class="line">The usual guarantee for
+    greedy fails here, yet greedy still picks best in every game to 100,000.</span></a></li>
     <li><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board"><span class="where">Game
     425</span><span class="title">Two optimal sets</span><span class="line">Every game up to 424 has one optimal
     set; game 425 has two.</span></a></li>
@@ -186,7 +194,7 @@ const [small, games] = await Promise.all([loadSmall(), loadGames()]);
 for (const s of document.querySelectorAll('[data-last-n]')) s.textContent = fmt(games.lastN);
 mountGame(document.getElementById('game'), { small });
 const counts = mountShrink(document.getElementById('shrink'), { games });
-document.querySelector('[data-orders-exp]').textContent = fmt(counts[1].exponent);
+document.querySelector('[data-orders-exp]').textContent = fmt(counts.game.exponent);
 mountChainChart(document.getElementById('chain-chart'), { games });
 fill833(games);
 mountProvenance(games, { model: false });

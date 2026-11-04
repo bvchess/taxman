@@ -243,13 +243,11 @@ table, .nums, output { font-variant-numeric: tabular-nums lining-nums; }
 .note-name { color: var(--ink); font-weight: 700; font-size: 0.88rem; line-height: 1.3; }
 .note-label { display: block; font-weight: 400; font-size: 0.72rem; color: var(--ink-3); margin-top: 1px; }
 
-/* A margin card: a result the story uses, with its name, its standing, its plain and precise statements, and its proof. */
+/* A margin card: a result the story uses, with its name, its standing (the link to its proof), and its plain and precise
+   statements. */
 .card { padding-top: 0.55rem; border-top: 1.5px solid var(--ink); }
 .card .plain { color: var(--ink); }
 .card .precise .run { font-weight: 700; color: var(--ink); margin-right: 0.3em; }
-.card .proof { margin: 0.2rem 0 0; font-weight: 700; font-size: 0.76rem; }
-.card .proof a { color: var(--ink); }
-.card .proof span { font-weight: 400; color: var(--ink-2); }
 .card .sub { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem; margin: 0.8rem 0 0.35rem; padding-top: 0.5rem; border-top: 1px solid var(--hair); color: var(--ink); font-weight: 700; }
 
 /* A technical note: notation, an exact definition, the mathematical version of a passage. */
@@ -276,6 +274,11 @@ table, .nums, output { font-variant-numeric: tabular-nums lining-nums; }
 .standing.is-givenU { border-style: double; border-width: 3.5px; padding: 0 0.42rem 0.04rem; }
 .standing.is-measured { border-style: dotted; border-width: 2px; }
 .standing.is-open { border-style: dashed; }
+/* A standing that is a link keeps its look and answers the pointer: it lifts a little, with an underline, and shows a
+   focus ring. */
+a.standing { text-decoration: none; transition: box-shadow 0.12s, transform 0.12s; }
+a.standing:hover { text-decoration: underline; text-underline-offset: 2px; box-shadow: 0 2px 0 var(--ink-3); transform: translateY(-1px); }
+a.standing:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; }
 
 /* ---- asides from "Along the way" -------------------------------------------------------------- */
 
@@ -555,6 +558,8 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
 
 /* What is left to choose, chapter by chapter: a row a chapter, its number, title and point at the left and its bar at
    the right, every bar from one baseline.  A bar is ink for a written chapter and a quieter gray for the others. */
+/* The figure stays in the center column, so that it starts right after its paragraph, beside the note's float. */
+.fig.wide.shrink { clear: none; max-width: var(--measure); margin-right: 0; }
 .shrink { --shrink-cols: 30px minmax(0, 13.4rem) minmax(0, 1fr); --shrink-gap: 14px; margin: 26px 0 36px; }
 .shrink-head {
   display: grid; grid-template-columns: var(--shrink-cols); column-gap: var(--shrink-gap); margin: 0 0 4px;

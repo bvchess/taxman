@@ -519,9 +519,10 @@ export const STANDING = {
   open: 'open',
 };
 
-/** The badge of a standing, as HTML. */
-export function standingBadge(kind) {
+/** The badge of a standing, as HTML; with an href it is the link to the proof. */
+export function standingBadge(kind, href) {
   if (!STANDING[kind]) throw new Error(`no standing ${kind}`);
+  if (href) return `<a class="standing is-${kind}" href="${href}">${STANDING[kind]}<span class="sr-only">, ${kind === 'measured' || kind === 'open' ? 'evidence' : 'proof'} on GitHub</span></a>`;
   return `<span class="standing is-${kind}">${STANDING[kind]}</span>`;
 }
 

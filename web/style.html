@@ -196,43 +196,38 @@
   <h2 id="h-technical">The technical layer</h2>
   <p>The right column holds everything more exact or more technical than the story, each piece beside the paragraph
   it belongs to.  There are three kinds.  A margin card states a result the story uses: its name, its standing, a
-  plain statement, a precise one, and its proof.  A technical note gives notation or an exact definition.  A block of
+  plain statement and a precise one.  The standing pill is the link to the proof.  A technical note gives notation or an exact definition.  A block of
   links points to the theory, the code and the papers.  The standing of a card is told by its badge's outline or fill,
   never by color.</p>
   <div class="note-grid spread">
     <aside class="note card" aria-label="The frame lemma, proved">
-      <div class="note-head"><span class="note-name">The frame lemma<span class="note-label">Lemma F1</span></span><span class="standing is-proved">proved</span></div>
+      <div class="note-head"><span class="note-name">The frame lemma<span class="note-label">Lemma F1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-frame-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Every number lies in exactly one frame.</p>
       <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  Every number of the board lies in exactly
       one component of the frame graph, whose sources lie in one layer k and factors in layer k − 1.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-frame-lemma">Proof on GitHub</a></p>
     </aside>
     <aside class="note card" aria-label="The length proposition, proved by computation">
-      <div class="note-head"><span class="note-name">The length proposition<span class="note-label">Proposition Q4</span></span><span class="standing is-computed">proved by computation</span></div>
+      <div class="note-head"><span class="note-name">The length proposition<span class="note-label">Proposition Q4</span></span><a class="standing is-computed" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-length-proposition">proved by computation<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">In game 833 every optimal game has 362 moves, and the longest games have 363.</p>
       <p class="precise"><span class="run">Precisely.</span>The prover and a maximum matching compute it: a heaviest
       game of 363 moves scores 29 less than opt(833).</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-length-proposition">Proof on GitHub</a></p>
     </aside>
     <aside class="note card" aria-label="The chain's scores, proved given U">
-      <div class="note-head"><span class="note-name">The chain's scores</span><span class="standing is-givenU">proved given U</span></div>
+      <div class="note-head"><span class="note-name">The chain's scores</span><a class="standing is-givenU" href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">proved given U<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Every score of the chain is opt(n) wherever statement U holds at n.</p>
       <p class="precise"><span class="run">Precisely.</span>Each recorded score is ΣU* + P*, which corollary X8 makes
       opt(n) given U at n.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">What supports the scores</a></p>
     </aside>
     <aside class="note card" aria-label="One optimal set, to 424, measured">
-      <div class="note-head"><span class="note-name">One optimal set, to 424</span><span class="standing is-measured">measured</span></div>
+      <div class="note-head"><span class="note-name">One optimal set, to 424</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board">measured<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">Up to game 424 every game has exactly one optimal set.</p>
       <p class="precise"><span class="run">Precisely.</span>The prover enumerates the optimal sets of the games it
       proves; from 425 on, a few have two or three.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board">The enumeration on GitHub</a></p>
     </aside>
     <aside class="note card" aria-label="Statement U, open">
-      <div class="note-head"><span class="note-name">Statement U</span><span class="standing is-open">open</span></div>
+      <div class="note-head"><span class="note-name">Statement U</span><a class="standing is-open" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">open<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">Some optimal game plays every source descending greedy keeps in layers 3 and up.</p>
       <p class="precise"><span class="run">Precisely.</span>Some optimal set of n contains U*<sub>≥3</sub>.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">Statement U on GitHub</a></p>
     </aside>
     <aside class="note tech" aria-label="Layers, precisely">
       <div class="note-head"><span class="note-name">Layers, precisely</span></div>
@@ -251,9 +246,8 @@
   <div class="phone-specimen"><div class="essay-like"><div class="column">
     <div class="para">
       <aside class="note card" aria-label="The loop rule, proved">
-        <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11</span></span><span class="standing is-proved">proved</span></div>
+        <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
         <p class="plain">Numbers with two prime factors can all be played exactly when their lines form no loop.</p>
-        <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">Proof on GitHub</a></p>
       </aside>
       <p>Whatever the order, the first move takes both of its primes, and one of the four is stuck.</p>
     </div>
@@ -274,7 +268,7 @@
     <div class="aside-body"><p>In game 833 every optimal game makes 362 moves, yet some games make one more.  The
     longest of those still scores less.</p></div>
   </details>
-  <p>The contents sit at the left: the main story's chapters, the findings along the way, and the about page.  Each
+  <p>The contents sit at the left: the story's chapters, the findings along the way, and the about page.  Each
   chapter's token is raised, since it is a link; the page the reader is on is gray, and a chapter not yet
   written lies flat and dashed.  Below 1300 px the contents fold into a bar at the top with a button that opens them.</p>
   <div class="nav-specimen spread">

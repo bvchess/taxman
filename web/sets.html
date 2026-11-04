@@ -9,20 +9,14 @@
 <script src="js/tone.js"></script>
 <link rel="stylesheet" href="css/site.css">
 </head>
-<body data-page="story" data-chapter="2">
+<body data-page="story" data-chapter="1">
 <header class="topbar"></header>
 <div class="site">
 <aside class="rail" aria-label="Contents"></aside>
 <main class="essay"><div class="column">
 
 <header class="essay-head para">
-  <aside class="note tech" aria-label="The technical layer">
-    <div class="note-head"><span class="note-name">The technical layer</span></div>
-    <p>This column holds what is more exact than the story: each claim's precise statement, where it stands, and a
-    link to its proof, with the notation and the code behind them.  A reader who never looks here misses nothing of
-    the story.</p>
-  </aside>
-  <p class="kicker">Chapter 2</p>
+  <p class="kicker">Chapter 1</p>
   <h1>A game is a set</h1>
   <p class="lede">Which numbers you take decides your score.  The order follows from the set, and whether a set can
   be played at all is quick to check.</p>
@@ -30,7 +24,7 @@
 
 <section class="chapter" id="orders-section" data-toc="orders-section" aria-label="The order follows from the set">
   <p>Your score is the sum of the numbers you take, so it does not depend on the order you take them in.  The order
-  matters only to keep every move legal: each number you take must still have a divisor in play.</p>
+  matters only to keep every move legal: each number you take must still have a divisor in the pot.</p>
   <p>Here are the nine moves of an optimal game of 21.  They can be played in <span data-orders-21>several</span>
   orders, and in every one of them each move takes the same tax.  Step through them.</p>
 
@@ -63,18 +57,17 @@
   <h2 id="h-payment">Tax as payment</h2>
   <div class="para">
     <aside class="note card" aria-label="The lifting lemma, proved">
-      <div class="note-head"><span class="note-name">The lifting lemma<span class="note-label">Lemma P1</span></span><span class="standing is-proved">proved</span></div>
-      <p class="plain">A number can be played exactly when one of its maximal factors is still in play.</p>
+      <div class="note-head"><span class="note-name">The lifting lemma<span class="note-label">Lemma P1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-lifting-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">A number can be played exactly when one of its maximal factors is still in the pot.</p>
       <p class="precise"><span class="run">Precisely.</span>The maximal factors of x are x/p, for each prime p that
-      divides x.  At any point of a game, if a proper divisor d of x is in play, so is a maximal factor f of x with
+      divides x.  At any point of a game, if a proper divisor d of x is in the pot, so is a maximal factor f of x with
       d | f.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-lifting-lemma">Proof on GitHub</a></p>
     </aside>
-    <p>A move is legal when one of its divisors is still in play, and only some divisors matter: a number's
+    <p>A move is legal when one of its divisors is still in the pot, and only some divisors matter: a number's
     <em>maximal factors</em>, the number divided by one of its primes.  <span class="n" data-n="12">12</span> =
     2 · 2 · 3 has the maximal factors 6 and 4, 9 has only 3, and a prime has only 1.  If any divisor of a move is
-    still in play, so is one of its maximal factors.  So a move is legal exactly when a maximal factor of it is still in
-    play.</p>
+    still in the pot, so is one of its maximal factors.  So a move is legal exactly when a maximal factor of it is
+    still in the pot.</p>
     <p>Think of that factor as what <em>pays for</em> the move.  Two moves cannot share a payment, because whichever is
     taken first sends the factor to the taxman.  So a set can be played only if each of its numbers can be given a
     maximal factor of its own, from outside the set.</p>
@@ -82,13 +75,12 @@
 
   <div class="para">
     <aside class="note card" aria-label="The playability theorem, proved">
-      <div class="note-head"><span class="note-name">The playability theorem<span class="note-label">Theorem P2</span></span><span class="standing is-proved">proved</span></div>
+      <div class="note-head"><span class="note-name">The playability theorem<span class="note-label">Theorem P2</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-playability-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">A set can be played exactly when each member can be paid for by a maximal factor of its own,
       from outside the set, with no circle in what must come first.</p>
       <p class="precise"><span class="run">Precisely.</span>S ⊆ {2, …, n} is playable iff it has a payment scheme, a
       one-to-one choice of a maximal factor outside S for each member, whose precedence is acyclic.  Then every
       topological order of the precedence is a legal game.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-playability-theorem">Proof on GitHub</a></p>
     </aside>
     <aside class="note tech" aria-label="Franklín and Moniot's Theorem 1">
       <div class="note-head"><span class="note-name">Franklín and Moniot</span></div>
@@ -99,7 +91,7 @@
       the theory relates to it</a>).</p>
     </aside>
     <p>A payment for each number is not quite enough, because the order can still tie itself in a knot.  A move takes
-    all of its divisors in play, not only the one that pays for it, so it can take a factor that another move was
+    all of its divisors in the pot, not only the one that pays for it, so it can take a factor that another move was
     counting on.  In game 21, <span class="n" data-n="9">9</span> is paid for by 3, and
     <span class="n" data-n="15">15</span> would take 3 as tax, so 9 must come before 15.  And 9 divides
     <span class="n" data-n="18">18</span>, so 9 must come before 18 as well, or 18 would take it.</p>
@@ -129,13 +121,12 @@
 
   <div class="para">
     <aside class="note card" aria-label="The peel theorem, proved">
-      <div class="note-head"><span class="note-name">The peel theorem<span class="note-label">Theorem P4</span></span><span class="standing is-proved">proved</span></div>
+      <div class="note-head"><span class="note-name">The peel theorem<span class="note-label">Theorem P4</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-peel-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Peel decides whether a set can be played, whichever safe steps it takes in whichever order.</p>
       <p class="precise"><span class="run">Precisely.</span>A front move pairs a member that lists one live factor
       with it; a back move pairs a live factor that one member alone lists with that member.  Each keeps an instance
       playable, and keeps it unplayable.  An instance is playable iff a run of peel pairs every member, and such a run
       yields an acyclic payment scheme.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-peel-theorem">Proof on GitHub</a></p>
     </aside>
     <aside class="note tech" aria-label="Peel in the code">
       <div class="note-head"><span class="note-name">Peel in the code</span></div>
@@ -169,17 +160,16 @@
 
   <div class="para">
     <aside class="note card" aria-label="The two-factor proposition, proved">
-      <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11</span></span><span class="standing is-proved">proved</span></div>
+      <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Numbers with two prime factors can all be played exactly when their edges form no loop.</p>
       <p class="precise"><span class="run">Precisely.</span>An instance whose members each list at most two factors
       is playable iff its lists are linearly independent over GF(2), iff its graph, with an edge for each member, is a
       forest.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">Proof on GitHub</a></p>
     </aside>
     <p>Whatever order you choose, the first number takes both of its primes as tax.  That leaves two primes for the
     other three numbers, and one of them is always stuck.</p>
     <p>The same holds for any set of numbers with two prime factors: they can all be played exactly when their edges
-    contain no loop.  The rule comes back in chapter 4, where it settles those numbers in every game.</p>
+    contain no loop.  The rule comes back in chapter 3, where it settles those numbers in every game.</p>
   </div>
 </section>
 
@@ -188,7 +178,7 @@
     <aside class="note tech" aria-label="Three factors, precisely">
       <div class="note-head"><span class="note-name">Three factors, precisely</span></div>
       <p>30 has the maximal factors 15, 10 and 6.  Once 1, 2, 3 and 5 are gone, those three are all of its divisors
-      in play.  The game shown is legal and scores opt(40), which the prover proves; this page finds it and checks
+      in the pot.  The game shown is legal and scores opt(40), which the prover proves; this page finds it and checks
       it with <a href="https://github.com/bvchess/taxman/blob/master/web/js/model.js">web/js/model.js</a>.</p>
     </aside>
     <details class="aside" id="game-40" data-toc="game-40">
@@ -199,7 +189,7 @@
       </summary>
       <div class="aside-body">
         <p>A move usually takes one or two numbers as tax.  In game 40, one optimal game takes 30 when 6, 10 and 15 are
-        all still in play, so the taxman gets three numbers for one move.</p>
+        all still in the pot, so the taxman gets three numbers for one move.</p>
         <figure class="fig fig-strip" id="game-40-fig"></figure>
         <p>It scores <span data-g40-score>opt(40)</span>, the best possible.  The same happens in larger games: in the
         chain's own game of 1250, the move 748 takes 44, 68 and 374.</p>
@@ -209,14 +199,13 @@
 
   <div class="para">
     <aside class="note card" aria-label="The length proposition, proved by computation">
-      <div class="note-head"><span class="note-name">The length proposition<span class="note-label">Proposition Q4</span></span><span class="standing is-computed">proved by computation</span></div>
+      <div class="note-head"><span class="note-name">The length proposition<span class="note-label">Proposition Q4</span></span><a class="standing is-computed" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-length-proposition">proved by computation<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">In game 833 every optimal game has <span data-833="moves">362</span> moves, and the longest games
       have <span data-833="longestMoves">363</span>.</p>
       <p class="precise"><span class="run">Precisely.</span>In game 833 = 7² · 17 a heaviest game of
       <span data-833="longestMoves">363</span> moves scores <span data-833="longest">218,197</span>, which is
       <span data-833="gap">29</span> less than opt(833) = <span data-833="score">218,226</span>.  The prover and a
       maximum matching compute it.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-length-proposition">Proof on GitHub</a></p>
     </aside>
     <details class="aside" id="game-833" data-toc="game-833">
       <summary>
@@ -240,7 +229,7 @@
 
 <nav class="chapter-nav" aria-label="Chapters">
   <a class="prev" href="index.html">Front page</a>
-  <span class="next"><span class="nav-kicker">Next, not yet written:</span> <span class="nav-title">3. Walking up the
+  <span class="next"><span class="nav-kicker">Next, not yet written:</span> <span class="nav-title">2. Walking up the
   chain.</span>  Most games are easy if you know an optimal game of the one before.</span>
 </nav>
 

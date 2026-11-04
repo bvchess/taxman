@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Optimal games of Taxman: the main story</title>
+<title>Optimal games of Taxman: the story</title>
 <meta name="description" content="How the board of a Taxman game falls apart into frames, small games nearly independent of each other, and how a few promotions settle the best score.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2718%27 r=%2713%27 fill=%27%2314478c%27/%3E%3Ccircle cx=%2716%27 cy=%2715%27 r=%2713%27 fill=%27%232166c4%27/%3E%3C/svg%3E">
 <script src="js/tone.js"></script>
@@ -16,13 +16,7 @@
 <main class="essay"><div class="column">
 
 <header class="essay-head para">
-  <aside class="note tech" aria-label="The technical layer">
-    <div class="note-head"><span class="note-name">The technical layer</span></div>
-    <p>This column holds what is more exact than the story: each claim's precise statement, where it stands, and a
-    link to its proof, with the notation and the files behind them.  A reader who never looks here misses nothing of
-    the story.</p>
-  </aside>
-  <p class="kicker">The main story</p>
+  <p class="kicker">The story</p>
   <h1>Optimal games of Taxman</h1>
   <p class="lede">We found an optimal game of Taxman for every n from 1 to <span data-last-n>the end of the chain</span>.
   This essay explains how, from the rules up.  Its first four chapters are written: they take the board of a game
@@ -56,11 +50,10 @@
 
   <div class="para">
     <aside class="note card" aria-label="The prime lemma, proved">
-      <div class="note-head"><span class="note-name">The prime lemma<span class="note-label">Lemma N1</span></span><span class="standing is-proved">proved</span></div>
+      <div class="note-head"><span class="note-name">The prime lemma<span class="note-label">Lemma N1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-prime-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Every optimal game opens with the largest prime on the board, and plays no other prime.</p>
       <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2, and let q(n) be the largest prime up to n.
       Every optimal game of n plays q(n) as its first move, and plays no other prime.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-prime-lemma">Proof on GitHub</a></p>
     </aside>
     <p>The coins in the pot are the numbers above n/2, and the tiles are the rest.  A coin divides no other number
     on the board, so the taxman never takes one as tax: he gets a coin only at the end, if you never took it.  A number
@@ -96,11 +89,10 @@
       <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#payment-schemes">payment schemes</a>.</p>
     </aside>
     <aside class="note card" aria-label="The uniqueness of the optimal set to 424, measured">
-      <div class="note-head"><span class="note-name">One optimal set, to 424</span><span class="standing is-measured">measured</span></div>
+      <div class="note-head"><span class="note-name">One optimal set, to 424</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board">measured<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">Up to game 424 every game has exactly one optimal set; from 425 on, a few have two or three.</p>
       <p class="precise"><span class="run">Precisely.</span>The prover enumerates the optimal sets of the games it
       proves.  Game 425 has two, which trade {110, 132, 168} for {98, 150, 162}, each of sum 410.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board">The enumeration on GitHub</a></p>
     </aside>
     <p>So the question for game n is which sets of numbers can be played, in some order.  We call such a set
     <em>playable</em>.  The sum of a set is its <em>weight</em>, and an <em>optimal set</em>, the set of moves of an
@@ -108,11 +100,10 @@
   </div>
   <div class="para">
     <aside class="note card" aria-label="The lifting lemma, proved">
-      <div class="note-head"><span class="note-name">The lifting lemma<span class="note-label">Lemma P1</span></span><span class="standing is-proved">proved</span></div>
+      <div class="note-head"><span class="note-name">The lifting lemma<span class="note-label">Lemma P1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-lifting-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">A number can be played exactly when one of its maximal factors is still in the pot.</p>
       <p class="precise"><span class="run">Precisely.</span>At any point of a game, if a proper divisor d of x is in
       the pot, so is a maximal factor f of x with d | f.  The maximal factors of x are x/p, for each prime p dividing x.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-lifting-lemma">Proof on GitHub</a></p>
     </aside>
     <p>Whether a move is legal depends only on its <em>maximal factors</em>: the number divided by one of its primes.
     12 has the maximal factors 6 and 4, and 9 has only 3.  If any divisor of a move is still in the pot, so is a
@@ -123,12 +114,11 @@
 
   <div class="para">
     <aside class="note card" aria-label="The length proposition, proved">
-      <div class="note-head"><span class="note-name">The length proposition<span class="note-label">Proposition Q4</span></span><span class="standing is-proved">proved</span></div>
+      <div class="note-head"><span class="note-name">The length proposition<span class="note-label">Proposition Q4</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-length-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">In game 833 every optimal game has 362 moves, and the longest games have 363.</p>
       <p class="precise"><span class="run">Precisely.</span>In game 833 = 7² · 17 a heaviest game of 363 moves scores
       218,197, which is 29 less than opt(833) = 218,226.  Proved by computation, with the prover and a maximum
       matching.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-length-proposition">Proof on GitHub</a></p>
     </aside>
     <details class="aside" id="game-833" data-toc="game-833">
       <summary>
@@ -205,14 +195,13 @@
 
   <div class="para">
     <aside class="note card" aria-label="The frame lemma, proved">
-      <div class="note-head"><span class="note-name">The frame lemma<span class="note-label">Lemma F1</span></span><span class="standing is-proved">proved</span></div>
+      <div class="note-head"><span class="note-name">The frame lemma<span class="note-label">Lemma F1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-frame-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Every number lies in exactly one frame.  A frame's sources share a layer, and its factors lie in
       the layer just below.</p>
       <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  The frame graph of game n joins each source to
       its maximal factors, and a frame is one of its connected components.  Every number of the board lies in exactly
       one frame.  In each frame the sources all lie in one layer k and the factors in layer k − 1.  A frame in front of
       a frame of layer k lies in layer k − 1.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-frame-lemma">Proof on GitHub</a></p>
     </aside>
     <p data-follows="fig21" data-state="4">Then we <a class="go" href="?fig21=4#fig21" data-fig="fig21" data-state="4">group the numbers into
     frames</a>.  A frame is a group of sources that share factors, together with every factor that can pay for them.
@@ -223,13 +212,12 @@
 
   <div class="para">
     <aside class="note card" aria-label="The bottom-layers theorem, proved">
-      <div class="note-head"><span class="note-name">The bottom-layers theorem<span class="note-label">Theorem F4</span></span><span class="standing is-proved">proved</span></div>
+      <div class="note-head"><span class="note-name">The bottom-layers theorem<span class="note-label">Theorem F4</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-bottom-layers-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">In layers 1 and 2, every optimal game plays exactly the sources descending greedy keeps.</p>
       <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2 and S an optimal set of n.  Then S holds q(n) and
       no other prime, and the sources of S in layer 2 are exactly U*<sub>2</sub>, the members of U* in layer 2.  U* is
       what descending greedy keeps of the sources, deciding each step by
       <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-peel-theorem">peel</a>.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-bottom-layers-theorem">Proof on GitHub</a></p>
     </aside>
     <p data-follows="fig21" data-state="5">Which sources should we play?  <a class="go" href="?fig21=5#fig21" data-fig="fig21" data-state="5">Descending
     greedy</a> goes through the sources from the largest down and keeps each one that can still be played together
@@ -300,14 +288,13 @@
 
   <div class="para">
     <aside class="note card" aria-label="The loop rule, proved">
-      <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11, the two-factor proposition</span></span><span class="standing is-proved">proved</span></div>
+      <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11, the two-factor proposition</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Numbers with two prime factors can all be played exactly when their lines form no loop.</p>
       <p class="precise"><span class="run">Precisely.</span>Let S ⊆ {2, …, n}, each member with at most two maximal
       factors outside S.  Its graph has a vertex for each of those factors and one more, the ground, and an edge for
       each member: between its two factors, or from its one factor to the ground.  Then S is playable if and only if
       the graph has no cycle, two members joining the same factor to the ground counting as one.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">Proof on GitHub</a><span>;
-      the theory draws the same square in <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/img/cycle-21.svg">cycle-21.svg</a></span></p>
+      <p>The theory draws the same square in <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/img/cycle-21.svg">cycle-21.svg</a>.</p>
     </aside>
     <p>Whatever the order, the first move takes both of its primes, and at least one of the four is stuck.  Four
     numbers need four primes to pay with, one each, and the first move spends two.  The rule: numbers with two prime
@@ -320,12 +307,11 @@
   <h3 class="section-head" id="exact">What the model costs</h3>
   <div class="para">
     <aside class="note card" aria-label="The exactness theorem, proved">
-      <div class="note-head"><span class="note-name">The exactness theorem<span class="note-label">Theorem X7</span></span><span class="standing is-proved">proved</span></div>
+      <div class="note-head"><span class="note-name">The exactness theorem<span class="note-label">Theorem X7</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#the-exactness-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">The frame model's best score is the best score of a game that plays all of U*.</p>
       <p class="precise"><span class="run">Precisely.</span>The promotion sets of every root problem of game n are
       exactly the sets L of numbers up to n/2 for which U* ∪ L is playable.  So ΣU* + P* is the largest weight of a
       playable set that contains U*.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#the-exactness-theorem">Proof on GitHub</a></p>
     </aside>
     <p>The frame model fixes the sources to U* and searches only the promotions.  Is anything lost?  The answer has
     two parts.</p>
@@ -334,20 +320,18 @@
   </div>
   <div class="para">
     <aside class="note card" aria-label="Statement U, open">
-      <div class="note-head"><span class="note-name">Statement U<span class="note-label">and corollary X8</span></span><span class="standing is-open">open</span></div>
+      <div class="note-head"><span class="note-name">Statement U<span class="note-label">and corollary X8</span></span><a class="standing is-open" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">open<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">Some optimal game plays every source that descending greedy keeps in layers 3 and up.</p>
       <p class="precise"><span class="run">Precisely.</span>U at n: some optimal set of n contains U*<sub>≥3</sub>, the
       members of U* in layers 3 and up.  Corollary X8, proved: ΣU* + P* ≤ opt(n), with equality if and only if U holds
       at n.  Layers 1 and 2 are settled by the bottom-layers theorem.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">Statement U on GitHub</a></p>
     </aside>
     <aside class="note card" aria-label="The chain's scores, proved given U">
-      <div class="note-head"><span class="note-name">The chain's scores</span><span class="standing is-givenU">proved given U</span></div>
+      <div class="note-head"><span class="note-name">The chain's scores</span><a class="standing is-givenU" href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">proved given U<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Every score of the chain is opt(n) wherever statement U holds at n.</p>
       <p class="precise"><span class="run">Precisely.</span>Each recorded score is ΣU* + P*, optimal in the frame model
       given that the solver is right, and so opt(n) by X8 given U at n.  For the first games of the chain the prover,
       which knows nothing of frames, proves the scores on the whole board.</p>
-      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">What supports the scores</a></p>
     </aside>
     <aside class="note links" aria-label="Further reading">
       <div class="note-head"><span class="note-name">Further reading</span></div>

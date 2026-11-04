@@ -1,4 +1,4 @@
-// The map of the site, drawn as a route: the main story is one line of stops, and the findings along the way are pins
+// The map of the site, drawn as a route: the story is one line of stops, and the findings along the way are pins
 // beside their stops.  Drawn from js/site.js, so the map, the contents and the pages agree.  A stop is a raised coin,
 // since it is a link; one not yet written lies flat and dashed, like a source not played.
 
@@ -20,5 +20,5 @@ export function mountSiteMap(host) {
     }).join('');
     return `<li class="stop${href ? '' : ' is-unwritten'}"><span class="stop-coin">${coin(c)}</span><div class="stop-text">${title}<p>${c.line}${href ? '' : ' Not yet written.'}</p>${pins}</div></li>`;
   }).join('');
-  host.innerHTML = `<ol class="route" aria-label="The main story and the findings along the way">${items}</ol>`;
+  host.innerHTML = `<ol class="route" aria-label="The story and the findings along the way">${items}</ol>`;
 }

@@ -1,7 +1,7 @@
 // The problem shrinking, chapter by chapter, for the last game of the chain: one row a chapter, with its number, its
 // title (a link once the chapter is written), the point it makes, and a bar for what is left to choose after it, on a
 // log scale, labeled with its count.  The rows of chapters not yet written are quieter, and their numbers lie flat and
-// dashed, as in the contents.  Chapter 3 settles no part of the last game; its row is a strip of the chain's games,
+// dashed, as in the contents.  Chapter 2 settles no part of the last game; its row is a strip of the chain's games,
 // with a mark for each game settled with no search.
 //
 // The chapters come from js/site.js; every count is computed from data/games.json.  The counts are rough sizes, as the
@@ -14,15 +14,18 @@ import { fmt, numberSVG } from '../js/vocab.js';
 
 /** The point of each chapter, as the row says it: what it takes away. */
 const POINTS = {
-  1: 'A game is an order of moves.',
-  2: 'Only the set matters, and a set is quick to check.',
-  3: 'Most games follow from the game before.',
-  4: 'One greedy pass chooses the numbers above n/2.',
-  5: 'Only the promotions are left to choose.',
-  6: 'A search with a sharp bound finishes.',
-  7: 'Two programs check every score.',
-  8: 'The games, and what they show.',
+  game: 'A game is an order of moves.',
+  1: 'Only the set matters, and a set is quick to check.',
+  2: 'Most games follow from the game before.',
+  3: 'One greedy pass chooses the numbers above n/2.',
+  4: 'Only the promotions are left to choose.',
+  5: 'A search with a sharp bound finishes.',
+  6: 'Two programs check every score.',
+  7: 'The games, and what they show.',
 };
+
+/** The first row is the game as played, not a chapter: no number, and a link to the front page's section on it. */
+const GAME_ROW = { title: 'The game', href: '#the-game' };
 
 const LOG2 = Math.log10(2);
 
@@ -39,8 +42,9 @@ export function settledWithNoSearch(proof, method) {
   return proof === 'trivial' || proof === 'prime_formula' || proof === 'same_search' || (proof === 'cap' && method === 'start');
 }
 
-// A count of about 10^exponent, where exponent is ⌊log10 of the count⌋, with the noun it counts: a row's bar.
-const power = (log, noun) => ({ log, exponent: Math.floor(log), html: `10<sup>${fmt(Math.floor(log))}</sup> ${noun}` });
+// A count of about 10^exponent, where exponent is log10 of the count rounded to the nearest power, with the noun it
+// counts: a row's bar.
+const power = (log, noun) => ({ log, exponent: Math.round(log), html: `10<sup>${fmt(Math.round(log))}</sup> ${noun}` });
 
 // A large count in words: 3,179,486,263 as 3.2 billion.
 function inWords(x) {
@@ -50,8 +54,8 @@ function inWords(x) {
   return fmt(x);
 }
 
-/** What is left to choose in game n after each chapter, keyed by chapter: a bar { log, exponent, html }, the strip of
- *  chapter 3 { strip }, words alone { html }, or nothing. */
+/** What is left to choose in game n as played (key game) and after each chapter, keyed by chapter: a bar
+ *  { log, exponent, html }, the strip of chapter 2 { strip }, words alone { html }, or nothing. */
 export function shrinkCounts(games) {
   const c = games.columns;
   const n = games.lastN;
@@ -64,12 +68,12 @@ export function shrinkCounts(games) {
   const log4 = Math.floor(n / 2) * LOG2;
   return {
     n,
-    1: power(log1, 'orders'),
-    2: power(log2, 'sets'),
-    3: { strip: noSearch },
-    4: power(log4, 'sets'),
-    5: candidates == null ? { html: 'nothing to promote' } : power(candidates * LOG2, `sets of ${fmt(candidates)} candidates`),
-    6: nodes == null ? { html: 'settled with no search' } : { log: Math.log10(nodes), html: `${inWords(nodes)} nodes` },
+    game: power(log1, 'orders'),
+    1: power(log2, 'sets'),
+    2: { strip: noSearch },
+    3: power(log4, 'sets'),
+    4: candidates == null ? { html: 'nothing to promote' } : power(candidates * LOG2, `sets of ${fmt(candidates)} candidates`),
+    5: nodes == null ? { html: 'settled with no search' } : { log: Math.log10(nodes), html: `${inWords(nodes)} nodes` },
   };
 }
 
@@ -89,11 +93,12 @@ function stripSVG(noSearch) {
 
 export function mountShrink(host, { games }) {
   const counts = shrinkCounts(games);
-  const max = counts[1].log;
-  const rows = STORY.map((chapter) => {
-    const href = hrefOf(chapter);
-    const count = counts[chapter.n];
-    const token = numberSVG(chapter.n, { rendering: 'raised', looks: href ? [] : ['lying', 'rejected'], size: 30, pad: 2 }).outerHTML;
+  const max = counts.game.log;
+  const rows = [GAME_ROW, ...STORY].map((chapter) => {
+    const key = chapter.n ?? 'game';
+    const href = chapter.href ?? hrefOf(chapter);
+    const count = counts[key];
+    const token = numberSVG(chapter.n ?? '', { rendering: 'raised', looks: href ? [] : ['lying', 'rejected'], size: 30, pad: 2 }).outerHTML;
     const title = href
       ? `<a class="shrink-title" href="${href}">${chapter.title}</a>`
       : `<span class="shrink-title">${chapter.title}<span class="sr-only">, not yet written</span></span>`;
@@ -111,7 +116,7 @@ export function mountShrink(host, { games }) {
     } else if (count) measure = `<span class="shrink-count">${count.html}</span>`;
     return `<li class="shrink-row ${href ? 'is-written' : 'is-unwritten'}">
       <span class="shrink-badge" aria-hidden="true">${token}</span>
-      <span class="shrink-text">${title}<span class="shrink-point">${POINTS[chapter.n]}</span></span>
+      <span class="shrink-text">${title}<span class="shrink-point">${POINTS[key]}</span></span>
       <span class="shrink-measure${count?.strip ? ' is-strip' : ''}">${measure}</span>
     </li>`;
   }).join('');

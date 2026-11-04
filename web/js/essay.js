@@ -2,7 +2,7 @@
 // into the text on a narrow window; the words that move a figure; and the numbers in the prose that put a halo on
 // their mark in a figure.
 
-import { AFTER, ALONG, SAMPLE, STORY, hrefOf } from './site.js';
+import { AFTER, ALONG, STORY, hrefOf } from './site.js';
 import { numberSVG } from './vocab.js';
 
 const figures = new Map();
@@ -36,8 +36,8 @@ function badge(entry, here) {
 /** The page the reader is on, as site.js names pages: its file name, index.html for the folder itself. */
 export const herePage = () => decodeURIComponent(location.pathname.split('/').pop() || 'index.html');
 
-/** The contents of the site: the main story's chapters as the outline lists them, each a link once it is written, the
- *  findings along the way and the about page, and the sample chapter.  here is the page the reader is on. */
+/** The contents of the site: the story's chapters as the outline lists them, each a link once it is written, the
+ *  findings along the way and the about page.  here is the page the reader is on. */
 export function contentsHTML({ here = herePage() } = {}) {
   const unwritten = (badgeHTML, title) =>
     `<li><span class="unwritten"><span class="badge">${badgeHTML}</span><span>${title}<small>not yet written</small></span></span></li>`;
@@ -48,8 +48,7 @@ export function contentsHTML({ here = herePage() } = {}) {
     return href ? link(badge(c, href === here), c.title, href) : unwritten(badge(c, false), c.title);
   }).join('');
   const after = AFTER.map((a) => unwritten(ALONG_ICON, a.title)).join('');
-  const sample = link(ALONG_ICON, SAMPLE.title, SAMPLE.href);
-  return `<p class="toc-group">The main story</p><ul class="toc">${story}</ul><ul class="toc">${after}</ul><p class="toc-group">Prototype</p><ul class="toc">${sample}</ul>`;
+  return `<p class="toc-group">The story</p><ul class="toc">${story}</ul><ul class="toc">${after}</ul>`;
 }
 
 export const homeMark = () => numberSVG('', { rendering: 'raised', looks: ['player'], size: 24, pad: 2 }).outerHTML;
@@ -138,7 +137,7 @@ export function mountNotes(root = document) {
     fold.className = 'note-fold';
     fold.setAttribute('aria-expanded', 'false');
     fold.setAttribute('aria-controls', note.id);
-    fold.innerHTML = `${name === kind ? '' : `<span class="fold-kind">${kind}</span>`}<span class="fold-name">${name}</span>${standing ? standing.outerHTML : ''}<span class="fold-sign" aria-hidden="true">+</span>`;
+    fold.innerHTML = `${name === kind ? '' : `<span class="fold-kind">${kind}</span>`}<span class="fold-name">${name}</span>${standing ? `<span class="${standing.className}">${standing.firstChild.textContent}</span>` : ''}<span class="fold-sign" aria-hidden="true">+</span>`;
     fold.addEventListener('click', () => {
       const open = !note.classList.contains('is-open');
       note.classList.toggle('is-open', open);
