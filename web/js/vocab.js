@@ -551,14 +551,14 @@ export function restyle(svg, ...looks) {
 // ---------------------------------------------------------------------------------------------------------------
 
 /** The standings a statement can have.  The badge's outline and fill tell them apart: filled for proved, gray under a
- *  solid outline for proved by computation, a double outline for proved given U, gray stripes for certified game by
- *  game, dotted for measured, dashed for
+ *  solid outline for proved by computation, a double outline for proved given U, gray stripes for open but proved
+ *  in every game up to some N, dotted for measured, dashed for
  *  open. */
 export const STANDING = {
   proved: 'proved',
   computed: 'proved by computation',
   'given-u': 'proved given U',
-  certified: 'certified game by game',
+  certified: 'open, proved to N',
   measured: 'measured',
   open: 'open',
 };

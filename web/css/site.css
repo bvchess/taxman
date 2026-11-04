@@ -188,6 +188,10 @@ table, .nums, output { font-variant-numeric: tabular-nums lining-nums; }
 .essay-head { margin-bottom: 56px; }
 .essay-head .kicker { font-size: 0.86rem; color: var(--ink-3); margin: 0 0 10px; }
 .essay-head h1 { margin-bottom: 18px; }
+.essay-head hgroup { margin-bottom: 14px; }
+.essay-head hgroup h1 { margin-bottom: 6px; }
+.essay-head .subhead { font-size: 1.55rem; line-height: 1.2; color: var(--ink-2); margin: 0; }
+.essay-head .byline { font-size: 0.95rem; color: var(--ink-3); margin: 0 0 22px; }
 .essay-head .lede { font-size: 1.14rem; color: var(--ink-2); }
 
 .chapter { margin: 0 0 84px; scroll-margin-top: 24px; }
@@ -266,8 +270,8 @@ table, .nums, output { font-variant-numeric: tabular-nums lining-nums; }
 .links li span { display: block; color: var(--ink-3); font-size: 0.74rem; }
 
 /* The standing of a statement: a pill told apart by its outline or its fill, never by color: filled for proved, gray
-   under a solid outline for proved by computation, a double outline for proved given U, gray stripes for certified
-   game by game, dotted for measured, dashed for open. */
+   under a solid outline for proved by computation, a double outline for proved given U, gray stripes for open but
+   proved in every game up to some N, dotted for measured, dashed for open. */
 .standing {
   display: inline-block; flex: none; padding: 0.04rem 0.5rem 0.1rem; border: 1.5px solid var(--ink); border-radius: 999px;
   font-size: 0.68rem; font-weight: 700; line-height: 1.35; color: var(--ink); white-space: nowrap; background: var(--paper);

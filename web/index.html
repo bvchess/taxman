@@ -16,7 +16,11 @@
 <main class="essay"><div class="column">
 
 <header class="essay-head para">
-  <h1>Playing optimal games of Taxman</h1>
+  <hgroup>
+    <h1>Taxman</h1>
+    <p class="subhead">Playing optimal games</p>
+  </hgroup>
+  <p class="byline">Brian Chess</p>
   <p class="lede">Taxman is a number game played against a taxman.  We play an optimal game, one with the best
   possible score, for every n from 1 to <span data-last-n>the end of our chain</span>.  This site explains how we did
   it.</p>
@@ -82,15 +86,22 @@
 <section class="chapter front-chain" id="chain" data-toc="chain" aria-labelledby="h-chain">
   <h2 id="h-chain">The chain</h2>
   <div class="para">
-    <aside class="note tech" aria-label="How each game was settled">
-      <div class="note-head"><span class="note-name">How each game was settled</span></div>
-      <p>By a <a class="gloss" href="glossary.html#search">search</a> of its whole tree; as a <a class="gloss" href="glossary.html#repeat">repeat</a> of an earlier game's search, which
-      poses the same problem; at its <a class="gloss" href="glossary.html#ceiling">ceiling</a>, n + opt(n − 1); by the
-      <a class="gloss" href="glossary.html#prime-formula">prime formula</a>; by an upper bound in the bounds store, which the
-      <a class="gloss" href="glossary.html#referee">referee</a> checks
-      against a game that meets it; or trivially, with nothing to choose.  The proof kinds are defined in
-      <a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#4-why-the-answers-can-be-trusted">the
-      frame solver's reference</a>.</p>
+    <aside class="note tech" aria-label="How each game was proven">
+      <div class="note-head"><span class="note-name">How each game was proven</span></div>
+      <p>A game counts under the first of these that applies.  Derived from n − 1: n is prime, and the
+      <a class="gloss" href="glossary.html#prime-formula">prime formula</a> gives its score from game n − 1’s, or its
+      score is its <a class="gloss" href="glossary.html#ceiling">ceiling</a>, n + opt(n − 1).  Repeats an earlier
+      search: the game poses the same problem as an earlier game, whose search settled it.  Search: the game’s own tree
+      was searched.  A game of the <a class="gloss" href="glossary.html#bounds-store">bounds store</a> counts by the
+      bound it cites, and the <span data-proof="searchNothing">…</span> small games with nothing to promote count as
+      searches, of a tree of one node.</p>
+    </aside>
+    <aside class="note tech" aria-label="The time of a search">
+      <div class="note-head"><span class="note-name">The time of a search</span></div>
+      <p>A search’s time is the wall-clock time of its game over every run, on the machine of its run, from 8 threads up
+      to game 2,175 to 88 at the end.  From game 2,176 on, the runs searched several games at a time, four as a rule
+      and for a while sixteen, so their times overlap, and their sum is more than the time the runs took.  The <span data-proof="storeSearch">…</span> games
+      the bounds store proved by a search were searched in runs apart from the chain, and have no time here.</p>
     </aside>
     <aside class="note tech" aria-label="The player's share">
       <div class="note-head"><span class="note-name">The player's share</span></div>
@@ -99,8 +110,8 @@
     </aside>
     <p>We found the games in order, from game 1 up, each one built from an <a class="gloss" href="glossary.html#optimal-game">optimal game</a> of the one before,
     so they form a <a class="gloss" href="glossary.html#chain">chain</a>.  The chart shows every game of it: the share of the
-    <a class="gloss" href="glossary.html#board">board</a> that the player wins, and how each game
-    was settled.</p>
+    <a class="gloss" href="glossary.html#board">board</a> that the player wins, how each game was proven, and how
+    long its search took.</p>
   </div>
   <figure class="chart" id="chain-chart">
     <p class="chart-sub"></p>
