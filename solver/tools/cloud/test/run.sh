@@ -502,7 +502,10 @@ its best" has_line "$tmp/s1.norm" \
         >"$work/logs/chain.log"
     fake_results 3
     recorded_line 2 20 search 5 1.5 unknown exhausted "  active=1.500 s  cpu=3.000 s  best=18" >"$work/logs/chain.out"
-    progress 4 1h40m00s 14000000000 250.0k/s 341541 >"$work/logs/chain.err"
+    {
+        progress 4 1h40m00s 14000000000 250.0k/s 341541
+        progress 5 11h55m57s 6595439724 150.6k/s 550715 1046.6h
+    } >"$work/logs/chain.err"
     TZ=America/Los_Angeles "$status" --host "$host" >"$tmp/w1.out" 2>&1
     sed 's/  */ /g' "$tmp/w1.out" >"$tmp/w1.norm"
     check "the table has the game of chain.out, the game in flight with its times, and the window of chain.log" equals \
@@ -513,6 +516,22 @@ its best" has_line "$tmp/s1.norm" \
         "$(awk '/ active / {head = index($0, "nodes") + 4}
             /14,000,000,000/ {row = index($0, "14,000,000,000") + 13}
             END {print (head > 0 && head == row) ? "ok" : "head " head " row " row}' "$tmp/w1.out")" ok
+    # Game 5's CPU time, 1046h35m59s, is 11 characters, wider than the column's usual 10.
+    check "a CPU time wider than its column leaves the nodes, best and state of every row where the header's are" \
+        equals "$(awk '/^ *(n|[0-9]+)  / {
+                rest = $0; edge = 0; rows++
+                for (k = 1; k <= 6; k++) {
+                    match(rest, /[^ ]+/)
+                    begin = edge + RSTART
+                    edge += RSTART + RLENGTH - 1
+                    rest = substr(rest, RSTART + RLENGTH)
+                    if (k == 4) where = edge
+                    if (k == 5) where = where "," edge
+                    if (k == 6) where = where "," begin
+                }
+                if (!(where in seen)) { seen[where] = 1; alignments++ }
+            }
+            END {print rows " rows, " alignments " alignment"}' "$tmp/w1.out")" "5 rows, 1 alignment"
 }
 
 for s in "${selected[@]}"; do

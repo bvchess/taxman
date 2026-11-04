@@ -119,10 +119,18 @@ games_table() {
         else if (unit == "G") text *= 1e9
         return text
     }
-    function row(n, active, cpu, nodes, best, state) {
-        printf "  %5s  %-10s  %-10s  %14s  %9s  %s\n", n, active, cpu, commas(nodes), commas(best), state
+    function row(n, active, cpu, nodes, best, state,    c) {
+        rows++
+        cell[rows, 1] = n
+        cell[rows, 2] = active
+        cell[rows, 3] = cpu
+        cell[rows, 4] = commas(nodes)
+        cell[rows, 5] = commas(best)
+        cell[rows, 6] = state
+        for (c = 1; c <= 5; c++) if (length(cell[rows, c]) > width[c]) width[c] = length(cell[rows, c])
     }
     BEGIN {
+        width[1] = 5; width[2] = 10; width[3] = 10; width[4] = 14; width[5] = 9
         first += 0
         last = first + flight - 1
         row("n", "active", "cpu", "nodes", "best", "state")
@@ -202,6 +210,10 @@ games_table() {
             }
             row(g, duration(seconds(active[g])), duration(seconds(cpu[g])), nodes[g], best[g], state)
         }
+        # Every row is in: each column is as wide as its widest cell, and at least its usual width.
+        format = "  %" width[1] "s  %-" width[2] "s  %-" width[3] "s  %" width[4] "s  %" width[5] "s  %s\n"
+        for (r = 1; r <= rows; r++)
+            printf format, cell[r, 1], cell[r, 2], cell[r, 3], cell[r, 4], cell[r, 5], cell[r, 6]
     }'
 }
 
