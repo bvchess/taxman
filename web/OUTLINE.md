@@ -1,12 +1,13 @@
 # Outline of the site
 
-The plan of the site *Playing optimal games of Taxman*, page by page, for review before any prose is written.  Each
-entry says the point of a page, the beats of its main story, its figures, what its right column holds and the findings
-it carries as asides.  The entries are meant to be moved, merged and cut.
+The plan of the site *Playing optimal games of Taxman*, page by page.  Each entry below is one page of the site: the
+front page, then one page for each chapter of the story.  An entry says the point of its page, the beats of its story,
+its figures, what its right column holds and the findings it carries as asides.  The entries are meant to be moved,
+merged and cut.
 
 ## What holds on every page
 
-* **The three columns.**  Navigation on the left.  The main story in the center, for a high school senior who knows
+* **The three columns.**  Navigation on the left.  The story in the center, for a high school senior who knows
   primes and factors.  On the right, the technical layer: each result's precise statement, its standing and a link to
   its proof, technical notes, and links to the code, the data and the literature.  A reader who never looks right misses
   nothing of the story.  So no page needs to be set apart: the search is a chapter like the others, and its depth
@@ -20,52 +21,44 @@ it carries as asides.  The entries are meant to be moved, merged and cut.
 
 ## The arc
 
-The main story explains how we found optimal games past 5000.  Each chapter takes away part of the problem, and the
-front page shows the problem shrinking, chapter by chapter, for game 5060:
+The front page explains the game and gives the headline.  The story explains how we found optimal games past 5000, a
+chapter a page.  Each chapter takes away part of the problem, and the front page shows the problem shrinking, chapter by
+chapter, for game 5060:
 
 | step | what is left to choose | about |
 |---|---|---|
-| the game as it is played | an order of moves | 10^16,548 orders |
-| 2. a game is a set | a set of moves | 10^1,523 sets |
-| 3. the chain | (60% of games are settled here) | |
-| 4. the top half | which numbers up to n/2 to play | 10^762 sets |
-| 5. frames | which candidates to promote | 10^415 sets of 1,380 candidates |
-| 6. the search | the nodes a search explores | 3.2 billion nodes |
+| the game as it is played (the front page) | an order of moves | 10^16,548 orders |
+| 1. a game is a set | a set of moves | 10^1,523 sets |
+| 2. the chain | (60% of games are settled here) | |
+| 3. the top half | which numbers up to n/2 to play | 10^762 sets |
+| 4. frames | which candidates to promote | 10^415 sets of 1,380 candidates |
+| 5. the search | the nodes a search explores | 3.2 billion nodes |
 
 The figures are rough counts (n!, 2^n, 2^(n/2), 2^candidates) and say so in the right column; the last is the
 recorded search of game 5060.
 
 ## The front page
 
-**Point.**  We play an optimal game of Taxman for every n up to the chain's end, and this site explains how.
+**Point.**  Taxman is easy to play well and hard to play perfectly; we play an optimal game for every n up to the
+chain's end, and this site explains how.
 
 * **Headline:** *Playing optimal games of Taxman.*
-* **Lede:** Taxman in one sentence; what we did in two: an optimal game for every n from 1 to the chain's end, proven on
-  the whole board to 2175 and, past it, given one open statement.
-* **Hero:** the playable game (option D's), n = 10.
+* **Lede:** what we did: an optimal game for every n from 1 to the chain's end, proven outright to 2175 and, past it,
+  given one open statement.
+* **The game:** the rules as a list, ending with what it means to beat the taxman, then a game to play (n from 2 to 30,
+  with a button that plays an optimal game).
+* **Playing well is easy:** a simple strategy with no search scores 99.85% of the optimal points up to 1000.  The last
+  fraction of a percent is the whole problem, because only a perfect game is optimal, and only a proof shows it is.
 * **How we did it:** the shrinking problem above, as a figure, each step linked to its chapter.
 * **The chain:** the chart of every game: the player's share, and how each game was settled.
 * **Along the way:** the findings as cards, each linked to the chapter that explains it.
-* **Right column:** what "optimal" means here, the data and how to check it, how to cite the site.
+* **Check it yourself:** the data, the programs and the theory on GitHub.
+* **Right column:** what "optimal" means here; the rules precisely, opt(n) and the Taxman sequence (OEIS A019312); the
+  heuristics' claims and how they were measured (`heuristics/README.md`); how to check the chain; how to cite the site.
 
-## The main story
+## The story
 
-### 1. The game
-
-**Point.**  Taxman is easy to play well and hard to play perfectly.
-
-* The rules, and a game to play (n from 2 to 30, with a button that plays an optimal game).
-* The taxman's share: even good play leaves him over a third of the board.
-* Playing well is easy: a simple strategy with no search scores 99.85% of the optimal points up to 1000.  The last
-  fraction of a percent is the whole problem, because only a perfect game is optimal, and only a proof shows it is.
-* How many ways there are to play: the orders grow like n!.
-
-**Figures.**  The game.  A chart of the simple strategy's score against the optimal score (from `heuristics/results`).
-
-**Right column.**  opt(n) and S\*(n) defined; the Taxman sequence (OEIS A019312); the heuristics' claims and how they
-were measured (`heuristics/README.md`).
-
-### 2. A game is a set
+### 1. A game is a set
 
 **Point.**  Which numbers you take decides the score; the order follows, and whether a set can be played is quick to
 check.
@@ -85,7 +78,7 @@ in the language of matchings, the peel theorem (P4), the two-factor proposition 
 2175 needs one (its home in the repository is to be written; the wiki's Questions page has it).  *More moves, fewer
 points:* in game 833 every optimal game makes 362 moves, but a game can make 363 (the length proposition, Q4).
 
-### 3. Walking up the chain
+### 2. Walking up the chain
 
 **Point.**  Most games are easy if you know an optimal game of the one before.
 
@@ -105,7 +98,7 @@ theorem (N6), the half lemma (N7), the semiprime formula (J3), the repeat lemma 
 
 **Asides.**  *The cofactor rule:* whether a game needs a search can usually be told from n alone (measured).
 
-### 4. The top half
+### 3. The top half
 
 **Point.**  In the games that need a search, the numbers above n/2 carry about 93% of the score (measured), and one
 greedy pass chooses them.
@@ -129,7 +122,7 @@ certificates ((★), (♦)), where exchange breaks (game 2873), statement U, the
 
 **Asides.**  *The greedy that shouldn't work* (game 2873).
 
-### 5. Frames
+### 4. Frames
 
 **Point.**  What is left splits into frames, small games that barely touch, and only the promotions are left to choose.
 
@@ -149,7 +142,7 @@ and code.
 
 **Asides.**  *Two optimal sets:* every game to 424 has one optimal set; game 425 has two.
 
-### 6. The search
+### 5. The search
 
 **Point.**  A search tries promotion sets, and an upper bound proves when nothing better is left.
 
@@ -171,7 +164,7 @@ cores that are all the bound misses (measured), the prime-exchange theorem (R2),
 near-repeat lemma (R7); how a subtree grows with the gap (measured); what was tried and did not help (the notebook's
 register); the design (`solver/docs/DESIGN.md`, `search.md`, `gf2-bound.md`, `tactics.md`).
 
-### 7. Trust
+### 6. Trust
 
 **Point.**  Every score is checked, and every score says what it rests on.
 
@@ -193,7 +186,7 @@ opt(n).
 **Asides.**  *Exact to 77:* the parity bound equals opt(n) for every n up to 77 and fails first at 78, where an odd core
 weighs in.
 
-### 8. The results
+### 7. The results
 
 **Point.**  Here are the games, how each was proven, and what they show.
 
@@ -225,8 +218,8 @@ the player's share.
 
 ## Open decisions
 
-* Whether the heuristics deserve more than chapter 1's paragraph and an aside.
+* Whether the heuristics deserve more than the front page's paragraph and an aside.
 * Whether the explorer is in the first version of the site.
-* Whether trust (7) comes before the search chapter (6), so the reader knows what "proven" means before the search
+* Whether trust (6) comes before the search chapter (5), so the reader knows what "proven" means before the search
   proves anything.
 * Where the theory's proofs are read: on GitHub, as now, or as pages of the site in the same style.
