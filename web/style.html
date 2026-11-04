@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The style of the site</title>
+<meta name="description" content="Every piece of the site's look on one page: the type, the colors, the marks in both renderings, the controls, the technical layer, the layout at each width, and the motion.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2718%27 r=%2713%27 fill=%27%2314478c%27/%3E%3Ccircle cx=%2716%27 cy=%2715%27 r=%2713%27 fill=%27%232166c4%27/%3E%3C/svg%3E">
+<script src="js/tone.js"></script>
+<link rel="stylesheet" href="css/site.css">
+<link rel="stylesheet" href="css/style-page.css">
+</head>
+<body data-page="style">
+<header class="topbar"></header>
+<div class="site">
+<aside class="rail" aria-label="The sections of this page" data-own="true">
+  <a class="home" href="index.html"><span class="home-mark"></span>Taxman</a>
+  <nav aria-label="The sections of this page">
+    <p class="toc-group">The style of the site</p>
+    <ul class="toc">
+      <li><a href="#type" data-chapter="type"><span class="badge" data-n="1"></span><span>Type</span></a></li>
+      <li><a href="#color" data-chapter="color"><span class="badge" data-n="2"></span><span>Color</span></a></li>
+      <li><a href="#marks" data-chapter="marks"><span class="badge" data-n="3"></span><span>The marks</span></a></li>
+      <li><a href="#controls" data-chapter="controls"><span class="badge" data-n="4"></span><span>Controls</span></a></li>
+      <li><a href="#technical" data-chapter="technical"><span class="badge" data-n="5"></span><span>The technical layer</span></a></li>
+      <li><a href="#story-pieces" data-chapter="story-pieces"><span class="badge" data-n="6"></span><span>Asides and contents</span></a></li>
+      <li><a href="#layout" data-chapter="layout"><span class="badge" data-n="7"></span><span>Layout</span></a></li>
+      <li><a href="#motion" data-chapter="motion"><span class="badge" data-n="8"></span><span>Motion</span></a></li>
+    </ul>
+    <div class="site-nav"></div>
+  </nav>
+  <div class="progress" aria-hidden="true"><span></span></div>
+</aside>
+<main class="essay"><div class="column">
+
+<header class="essay-head para">
+  <aside class="note tech" aria-label="How this page is made">
+    <div class="note-head"><span class="note-name">How this page is made</span></div>
+    <p>Every specimen here is drawn by the site's own modules: <code>js/vocab.js</code> for the marks and the motion,
+    <code>js/scene.js</code> for the figures and the slider, and <code>css/site.css</code> for the tokens.  What
+    changes there changes here.</p>
+  </aside>
+  <p class="kicker">For the people who build the site</p>
+  <h1>The style of the site</h1>
+  <p class="lede">Every piece of the site's look, with what it means and when to use it.</p>
+</header>
+
+<!-- Type ------------------------------------------------------------------------------------------------------ -->
+<section class="chapter" id="type" data-toc="type" data-title="Type" aria-labelledby="h-type">
+  <h2 id="h-type">Type</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="The face's files">
+      <div class="note-head"><span class="note-name">The face's files</span></div>
+      <p>Two variable files in <code>fonts/</code>, upright and italic, weights 300 to 700, in the Latin subset.  A
+      symbol outside it, such as Σ, ∪, ≤ or Ω, comes from the reader's own system fonts.  The site loads nothing from
+      another site.</p>
+    </aside>
+    <p>The site is set in Radio Canada, served from the site itself under the
+    <a href="fonts/OFL.txt">SIL Open Font License</a>.  Numbers are the subject of the site, so the face is chosen
+    for its figures: a zero with no slash or dot, a 1 with a foot and a flag that no 7 can be taken for, and tabular
+    lining figures.  One custom property, <code>--font</code>, sets it for the text, the figures and the tables.</p>
+  </div>
+  <div class="face-specimen spread" aria-label="Radio Canada">
+    <p class="face-digits">10 20 101 1100 5060 17 71</p>
+    <p class="face-digits face-bold">10 20 101 1100 5060 17 71</p>
+    <p class="face-alphabet">Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz</p>
+    <p class="face-alphabet face-italic">An optimal game of Taxman for every n, with opt(n) = ΣU* + P* given U.</p>
+  </div>
+
+  <h3 class="section-head">The scale</h3>
+  <p>One family, in two weights for text (400 and 700) and one for quiet labels (600).  The text is 18 px on a line
+  of 1.62, and a phone sets it at 17 px.</p>
+  <div class="scale spread" id="scale"></div>
+
+  <h3 class="section-head">Numbers in prose, in figures and in tables</h3>
+  <div class="para">
+    <aside class="note tech" aria-label="The rule for numbers">
+      <div class="note-head"><span class="note-name">The rule for numbers</span></div>
+      <p>Figures are lining everywhere and tabular in figures, tables, sliders and scores, so a column of numbers lines
+      up and a changing score does not jitter.  Counts take thousands separators (218,226); game numbers in running
+      text do not need them but may have them.</p>
+    </aside>
+    <p class="prose-numbers">Game 21 scores 144 to 87, and 17 + 71 = 88.  Every game from 1 to
+    <span data-last-n>the end of the chain</span> has an optimal game; game 1100 scores <span data-score="1100">its
+    score</span>, and game 833 scores <span data-score="833">its score</span>.  A number the prose names, such as
+    <span class="n">101</span>, is set bold over a dotted line.</p>
+  </div>
+  <div class="num-rows" id="figure-numbers"></div>
+  <table class="num-table">
+    <caption>A table sets its figures tabular, right-aligned</caption>
+    <thead><tr><th>game</th><th>opt(n)</th><th>moves</th><th>proof</th></tr></thead>
+    <tbody id="num-table-rows"></tbody>
+  </table>
+</section>
+
+<!-- Color ----------------------------------------------------------------------------------------------------- -->
+<section class="chapter" id="color" data-toc="color" data-title="Color" aria-labelledby="h-color">
+  <h2 id="h-color">Color</h2>
+  <div class="para">
+    <aside class="note card" aria-label="The palette validator's result">
+      <div class="note-head"><span class="note-name">The validator's result<span class="note-label">dataviz validate_palette.js, on a white page</span></span><span class="standing is-measured">measured</span></div>
+      <p class="plain">At each tone, blue and orange pass every check, the protan and deutan simulations among them.</p>
+      <p class="precise"><span class="run">Precisely.</span>The marks of each tone pass the lightness band, the chroma
+      floor, CVD separation (deutan and protan ΔE 25 or more), the normal-vision floor and 3:1 contrast.  The faces
+      are fills under ink, not marks, and keep a deutan and protan ΔE of 9.9 or more.  The page recomputes the
+      separations from the tokens, beside each tone.  A third hue would sit too close to blue for a deutan reader, so
+      a chapter not yet written is marked by a dashed line and a gray wash.</p>
+    </aside>
+    <p>The page is ink on white.  Two colors mean something, and only two: blue is the player and the player's moves,
+    and orange is the taxman and his tax.  Every color distinction is doubled by a shape, a line style, a place or a
+    label, since about one man in twelve does not see red from green.  Blue against orange lies on the blue–yellow
+    axis that such readers still see.  What the prose names gets a halo of ink, never a third color.</p>
+  </div>
+  <h3 class="section-head" id="tones">Three tones</h3>
+  <div class="para">
+    <aside class="note tech" aria-label="Choosing a tone">
+      <div class="note-head"><span class="note-name">Choosing a tone</span></div>
+      <p>Add <code>?tone=deep</code>, <code>?tone=light</code> or <code>?tone=lightest</code> to the address of any
+      page to see the whole site in that tone.  Any element with <code>data-tone</code> sets the tone inside it, as
+      the three panels here do.</p>
+    </aside>
+    <p>The same pair at three tones, each with real tokens in the two trays, a flat move with its tax, and a chart's
+    lines.  Lighter tones fill with a light color under an ink number and outline in a mid shade.  An outline or a
+    line in color keeps 3:1 against the page, and words in color keep 4.5:1, so in the light tones the words are ink.
+    The site uses the lightest tone.</p>
+  </div>
+  <div class="tones spread" id="tone-panels"></div>
+  <h3 class="section-head">The tokens</h3>
+  <div class="tokens spread" id="tokens"></div>
+</section>
+
+<!-- The marks ------------------------------------------------------------------------------------------------- -->
+<section class="chapter" id="marks" data-toc="marks" data-title="The marks" aria-labelledby="h-marks">
+  <h2 id="h-marks">The marks: one grammar, two renderings</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="Which rendering">
+      <div class="note-head"><span class="note-name">Which rendering</span></div>
+      <p>Raised: the game, the loop and the front page's game, and the tokens of the contents and the map, which are
+      links.  Flat: game 21 from the board to the frames, the three steps, the orders, and the
+      numbers of an aside.  A chapter's number in its heading is flat: it is not a thing to press.</p>
+    </aside>
+    <p>Depth means you can touch it.  A number the reader plays is a raised token, a coin for a circle and a tile for
+    a square, standing on the page with an edge and a shadow; one that cannot be taken now lies flat.  A number in a
+    figure that explains is drawn flat, in ink.  The two renderings read the same look, so each mark below means the
+    same thing in both.</p>
+  </div>
+  <div class="marks spread" id="marks-table"></div>
+
+  <h3 class="section-head" id="promotion">A promotion</h3>
+  <p>The moment the vocabulary must make visible.  Flat, the square of 9 rounds into a circle as it hops one frame
+  forward, leaving a dashed ghost, and its payment is drawn.  Raised, the tile turns over in the air and lands as a
+  coin.</p>
+  <figure class="promo spread" id="promo">
+    <div class="promo-pair">
+      <div><svg data-rendering="flat"></svg><p class="promo-name">flat</p></div>
+      <div><svg data-rendering="raised"></svg><p class="promo-name">raised</p></div>
+    </div>
+    <button type="button" class="btn" data-act="replay">Play the promotion again</button>
+  </figure>
+</section>
+
+<!-- Controls -------------------------------------------------------------------------------------------------- -->
+<section class="chapter" id="controls" data-toc="controls" data-title="Controls" data-fig="demo" aria-labelledby="h-controls">
+  <h2 id="h-controls">Controls</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="The keys">
+      <div class="note-head"><span class="note-name">The keys</span></div>
+      <p>With the slider in focus, the arrow keys step from state to state, Home and End go to the first and the last,
+      and Page Up and Page Down jump three.  A figure opens at a state from its URL: <code>?fig21=6</code>,
+      <code>?demo=3</code>.</p>
+    </aside>
+    <p>A stepped figure has a time slider under it, with a named stop for each state, buttons for the state before
+    and after, and a button that plays on.  Drag the slider and the figure moves through every point between two
+    states.  Words in the prose move it too: watch 9
+    <a class="go" href="?demo=2#demo" data-fig="demo" data-state="2">become a candidate</a>, then
+    <a class="go" href="?demo=3#demo" data-fig="demo" data-state="3">promote it</a>, and point at
+    <span class="n" data-n="9">9</span> or <span class="n" data-n="3">3</span> to give it a halo.  The raised marker
+    on each such word names the stop it moves the figure to.</p>
+  </div>
+  <figure class="fig demo" id="demo">
+    <svg></svg>
+    <div class="fig-timeline"></div>
+    <figcaption class="fig-caption"></figcaption>
+  </figure>
+  <p>Buttons are raised, since they are pressed; the one that does the main thing is filled.</p>
+  <div class="button-row">
+    <button type="button" class="btn">Start over</button>
+    <button type="button" class="btn primary">Play an optimal game</button>
+    <button type="button" class="btn round" aria-label="One fewer">&minus;</button>
+    <button type="button" class="btn" disabled>Take back</button>
+  </div>
+</section>
+
+<!-- The technical layer --------------------------------------------------------------------------------------- -->
+<section class="chapter" id="technical" data-toc="technical" data-title="The technical layer" aria-labelledby="h-technical">
+  <h2 id="h-technical">The technical layer</h2>
+  <p>The right column holds everything more exact or more technical than the story, each piece beside the paragraph
+  it belongs to.  There are three kinds.  A margin card states a result the story uses: its name, its standing, a
+  plain statement, a precise one, and its proof.  A technical note gives notation or an exact definition.  A block of
+  links points to the theory, the code and the papers.  The standing of a card is told by its badge's outline, never
+  by color.</p>
+  <div class="note-grid spread">
+    <aside class="note card" aria-label="The frame lemma, proved">
+      <div class="note-head"><span class="note-name">The frame lemma<span class="note-label">Lemma F1</span></span><span class="standing is-proved">proved</span></div>
+      <p class="plain">Every number lies in exactly one frame.</p>
+      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  Every number of the board lies in exactly
+      one component of the frame graph, whose sources lie in one layer k and factors in layer k − 1.</p>
+      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-frame-lemma">Proof on GitHub</a></p>
+    </aside>
+    <aside class="note card" aria-label="The chain's scores, proved given U">
+      <div class="note-head"><span class="note-name">The chain's scores</span><span class="standing is-givenU">proved given U</span></div>
+      <p class="plain">Every score of the chain is opt(n) wherever statement U holds at n.</p>
+      <p class="precise"><span class="run">Precisely.</span>Each recorded score is ΣU* + P*, which corollary X8 makes
+      opt(n) given U at n.</p>
+      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">What supports the scores</a></p>
+    </aside>
+    <aside class="note card" aria-label="One optimal set, to 424, measured">
+      <div class="note-head"><span class="note-name">One optimal set, to 424</span><span class="standing is-measured">measured</span></div>
+      <p class="plain">Up to game 424 every game has exactly one optimal set.</p>
+      <p class="precise"><span class="run">Precisely.</span>The prover enumerates the optimal sets of the games it
+      proves; from 425 on, a few have two or three.</p>
+      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board">The enumeration on GitHub</a></p>
+    </aside>
+    <aside class="note card" aria-label="Statement U, open">
+      <div class="note-head"><span class="note-name">Statement U</span><span class="standing is-open">open</span></div>
+      <p class="plain">Some optimal game plays every source descending greedy keeps in layers 3 and up.</p>
+      <p class="precise"><span class="run">Precisely.</span>Some optimal set of n contains U*<sub>≥3</sub>.</p>
+      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">Statement U on GitHub</a></p>
+    </aside>
+    <aside class="note tech" aria-label="Layers, precisely">
+      <div class="note-head"><span class="note-name">Layers, precisely</span></div>
+      <p>The layer of x is Ω(x), its count of prime factors with multiplicity: Ω(12) = 3 and Ω(1) = 0.</p>
+    </aside>
+    <aside class="note links" aria-label="Further reading">
+      <div class="note-head"><span class="note-name">Further reading</span></div>
+      <ul>
+        <li><a href="https://github.com/bvchess/taxman/blob/master/docs/THEORY.md">docs/THEORY.md</a><span>the theorems, with their proofs</span></li>
+        <li><a href="https://oeis.org/A019312">OEIS A019312</a><span>the Taxman sequence</span></li>
+      </ul>
+    </aside>
+  </div>
+  <p>Below the width where the margin fits, each note folds into a line under its paragraph, marked with its kind, its
+  name and its standing, and opens when tapped.  Here is a paragraph and its note as a phone shows them.</p>
+  <div class="phone-specimen"><div class="essay-like"><div class="column">
+    <div class="para">
+      <aside class="note card" aria-label="The loop rule, proved">
+        <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11</span></span><span class="standing is-proved">proved</span></div>
+        <p class="plain">Numbers with two prime factors can all be played exactly when their lines form no loop.</p>
+        <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">Proof on GitHub</a></p>
+      </aside>
+      <p>Whatever the order, the first move takes both of its primes, and one of the four is stuck.</p>
+    </div>
+  </div></div></div>
+</section>
+
+<!-- Asides and the contents -------------------------------------------------------------------------- -->
+<section class="chapter" id="story-pieces" data-toc="story-pieces" data-title="Asides and contents" aria-labelledby="h-pieces">
+  <h2 id="h-pieces">Asides and the contents</h2>
+  <p>A finding along the way is an aside in the story's column, a card that opens: every reader should enjoy it, and
+  none has to.  It is raised, since it is pressed.</p>
+  <details class="aside">
+    <summary>
+      <span class="aside-pin" aria-hidden="true"></span>
+      <span><span class="where">Along the way: game 833</span><span class="title">A longer game is not a better one</span></span>
+      <span class="open-mark"><span class="closed-word">Open</span><span class="open-word">Close</span></span>
+    </summary>
+    <div class="aside-body"><p>In game 833 every optimal game makes 362 moves, yet some games make one more.  The
+    longest of those still scores less.</p></div>
+  </details>
+  <p>The contents sit at the left: the main story's chapters, the findings along the way, and the about page.  Each
+  chapter's token is raised, since it is a link; the page the reader is on is gray, and a chapter not yet
+  written lies flat and dashed.  Below 1300 px the contents fold into a bar at the top with a button that opens them.</p>
+  <div class="nav-specimen spread">
+    <div class="rail-specimen"></div>
+    <div class="topbar-specimen"><span class="home"></span><span class="where">Layers and frames</span><span class="btn contents-btn">Contents</span></div>
+  </div>
+</section>
+
+<!-- Layout ---------------------------------------------------------------------------------------------------- -->
+<section class="chapter" id="layout" data-toc="layout" data-title="Layout" aria-labelledby="h-layout">
+  <h2 id="h-layout">Layout: three columns, three jobs</h2>
+  <p>The left column finds the reader's place, the center tells the story, and the right holds the technical layer.
+  A reader who never looks right misses nothing of the story.  Figures sit in the story's column, inline; a figure
+  that needs more room reaches into the right column, and the notes beside it move below it.  No width scrolls
+  sideways.</p>
+  <div class="layout spread" id="layout-diagram"></div>
+  <ul class="dims">
+    <li><b>Contents</b> 224 px, sticky; a bar 52 px tall below a window of 1300 px.</li>
+    <li><b>Story</b> at most 36 rem, 648 px, about 70 characters a line; a 16 px gutter on a phone.</li>
+    <li><b>Technical layer</b> 16.5 rem, 297 px, a gutter of 2.4 rem from the story, with a hairline between.</li>
+  </ul>
+</section>
+
+<!-- Motion ---------------------------------------------------------------------------------------------------- -->
+<section class="chapter" id="motion" data-toc="motion" data-title="Motion" aria-labelledby="h-motion">
+  <h2 id="h-motion">Motion</h2>
+  <p>Motion answers the reader: a figure moves when its slider, a button or a word moves it, and the page itself
+  stays still.  Flat marks glide.  Raised tokens are picked up, carried and set down with a small overshoot, as a
+  thing with weight is, and a tile turns over when it becomes a coin.  With reduced motion every figure jumps.</p>
+  <div class="motion-demo spread" id="motion-demo">
+    <div class="lane"><span class="lane-name">a flat mark glides</span><svg aria-label="A flat mark gliding"></svg></div>
+    <div class="lane"><span class="lane-name">a raised token is carried and set down</span><svg aria-label="A raised token carried and set down"></svg></div>
+    <div class="lane"><span class="lane-name">a raised tile turns over and lands as a coin</span><svg aria-label="A raised tile turning over"></svg></div>
+    <button type="button" class="btn" data-act="motion">Play the motion</button>
+  </div>
+  <div class="curves" id="curves"></div>
+  <table class="motion-table">
+    <thead><tr><th>token</th><th>value</th><th>what moves so</th></tr></thead>
+    <tbody id="motion-rows"></tbody>
+  </table>
+</section>
+
+<footer class="site-foot"><p>This page shows the style; <a href="frames.html">the sample chapter</a> uses it.</p></footer>
+</div></main>
+</div>
+
+<script type="module">
+import { initEssay, registerFigure, contentsHTML, homeMark, ALONG_ICON } from './js/essay.js';
+import { MOTION, numberSVG } from './js/vocab.js';
+import { loadGames } from './js/data.js';
+import * as S from './figures/specimens.js';
+
+document.querySelector('.home-mark').innerHTML = homeMark();
+document.querySelectorAll('.rail .badge[data-n]').forEach((b) => b.appendChild(numberSVG(Number(b.dataset.n), { rendering: 'raised', size: 24, pad: 2 })));
+for (const pin of document.querySelectorAll('.aside-pin')) pin.innerHTML = ALONG_ICON.replace('width="22" height="22"', 'width="30" height="30"');
+document.querySelector('.site-nav').innerHTML = contentsHTML({ onStoryPage: false });
+document.querySelector('.rail-specimen').innerHTML = `<a class="home" href="index.html">${homeMark()}Taxman</a><nav aria-label="The site's contents, a specimen">${contentsHTML({ onStoryPage: true })}</nav>`;
+document.querySelector('.topbar-specimen .home').innerHTML = `${homeMark()}Taxman`;
+
+S.mountScale(document.getElementById('scale'));
+S.mountFigureNumbers(document.getElementById('figure-numbers'));
+S.mountTones(document.getElementById('tone-panels'));
+S.mountTokens(document.getElementById('tokens'));
+S.mountMarks(document.getElementById('marks-table'));
+S.mountPromotion(document.getElementById('promo'));
+registerFigure('demo', S.mountControls(document.getElementById('demo')));
+S.mountLayout(document.getElementById('layout-diagram'));
+S.mountCurves(document.getElementById('curves'));
+S.mountMotion(document.getElementById('motion-demo'));
+const css = getComputedStyle(document.documentElement);
+const rows = [
+  ['step', `${MOTION.step} ms`, 'one state of a stepped figure, played forward or back, eased by glide'],
+  ['jump', `${MOTION.jump(0)} ms + ${MOTION.jump(1) - MOTION.jump(0)} ms a state, at most ${MOTION.jump(10)} ms`, 'a jump over several states, every mark at once'],
+  ['pause', `${MOTION.pause} ms`, 'the rest at each state while a figure plays through'],
+  ['move', `${MOTION.move} ms`, 'a raised token taken in the game, carried to its tray and set down (settle)'],
+  ['lift', `${MOTION.lift} units`, 'the most a raised token is lifted as it travels'],
+  ['flip lift', `${MOTION.flipLift} units`, 'the lift of a raised token turning over'],
+  ['--ui', css.getPropertyValue('--ui').trim(), 'the page answering a pointer: a hover, a press, a note opening'],
+  ['--ease-glide', css.getPropertyValue('--ease-glide').trim(), 'the glide, for CSS'],
+  ['--ease-settle', css.getPropertyValue('--ease-settle').trim(), 'the settle, for CSS and the game'],
+];
+document.getElementById('motion-rows').innerHTML = rows.map((r) => `<tr><td><code>${r[0]}</code></td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+initEssay();
+const games = await loadGames();
+const c = games.columns;
+const fmt = (x) => x.toLocaleString('en-US');
+for (const s of document.querySelectorAll('[data-last-n]')) s.textContent = fmt(games.lastN);
+for (const s of document.querySelectorAll('[data-score]')) s.textContent = fmt(c.score[c.n.indexOf(Number(s.dataset.score))]);
+// The table's numbers are the chain's own, from games.json.
+document.getElementById('num-table-rows').innerHTML = [10, 21, 101, 1100, games.lastN].map((n) => {
+  const i = c.n.indexOf(n);
+  return `<tr><td>${n}</td><td>${fmt(c.score[i])}</td><td>${fmt(c.moves[i])}</td><td>${c.proof[i].replace('_', ' ')}</td></tr>`;
+}).join('');
+</script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playing optimal games of Taxman</title>
+<meta name="description" content="An optimal game of Taxman for every n from 1 to the end of the chain, and how we found them.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2718%27 r=%2713%27 fill=%27%2314478c%27/%3E%3Ccircle cx=%2716%27 cy=%2715%27 r=%2713%27 fill=%27%232166c4%27/%3E%3C/svg%3E">
+<script src="js/tone.js"></script>
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body data-page="front" class="front">
+<header class="site-header">
+  <a class="home" href="index.html"><span class="home-mark" aria-hidden="true"></span>Taxman</a>
+  <nav aria-label="Site">
+    <a href="frames.html">The main story</a>
+    <a href="https://github.com/bvchess/taxman">GitHub</a>
+  </nav>
+</header>
+
+<main class="front-main">
+  <section class="hero" aria-labelledby="headline">
+    <h1 id="headline">Playing optimal games of Taxman</h1>
+    <p class="hero-what">Taxman is played on the numbers 1 to n: you take a number, and the taxman takes all of its
+    divisors still in the pot.  We found the best possible game for every n in that range, and proved each one
+    optimal.  Try game 10 first.</p>
+    <div class="game-host" id="game"></div>
+    <p class="hero-standing">The proofs work in a model of the game that is exact given one statement, open in general;
+    for the games at the start of the chain, a second program proves the scores on the whole board.
+    <a href="frames.html#exact">What that means</a>.</p>
+  </section>
+
+  <section class="front-chart" aria-labelledby="h-chain">
+    <figure class="chart" id="chain-chart">
+      <h2 class="chart-title" id="h-chain">The whole chain</h2>
+      <p class="chart-sub"></p>
+      <div class="chart-box"></div>
+    </figure>
+  </section>
+
+  <section class="steps" aria-labelledby="h-steps">
+    <h2 id="h-steps">The idea in three steps</h2>
+    <ol class="step-list">
+      <li>
+        <div class="step-pic-host"></div>
+        <h3><span class="step-n" data-step="1"></span>Sets, not orders</h3>
+        <p>A game's score is the sum of the numbers you take, whatever their order.  So the question is which
+        numbers to take: which sets can be played at all.</p>
+      </li>
+      <li>
+        <div class="step-pic-host"></div>
+        <h3><span class="step-n" data-step="2"></span>Frames</h3>
+        <p>The numbers fall into frames: nearly independent small games, each a few large numbers with the smaller
+        ones that can pay for them.</p>
+      </li>
+      <li>
+        <div class="step-pic-host"></div>
+        <h3><span class="step-n" data-step="3"></span>A few promotions</h3>
+        <p>The hard part is choosing a few factors to promote, played as moves one frame forward.  A search settles
+        which.</p>
+      </li>
+    </ol>
+    <p><a class="read-on" href="frames.html">Read the main story</a></p>
+  </section>
+
+  <section class="site-map" aria-labelledby="h-map">
+    <h2 id="h-map">The map</h2>
+    <p class="map-lede">One essay tells the main story.  Smaller findings are pinned along the way.</p>
+    <div id="map"></div>
+  </section>
+
+  <section class="sources" aria-labelledby="h-sources">
+    <h2 id="h-sources">The sources</h2>
+    <ul class="source-list">
+      <li><a href="https://github.com/bvchess/taxman">The repository</a><span>the solver, the prover, the theory and
+      the results</span></li>
+      <li><a href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a><span>the
+      chain of optimal games, one line a game</span></li>
+      <li><a href="https://github.com/bvchess/taxman/blob/master/results/README.md">results/README.md</a><span>what each
+      results file holds, and what supports its scores</span></li>
+      <li><a href="https://github.com/bvchess/taxman/blob/master/docs/THEORY.md">docs/THEORY.md</a><span>the theorems
+      both programs rest on, with their proofs</span></li>
+      <li><a href="https://github.com/bvchess/taxman/blob/master/solver/frame/README.md">solver/frame/README.md</a><span>the
+      frame solver: how to build it and run it</span></li>
+    </ul>
+  </section>
+</main>
+<footer class="front-foot site-foot"><p class="provenance"></p><p><a href="style.html">The style of the site</a>: the
+type, the colors, the marks and the motion, on one page.</p></footer>
+
+<script type="module">
+import { loadGames, loadSmall } from './js/data.js';
+import { numberSVG } from './js/vocab.js';
+import { homeMark } from './js/essay.js';
+import { mountGame } from './figures/game.js';
+import { mountChainChart } from './figures/chain-chart.js';
+import { mountSteps } from './figures/steps.js';
+import { mountSiteMap } from './figures/site-map.js';
+
+document.querySelector('.home-mark').innerHTML = homeMark();
+// The steps are a sequence, so they are numbered; the numbers are drawn flat, since there is nothing to press.
+for (const s of document.querySelectorAll('[data-step]')) s.appendChild(numberSVG(Number(s.dataset.step), { rendering: 'flat', looks: ['move', 'kept'], size: 30, pad: 2 }));
+mountSteps(document.querySelector('.steps'));
+mountSiteMap(document.getElementById('map'));
+const [small, games] = await Promise.all([loadSmall(), loadGames()]);
+for (const s of document.querySelectorAll('[data-last-n]')) s.textContent = games.lastN.toLocaleString('en-US');
+mountGame(document.getElementById('game'), { small });
+mountChainChart(document.getElementById('chain-chart'), { games });
+const src = games.source;
+document.querySelector('.provenance').textContent = `The numbers on this page come from ${src.file}, as of commit ${src.commit} of the repository.`;
+</script>
+</body>
+</html>
