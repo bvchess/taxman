@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walking up the chain · Playing optimal games of Taxman</title>
+<meta name="description" content="Most games of Taxman are easy if you know an optimal game of the one before: n fits at the ceiling, a prime takes the place of the prime below it, and a repeat carries an earlier answer over.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2718%27 r=%2713%27 fill=%27%2314478c%27/%3E%3Ccircle cx=%2716%27 cy=%2715%27 r=%2713%27 fill=%27%232166c4%27/%3E%3C/svg%3E">
+<script src="js/tone.js"></script>
+<link rel="stylesheet" href="css/site.css">
+<link rel="stylesheet" href="css/chain.css">
+</head>
+<body data-page="story" data-chapter="2">
+<header class="topbar"></header>
+<div class="site">
+<aside class="rail" aria-label="Contents"></aside>
+<main class="essay"><div class="column">
+
+<header class="essay-head para">
+  <p class="kicker">Chapter 2</p>
+  <h1>Walking up the chain</h1>
+  <p class="lede">Most games are easy if you know an optimal game of the one before.  So we play them in order, from
+  game 1 up, and most steps need no search at all.</p>
+</header>
+
+<section class="chapter" id="ceiling" data-toc="ceiling" aria-label="The ceiling">
+  <div class="para">
+    <aside class="note card" aria-label="Monotonicity, proved">
+      <div class="note-head"><span class="note-name">Monotonicity<span class="note-label">Lemma N3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#monotonicity">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">A game of n − 1 is a game of n, so the best score never falls.</p>
+      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  A game of n − 1 is a game of n, with the same
+      taxes, and a game of n that does not play n is a game of n − 1.  So opt(n − 1) ≤ opt(n), and a set without n is
+      <a class="gloss" href="glossary.html#playable">playable</a> in game n exactly when it is playable in game n − 1.</p>
+    </aside>
+    <p>Game n has the numbers of game n − 1 and one more, n.  The new number divides nothing else on the
+    <a class="gloss" href="glossary.html#board">board</a>, so it is never <a class="gloss" href="glossary.html#tax">tax</a>.
+    A game of n − 1 is therefore still a legal game of n, with every <a class="gloss" href="glossary.html#move">move</a>
+    taking the same tax as before.  So the best score never falls: <a class="gloss" href="glossary.html#opt">opt(n)</a>
+    is at least opt(n − 1).</p>
+  </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="The ceiling lemma, proved">
+      <div class="note-head"><span class="note-name">The ceiling lemma<span class="note-label">Lemma N4</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-ceiling-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">Leave the move n out of a game of n, and a game of n − 1 is left, so the best score rises by at
+      most n.</p>
+      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  The moves of a game of n other than n, in
+      their order, are a game of n − 1.  So opt(n) ≤ opt(n − 1) + n, the ceiling of game n, and if S is playable in
+      game n, then S without n is playable in game n − 1.</p>
+    </aside>
+    <p>Nor can it rise by more than n.  Take an optimal game of n and leave out the move n.  Everything n would have
+    taken stays in the <a class="gloss" href="glossary.html#pot">pot</a>, so every other move still has its divisor,
+    and what is left is a game of n − 1.  It scores opt(n) − n, which is at most opt(n − 1).</p>
+    <p>So opt(n − 1) + n is the most that game n can score.  It is the
+    <a class="gloss" href="glossary.html#ceiling"><em>ceiling</em></a> of game n, and a game that reaches it is
+    optimal, with nothing more to check.</p>
+  </div>
+</section>
+
+<section class="chapter" id="fits" data-toc="fits" aria-labelledby="h-fits">
+  <h2 id="h-fits">When n fits</h2>
+  <div class="para">
+    <aside class="note card" aria-label="The step theorem, proved">
+      <div class="note-head"><span class="note-name">The step theorem<span class="note-label">Theorem N6</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-step-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">Game n reaches its ceiling exactly when some optimal set of n − 1 can still be played with n
+      added, and its optimal sets are then exactly those sets with n.</p>
+      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  Game n is at its ceiling iff some optimal set T
+      of game n − 1 has T ∪ {n} playable in game n, and the optimal sets of game n are then exactly these sets
+      T ∪ {n}.</p>
+    </aside>
+    <p>The quickest way to a good game of n is to take an
+    <a class="gloss" href="glossary.html#optimal-set">optimal set</a> of game n − 1 and add n.  If the set can still be
+    <a class="gloss" href="glossary.html#playable">played</a>, it scores opt(n − 1) + n, the
+    <a class="gloss" href="glossary.html#ceiling">ceiling</a>, and game n is done.  We say that n <em>fits</em>.</p>
+    <p>Game 21's optimal set is <span data-set="21">9, 12, 14, 15, 16, 18, 19, 20 and 21</span>, and it scores
+    <span data-opt="21">144</span>.  <span class="n" data-n="22">22</span> fits.  Its half,
+    <span class="n" data-n="11">11</span>, divides nothing else up to 21, so it is never tax, and the game of 21 does not
+    play it.  So 11 is still in the <a class="gloss" href="glossary.html#pot">pot</a> at the end, and 22 can be played
+    last, paid for by 11.  Game 22 scores <span data-opt="21">144</span> + 22 = <span data-opt="22">166</span>, its
+    ceiling.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="The half lemma, proved">
+      <div class="note-head"><span class="note-name">The half lemma<span class="note-label">Lemma N7</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-half-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">At an even n, if an optimal game of n − 1 leaves n/2 alone, game n is at its ceiling.</p>
+      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 4 be even.  The number n/2 divides no number of
+      the board of n − 1 but itself, so if some optimal game of n − 1 does not play n/2, it is still in the pot at the
+      end, n can follow, and opt(n) = opt(n − 1) + n.  For n twice a prime, an optimal game of n − 1 plays only its
+      largest prime, which exceeds n/2, so game n is always at its ceiling.</p>
+    </aside>
+    <p>The same holds at every even n whose half the game before leaves alone.  When n is twice a prime, it always does:
+    an optimal game plays only one prime, the largest, so the smaller prime n/2 is still in the pot at the end.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note tech" aria-label="One optimal set">
+      <div class="note-head"><span class="note-name">One optimal set</span></div>
+      <p>The step theorem asks about every optimal set of n − 1.  Every game up to 424 has only one, which the
+      <a class="gloss" href="glossary.html#prover">prover</a> finds by listing them all (measured); game 425 has two.  So
+      in these games one test decides whether n fits.  The optimal sets of games 20 to 23 are also checked by an
+      exhaustive search (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-step-theorem">the
+      step theorem's examples</a>).</p>
+    </aside>
+    <p><span class="n" data-n="21">21</span> does not fit.  Game 20 has only one optimal set,
+    <span data-set="20">10, 12, 14, 15, 16, 18, 19 and 20</span>.  With 21 added it holds
+    <span class="n" data-n="10">10</span>, <span class="n" data-n="14">14</span>, <span class="n" data-n="15">15</span>
+    and 21, the <a class="gloss" href="glossary.html#loop">loop</a> of chapter 1 on the primes 2, 5, 3 and 7, and no game
+    plays all four.  So game 21 cannot reach its ceiling of <span data-opt="20">124</span> + 21 =
+    <span data-ceiling="21">145</span>.  Its optimal game gives up 10 and plays <span class="n" data-n="9">9</span>
+    instead, and scores <span data-opt="21">144</span>.</p>
+  </div>
+
+  <figure class="fig arrival-pair" id="arrival-fits">
+    <div class="arrival" data-board="21"><svg role="img"></svg><p class="arrival-says"></p></div>
+    <div class="arrival" data-board="22"><svg role="img"></svg><p class="arrival-says"></p></div>
+    <figcaption class="fig-caption">Each board holds the game's numbers, ten to a row, 1 at the bottom left.  The blue
+    circles are the moves of its optimal game.  A halo marks what changed from the game before: n and any move that
+    joins it, and, dashed, a move given up.</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="prime" data-toc="prime" aria-labelledby="h-prime">
+  <h2 id="h-prime">At a prime</h2>
+  <div class="para">
+    <aside class="note card" aria-label="The prime lemma, proved">
+      <div class="note-head"><span class="note-name">The prime lemma<span class="note-label">Lemma N1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-prime-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">Every optimal game opens with the largest prime of its board, and plays no other prime.</p>
+      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2, and q(n) the largest prime up to n.  Every
+      optimal game of n plays q(n), as its first move, and no other prime: a game without it can take q(n) in place of
+      its first move, or in front of it, and score more.</p>
+    </aside>
+    <p>Past 2, a prime never fits.  Its only divisor is 1, and the first move of every game takes 1 as
+    <a class="gloss" href="glossary.html#tax">tax</a>, so a prime can be played only as the first move.  Every
+    <a class="gloss" href="glossary.html#optimal-game">optimal game</a> opens with the largest prime of its board: a
+    game that does not can always play that prime in place of its first move, or in front of it, and score more.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="The prime formula, proved">
+      <div class="note-head"><span class="note-name">The prime formula<span class="note-label">Lemma N5</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-prime-formula">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">At a prime p, the largest prime below p gives way to p, and the score rises by their
+      difference.</p>
+      <p class="precise"><span class="run">Precisely.</span>Let p ≥ 3 be prime.  Exchanging the opening move
+      q(p − 1) for p turns a finished game of p − 1 into a finished game of p, and back, so
+      opt(p) = opt(p − 1) + p − q(p − 1).  The exchange maps the optimal sets of p − 1 one to one onto those of p
+      (the step theorem).</p>
+    </aside>
+    <p>So at a prime n, an optimal game of n − 1 opens with the largest prime below n, and n takes its place.  Neither
+    prime divides any other number on the board, so the rest of the game cannot tell them apart, and every other move
+    stays legal.  The score rises by the gap between the two primes.  Run backward, the same exchange turns an optimal
+    game of n into a game of n − 1, so no game of n can beat the swap.  This is the
+    <a class="gloss" href="glossary.html#prime-formula">prime formula</a>.</p>
+    <p>Game 22 opens with <span class="n" data-n="19">19</span>.  In game 23, <span class="n" data-n="23">23</span> takes
+    its place, and the game scores <span data-opt="22">166</span> + 23 − 19 = <span data-opt="23">170</span>.</p>
+  </div>
+
+  <figure class="fig arrival-one" id="arrival-prime">
+    <div class="arrival" data-board="23"><svg role="img"></svg></div>
+    <p class="arrival-says"></p>
+  </figure>
+</section>
+
+<section class="chapter" id="repeat" data-toc="repeat" aria-labelledby="h-repeat">
+  <h2 id="h-repeat">A repeat</h2>
+  <div class="para">
+    <aside class="note card" aria-label="The repeat lemma, proved given U">
+      <div class="note-head"><span class="note-name">The repeat lemma<span class="note-label">Lemma R6</span></span><a class="standing is-given-u" href="https://github.com/bvchess/taxman/blob/master/docs/theory/search-rules.md#the-repeat-lemma">proved given U<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">If game n poses the search problem of an earlier game, the earlier game's answer gives an optimal
+      game of n.</p>
+      <p class="precise"><span class="run">Precisely.</span>Let Π_n = Π_m, root problems of games n and m.  Every
+      promotion set L makes a game of n worth Σ<a class="gloss" href="glossary.html#u-star">U*</a>(n) + ΣL, and, given
+      <a class="gloss" href="glossary.html#statement-u">statement U</a> at n, a promotion set that makes an optimal game
+      of m makes an optimal game of n.  The first part needs no U.  Every game to 2175 is also proven by the prover,
+      without U.</p>
+    </aside>
+    <p>Most games that neither fit nor are prime still need no search.  Before the
+    <a class="gloss" href="glossary.html#frame-solver">frame solver</a> searches a game, rules settle most of it, and what
+    is left is the game's search problem: which few numbers up to n/2 to play as moves as well.  Often n does not change
+    that problem at all.  Then game n is a <a class="gloss" href="glossary.html#repeat"><em>repeat</em></a>, and the
+    earlier game's answer to the problem is game n's answer too.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="The semiprime formula, proved">
+      <div class="note-head"><span class="note-name">The semiprime formula<span class="note-label">Theorem J3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/arrival.md#the-semiprime-formula">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">At an odd n with two prime factors that closes a loop with the moves of game n − 1, as every one from 189
+      on does, n takes the place of one move with two prime factors, and the score rises by the difference: no search,
+      and no statement U.</p>
+      <p class="precise"><span class="run">Precisely.</span>Let n be odd with two prime factors, closing a cycle with
+      U*₂(n − 1), as every such n ≥ 189 does, and x the smallest other member of the cycle.  Then
+      opt(n) = opt(n − 1) + n − x, and exchanging x for n maps the optimal sets of n − 1 onto those of n.  In game 39,
+      x = 22.</p>
+    </aside>
+    <p>Game <span class="n" data-n="39">39</span> = 3 · 13 is one.  It poses the search problem of game 38, and its
+    optimal game is game 38's with one exchange: 39 takes the place of <span class="n" data-n="22">22</span> = 2 · 11.
+    It scores <span data-opt="38">486</span> + 39 − 22 = <span data-opt="39">503</span>, <span data-gap="39">22</span> below its
+    ceiling.  Here a
+    theorem proves the same exchange with no search at all, and it covers every odd n with two prime factors from 189
+    on.</p>
+  </div>
+
+  <figure class="fig arrival-one" id="arrival-repeat">
+    <div class="arrival" data-board="39"><svg role="img"></svg></div>
+    <p class="arrival-says"></p>
+  </figure>
+</section>
+
+<section class="chapter" id="walk" data-toc="walk" aria-labelledby="h-walk">
+  <h2 id="h-walk">The first hundred games</h2>
+  <p>Walk from game 2 to game 100, each built from the one before.  Drag along the strip or step with the buttons: the
+  board shows each game and what changed, and the strip says how each was settled.</p>
+
+  <figure class="fig walker" id="walker">
+    <svg role="img"></svg>
+    <div class="walk-controls">
+      <button type="button" class="btn round" data-act="prev" aria-label="The game before">&lsaquo;</button>
+      <div class="walk-strip"></div>
+      <button type="button" class="btn round" data-act="next" aria-label="The next game">&rsaquo;</button>
+    </div>
+    <div class="chart-key rule-legend"></div>
+    <figcaption class="walk-caption" aria-live="polite"></figcaption>
+  </figure>
+
+  <div class="para">
+    <aside class="note tech" aria-label="How the figure decides">
+      <div class="note-head"><span class="note-name">How the figure decides</span></div>
+      <p>Whether n fits is decided in the page by peel
+      (<a href="https://github.com/bvchess/taxman/blob/master/web/js/model.js">web/js/model.js</a>), on the recorded
+      optimal set of game n − 1 with n added.  The page checks that every game it finds n fitting reaches its ceiling,
+      and every other game falls below it.  How each game was proved is the record of
+      <a href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a>.</p>
+    </aside>
+    <p>Of games 2 to 100, <span data-walk="ceiling">…</span> are at the ceiling, <span data-walk="prime">…</span> are
+    prime and <span data-walk="repeat">…</span> are repeats.  <span data-walk="search">…</span> needed a
+    <a class="gloss" href="glossary.html#search">search</a>, and the other <span data-walk="nothing">…</span> had nothing
+    to choose once the numbers above n/2 were chosen.</p>
+  </div>
+</section>
+
+<section class="chapter" id="whole-chain" data-toc="whole-chain" aria-labelledby="h-whole">
+  <h2 id="h-whole">The whole chain</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="How the chart counts">
+      <div class="note-head"><span class="note-name">How the chart counts</span></div>
+      <p>A game counts under the first rule that settles it, in the order prime, ceiling, repeat, and a game whose search
+      ran counts as a search.  So the ceiling holds <span data-settled="ceilingRepeat">…</span> games the chain records
+      as repeats and <span data-settled="ceilingStore">…</span> from the bounds store, which proves upper bounds apart
+      from the chain.</p>
+    </aside>
+    <p>The same rules carry the <a class="gloss" href="glossary.html#chain">chain</a> to its end.  Of its
+    <span data-settled="total">…</span> games, <span data-settled="noSearch">…</span> were settled with no search, or
+    <span data-settled="share">…</span>: <span data-settled="ceiling">…</span> at the ceiling,
+    <span data-settled="prime">…</span> by the prime formula and <span data-settled="repeat">…</span> as repeats.</p>
+  </div>
+
+  <figure class="fig wide chart" id="settled">
+    <p class="chart-sub">Every game of the chain, a cell each, a hundred to a row from game 1 at the bottom left, shaded
+    by how it was settled.  The dark cells are the searches.</p>
+    <div class="chart-key rule-legend"></div>
+    <div class="chart-box"></div>
+  </figure>
+
+  <div class="para">
+    <aside class="note tech" aria-label="What each rule rests on">
+      <div class="note-head"><span class="note-name">What each rule rests on</span></div>
+      <p>The ceiling and the prime formula prove a game optimal wherever the game before it is optimal.  A repeat rests
+      on <a class="gloss" href="glossary.html#statement-u">statement U</a> at n too, and a search on the
+      <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is exact where U holds.  Every game to
+      2175 is also proven by the <a class="gloss" href="glossary.html#prover">prover</a>, on the whole board, without U
+      (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports
+      the scores</a>).</p>
+    </aside>
+    <p>That is why the result is a chain.  Each of those games is built from the one before, so the games are found in
+    order, from game 1 up: game 5000 is reached by walking there.</p>
+  </div>
+</section>
+
+<section class="chapter" id="along" data-toc="along" aria-label="Along the way">
+  <div class="para">
+    <aside class="note card" aria-label="The cofactor rule, measured">
+      <div class="note-head"><span class="note-name">The cofactor rule</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/arrival.md#the-cofactor-rule">measured<span class="sr-only">, evidence on GitHub</span></a></div>
+      <p class="plain">Whether a game needs a search can usually be told from n and its largest prime factor.</p>
+      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 28, and m be n − 1, or n − 2 when n − 1 is prime.
+      If no <a class="gloss" href="glossary.html#frame">frame</a> of <a class="gloss" href="glossary.html#layer">layer</a> 2 has a
+      <a class="gloss" href="glossary.html#freedom">freedom</a> in game n or in game m, as for every n ≥ 188, then game n has the root
+      problem of game m if its cofactor is a prime or twice a prime, and is at its ceiling if its cofactor is 9.  The
+      first case is proved, by the layer-2 corollary (J2); the other two are measured.</p>
+    </aside>
+    <details class="aside" id="cofactor-rule" data-toc="cofactor-rule" data-title="Easy from n alone">
+      <summary>
+        <span class="aside-pin" aria-hidden="true"></span>
+        <span><span class="where">Along the way: every game</span><span class="title">Easy from n alone</span></span>
+        <span class="open-mark"><span class="closed-word">Open</span><span class="open-word">Close</span></span>
+      </summary>
+      <div class="aside-body">
+        <p>Whether a game needs a <a class="gloss" href="glossary.html#search">search</a> can usually be told from n
+        alone, before any work.  Write n as its largest prime factor times what is left, the <em>cofactor</em> of n:
+        3002 = 38 · 79 has the cofactor 38, and a prime has the cofactor 1.  From game 188 on, no game whose cofactor is
+        1, a prime, twice a prime or 9 needed a search.</p>
+        <figure class="chart" id="cofactor-fig">
+          <div class="chart-key rule-legend"></div>
+          <div class="chart-box"></div>
+        </figure>
+        <p>Those four cofactors take in <span data-cof="named">…</span> of the <span data-cof="total">…</span> games from
+        188 on, and
+        <span data-cof="share">…</span> of the ones settled with no search.  Of the <span data-cof="other">…</span> games
+        with any other cofactor, <span data-cof="otherSearched">…</span> needed a search.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<nav class="chapter-nav" aria-label="Chapters">
+  <a class="prev" href="sets.html">1. A game is a set</a>
+  <a class="next" href="top-half.html"><span class="nav-kicker">Next:</span> <span class="nav-title">3. The top
+  half.</span>  In the games that need a search, one greedy pass chooses the numbers above n/2.</a>
+</nav>
+
+<footer class="site-foot"><p class="provenance"></p><p><a href="notation.html">Notation</a>: what the marks, pills and symbols mean</p></footer>
+</div></main>
+</div>
+
+<script type="module">
+import { initEssay, registerFigure, mountProvenance } from './js/essay.js';
+import { loadGames, loadSmall } from './js/data.js';
+import { fmt, listWords } from './js/vocab.js';
+import { pct } from './js/chart.js';
+import { mountArrival } from './figures/arrival.js';
+import { mountWalker } from './figures/walker.js';
+import { mountSettled } from './figures/settled.js';
+import { mountCofactor } from './figures/cofactor.js';
+
+initEssay();
+const [small, games] = await Promise.all([loadSmall(), loadGames()]);
+mountProvenance(games);
+const data = { small, games };
+const c = games.columns;
+const fill = (attr, values) => {
+  for (const s of document.querySelectorAll(`[data-${attr}]`)) s.textContent = values(s.dataset[attr]);
+};
+
+// The games the prose names: their scores, ceilings and optimal sets.
+fill('opt', (n) => fmt(c.score[Number(n) - 1]));
+fill('ceiling', (n) => fmt(c.score[Number(n) - 2] + Number(n)));
+fill('gap', (n) => fmt(c.score[Number(n) - 2] + Number(n) - c.score[Number(n) - 1]));
+fill('set', (n) => listWords([...small[Number(n) - 1].moves].sort((a, b) => a - b)));
+
+// The boards beside the prose, each figure under its own name for the numbers in the text.
+for (const fig of document.querySelectorAll('#arrival-fits, #arrival-prime, #arrival-repeat')) {
+  const boards = [...fig.querySelectorAll('.arrival')].map((host) => mountArrival(host, data, Number(host.dataset.board), {
+    says: host.querySelector('.arrival-says') ?? fig.querySelector(':scope > .arrival-says'),
+  }));
+  registerFigure(fig.id, { highlight: (x, on) => boards.forEach((b) => b.highlight(x, on)), goState() {} });
+}
+
+// The walk through the first hundred games, and its counts.
+const walker = mountWalker(document.getElementById('walker'), data, { from: 2, to: 100, start: 22 });
+registerFigure('walker', walker);
+fill('walk', (key) => fmt(walker.steps.filter((f) => f.rule === key).length));
+
+// The whole chain.
+const chain = mountSettled(document.getElementById('settled'), { games });
+const ceilingAs = (proof) => chain.rules.filter((r, i) => r === 'ceiling' && c.proof[i] === proof).length;
+const settledFacts = {
+  total: fmt(chain.total), noSearch: fmt(chain.noSearch), share: pct(chain.noSearch / chain.total, 0),
+  ceiling: fmt(chain.counts.ceiling), prime: fmt(chain.counts.prime), repeat: fmt(chain.counts.repeat),
+  ceilingRepeat: fmt(ceilingAs('same_search')), ceilingStore: fmt(ceilingAs('known')),
+};
+fill('settled', (key) => settledFacts[key]);
+
+// The cofactor rule.
+const cof = mountCofactor(document.getElementById('cofactor-fig'), { games });
+if (cof.namedSearched !== 0) throw new Error(`the cofactor rule: ${cof.namedSearched} games it names were searched`);
+const cofFacts = {
+  named: fmt(cof.named), total: fmt(cof.total), share: cof.pctShare, other: fmt(cof.other),
+  otherSearched: fmt(cof.otherSearched),
+};
+fill('cof', (key) => cofFacts[key]);
+</script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+/* Chapter 2, Walking up the chain: the boards of the arrival of n, the walk through the first hundred games, and the
+   charts of how each game was settled.  Loaded after css/site.css. */
+
+/* How a game was settled: the chapter's four rules on a gray ramp, light to dark in the order the chapter meets them,
+   the three that need no search close together and a search far darker, so that the searches stand out (checked with
+   the dataviz validator, --ordinal: lightness monotone, steps of at least 0.06, the light end at 2.2:1 on white); the two
+   kinds of game that no rule of the chapter settles are a hollow cell and the palest gray.  Never blue or orange,
+   which are the player's and the taxman's. */
+:root {
+  --rule-ceiling: #a9b0b9;
+  --rule-prime: #949ca6;
+  --rule-repeat: #7f8792;
+  --rule-search: var(--ink);
+  --rule-store: var(--hair);
+}
+.rule-cell.is-ceiling { fill: var(--rule-ceiling); }
+.rule-cell.is-prime { fill: var(--rule-prime); }
+.rule-cell.is-repeat { fill: var(--rule-repeat); }
+.rule-cell.is-search { fill: var(--rule-search); }
+.rule-cell.is-nothing { fill: var(--paper); stroke: var(--rule-ceiling); stroke-width: 1; }
+.rule-cell.is-store { fill: var(--rule-store); }
+.rule-cell.is-segment { transition: opacity var(--ui); }
+.rule-cell.is-segment:hover { opacity: 0.82; }
+.rule-swatch {
+  display: inline-block; flex: none; width: 12px; height: 12px; border-radius: 2px; margin-right: 7px; vertical-align: -1px;
+}
+.rule-swatch.is-ceiling { background: var(--rule-ceiling); }
+.rule-swatch.is-prime { background: var(--rule-prime); }
+.rule-swatch.is-repeat { background: var(--rule-repeat); }
+.rule-swatch.is-search { background: var(--rule-search); }
+.rule-swatch.is-nothing { background: var(--paper); box-shadow: inset 0 0 0 1px var(--rule-ceiling); }
+.rule-swatch.is-store { background: var(--rule-store); }
+.rule-legend { margin: 10px 0 0; }
+.rule-legend .key-item { margin-right: 6px; }
+.rule-legend .key-item b { margin-left: 6px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.chart .rule-in { font-size: 11.5px; font-weight: 700; fill: var(--paper); pointer-events: none; }
+.chart .rule-ring { fill: none; stroke: var(--ink); stroke-width: 1.5; pointer-events: none; }
+
+/* ---- the boards of the arrival of n ---------------------------------------------------------------------------- */
+
+/* Two boards side by side, each with the line that says what changed, and the key to the marks under both. */
+.arrival-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 22px; align-items: start; }
+.arrival-pair > figcaption { grid-column: 1 / -1; }
+/* One board, at the size of one of a pair, with its line beside it. */
+.arrival-one { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 22px; align-items: end; }
+.arrival svg { display: block; width: 100%; height: auto; }
+.arrival-says { font-size: 0.86rem; line-height: 1.5; color: var(--ink-2); margin: 6px 2px 0; }
+.arrival-one .arrival-says { margin: 0 0 6px; }
+.arrival-says strong { color: var(--ink); }
+.arrival-n { font-weight: 700; color: var(--ink); margin-right: 0.35em; }
+
+/* ---- the walk ------------------------------------------------------------------------------------------------- */
+
+.walker { position: relative; max-width: var(--measure); }
+.walker > svg { display: block; width: 100%; max-width: 26rem; height: auto; margin: 0 auto; }
+.walk-controls { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.walk-strip { position: relative; flex: 1; min-width: 0; cursor: pointer; touch-action: none; border-radius: 4px; }
+.walk-strip svg { display: block; overflow: visible; }
+.walk-strip:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 3px; }
+.walk-slot { fill: var(--faint); }
+.walk-thumb { fill: none; stroke: var(--ink); stroke-width: 2; pointer-events: none; }
+.walk-tick { stroke: var(--faint); stroke-width: 1; }
+.walk-tick-label { font-family: var(--font); font-size: 10.5px; fill: var(--ink-3); font-variant-numeric: tabular-nums; }
+.walker .rule-legend { margin: 8px 0 0 44px; }
+.walk-caption { font-size: 0.9rem; line-height: 1.5; color: var(--ink-2); margin: 12px 2px 0; }
+.walk-caption strong { color: var(--ink); }
+.walk-n { display: flex; align-items: center; font-weight: 700; font-size: 1rem; color: var(--ink); margin-bottom: 2px; }
+.walk-record { display: block; margin-top: 5px; color: var(--ink-3); }
+.walk-measure { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: none; }
+
+/* ---- the whole chain, and the cofactors ------------------------------------------------------------------------ */
+
+#settled .chart-box, #cofactor-fig .chart-box { position: relative; }
+#cofactor-fig { margin: 18px 0 16px; }
+
+@container essay (max-width: 540px) {
+  .arrival-pair, .arrival-one { grid-template-columns: minmax(0, 1fr); }
+  .arrival-one .arrival-says { margin: 6px 2px 0; order: 2; }
+  .walker .rule-legend { margin-left: 0; }
+}
+
+/* The table under a chart inside an aside keeps a table's own disclosure, not the aside's summary. */
+.aside .chart-table summary {
+  display: list-item; list-style: revert; padding: 0; border-radius: 0; grid-template-columns: none;
+}
+.aside .chart-table summary::-webkit-details-marker { display: revert; }
+.aside .chart-table summary:hover { background: none; }
