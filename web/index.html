@@ -167,7 +167,7 @@ import { fmt } from './js/vocab.js';
 import { mountGame } from './figures/game.js';
 import { mountShrink } from './figures/shrink.js';
 import { mountChainChart } from './figures/chain-chart.js';
-import { settled } from './js/proof.js';
+import { fillOneSearch, settled } from './js/proof.js';
 import { fill833 } from './figures/longer-833.js';
 
 initEssay();
@@ -185,6 +185,7 @@ const proofFacts = {
 };
 for (const s of document.querySelectorAll('[data-proof]')) s.textContent = fmt(proofFacts[s.dataset.proof]);
 fill833(games);
+fillOneSearch(games);
 mountProvenance(games, { model: false });
 </script>
 </body>

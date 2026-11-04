@@ -41,6 +41,7 @@ import { findingCardsHTML, initEssay, mountProvenance } from './js/essay.js';
 import { loadGames } from './js/data.js';
 import { ALONG } from './js/site.js';
 import { pct } from './js/chart.js';
+import { fillOneSearch } from './js/proof.js';
 import { fill833 } from './figures/longer-833.js';
 import { shareOf } from './figures/share-chart.js';
 
@@ -48,6 +49,7 @@ initEssay();
 document.querySelector('.finding-cards').innerHTML = findingCardsHTML(ALONG);
 const games = await loadGames();
 fill833(games);
+fillOneSearch(games);
 document.querySelector('[data-share]').textContent = pct(shareOf(games.columns, games.lastN - 1), 1);
 mountProvenance(games, { model: false });
 </script>

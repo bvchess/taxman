@@ -12,7 +12,7 @@ import {
   descendingGreedy, finish, frameModel, frames, isOver, isPlayable, legalMoves, maximalFactors, newGame, omega, peel,
   play, primeFactors, properDivisors, replay, score, sources,
 } from '../js/model.js';
-import { GROUPS, RULES, settled } from '../js/proof.js';
+import { GROUPS, RULES, oneSearchFacts, settled } from '../js/proof.js';
 import { readResults, repoRoot } from './results.mjs';
 
 // Descending greedy is checked against the results file's in_the_bag for every game up to GREEDY_ALL_UP_TO, then for
@@ -282,6 +282,13 @@ same('every cap, prime formula and store ceiling or prime record is derived from
 same('every game of the search group is exhausted, trivial or a store search, and of the repeat group a repeat',
   badSearch.slice(0, 5), []);
 const groupLine = GROUPS.map((g) => `${g.name} ${sorted.groupCounts[g.key].toLocaleString('en-US')}`).join(', ');
+let runs = null;
+try {
+  runs = oneSearchFacts(games);
+} catch (e) {
+  failures.push(`oneSearchFacts: ${e.message}`);
+}
+checks++;
 const ruleLine = RULES.map((r) => `${r.key} ${sorted.counts[r.key].toLocaleString('en-US')}`).join(', ');
 
 // --- Summary ----------------------------------------------------------------------------------------------------
@@ -298,3 +305,7 @@ console.log(
     `descending greedy against in_the_bag on ${compared} games up to ${Math.max(...greedyGames)})`,
 );
 console.log(`proofs of ${records.length} games, by group: ${groupLine}; by rule: ${ruleLine}`);
+if (runs) {
+  const run = (r) => `games ${r.first} to ${r.last} (${r.count} games, ${r.nodes.toLocaleString('en-US')} nodes)`;
+  console.log(`one search: the example ${run(runs.example)}; the longest ${run(runs.longest)}`);
+}

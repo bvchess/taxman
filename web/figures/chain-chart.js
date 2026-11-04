@@ -220,13 +220,12 @@ export function mountChainChart(host, { games }) {
       dot.setAttribute('cx', px);
       dot.setAttribute('cy', y(Math.max(lo, Math.min(hi, share[j]))));
       dot.setAttribute('opacity', n > 1 ? 1 : 0);
-      const [group, how] = ruleWords(c, j);
       const rows = [
-        `Game ${fmt(n)}`, ['opt(n)', fmt(c.score[j])], ['player’s share', pct(share[j], 2)], ['proven', group],
-        ['by', how],
-        ['its stretch', `games ${fmt(st.a)} to ${fmt(st.b)}`],
+        `Game ${fmt(n)}`, ['opt(n)', fmt(c.score[j])], ['player’s share', pct(share[j], 2)],
+        ['proven by', ruleWords(c, j)],
+        `Games ${fmt(st.a)} to ${fmt(st.b)}`,
         ...GROUPS.map((grp) => [grp.name, fmt(st.by[grp.key])]),
-        ['searches', fmt(st.searches)], ['median search time', duration(st.median)],
+        ['median search time', duration(st.median)],
       ];
       tip.show(rows, px, m.t + 40);
     };

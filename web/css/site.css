@@ -548,7 +548,8 @@ figure { margin: 30px 0 34px; }
 }
 .chart-tip.is-on { opacity: 1; }
 .chart-tip b { font-size: 1rem; font-weight: 700; display: block; }
-.chart-tip .row { display: flex; justify-content: space-between; gap: 14px; color: var(--ink-2); }
+.chart-tip .tip-sub { font-size: 0.86rem; border-top: 1px solid var(--hair); margin-top: 7px; padding-top: 7px; }
+.chart-tip .row { white-space: nowrap; display: flex; justify-content: space-between; gap: 14px; color: var(--ink-2); }
 .chart-tip .row span:last-child { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
 .chart-title { font-weight: 700; font-size: 1.05rem; margin: 0 0 2px; }
 .chart-sub { font-size: 0.86rem; color: var(--ink-2); margin: 0 0 12px; max-width: 40rem; }

@@ -96,20 +96,74 @@ export function nodesWords(k) {
   return `${Number((k / unit).toPrecision(2))} ${name}`;
 }
 
-/** How the game in row i was proven by its rule, in words for a tooltip: [the group's name, the how]. */
+/** How the game in row i was proven by its rule, as one phrase that reads after "proven by" in a tooltip. */
 export function ruleWords(c, i, rule = ruleOf(c, i)) {
   const n = c.n[i];
-  const group = GROUP[groupOfRule(rule)].name;
   const stored = c.proof[i] === 'known';
   switch (rule) {
-    case 'prime': return [group, 'the prime formula'];
-    case 'ceiling': return [group, 'the ceiling'];
-    case 'repeat': return [group, stored ? 'in the bounds store' : `game ${fmt(repeatOf(n))}’s`];
+    case 'prime': return 'the prime formula';
+    case 'ceiling': return 'the ceiling';
+    case 'repeat': return stored ? 'a repeat, in the bounds store' : `a repeat of game ${fmt(repeatOf(n))}’s search`;
     default:
-      if (stored) return [group, 'in the bounds store'];
-      if (c.proof[i] === 'trivial') return [group, 'nothing to promote'];
-      return [group, `${nodesWords(c.nodes[i])} node${c.nodes[i] === 1 ? '' : 's'}`];
+      if (stored) return 'a search, in the bounds store';
+      if (c.proof[i] === 'trivial') return 'a search of one node';
+      return `a search of ${nodesWords(c.nodes[i])} node${c.nodes[i] === 1 ? '' : 's'}`;
   }
+}
+
+// For each game, the game whose search its record rests on: itself, or, for a record same_search, the root of the game
+// it repeats (repeatOf).  Cached for the columns of one games.json.
+const ROOTS = new WeakMap();
+function rootsOf(c) {
+  if (!ROOTS.has(c)) {
+    const roots = [];
+    c.n.forEach((n, i) => roots.push(c.proof[i] === 'same_search' ? roots[repeatOf(n) - 1] : n));
+    ROOTS.set(c, roots);
+  }
+  return ROOTS.get(c);
+}
+
+/** The games that rest on one search of the chain: game n, which the chain searched, and every later game whose
+ *  record repeats a search (same_search) and whose repeats, followed back through repeatOf, end at n. */
+export function oneSearch(c, n) {
+  if (c.method[n - 1] !== 'search' || c.proof[n - 1] !== 'exhausted') {
+    throw new Error(`the chain did not search game ${n}`);
+  }
+  const roots = rootsOf(c);
+  const games = c.n.filter((m, i) => m >= n && roots[i] === n);
+  return { first: n, last: Math.max(...games), count: games.length, nodes: c.nodes[n - 1], games };
+}
+
+// The first game of the run the finding names: games 1386 to 1391.
+const EXAMPLE_FIRST = 1386;
+const EXAMPLE_COUNT = 6;
+
+/** The run of games the finding names, 1386 to 1391, and the longest run of the chain. */
+export function oneSearchFacts(games) {
+  const c = games.columns;
+  const example = oneSearch(c, EXAMPLE_FIRST);
+  const wanted = Array.from({ length: EXAMPLE_COUNT }, (_, k) => EXAMPLE_FIRST + k);
+  if (JSON.stringify(example.games) !== JSON.stringify(wanted)) {
+    const named = `${wanted[0]} to ${wanted.at(-1)}`;
+    throw new Error(`the one search of game ${EXAMPLE_FIRST} carries games ${example.games.join(', ')}, not ${named}`);
+  }
+  let longest = null;
+  c.n.forEach((n, i) => {
+    if (c.method[i] !== 'search' || c.proof[i] !== 'exhausted') return;
+    const run = oneSearch(c, n);
+    if (!longest || run.count > longest.count) longest = run;
+  });
+  return { example, longest };
+}
+
+/** Fill each span data-run="key" with that fact. */
+export function fillOneSearch(games, root = document) {
+  const { example, longest } = oneSearchFacts(games);
+  const facts = {
+    nodes: nodesWords(example.nodes), longestFirst: fmt(longest.first), longestLast: fmt(longest.last),
+    longestCount: fmt(longest.count), longestNodes: nodesWords(longest.nodes),
+  };
+  for (const s of root.querySelectorAll('[data-run]')) s.textContent = facts[s.dataset.run];
 }
 
 /** Every game's rule and group, and the count of each. */

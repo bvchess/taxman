@@ -122,6 +122,8 @@ not.  The prime swap.  A strip over n of how each game was settled.
 **Right column.**  The prime lemma (N1), monotonicity (N3), the ceiling lemma (N4), the prime formula (N5), the step
 theorem (N6), the half lemma (N7), the semiprime formula (J3), the repeat lemma (R6, its last part given U).
 
+**Asides.**  *One search, six games:* games 1386 to 1391 all rest on one search.
+
 ### 3. The top half
 
 **Point.**  In the games that need a search, the numbers above n/2 carry about 93% of the score (measured), and one
@@ -224,8 +226,8 @@ commands, the open questions (`docs/theory/statements.md#open-questions`).
 
 ## Along the way
 
-An index of the findings, each a card linked to the page that explains it: three factors of tax (40), more moves and
-fewer points (833), two optimal sets (425), and the player's share.
+An index of the findings, each a card linked to the page that explains it: three factors of tax (40), one search for six
+games (1386 to 1391), more moves and fewer points (833), two optimal sets (425), and the player's share.
 
 ## Glossary
 

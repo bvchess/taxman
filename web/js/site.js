@@ -32,6 +32,12 @@ export const ALONG = [
       optimal game can claim 30 while 6, 10 and 15 are all still in the pot.`,
   },
   {
+    title: 'One search, six games', where: 'games 1386 to 1391', id: 'one-search', at: 2, href: 'chain.html#one-search',
+    line: `A game often poses exactly the search problem of an earlier game, and then needs no search of its own.  Games
+      1,386 to 1,391 all pose the same one, so game 1,386’s search, of <span data-run="nodes">278,935</span> nodes, was
+      the only one the six needed.`,
+  },
+  {
     title: 'Not always one best game', where: 'game 425', id: 'game-425', at: 4, href: 'frames.html#game-425',
     line: `The optimal set of moves is not always unique.  Up to game 424 each game has one unique set of optimal moves,
      but game 425 has two, which differ in three numbers and score the same.`,
