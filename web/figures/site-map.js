@@ -15,8 +15,8 @@ export function mountSiteMap(host) {
     const href = hrefOf(c);
     const title = href ? `<a href="${href}">${c.title}</a>` : `<span>${c.title}</span>`;
     const pins = ALONG.filter((a) => a.at === c.n).map((a) => {
-      const t = a.id ? `<a href="frames.html#${a.id}">${a.title}</a>` : `<span>${a.title}</span>`;
-      return `<div class="pin${a.id ? '' : ' is-unwritten'}">${PIN}<div>${t}<small>Along the way: ${a.where}${a.id ? '' : '; not yet written'}</small></div></div>`;
+      const t = a.href ? `<a href="${a.href}">${a.title}</a>` : `<span>${a.title}</span>`;
+      return `<div class="pin${a.href ? '' : ' is-unwritten'}">${PIN}<div>${t}<small>Along the way: ${a.where}${a.href ? '' : '; not yet written'}</small></div></div>`;
     }).join('');
     return `<li class="stop${href ? '' : ' is-unwritten'}"><span class="stop-coin">${coin(c)}</span><div class="stop-text">${title}<p>${c.line}${href ? '' : ' Not yet written.'}</p>${pins}</div></li>`;
   }).join('');

@@ -33,14 +33,22 @@ function badge(entry, here) {
   return numberSVG(entry.n, { rendering: 'raised', looks, size: 24, pad: 2 }).outerHTML;
 }
 
-/** The contents of the site: the main story's chapters as the outline lists them, the findings along the way and the
- *  about page, each shown as not yet written, and the sample chapter. */
-export function contentsHTML({ onStoryPage }) {
+/** The page the reader is on, as site.js names pages: its file name, index.html for the folder itself. */
+export const herePage = () => decodeURIComponent(location.pathname.split('/').pop() || 'index.html');
+
+/** The contents of the site: the main story's chapters as the outline lists them, each a link once it is written, the
+ *  findings along the way and the about page, and the sample chapter.  here is the page the reader is on. */
+export function contentsHTML({ here = herePage() } = {}) {
   const unwritten = (badgeHTML, title) =>
     `<li><span class="unwritten"><span class="badge">${badgeHTML}</span><span>${title}<small>not yet written</small></span></span></li>`;
-  const story = STORY.map((c) => unwritten(badge(c, false), c.title)).join('');
+  const link = (badgeHTML, title, href) =>
+    `<li><a href="${href}"${href === here ? ' aria-current="page" class="is-here"' : ''}><span class="badge">${badgeHTML}</span><span>${title}</span></a></li>`;
+  const story = STORY.map((c) => {
+    const href = hrefOf(c);
+    return href ? link(badge(c, href === here), c.title, href) : unwritten(badge(c, false), c.title);
+  }).join('');
   const after = AFTER.map((a) => unwritten(ALONG_ICON, a.title)).join('');
-  const sample = `<li><a href="${SAMPLE.href}"${onStoryPage ? ' aria-current="page" class="is-here"' : ''}><span class="badge">${ALONG_ICON}</span><span>${SAMPLE.title}</span></a></li>`;
+  const sample = link(ALONG_ICON, SAMPLE.title, SAMPLE.href);
   return `<p class="toc-group">The main story</p><ul class="toc">${story}</ul><ul class="toc">${after}</ul><p class="toc-group">Prototype</p><ul class="toc">${sample}</ul>`;
 }
 
@@ -49,13 +57,12 @@ export const homeMark = () => numberSVG('', { rendering: 'raised', looks: ['play
 function mountContents() {
   const rail = document.querySelector('.rail');
   const top = document.querySelector('.topbar');
-  const onStoryPage = document.body.dataset.page === 'story';
   const foot = '<p class="rail-foot"><a href="style.html">The style of the site</a></p>';
   if (rail && !rail.dataset.own) {
-    rail.innerHTML = `<a class="home" href="index.html">${homeMark()}Taxman</a><nav aria-label="Contents">${contentsHTML({ onStoryPage })}</nav><div class="progress" aria-hidden="true"><span></span></div>${foot}`;
+    rail.innerHTML = `<a class="home" href="index.html">${homeMark()}Taxman</a><nav aria-label="Contents">${contentsHTML()}</nav><div class="progress" aria-hidden="true"><span></span></div>${foot}`;
   }
   if (top) {
-    const own = rail?.dataset.own ? rail.querySelector('nav').outerHTML : `<nav aria-label="Contents">${contentsHTML({ onStoryPage })}</nav>`;
+    const own = rail?.dataset.own ? rail.querySelector('nav').outerHTML : `<nav aria-label="Contents">${contentsHTML()}</nav>`;
     top.innerHTML = `<a class="home" href="index.html">${homeMark()}Taxman</a><span class="where"></span><button class="btn contents-btn" type="button" aria-expanded="false" aria-controls="toc-panel">Contents</button><span class="bar" aria-hidden="true"></span>`;
     const panel = document.createElement('div');
     panel.id = 'toc-panel';
@@ -75,12 +82,17 @@ function mountContents() {
       }
     });
   }
-  // Where the reader is: the last section whose top has passed the upper third of the window.
+  // Where the reader is: the last section whose top has passed the upper third of the window.  A section's name is
+  // the site's for a chapter or a finding, else its own: data-title, its heading, or its label.  Above the first
+  // section, a chapter page names its chapter.
   const sections = [...document.querySelectorAll('[data-toc]')];
-  const titleOf = (id) => {
-    if (!id) return '';
-    return [...STORY, ...ALONG].find((c) => c.id === id)?.title ?? document.querySelector(`[data-toc="${id}"]`)?.dataset.title ?? '';
+  const titleOf = (section) => {
+    const id = section.dataset.toc;
+    const named = [...STORY, ...ALONG].find((c) => c.id === id)?.title;
+    return named ?? section.dataset.title ?? section.querySelector('h2, h3')?.textContent ?? section.getAttribute('aria-label') ?? '';
   };
+  const chapter = STORY.find((c) => String(c.n) === document.body.dataset.chapter);
+  const pageTitle = chapter ? `${chapter.n}. ${chapter.title}` : '';
   const bars = [...document.querySelectorAll('.rail .progress span, .topbar .bar')];
   const where = top?.querySelector('.where');
   const update = () => {
@@ -99,7 +111,7 @@ function mountContents() {
       if (on) a.setAttribute('aria-current', 'location');
       else a.removeAttribute('aria-current');
     }
-    if (where) where.textContent = titleOf(current?.dataset.toc) ?? '';
+    if (where) where.textContent = current ? titleOf(current) : pageTitle;
     const max = document.documentElement.scrollHeight - innerHeight;
     for (const b of bars) b.style.width = `${max > 0 ? (100 * scrollY) / max : 0}%`;
   };
@@ -162,13 +174,35 @@ function mountFigureLinks() {
       });
     });
   }
+  // A number names its mark in the figure of its paragraph's data-fig, or else in the figure nearest its paragraph
+  // that holds a mark for it, measured when the reader points, so that the numbers of one paragraph agree.
   const figOf = (node) => node.dataset.fig ?? node.closest('[data-fig]')?.dataset.fig;
+  const nearest = (s) => {
+    const n = s.dataset.n;
+    const at = (s.closest('p, li') ?? s).getBoundingClientRect();
+    let best = null;
+    let bestGap = Infinity;
+    for (const name of figures.keys()) {
+      const fig = document.getElementById(name);
+      if (!fig || !fig.querySelector(`svg [data-n="${n}"]`) || fig.offsetParent === null) continue;
+      const r = fig.getBoundingClientRect();
+      const gap = Math.max(0, r.top - at.bottom, at.top - r.bottom);
+      if (gap < bestGap) [best, bestGap] = [name, gap];
+    }
+    return best;
+  };
   for (const s of document.querySelectorAll('.n[data-n]')) {
-    const name = figOf(s);
-    if (!name) continue;
+    const named = figOf(s);
     s.tabIndex = 0;
-    const on = () => withFigure(name, (api) => api.highlight(Number(s.dataset.n), true));
-    const off = () => withFigure(name, (api) => api.highlight(Number(s.dataset.n), false));
+    let lit = null;
+    const on = () => {
+      lit = named ?? nearest(s);
+      if (lit) withFigure(lit, (api) => api.highlight(Number(s.dataset.n), true));
+    };
+    const off = () => {
+      if (lit) withFigure(lit, (api) => api.highlight(Number(s.dataset.n), false));
+      lit = null;
+    };
     s.addEventListener('mouseenter', on);
     s.addEventListener('mouseleave', off);
     s.addEventListener('focus', on);
@@ -176,8 +210,49 @@ function mountFigureLinks() {
   }
 }
 
+// ---- asides: each wears its pin, and a link to one opens it ----------------------------------------------------
+
+function mountAsides() {
+  for (const pin of document.querySelectorAll('.aside-pin:empty')) {
+    pin.innerHTML = ALONG_ICON.replace('width="22" height="22"', 'width="30" height="30"');
+  }
+  const openTarget = () => {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const target = id ? document.getElementById(id) : null;
+    if (!(target instanceof HTMLDetailsElement) || target.open) return;
+    target.open = true;
+    target.scrollIntoView({ block: 'start' });
+    // The figures above it may still be drawing, and the page grows as they do: keep the aside in view while the
+    // page settles, until the reader scrolls.
+    const hold = new ResizeObserver(() => target.scrollIntoView({ block: 'start' }));
+    const release = () => hold.disconnect();
+    hold.observe(document.body);
+    for (const type of ['wheel', 'touchstart', 'keydown', 'pointerdown']) addEventListener(type, release, { once: true, passive: true });
+    setTimeout(release, 4000);
+  };
+  addEventListener('hashchange', openTarget);
+  openTarget();
+}
+
+/** The line at the foot of a page that says where its numbers come from: the results file at its commit, and, on a
+ *  page whose figures run it, the model of the game. */
+export function mountProvenance(games, { model = true } = {}) {
+  const line = document.querySelector('.provenance');
+  if (!line) return;
+  const { file, commit } = games.source;
+  line.textContent = `The numbers on this page come from ${file}, as of commit ${commit} of the repository${
+    model ? ', and from the project\'s model of the game, which every figure runs in the page' : ''}.`;
+}
+
+// The way on at the foot of a chapter: the link to the front page wears the home token, as in the contents.
+function mountChapterNav() {
+  for (const a of document.querySelectorAll('.chapter-nav a[href="index.html"]')) a.insertAdjacentHTML('afterbegin', homeMark());
+}
+
 export function initEssay() {
   mountContents();
   mountNotes();
+  mountAsides();
   mountFigureLinks();
+  mountChapterNav();
 }

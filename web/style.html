@@ -197,8 +197,8 @@
   <p>The right column holds everything more exact or more technical than the story, each piece beside the paragraph
   it belongs to.  There are three kinds.  A margin card states a result the story uses: its name, its standing, a
   plain statement, a precise one, and its proof.  A technical note gives notation or an exact definition.  A block of
-  links points to the theory, the code and the papers.  The standing of a card is told by its badge's outline, never
-  by color.</p>
+  links points to the theory, the code and the papers.  The standing of a card is told by its badge's outline or fill,
+  never by color.</p>
   <div class="note-grid spread">
     <aside class="note card" aria-label="The frame lemma, proved">
       <div class="note-head"><span class="note-name">The frame lemma<span class="note-label">Lemma F1</span></span><span class="standing is-proved">proved</span></div>
@@ -206,6 +206,13 @@
       <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  Every number of the board lies in exactly
       one component of the frame graph, whose sources lie in one layer k and factors in layer k − 1.</p>
       <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-frame-lemma">Proof on GitHub</a></p>
+    </aside>
+    <aside class="note card" aria-label="The length proposition, proved by computation">
+      <div class="note-head"><span class="note-name">The length proposition<span class="note-label">Proposition Q4</span></span><span class="standing is-computed">proved by computation</span></div>
+      <p class="plain">In game 833 every optimal game has 362 moves, and the longest games have 363.</p>
+      <p class="precise"><span class="run">Precisely.</span>The prover and a maximum matching compute it: a heaviest
+      game of 363 moves scores 29 less than opt(833).</p>
+      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-length-proposition">Proof on GitHub</a></p>
     </aside>
     <aside class="note card" aria-label="The chain's scores, proved given U">
       <div class="note-head"><span class="note-name">The chain's scores</span><span class="standing is-givenU">proved given U</span></div>
@@ -261,7 +268,7 @@
   <details class="aside">
     <summary>
       <span class="aside-pin" aria-hidden="true"></span>
-      <span><span class="where">Along the way: game 833</span><span class="title">A longer game is not a better one</span></span>
+      <span><span class="where">Along the way: game 833</span><span class="title">More moves, fewer points</span></span>
       <span class="open-mark"><span class="closed-word">Open</span><span class="open-word">Close</span></span>
     </summary>
     <div class="aside-body"><p>In game 833 every optimal game makes 362 moves, yet some games make one more.  The
@@ -272,7 +279,7 @@
   written lies flat and dashed.  Below 1300 px the contents fold into a bar at the top with a button that opens them.</p>
   <div class="nav-specimen spread">
     <div class="rail-specimen"></div>
-    <div class="topbar-specimen"><span class="home"></span><span class="where">Layers and frames</span><span class="btn contents-btn">Contents</span></div>
+    <div class="topbar-specimen"><span class="home"></span><span class="where">Peel</span><span class="btn contents-btn">Contents</span></div>
   </div>
 </section>
 
@@ -315,16 +322,15 @@
 </div>
 
 <script type="module">
-import { initEssay, registerFigure, contentsHTML, homeMark, ALONG_ICON } from './js/essay.js';
+import { initEssay, registerFigure, contentsHTML, homeMark } from './js/essay.js';
 import { MOTION, numberSVG } from './js/vocab.js';
 import { loadGames } from './js/data.js';
 import * as S from './figures/specimens.js';
 
 document.querySelector('.home-mark').innerHTML = homeMark();
 document.querySelectorAll('.rail .badge[data-n]').forEach((b) => b.appendChild(numberSVG(Number(b.dataset.n), { rendering: 'raised', size: 24, pad: 2 })));
-for (const pin of document.querySelectorAll('.aside-pin')) pin.innerHTML = ALONG_ICON.replace('width="22" height="22"', 'width="30" height="30"');
-document.querySelector('.site-nav').innerHTML = contentsHTML({ onStoryPage: false });
-document.querySelector('.rail-specimen').innerHTML = `<a class="home" href="index.html">${homeMark()}Taxman</a><nav aria-label="The site's contents, a specimen">${contentsHTML({ onStoryPage: true })}</nav>`;
+document.querySelector('.site-nav').innerHTML = contentsHTML();
+document.querySelector('.rail-specimen').innerHTML = `<a class="home" href="index.html">${homeMark()}Taxman</a><nav aria-label="The site's contents, a specimen">${contentsHTML({ here: 'sets.html' })}</nav>`;
 document.querySelector('.topbar-specimen .home').innerHTML = `${homeMark()}Taxman`;
 
 S.mountScale(document.getElementById('scale'));

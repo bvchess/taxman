@@ -4,110 +4,192 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Playing optimal games of Taxman</title>
-<meta name="description" content="An optimal game of Taxman for every n from 1 to the end of the chain, and how we found them.">
+<meta name="description" content="How we play an optimal game of Taxman, the number game, for every n from 1 to past 5,000, and why each is the best possible.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2718%27 r=%2713%27 fill=%27%2314478c%27/%3E%3Ccircle cx=%2716%27 cy=%2715%27 r=%2713%27 fill=%27%232166c4%27/%3E%3C/svg%3E">
 <script src="js/tone.js"></script>
 <link rel="stylesheet" href="css/site.css">
 </head>
-<body data-page="front" class="front">
-<header class="site-header">
-  <a class="home" href="index.html"><span class="home-mark" aria-hidden="true"></span>Taxman</a>
-  <nav aria-label="Site">
-    <a href="frames.html">The main story</a>
-    <a href="https://github.com/bvchess/taxman">GitHub</a>
-  </nav>
+<body data-page="front">
+<header class="topbar"></header>
+<div class="site">
+<aside class="rail" aria-label="Contents"></aside>
+<main class="essay"><div class="column">
+
+<header class="essay-head para">
+  <aside class="note tech" aria-label="Optimal, precisely">
+    <div class="note-head"><span class="note-name">Optimal, precisely</span></div>
+    <p>Every score up to 2175 is opt(n), proven on the whole board by the prover, a second program that shares no
+    proof code with the frame solver.  Past 2175, each score is the best score of the frame model, which is opt(n)
+    wherever <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">statement
+    U</a> holds; U is open in general.  Every game's record says how it was proven and what it assumes
+    (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports
+    the scores</a>).</p>
+  </aside>
+  <h1>Playing optimal games of Taxman</h1>
+  <p class="lede">Taxman is a game on the numbers 1 to n.  You take a number and score it, and the taxman takes every
+  divisor of it still in play.  We play an optimal game, one with the best possible score, for every n from 1 to
+  <span data-last-n>the end of our chain</span>.  This site explains how we found them, and why we can trust them.</p>
 </header>
 
-<main class="front-main">
-  <section class="hero" aria-labelledby="headline">
-    <h1 id="headline">Playing optimal games of Taxman</h1>
-    <p class="hero-what">Taxman is played on the numbers 1 to n: you take a number, and the taxman takes all of its
-    divisors still in the pot.  We found the best possible game for every n in that range, and proved each one
-    optimal.  Try game 10 first.</p>
-    <div class="game-host" id="game"></div>
-    <p class="hero-standing">The proofs work in a model of the game that is exact given one statement, open in general;
-    for the games at the start of the chain, a second program proves the scores on the whole board.
-    <a href="frames.html#exact">What that means</a>.</p>
-  </section>
+<section class="chapter front-play" id="play" data-toc="play" aria-label="Play a game">
+  <div class="para">
+    <aside class="note tech" aria-label="The rules, precisely">
+      <div class="note-head"><span class="note-name">The rules, precisely</span></div>
+      <p>A move takes a number that still has a proper divisor in play; the taxman takes all of its proper divisors
+      still in play.  When no move is left, the taxman takes the rest.  The best score of game n is opt(n), and
+      opt(1), opt(2), opt(3), … is the Taxman sequence, <a href="https://oeis.org/A019312">A019312</a> in the OEIS.
+      The rules in full are in <a href="https://github.com/bvchess/taxman/blob/master/docs/GLOSSARY.md#the-game">the
+      glossary</a>.</p>
+    </aside>
+    <p>Try game 10.  Take a number, and the taxman takes its divisors.  You may take only a number that still has a
+    divisor in play, so the taxman always gets something, and when you can take nothing more, he takes the rest.</p>
+  </div>
 
-  <section class="front-chart" aria-labelledby="h-chain">
-    <figure class="chart" id="chain-chart">
-      <h2 class="chart-title" id="h-chain">The whole chain</h2>
-      <p class="chart-sub"></p>
-      <div class="chart-box"></div>
-    </figure>
-  </section>
+  <div class="game-host" id="game"></div>
 
-  <section class="steps" aria-labelledby="h-steps">
-    <h2 id="h-steps">The idea in three steps</h2>
-    <ol class="step-list">
-      <li>
-        <div class="step-pic-host"></div>
-        <h3><span class="step-n" data-step="1"></span>Sets, not orders</h3>
-        <p>A game's score is the sum of the numbers you take, whatever their order.  So the question is which
-        numbers to take: which sets can be played at all.</p>
-      </li>
-      <li>
-        <div class="step-pic-host"></div>
-        <h3><span class="step-n" data-step="2"></span>Frames</h3>
-        <p>The numbers fall into frames: nearly independent small games, each a few large numbers with the smaller
-        ones that can pay for them.</p>
-      </li>
-      <li>
-        <div class="step-pic-host"></div>
-        <h3><span class="step-n" data-step="3"></span>A few promotions</h3>
-        <p>The hard part is choosing a few factors to promote, played as moves one frame forward.  A search settles
-        which.</p>
-      </li>
-    </ol>
-    <p><a class="read-on" href="frames.html">Read the main story</a></p>
-  </section>
+  <div class="para">
+    <aside class="note tech" aria-label="Playing well">
+      <div class="note-head"><span class="note-name">Playing well</span></div>
+      <p>The strategy called Solvent needs no search and scores 99.85% of the optimal points over the games 1 to
+      1000, and never below 99.08% in any of them
+      (<a href="https://github.com/bvchess/taxman/blob/master/heuristics/README.md">the heuristics</a>, measured).</p>
+    </aside>
+    <p>The button plays an optimal game, the best you can do.  For game 10 you can find one by hand.  Playing well is
+    easy even in large games: a simple strategy with no search comes within a fraction of a percent of the best
+    score.  But only a perfect game is optimal, and only a proof shows that a game is perfect.  The published table of
+    best scores stopped at game 1000.</p>
+  </div>
+</section>
 
-  <section class="site-map" aria-labelledby="h-map">
-    <h2 id="h-map">The map</h2>
-    <p class="map-lede">One essay tells the main story.  Smaller findings are pinned along the way.</p>
-    <div id="map"></div>
-  </section>
+<section class="chapter front-how" id="how" data-toc="how" aria-labelledby="h-how">
+  <h2 id="h-how">How we did it</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="The counts, precisely">
+      <div class="note-head"><span class="note-name">The counts, precisely</span></div>
+      <p>The counts are rough sizes, not counts of legal games.  The orders are n!, the orders of all n numbers.
+      The sets are 2<sup>n</sup>, every subset of the board.  Once the top half is settled, 2<sup>⌊n/2⌋</sup> subsets
+      of the numbers up to n/2 are left, and once the board is in frames, 2<sup>c</sup> subsets of its c candidates.
+      The last is the number of nodes the recorded search of the game explored.</p>
+    </aside>
+    <p>Game <span data-last-n>n</span>'s numbers can be put in about 10<sup data-orders-exp>…</sup> orders.  No
+    computer could try them all, and we never try them.  Each chapter of the main story takes away part of the
+    problem, until what is left is small enough for a search to finish.</p>
+  </div>
 
-  <section class="sources" aria-labelledby="h-sources">
-    <h2 id="h-sources">The sources</h2>
-    <ul class="source-list">
-      <li><a href="https://github.com/bvchess/taxman">The repository</a><span>the solver, the prover, the theory and
-      the results</span></li>
-      <li><a href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a><span>the
-      chain of optimal games, one line a game</span></li>
-      <li><a href="https://github.com/bvchess/taxman/blob/master/results/README.md">results/README.md</a><span>what each
-      results file holds, and what supports its scores</span></li>
-      <li><a href="https://github.com/bvchess/taxman/blob/master/docs/THEORY.md">docs/THEORY.md</a><span>the theorems
-      both programs rest on, with their proofs</span></li>
-      <li><a href="https://github.com/bvchess/taxman/blob/master/solver/frame/README.md">solver/frame/README.md</a><span>the
-      frame solver: how to build it and run it</span></li>
-    </ul>
-  </section>
-</main>
-<footer class="front-foot site-foot"><p class="provenance"></p><p><a href="style.html">The style of the site</a>: the
-type, the colors, the marks and the motion, on one page.</p></footer>
+  <figure class="fig wide shrink" id="shrink" aria-label="The problem of playing the last game of the chain, shrinking from chapter to chapter."></figure>
+</section>
+
+<section class="chapter front-chain" id="chain" data-toc="chain" aria-labelledby="h-chain">
+  <h2 id="h-chain">The chain</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="How each game was settled">
+      <div class="note-head"><span class="note-name">How each game was settled</span></div>
+      <p>By a search of its whole tree; as a repeat of an earlier game's search, which poses the same problem; at its
+      ceiling, n + opt(n − 1); by the prime formula; by an upper bound in the bounds store, which the referee checks
+      against a game that meets it; or trivially, with nothing to choose.  The proof kinds are defined in
+      <a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#4-why-the-answers-can-be-trusted">the
+      frame solver's reference</a>.</p>
+    </aside>
+    <aside class="note tech" aria-label="The player's share">
+      <div class="note-head"><span class="note-name">The player's share</span></div>
+      <p>The share is opt(n) / (1 + 2 + ⋯ + n).  Hensley proved in 1988 that opt(n) / (n²/2) tends to a constant
+      between 1/2 and 35/48.  The chain's games put it near 0.63, which is a measurement, not a proof.</p>
+    </aside>
+    <p>We found the games in order, from game 1 up, each one built from an optimal game of the one before, so they
+    form a chain.  The chart shows every game of it: the share of the board that the player wins, and how each game
+    was settled.</p>
+  </div>
+  <figure class="chart" id="chain-chart">
+    <p class="chart-sub"></p>
+    <div class="chart-box"></div>
+  </figure>
+</section>
+
+<section class="chapter front-along" id="along" data-toc="along" aria-labelledby="h-along">
+  <h2 id="h-along">Along the way</h2>
+  <p>Finding the games turned up some surprises.  Each one is told in the chapter that explains it.</p>
+  <ul class="finding-cards">
+    <li><a href="sets.html#game-833"><span class="where">Game 833</span><span class="title">More moves, fewer
+    points</span><span class="line">Every optimal game makes <span data-833="moves">362</span> moves, but some games make
+    <span data-833="longestMoves">363</span>.</span></a></li>
+    <li><a href="sets.html#game-40"><span class="where">Game 40</span><span class="title">Three factors of
+    tax</span><span class="line">An optimal game can take 30 while 6, 10 and 15 are all still in play.</span></a></li>
+    <li><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#where-exchange-breaks"><span class="where">Game
+    2873</span><span class="title">The greedy that shouldn't work</span><span class="line">The usual guarantee for a
+    greedy choice fails here, yet greedy still chooses the best numbers above n/2 in every game we checked, to
+    100,000.</span></a></li>
+    <li><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board"><span class="where">Game
+    425</span><span class="title">Two optimal sets</span><span class="line">Every game up to 424 has one optimal
+    set; game 425 has two.</span></a></li>
+    <li><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#what-the-parity-bound-misses"><span class="where">Games
+    1 to 77</span><span class="title">A bound that is exact</span><span class="line">A bound from linear algebra
+    gives the best score of every game up to 77, and misses first at 78.</span></a></li>
+    <li><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/arrival.md#the-cofactor-rule"><span class="where">Every
+    game</span><span class="title">Easy from n alone</span><span class="line">Whether a game needs a search can
+    usually be told from n and its largest prime factor.</span></a></li>
+  </ul>
+</section>
+
+<section class="chapter front-check" id="check" data-toc="check" aria-labelledby="h-check">
+  <h2 id="h-check">Check it yourself</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="Checking the chain">
+      <div class="note-head"><span class="note-name">Checking the chain</span></div>
+      <p>From the top of the repository, after building the frame solver:
+      <code>taxman verify-results results/optimal.jsonl.gz</code>, and the independent check in Python,
+      <code>python3 solver/tools/check_results.py results/optimal.jsonl.gz</code>.  Both replay every game.</p>
+    </aside>
+    <p>Every game, with its score and its proof, is in one file, and two programs check it.  The code, the theory
+    and the record of what we tried are on GitHub.</p>
+  </div>
+  <ul class="source-list">
+    <li><a href="https://github.com/bvchess/taxman">The repository</a><span>the frame solver, the prover, the theory
+    and the results</span></li>
+    <li><a href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">The chain of
+    games</a><span>one line a game, and <a href="https://github.com/bvchess/taxman/blob/master/results/README.md">what
+    supports each score</a></span></li>
+    <li><a href="https://github.com/bvchess/taxman/blob/master/docs/THEORY.md">The theory</a><span>every result the
+    programs rest on, with its proof and its standing</span></li>
+    <li><a href="https://github.com/bvchess/taxman/blob/master/solver/frame/README.md">The frame solver</a><span>how
+    to build it and run it</span></li>
+    <li><a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/README.md">The prover</a><span>the second
+    program, which proves the scores on the whole board</span></li>
+    <li><a href="https://oeis.org/A019312">The Taxman sequence</a><span>A019312 in the OEIS</span></li>
+    <li><a href="https://arxiv.org/abs/2211.00461">The difficulty of beating the Taxman</a><span>Franklín and Moniot,
+    Discrete Applied Mathematics 339 (2023)</span></li>
+  </ul>
+</section>
+
+<footer class="site-foot"><p class="provenance"></p><p><a href="style.html">The style of the site</a>: the type, the
+colors, the marks and the motion, on one page.</p></footer>
+</div></main>
+</div>
 
 <script type="module">
+import { ALONG_ICON, initEssay, mountProvenance } from './js/essay.js';
 import { loadGames, loadSmall } from './js/data.js';
-import { numberSVG } from './js/vocab.js';
-import { homeMark } from './js/essay.js';
+import { STORY } from './js/site.js';
+import { fmt } from './js/vocab.js';
 import { mountGame } from './figures/game.js';
+import { mountShrink } from './figures/shrink.js';
 import { mountChainChart } from './figures/chain-chart.js';
-import { mountSteps } from './figures/steps.js';
-import { mountSiteMap } from './figures/site-map.js';
+import { fill833 } from './figures/longer-833.js';
 
-document.querySelector('.home-mark').innerHTML = homeMark();
-// The steps are a sequence, so they are numbered; the numbers are drawn flat, since there is nothing to press.
-for (const s of document.querySelectorAll('[data-step]')) s.appendChild(numberSVG(Number(s.dataset.step), { rendering: 'flat', looks: ['move', 'kept'], size: 30, pad: 2 }));
-mountSteps(document.querySelector('.steps'));
-mountSiteMap(document.getElementById('map'));
+initEssay();
+// Each finding wears the pin of the findings along the way, and says where its link goes.
+for (const a of document.querySelectorAll('.finding-cards a')) {
+  a.querySelector('.where').insertAdjacentHTML('afterbegin', ALONG_ICON.replace('width="22" height="22"', 'width="18" height="18"'));
+  const chapter = STORY.find((c) => c.href && a.getAttribute('href').split('#')[0] === c.href);
+  a.insertAdjacentHTML('beforeend', `<span class="to">${chapter ? `Chapter ${chapter.n}, ${chapter.title}` : 'On GitHub'}</span>`);
+}
 const [small, games] = await Promise.all([loadSmall(), loadGames()]);
-for (const s of document.querySelectorAll('[data-last-n]')) s.textContent = games.lastN.toLocaleString('en-US');
+for (const s of document.querySelectorAll('[data-last-n]')) s.textContent = fmt(games.lastN);
 mountGame(document.getElementById('game'), { small });
+const counts = mountShrink(document.getElementById('shrink'), { games });
+document.querySelector('[data-orders-exp]').textContent = fmt(counts[1].exponent);
 mountChainChart(document.getElementById('chain-chart'), { games });
-const src = games.source;
-document.querySelector('.provenance').textContent = `The numbers on this page come from ${src.file}, as of commit ${src.commit} of the repository.`;
+fill833(games);
+mountProvenance(games, { model: false });
 </script>
 </body>
 </html>

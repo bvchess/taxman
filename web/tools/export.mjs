@@ -31,6 +31,7 @@ const columns = {
   seconds: records.map((r) => significant(r.seconds?.total, 3)),
   moves: records.map((r) => (r.moves == null ? null : r.moves.length)),
   promotions: records.map((r) => (r.promotions == null ? null : r.promotions.length)),
+  candidates: records.map((r) => orNull(r.setup?.candidates)),
   inTheBag: records.map((r) => orNull(r.in_the_bag)),
 };
 

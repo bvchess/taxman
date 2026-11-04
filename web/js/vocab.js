@@ -508,10 +508,12 @@ export function restyle(svg, ...looks) {
 // Standing: where a statement stands
 // ---------------------------------------------------------------------------------------------------------------
 
-/** The standings a statement can have.  The badge's outline tells them apart: filled for proved, a double outline for
- *  proved given U, dotted for measured, dashed for open. */
+/** The standings a statement can have.  The badge's outline and fill tell them apart: filled for proved, gray under a
+ *  solid outline for proved by computation, a double outline for proved given U, dotted for measured, dashed for
+ *  open. */
 export const STANDING = {
   proved: 'proved',
+  computed: 'proved by computation',
   givenU: 'proved given U',
   measured: 'measured',
   open: 'open',

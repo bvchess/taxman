@@ -84,5 +84,5 @@ export function mountOrders(host, { small }) {
   host.querySelector('[data-act="next"]').addEventListener('click', () => show(k + 1));
   const start = Number(new URLSearchParams(location.search).get('orders'));
   show(Number.isInteger(start) && start >= 1 && start <= orders.length ? start - 1 : 0, false);
-  return { highlight: (n, on) => s.highlight(n, on) };
+  return { highlight: (n, on) => s.highlight(n, on), count: orders.length };
 }

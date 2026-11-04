@@ -146,6 +146,25 @@ for (let n = 2; n <= FRAMES_UP_TO; n++) {
   ]);
 }
 
+// Peel that chooses its own steps reaches the same answer, whichever steps it takes (the peel theorem): on game 21's
+// optimal set, taking the last step offered, a back move whenever there is one, still pairs every member once.
+{
+  const set = [9, 12, 14, 15, 16, 18, 19, 20, 21];
+  let offered = true;
+  const run = peel(set, {
+    choose(options) {
+      offered &&= options.every((o) => (o.kind === 'front' || o.kind === 'back') && set.includes(o.member));
+      return options[options.length - 1];
+    },
+  });
+  same('peel with choose, on game 21\'s optimal set, is playable', [run.playable, run.stuck], [true, []]);
+  same('peel with choose offers only steps of its members', offered, true);
+  same('peel with choose pairs every member once', run.steps.map((step) => step.member).sort((a, b) => a - b), set);
+  same('peel with choose uses distinct factors', new Set(run.steps.map((step) => step.factor)).size, set.length);
+  same('peel with choose, on the square, is stuck', peel([10, 14, 15, 21], { choose: (options) => options[0] }).stuck, [10, 14, 15, 21]);
+  throws('peel with a choose that invents a step', () => peel(set, { choose: () => ({ kind: 'front', member: 9, factor: 1 }) }));
+}
+
 // The square of docs/theory/playability.md, "Payment schemes": 10, 14, 15 and 21 form a cycle on the primes 2, 3, 5, 7.
 same('isPlayable([10, 14, 15, 21])', isPlayable([10, 14, 15, 21]), false);
 same('isPlayable([10, 14, 15])', isPlayable([10, 14, 15]), true);

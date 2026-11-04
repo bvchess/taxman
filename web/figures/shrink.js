@@ -1,0 +1,122 @@
+// The problem shrinking, chapter by chapter, for the last game of the chain: one row a chapter, with its number, its
+// title (a link once the chapter is written), the point it makes, and a bar for what is left to choose after it, on a
+// log scale, labeled with its count.  The rows of chapters not yet written are quieter, and their numbers lie flat and
+// dashed, as in the contents.  Chapter 3 settles no part of the last game; its row is a strip of the chain's games,
+// with a mark for each game settled with no search.
+//
+// The chapters come from js/site.js; every count is computed from data/games.json.  The counts are rough sizes, as the
+// page's note says: n! orders, 2^n sets, 2^(n/2) sets of the numbers up to n/2, 2^c sets of the c candidates, and the
+// nodes of the recorded search.  A bar's length is the count's number of digits, so a count of 10^1,523 has a bar a
+// tenth as long as one of 10^15,230.
+
+import { STORY, hrefOf } from '../js/site.js';
+import { fmt, numberSVG } from '../js/vocab.js';
+
+/** The point of each chapter, as the row says it: what it takes away. */
+const POINTS = {
+  1: 'A game is an order of moves.',
+  2: 'Only the set matters, and a set is quick to check.',
+  3: 'Most games follow from the game before.',
+  4: 'One greedy pass chooses the numbers above n/2.',
+  5: 'Only the promotions are left to choose.',
+  6: 'A search with a sharp bound finishes.',
+  7: 'Two programs check every score.',
+  8: 'The games, and what they show.',
+};
+
+const LOG2 = Math.log10(2);
+
+/** log10 n!, summed: the error is far below what the floor of a count of thousands of digits could notice. */
+export function log10Factorial(n) {
+  let sum = 0;
+  for (let k = 2; k <= n; k++) sum += Math.log10(k);
+  return sum;
+}
+
+/** Whether a game of the chain was settled with no search: trivially, by the prime formula, at its ceiling from the
+ *  start, or as a repeat of an earlier game's search. */
+export function settledWithNoSearch(proof, method) {
+  return proof === 'trivial' || proof === 'prime_formula' || proof === 'same_search' || (proof === 'cap' && method === 'start');
+}
+
+// A count of about 10^exponent, where exponent is ⌊log10 of the count⌋, with the noun it counts: a row's bar.
+const power = (log, noun) => ({ log, exponent: Math.floor(log), html: `10<sup>${fmt(Math.floor(log))}</sup> ${noun}` });
+
+// A large count in words: 3,179,486,263 as 3.2 billion.
+function inWords(x) {
+  for (const [size, word] of [[1e12, 'trillion'], [1e9, 'billion'], [1e6, 'million']]) {
+    if (x >= size) return `${Number((x / size).toPrecision(2))} ${word}`;
+  }
+  return fmt(x);
+}
+
+/** What is left to choose in game n after each chapter, keyed by chapter: a bar { log, exponent, html }, the strip of
+ *  chapter 3 { strip }, words alone { html }, or nothing. */
+export function shrinkCounts(games) {
+  const c = games.columns;
+  const n = games.lastN;
+  const i = c.n.indexOf(n);
+  const candidates = c.candidates[i];
+  const nodes = c.nodes[i];
+  const noSearch = c.n.map((_, j) => settledWithNoSearch(c.proof[j], c.method[j]));
+  const log1 = log10Factorial(n);
+  const log2 = n * LOG2;
+  const log4 = Math.floor(n / 2) * LOG2;
+  return {
+    n,
+    1: power(log1, 'orders'),
+    2: power(log2, 'sets'),
+    3: { strip: noSearch },
+    4: power(log4, 'sets'),
+    5: candidates == null ? { html: 'nothing to promote' } : power(candidates * LOG2, `sets of ${fmt(candidates)} candidates`),
+    6: nodes == null ? { html: 'settled with no search' } : { log: Math.log10(nodes), html: `${inWords(nodes)} nodes` },
+  };
+}
+
+// The strip of the chain's games: one unit of width a game, a mark over each run of games settled with no search.
+function stripSVG(noSearch) {
+  let d = '';
+  for (let j = 0; j < noSearch.length; j++) {
+    if (!noSearch[j]) continue;
+    let k = j;
+    while (k + 1 < noSearch.length && noSearch[k + 1]) k++;
+    d += `M${j} 0h${k - j + 1}v1h${-(k - j + 1)}z`;
+    j = k;
+  }
+  const count = noSearch.filter(Boolean).length;
+  return `<svg class="shrink-strip" viewBox="0 0 ${noSearch.length} 1" preserveAspectRatio="none" role="img" aria-label="The chain's ${fmt(noSearch.length)} games, with a mark for each of the ${fmt(count)} settled with no search"><rect class="strip-ground" width="${noSearch.length}" height="1"/><path class="strip-marks" d="${d}"/></svg>`;
+}
+
+export function mountShrink(host, { games }) {
+  const counts = shrinkCounts(games);
+  const max = counts[1].log;
+  const rows = STORY.map((chapter) => {
+    const href = hrefOf(chapter);
+    const count = counts[chapter.n];
+    const token = numberSVG(chapter.n, { rendering: 'raised', looks: href ? [] : ['lying', 'rejected'], size: 30, pad: 2 }).outerHTML;
+    const title = href
+      ? `<a class="shrink-title" href="${href}">${chapter.title}</a>`
+      : `<span class="shrink-title">${chapter.title}<span class="sr-only">, not yet written</span></span>`;
+    let measure = '';
+    if (count?.strip) {
+      const share = count.strip.filter(Boolean).length / count.strip.length;
+      measure = `${stripSVG(count.strip)}<span class="shrink-count">a mark for each game settled with no search, ${Math.round(100 * share)}% of games 1 to ${fmt(counts.n)}</span>`;
+    } else if (count?.log !== undefined) {
+      const f = count.log / max;
+      const label = `<span class="shrink-count">${count.html}</span>`;
+      // A bar long enough to hold its count holds it; any other has it at its tip.
+      measure = f > 0.5
+        ? `<span class="shrink-bar is-labeled" style="--f: ${f.toFixed(5)}">${label}</span>`
+        : `<span class="shrink-bar" style="--f: ${f.toFixed(5)}"></span>${label}`;
+    } else if (count) measure = `<span class="shrink-count">${count.html}</span>`;
+    return `<li class="shrink-row ${href ? 'is-written' : 'is-unwritten'}">
+      <span class="shrink-badge" aria-hidden="true">${token}</span>
+      <span class="shrink-text">${title}<span class="shrink-point">${POINTS[chapter.n]}</span></span>
+      <span class="shrink-measure${count?.strip ? ' is-strip' : ''}">${measure}</span>
+    </li>`;
+  }).join('');
+  host.innerHTML = `<p class="shrink-head"><span class="shrink-head-title">What is left to choose in game ${fmt(counts.n)}</span>
+    <span class="shrink-head-sub">on a log scale: a bar is as long as its count has digits</span></p>
+    <ol class="shrink-rows">${rows}</ol>`;
+  return counts;
+}

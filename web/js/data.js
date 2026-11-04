@@ -13,7 +13,8 @@ function load(name) {
   return cache.get(name);
 }
 
-/** games.json: { source, lastN, columns: { n, score, proof, method, nodes, seconds, moves, promotions, inTheBag } }. */
+/** games.json: { source, lastN, columns: { n, score, proof, method, nodes, seconds, moves, promotions,
+ *  candidates, inTheBag } }. */
 export const loadGames = () => load('games.json');
 
 /** small.json: [{ n, score, moves, promotions }] for the first games. */

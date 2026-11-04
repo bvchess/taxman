@@ -217,8 +217,12 @@ export function frames(n) {
  *  The set is playable exactly when every member gets paired, whatever the order of steps (the peel theorem).
  *  Returns { playable, steps: [{ kind: 'front' | 'back', member, factor }], stuck }, where stuck lists the members left
  *  when peel stops (ascending; empty if playable).  Peel stops early, with the set unplayable, when a member is left
- *  with no live factor.  Fronts go before backs, and each in the order it becomes available, so a run is repeatable. */
-export function peel(set) {
+ *  with no live factor.  Fronts go before backs, and each in the order it becomes available, so a run is repeatable.
+ *
+ *  choose, if given, picks the steps instead, for a figure that shows a run of its own: at each step it gets every safe
+ *  step open then, fronts by member and then backs by factor, each { kind, member, factor }, and returns one of them.
+ *  The theorem says the answer is the same whichever it picks. */
+export function peel(set, { choose = null } = {}) {
   const members = [...new Set(set)].sort(ascending);
   const inSet = new Set(members);
   const list = new Map(); // member -> the live factors it lists
@@ -256,8 +260,23 @@ export function peel(set) {
     listedBy.delete(f);
   }
 
+  // The safe steps open now, for choose: fronts by member, then backs by factor.
+  const open = () => [
+    ...[...remaining].sort(ascending).filter((x) => list.get(x).size === 1)
+      .map((x) => ({ kind: 'front', member: x, factor: [...list.get(x)][0] })),
+    ...[...listedBy.keys()].sort(ascending).filter((f) => listedBy.get(f).size === 1)
+      .map((f) => ({ kind: 'back', member: [...listedBy.get(f)][0], factor: f })),
+  ];
+  const same = (a, b) => a.kind === b?.kind && a.member === b.member && a.factor === b.factor;
+
   while (remaining.size > 0 && !starved) {
-    if (fronts.length > 0) {
+    if (choose) {
+      const options = open();
+      if (options.length === 0) break;
+      const step = choose(options);
+      if (!options.some((o) => same(o, step))) throw new Error('peel: choose must return one of the steps it is given');
+      pair(step.kind, step.member, step.factor);
+    } else if (fronts.length > 0) {
       const x = fronts.shift();
       if (remaining.has(x) && list.get(x).size === 1) pair('front', x, [...list.get(x)][0]);
     } else if (backs.length > 0) {

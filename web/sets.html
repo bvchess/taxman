@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A game is a set · Playing optimal games of Taxman</title>
+<meta name="description" content="Which numbers you take decides your score in Taxman; the order follows from the set, and peel decides quickly whether a set can be played.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2718%27 r=%2713%27 fill=%27%2314478c%27/%3E%3Ccircle cx=%2716%27 cy=%2715%27 r=%2713%27 fill=%27%232166c4%27/%3E%3C/svg%3E">
+<script src="js/tone.js"></script>
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body data-page="story" data-chapter="2">
+<header class="topbar"></header>
+<div class="site">
+<aside class="rail" aria-label="Contents"></aside>
+<main class="essay"><div class="column">
+
+<header class="essay-head para">
+  <aside class="note tech" aria-label="The technical layer">
+    <div class="note-head"><span class="note-name">The technical layer</span></div>
+    <p>This column holds what is more exact than the story: each claim's precise statement, where it stands, and a
+    link to its proof, with the notation and the code behind them.  A reader who never looks here misses nothing of
+    the story.</p>
+  </aside>
+  <p class="kicker">Chapter 2</p>
+  <h1>A game is a set</h1>
+  <p class="lede">Which numbers you take decides your score.  The order follows from the set, and whether a set can
+  be played at all is quick to check.</p>
+</header>
+
+<section class="chapter" id="orders-section" data-toc="orders-section" aria-label="The order follows from the set">
+  <p>Your score is the sum of the numbers you take, so it does not depend on the order you take them in.  The order
+  matters only to keep every move legal: each number you take must still have a divisor in play.</p>
+  <p>Here are the nine moves of an optimal game of 21.  They can be played in <span data-orders-21>several</span>
+  orders, and in every one of them each move takes the same tax.  Step through them.</p>
+
+  <figure class="fig fig-panel" id="orders">
+    <svg role="img" aria-label="The nine moves of an optimal game of 21, each above the tax it takes, in one of the orders that play a legal game."></svg>
+    <div class="fig-controls">
+      <button type="button" class="btn round" data-act="prev" aria-label="Previous order">&lsaquo;</button>
+      <output aria-live="polite"></output>
+      <button type="button" class="btn round" data-act="next" aria-label="Next order">&rsaquo;</button>
+    </div>
+    <figcaption class="orders-status"></figcaption>
+  </figure>
+
+  <div class="para">
+    <aside class="note tech" aria-label="Sets, precisely">
+      <div class="note-head"><span class="note-name">Sets, precisely</span></div>
+      <p>A set S ⊆ {2, …, n} is <em>playable</em> when some order of it is the moves of a legal game of n.  Its
+      weight is ΣS, the sum of its members.  An <em>optimal set</em>, written S*(n), is the set of moves of an optimal
+      game: a heaviest playable set.  From game 425 on, a game can have more than one, so we say <em>an</em> optimal
+      set (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/statements.md#notation">the theory's
+      notation</a>).</p>
+    </aside>
+    <p>So the question for game n is not how to play but what to take.  We call a set of numbers
+    <em>playable</em> when some order of it is a legal game.  An <em>optimal set</em> is a playable set with the
+    largest sum, the set of moves of an optimal game.</p>
+  </div>
+</section>
+
+<section class="chapter" id="payment" data-toc="payment" aria-labelledby="h-payment">
+  <h2 id="h-payment">Tax as payment</h2>
+  <div class="para">
+    <aside class="note card" aria-label="The lifting lemma, proved">
+      <div class="note-head"><span class="note-name">The lifting lemma<span class="note-label">Lemma P1</span></span><span class="standing is-proved">proved</span></div>
+      <p class="plain">A number can be played exactly when one of its maximal factors is still in play.</p>
+      <p class="precise"><span class="run">Precisely.</span>The maximal factors of x are x/p, for each prime p that
+      divides x.  At any point of a game, if a proper divisor d of x is in play, so is a maximal factor f of x with
+      d | f.</p>
+      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-lifting-lemma">Proof on GitHub</a></p>
+    </aside>
+    <p>A move is legal when one of its divisors is still in play, and only some divisors matter: a number's
+    <em>maximal factors</em>, the number divided by one of its primes.  <span class="n" data-n="12">12</span> =
+    2 · 2 · 3 has the maximal factors 6 and 4, 9 has only 3, and a prime has only 1.  If any divisor of a move is
+    still in play, so is one of its maximal factors.  So a move is legal exactly when a maximal factor of it is still in
+    play.</p>
+    <p>Think of that factor as what <em>pays for</em> the move.  Two moves cannot share a payment, because whichever is
+    taken first sends the factor to the taxman.  So a set can be played only if each of its numbers can be given a
+    maximal factor of its own, from outside the set.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="The playability theorem, proved">
+      <div class="note-head"><span class="note-name">The playability theorem<span class="note-label">Theorem P2</span></span><span class="standing is-proved">proved</span></div>
+      <p class="plain">A set can be played exactly when each member can be paid for by a maximal factor of its own,
+      from outside the set, with no circle in what must come first.</p>
+      <p class="precise"><span class="run">Precisely.</span>S ⊆ {2, …, n} is playable iff it has a payment scheme, a
+      one-to-one choice of a maximal factor outside S for each member, whose precedence is acyclic.  Then every
+      topological order of the precedence is a legal game.</p>
+      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-playability-theorem">Proof on GitHub</a></p>
+    </aside>
+    <aside class="note tech" aria-label="Franklín and Moniot's Theorem 1">
+      <div class="note-head"><span class="note-name">Franklín and Moniot</span></div>
+      <p>Their Theorem 1 says the same in the language of matchings: a set is playable iff it is the set of upper
+      ends of a matching of the maximal-factor graph with no flat alternating cycle
+      (<a href="https://arxiv.org/abs/2211.00461">the paper</a>;
+      <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#what-the-paper-proves">how
+      the theory relates to it</a>).</p>
+    </aside>
+    <p>A payment for each number is not quite enough, because the order can still tie itself in a knot.  A move takes
+    all of its divisors in play, not only the one that pays for it, so it can take a factor that another move was
+    counting on.  In game 21, <span class="n" data-n="9">9</span> is paid for by 3, and
+    <span class="n" data-n="15">15</span> would take 3 as tax, so 9 must come before 15.  And 9 divides
+    <span class="n" data-n="18">18</span>, so 9 must come before 18 as well, or 18 would take it.</p>
+    <p>Rules like these say which moves must come before which.  A set can be played exactly when its numbers can be
+    paid for in a way whose rules never run in a circle, each move before the next and the last before the first.
+    Then any order that keeps the rules is a legal game.</p>
+  </div>
+</section>
+
+<section class="chapter" id="peel" data-toc="peel" aria-labelledby="h-peel">
+  <h2 id="h-peel">Peel</h2>
+  <p>Trying every way to pay would be slow.  A quicker test never has to guess.  It pairs numbers with their payments
+  one at a time, using only two kinds of safe step:</p>
+  <ul class="rules">
+    <li>A number with only one maximal factor left to pay with takes it.</li>
+    <li>A factor that only one number can still use goes to that number.</li>
+  </ul>
+  <p>Each step takes its pair out, and the next step looks at what is left.  If every number gets paired, the set is
+  playable.  If the steps run out with numbers left over, it is not.  It never matters which safe step was taken
+  first.  We call this test <em>peel</em>.</p>
+
+  <figure class="fig fig-panel" id="peel-fig">
+    <svg role="img" aria-label="Peel, step by step, pairing each move of game 21's optimal set with the factor that pays for it."></svg>
+    <div class="fig-timeline"></div>
+    <figcaption class="fig-caption"></figcaption>
+  </figure>
+
+  <div class="para">
+    <aside class="note card" aria-label="The peel theorem, proved">
+      <div class="note-head"><span class="note-name">The peel theorem<span class="note-label">Theorem P4</span></span><span class="standing is-proved">proved</span></div>
+      <p class="plain">Peel decides whether a set can be played, whichever safe steps it takes in whichever order.</p>
+      <p class="precise"><span class="run">Precisely.</span>A front move pairs a member that lists one live factor
+      with it; a back move pairs a live factor that one member alone lists with that member.  Each keeps an instance
+      playable, and keeps it unplayable.  An instance is playable iff a run of peel pairs every member, and such a run
+      yields an acyclic payment scheme.</p>
+      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-peel-theorem">Proof on GitHub</a></p>
+    </aside>
+    <aside class="note tech" aria-label="Peel in the code">
+      <div class="note-head"><span class="note-name">Peel in the code</span></div>
+      <p>The frame solver decides playability by peel in
+      <a href="https://github.com/bvchess/taxman/blob/master/solver/frame/src/playable.rs">solver/frame/src/playable.rs</a>,
+      which shares nothing with its frame model, and the figures of this site use
+      <a href="https://github.com/bvchess/taxman/blob/master/web/js/model.js">web/js/model.js</a>.</p>
+    </aside>
+    <p>In game 21, peel pairs <span class="n" data-n="19">19</span> with 1, the only factor it has, and
+    <span class="n" data-n="9">9</span> with 3 for the same reason.  Once 3 is gone, 15 has only 5 left and 21 only
+    7, and the rest follow.  The pairs it finds are the payments of the game itself.</p>
+    <p>A run of peel that pairs every number also gives a legal order: play each number before any move that would
+    take it, or its payment, as tax.  So a playable set comes with a game, quickly.</p>
+  </div>
+</section>
+
+<section class="chapter" id="loop-section" data-toc="loop-section" aria-labelledby="h-loop">
+  <h2 id="h-loop">The loop</h2>
+  <p>When peel gets stuck, a loop is to blame.  Take the numbers <span class="n" data-n="10">10</span>,
+  <span class="n" data-n="14">14</span>, <span class="n" data-n="15">15</span> and
+  <span class="n" data-n="21">21</span>, with only the primes 2, 3, 5 and 7 left to pay with.  Each of the four has
+  two prime factors, so it can be drawn as an edge between two primes, and the four edges make a square:
+  10 = 2 · 5, 15 = 5 · 3, 21 = 3 · 7 and 14 = 7 · 2.  Every number has two ways to pay, and every prime can pay for
+  two numbers, so peel has no safe step.  Try to play all four.</p>
+
+  <figure class="fig fig-panel" id="loop" data-fig="loop">
+    <svg role="img" aria-label="The numbers 10, 15, 21 and 14 on the sides of a square whose corners are the primes 2, 5, 3 and 7. Take them one at a time; the primes go to the taxman."></svg>
+    <div class="fig-controls"><button type="button" class="btn" data-act="reset">Start over</button></div>
+    <figcaption class="loop-status" aria-live="polite"></figcaption>
+  </figure>
+
+  <div class="para">
+    <aside class="note card" aria-label="The two-factor proposition, proved">
+      <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11</span></span><span class="standing is-proved">proved</span></div>
+      <p class="plain">Numbers with two prime factors can all be played exactly when their edges form no loop.</p>
+      <p class="precise"><span class="run">Precisely.</span>An instance whose members each list at most two factors
+      is playable iff its lists are linearly independent over GF(2), iff its graph, with an edge for each member, is a
+      forest.</p>
+      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">Proof on GitHub</a></p>
+    </aside>
+    <p>Whatever order you choose, the first number takes both of its primes as tax.  That leaves two primes for the
+    other three numbers, and one of them is always stuck.</p>
+    <p>The same holds for any set of numbers with two prime factors: they can all be played exactly when their edges
+    contain no loop.  The rule comes back in chapter 4, where it settles those numbers in every game.</p>
+  </div>
+</section>
+
+<section class="chapter" id="along" data-toc="along" aria-label="Along the way">
+  <div class="para">
+    <aside class="note tech" aria-label="Three factors, precisely">
+      <div class="note-head"><span class="note-name">Three factors, precisely</span></div>
+      <p>30 has the maximal factors 15, 10 and 6.  Once 1, 2, 3 and 5 are gone, those three are all of its divisors
+      in play.  The game shown is legal and scores opt(40), which the prover proves; this page finds it and checks
+      it with <a href="https://github.com/bvchess/taxman/blob/master/web/js/model.js">web/js/model.js</a>.</p>
+    </aside>
+    <details class="aside" id="game-40" data-toc="game-40">
+      <summary>
+        <span class="aside-pin" aria-hidden="true"></span>
+        <span><span class="where">Along the way: game 40</span><span class="title">Three factors of tax</span></span>
+        <span class="open-mark"><span class="closed-word">Open</span><span class="open-word">Close</span></span>
+      </summary>
+      <div class="aside-body">
+        <p>A move usually takes one or two numbers as tax.  In game 40, one optimal game takes 30 when 6, 10 and 15 are
+        all still in play, so the taxman gets three numbers for one move.</p>
+        <figure class="fig fig-strip" id="game-40-fig"></figure>
+        <p>It scores <span data-g40-score>opt(40)</span>, the best possible.  The same happens in larger games: in the
+        chain's own game of 1250, the move 748 takes 44, 68 and 374.</p>
+      </div>
+    </details>
+  </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="The length proposition, proved by computation">
+      <div class="note-head"><span class="note-name">The length proposition<span class="note-label">Proposition Q4</span></span><span class="standing is-computed">proved by computation</span></div>
+      <p class="plain">In game 833 every optimal game has <span data-833="moves">362</span> moves, and the longest games
+      have <span data-833="longestMoves">363</span>.</p>
+      <p class="precise"><span class="run">Precisely.</span>In game 833 = 7² · 17 a heaviest game of
+      <span data-833="longestMoves">363</span> moves scores <span data-833="longest">218,197</span>, which is
+      <span data-833="gap">29</span> less than opt(833) = <span data-833="score">218,226</span>.  The prover and a
+      maximum matching compute it.</p>
+      <p class="proof"><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-length-proposition">Proof on GitHub</a></p>
+    </aside>
+    <details class="aside" id="game-833" data-toc="game-833">
+      <summary>
+        <span class="aside-pin" aria-hidden="true"></span>
+        <span><span class="where">Along the way: game 833</span><span class="title">More moves, fewer points</span></span>
+        <span class="open-mark"><span class="closed-word">Open</span><span class="open-word">Close</span></span>
+      </summary>
+      <div class="aside-body">
+        <p>Taking more numbers does not always score more.  In game 833, every optimal game makes
+        <span data-833="moves">362</span> moves, yet some games make one more.  The longest of those still scores
+        less: they play five smaller numbers where the optimal game plays four larger ones.</p>
+        <div id="exchange-833"></div>
+        <p>The trade happens below n/2.  Each of the nine numbers is a maximal factor of a number the optimal game
+        plays, and a number taken as a move cannot also pay for another.  The optimal game takes the four large ones
+        and pays for those numbers some other way.  The longest game leaves the four to pay, and takes five smaller ones
+        instead.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<nav class="chapter-nav" aria-label="Chapters">
+  <a class="prev" href="index.html">Front page</a>
+  <span class="next"><span class="nav-kicker">Next, not yet written:</span> <span class="nav-title">3. Walking up the
+  chain.</span>  Most games are easy if you know an optimal game of the one before.</span>
+</nav>
+
+<footer class="site-foot"><p class="provenance"></p><p><a href="style.html">The style of the site</a>: the type, the
+colors, the marks and the motion, on one page.</p></footer>
+</div></main>
+</div>
+
+<script type="module">
+import { initEssay, registerFigure, mountProvenance } from './js/essay.js';
+import { loadGames, loadSmall } from './js/data.js';
+import { fmt } from './js/vocab.js';
+import { mountOrders } from './figures/orders.js';
+import { mountPeel } from './figures/peel.js';
+import { mountLoop } from './figures/loop.js';
+import { mountGame40 } from './figures/game40.js';
+import { fill833, mountLonger833 } from './figures/longer-833.js';
+
+initEssay();
+const [small, games] = await Promise.all([loadSmall(), loadGames()]);
+mountProvenance(games);
+
+const orders = mountOrders(document.getElementById('orders'), { small });
+registerFigure('orders', orders);
+document.querySelector('[data-orders-21]').textContent = fmt(orders.count);
+registerFigure('peel-fig', mountPeel(document.getElementById('peel-fig'), { small }));
+registerFigure('loop', mountLoop(document.getElementById('loop')));
+const g40 = mountGame40(document.getElementById('game-40-fig'), { small });
+document.querySelector('[data-g40-score]').textContent = fmt(g40.score);
+mountLonger833(document.getElementById('exchange-833'), { games });
+fill833(games);
+</script>
+</body>
+</html>

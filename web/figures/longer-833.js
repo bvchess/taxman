@@ -11,14 +11,29 @@ const OPTIMAL_PLAYS = [250, 252, 294, 400];
 const LONGEST_PLAYS = [116, 180, 200, 320, 351];
 const LONGEST_SCORE = 218197;
 
-export function mountLonger833(host, { games }) {
+const sum = (xs) => xs.reduce((a, b) => a + b, 0);
+
+/** The numbers the page says of game 833: the optimal game's moves and score, the longest game's moves and score, and
+ *  the gap between the two scores, checked against the exchange. */
+export function facts833(games) {
   const i = games.columns.n.indexOf(N);
   const moves = games.columns.moves[i];
   const score = games.columns.score[i];
-  const sum = (xs) => xs.reduce((a, b) => a + b, 0);
   if (sum(OPTIMAL_PLAYS) - sum(LONGEST_PLAYS) !== score - LONGEST_SCORE || LONGEST_PLAYS.length !== OPTIMAL_PLAYS.length + 1) {
     throw new Error('game 833: the exchange does not match the recorded score');
   }
+  return { moves, score, longestMoves: moves + 1, longest: LONGEST_SCORE, gap: score - LONGEST_SCORE };
+}
+
+/** Fill each span data-833="moves" (or longestMoves, score, longest, gap) with that number. */
+export function fill833(games, root = document) {
+  const facts = facts833(games);
+  for (const span of root.querySelectorAll('[data-833]')) span.textContent = fmt(facts[span.dataset['833']]);
+  return facts;
+}
+
+export function mountLonger833(host, { games }) {
+  const { moves, score } = facts833(games);
   const row = (xs, label, total, count) => {
     const div = document.createElement('div');
     div.className = 'exchange-row';
@@ -37,5 +52,5 @@ export function mountLonger833(host, { games }) {
   );
   host.setAttribute('role', 'img');
   host.setAttribute('aria-label', `Game ${N}: an optimal game plays ${OPTIMAL_PLAYS.join(', ')}, which sum to ${fmt(sum(OPTIMAL_PLAYS))}, in ${moves} moves; a heaviest game of ${moves + 1} moves plays ${LONGEST_PLAYS.join(', ')} instead, which sum to ${fmt(sum(LONGEST_PLAYS))}.`);
-  return { moves, score, longest: LONGEST_SCORE };
+  return facts833(games);
 }
