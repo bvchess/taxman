@@ -118,16 +118,16 @@
     <li><a href="sets.html#game-40"><span class="where">Game 40</span><span class="title">Three factors of
     tax</span><span class="line">An optimal game can take 30 while 6, 10 and 15 are all still in the
     pot.</span></a></li>
-    <li><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#where-exchange-breaks"><span class="where">Game
+    <li><a href="top-half.html#game-2873"><span class="where">Game
     2873</span><span class="title">The greedy that shouldn't work</span><span class="line">The usual guarantee for
     greedy fails here, yet greedy still picks best in every game to 100,000.</span></a></li>
-    <li><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board"><span class="where">Game
+    <li><a href="frames.html#game-425"><span class="where">Game
     425</span><span class="title">Two optimal sets</span><span class="line">Every game up to 424 has one optimal
     set; game 425 has two.</span></a></li>
-    <li><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#what-the-parity-bound-misses"><span class="where">Games
+    <li><a href="trust.html#exact-to-77"><span class="where">Games
     1 to 77</span><span class="title">A bound that is exact</span><span class="line">A bound from linear algebra
     gives the best score of every game up to 77, and misses first at 78.</span></a></li>
-    <li><a href="https://github.com/bvchess/taxman/blob/master/docs/theory/arrival.md#the-cofactor-rule"><span class="where">Every
+    <li><a href="chain.html#cofactor-rule"><span class="where">Every
     game</span><span class="title">Easy from n alone</span><span class="line">Whether a game needs a search can
     usually be told from n and its largest prime factor.</span></a></li>
   </ul>
@@ -144,13 +144,8 @@
     </aside>
     <aside class="note tech" aria-label="What supports the scores">
       <div class="note-head"><span class="note-name">What supports the scores</span></div>
-      <p>Every score up to 2175 is opt(n), proven on the whole board by the <a class="gloss" href="glossary.html#prover">prover</a>,
-      a second program that shares no proof code with the frame solver.  Past 2175, each score is the best score of
-      the <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is opt(n) wherever
-      <a class="gloss" href="glossary.html#statement-u">statement U</a> holds; U is open in general.  Every game's record says how
-      it was proven and what it assumes
-      (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports
-      the scores</a>).</p>
+      <p>Every score up to 2175 is opt(n) on the whole board, and every score past it is opt(n) given statement U.
+      <a href="trust.html#what-supports-the-scores">Chapter 6</a> says what each one rests on.</p>
     </aside>
     <p>Every game, with its score and its proof, is in one file, and two programs check it.  The code, the theory
     and the record of what we tried are on GitHub.</p>
