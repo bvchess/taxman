@@ -1,0 +1,21 @@
+/* Chapter 5, the search: the search tree of game 45 and the chart of the searches' cost.  The tree is flat ink, as an
+   explanatory figure is: a node is a small chip with its bound, a dropped branch a dashed chip, the best game's leaf a
+   gray one.  The chart is one series of dots in ink. */
+
+.search-tree-fig { max-width: 30rem; }
+.search-tree-fig .fig-caption { min-height: 6.2em; }
+
+.search-tree .st-halo { stroke: var(--ink); stroke-width: 7px; }
+.search-tree .st-body { stroke-linejoin: round; }
+.search-tree .st-bound { font-family: var(--font); font-size: 13px; font-variant-numeric: tabular-nums lining-nums; }
+.search-tree .v-text-label { font-size: 12px; fill: var(--ink-2); }
+.search-tree .v-text.is-named { font-weight: 750 !important; fill: var(--ink) !important; }
+
+@media (max-width: 560px) {
+  .search-tree-fig .fig-caption { min-height: 10.5em; }
+  .v-figure.search-tree .st-bound { font-size: 15px; }
+  .v-figure.search-tree .v-text-label { font-size: 14px; }
+}
+
+#cost-chart .cost-dots { stroke: var(--ink-2); stroke-opacity: 0.6; }
+#cost-chart .cost-end { fill: var(--ink); stroke: var(--paper); }

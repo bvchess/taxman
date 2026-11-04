@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trust · Playing optimal games of Taxman</title>
+<meta name="description" content="Every score of the chain of optimal Taxman games is checked, and every score says what it rests on: a referee, two verifiers, a second program that proves the scores to 2175, and the parity bound.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2718%27 r=%2713%27 fill=%27%2314478c%27/%3E%3Ccircle cx=%2716%27 cy=%2715%27 r=%2713%27 fill=%27%232166c4%27/%3E%3C/svg%3E">
+<script src="js/tone.js"></script>
+<link rel="stylesheet" href="css/site.css">
+<link rel="stylesheet" href="css/trust.css">
+</head>
+<body data-page="story" data-chapter="6">
+<header class="topbar"></header>
+<div class="site">
+<aside class="rail" aria-label="Contents"></aside>
+<main class="essay"><div class="column">
+
+<header class="essay-head para">
+  <p class="kicker">Chapter 6</p>
+  <h1>Trust</h1>
+  <p class="lede">Every score is checked, and every score says what it rests on.</p>
+</header>
+
+<section class="chapter" id="referee" data-toc="referee" aria-label="The referee">
+  <div class="para">
+    <aside class="note tech" aria-label="The checks, in the code">
+      <div class="note-head"><span class="note-name">The checks, in the code</span></div>
+      <p>The referee shares no code with the frame solver's number theory.  The verifiers are
+      <code>taxman verify-results results/optimal.jsonl.gz</code> and
+      <code>python3 solver/tools/check_results.py results/optimal.jsonl.gz</code>; both pass the file
+      (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/verifiers.md">what each checks</a>).</p>
+    </aside>
+    <p>A game is easy to check and hard to prove.  Before any game of the
+    <a class="gloss" href="glossary.html#chain">chain</a> counts, a <a class="gloss" href="glossary.html#referee">referee</a>
+    replays it: every move must be legal, no move may be left at the end, and the moves must add up to the score
+    recorded.  A game that passes is a real game, so the best score of its board is at least its score.</p>
+    <p>Two verifiers then replay the whole file, each on its own: the
+    <a class="gloss" href="glossary.html#frame-solver">frame solver</a>'s, and a second one, in Python, that shares no
+    code with it.  They also check that the scores never fall from one game to the next and never rise by more than n,
+    and they work out each game's proof again from its record, so that no edit by hand can change one.</p>
+    <p>A replay shows that a game can be played, not that it is the best.  That takes a proof.</p>
+  </div>
+</section>
+
+<section class="chapter" id="prover" data-toc="prover" aria-labelledby="h-prover">
+  <h2 id="h-prover">A second program</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="The prover">
+      <div class="note-head"><span class="note-name">The prover</span></div>
+      <p>A branch and bound over sets of moves, bounded by the parity bound, that takes the recorded score as its
+      target.  It rests only on the theory's theorems and on elementary bounds, and its exact methods are tested
+      against brute force (<a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/README.md">its
+      README</a>).  Both programs read the chain through one gzip decoder, whose check of every byte makes a misread
+      fail loudly rather than hand both the same wrong game.  The proofs reach 2175, where the chain ended when they
+      were made (<a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md">the
+      proofs</a>).</p>
+    </aside>
+    <p>Every proof of the frame solver rests, in the end, on the
+    <a class="gloss" href="glossary.html#frame-model">frame model</a>,
+    which gives the best score exactly where <a class="gloss" href="glossary.html#statement-u">statement U</a> holds.
+    So a second program, the <a class="gloss" href="glossary.html#prover">prover</a>, proves the scores again without
+    it.  It shares no proof code with the frame solver.  It searches the whole
+    <a class="gloss" href="glossary.html#board">board</a>, sets of moves rather than promotions, with no frames, and
+    proves that no set that can be played beats the recorded score.</p>
+    <p>It proves every score of the chain up to 2,175.  There each score is
+    <a class="gloss" href="glossary.html#opt">opt(n)</a> with no assumption, and statement U holds as well, since the
+    frame model's best is that score.</p>
+  </div>
+</section>
+
+<section class="chapter" id="parity-bound" data-toc="parity-bound" aria-labelledby="h-parity">
+  <h2 id="h-parity">The parity bound</h2>
+  <div class="para">
+    <aside class="note card" aria-label="The parity bound, proved">
+      <div class="note-head"><span class="note-name">The parity bound<span class="note-label">Theorem W1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#the-parity-bound">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">The heaviest set that passes the test bounds opt(n).</p>
+      <p class="precise"><span class="run">Precisely.</span>A <a class="gloss" href="glossary.html#playable">playable</a>
+      set is independent with its own coordinates over GF(2) (the independence lemma, P10), which is independence at
+      both parities of the layer.  So opt(n) is at most the heaviest set independent at both parities.  Weighted
+      matroid intersection finds it, and a weight split checks its value.</p>
+    </aside>
+    <p>The prover's <a class="gloss" href="glossary.html#bound">bound</a> is the test of chapter 5, applied to the
+    whole board.  List, for each number of a set, its <a class="gloss" href="glossary.html#maximal-factor">maximal
+    factors</a> outside the set.  In a set that can be played, no group of numbers lists every factor an even number of
+    times.  So the heaviest set with no such group bounds opt(n).  We call it the parity bound.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="The two gaps, measured">
+      <div class="note-head"><span class="note-name">The two gaps</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md">measured<span class="sr-only">, evidence on GitHub</span></a></div>
+      <p class="plain">The parity bound's gap above opt(n) is about a tenth of Franklín and Moniot's.</p>
+      <p class="precise"><span class="run">Precisely.</span>130 points against 1,200 at n = 1000 to 1300.  Theirs is the
+      heaviest set with a payment scheme, a maximum-weight matching
+      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#what-the-paper-proves">what
+      the paper proves</a>).</p>
+    </aside>
+    <p>Franklín and Moniot's paper gives a looser bound: the heaviest set whose numbers can each be given a maximal
+    factor of their own, from outside the set, to pay with.  Every set that passes the parity test passes theirs, and
+    the parity bound comes far closer to opt(n): its gap is about a tenth of theirs.</p>
+    <p>Why one is stricter than the other shows in a count.  A
+    <a class="gloss" href="glossary.html#payment-scheme">payment scheme</a> gives each number of a set a maximal factor
+    of its own, from outside the set, to pay with.  Count the schemes that pay with the same factors.  A set is
+    allowed by Franklín and Moniot's bound when some choice of factors gets at least one scheme, and by the parity bound
+    when some choice gets an odd number.  It can be played exactly when some choice gets exactly one.</p>
+  </div>
+
+  <figure class="fig wide ladder-fig" id="ladder">
+    <div class="ladder"></div>
+    <figcaption class="fig-caption">Each drawing is one payment scheme: a thick line joins a number to the factor it
+    pays with, a thin line to a factor it could pay with.  Each set's schemes all pay with the same factors.</figcaption>
+  </figure>
+
+  <div class="para">
+    <aside class="note card" aria-label="The counting theorem, proved">
+      <div class="note-head"><span class="note-name">The counting theorem<span class="note-label">Theorem C2</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-counting-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">A set has a payment scheme, passes the parity test, or can be played exactly when some set of
+      factors gets at least one, an odd number, or exactly one of its schemes.</p>
+      <p class="precise"><span class="run">Precisely.</span>With per(S, T) the number of schemes of S onto the factors
+      T, the three conditions are per(S, T) ≥ 1, odd, or 1, for some T.  The odd count is independence over GF(2),
+      since a permanent is its determinant mod 2.</p>
+    </aside>
+    <p>Two schemes on the same factors differ around a <a class="gloss" href="glossary.html#loop">loop</a>: the
+    triangle's second scheme is its first turned once around.  Whichever of 6, 10 and 15 is played first takes both
+    of its primes as tax, and one of the other two is left with nothing to pay with.  Swap 6 for 9 and the loop opens:
+    one scheme, and the set plays, 9 first.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="The first odd core, proved">
+      <div class="note-head"><span class="note-name">The first odd core<span class="note-label">Proposition C3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-first-odd-core">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">Below 45 every set that passes the parity test can be played.</p>
+      <p class="precise"><span class="run">Precisely.</span>Every S ⊆ {2, …, 44} independent with its own coordinates
+      over GF(2) is playable, so the parity bound is opt(n) for n ≤ 44, and {12, 18, 20, 30, 45} is an odd core.</p>
+    </aside>
+    <p>An odd count is what the parity test cannot tell from one.  The five numbers 12, 18, 20, 30 and 45 have three
+    schemes, all paying with 4, 6, 9, 10 and 15.  Three is odd, so they pass the test, yet they cannot all be played:
+    every number has two or more factors to pay with and every factor two or more takers, so
+    <a class="gloss" href="glossary.html#peel">peel</a> has no safe step.  A set like this, which passes the test and
+    cannot be played, is an odd core, and 45 is the smallest board with one.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="The exactness of the parity bound to 77, measured">
+      <div class="note-head"><span class="note-name">Exact to 77</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#what-the-parity-bound-misses">measured<span class="sr-only">, evidence on GitHub</span></a></div>
+      <p class="plain">The parity bound equals opt(n) for every n up to 77, and exceeds it at 78.</p>
+      <p class="precise"><span class="run">Precisely.</span>The prover's run on 2 to 1300 records each bound, checked by
+      its weight split: at 78 it is 1,992 against opt(78) = 1,991
+      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#observations">the evidence</a>).
+      U* with <span data-78="promotions">28, 30, 36 and 39</span> passes the test at that weight; the nine numbers drawn
+      are what peel leaves of it.</p>
+    </aside>
+    <details class="aside" id="exact-to-77" data-toc="exact-to-77" data-title="A bound that is exact">
+      <summary>
+        <span class="aside-pin" aria-hidden="true"></span>
+        <span><span class="where">Along the way: games 1 to 77</span><span class="title">A bound that is exact</span></span>
+        <span class="open-mark"><span class="closed-word">Open</span><span class="open-word">Close</span></span>
+      </summary>
+      <div class="aside-body">
+        <p>Up to game 77 the parity bound is exactly opt(n): below 45 no board has an odd core, and from 45 to 77 none
+        of them raises the bound.</p>
+        <p>At game 78 the bound first misses, by one point: <span data-78="bound">1,992</span> against opt(78) =
+        <span data-78="opt">1,991</span>.  A set worth <span data-78="bound">1,992</span> that passes the test is the optimal
+        game's set with
+        <span data-78="inn">28</span> promoted in place of <span data-78="out">27</span>, and these nine of its numbers
+        cannot all be played.</p>
+        <figure class="fig exact-78-fig" id="exact-78">
+          <svg role="img" aria-label="The odd core of game 78."></svg>
+          <figcaption class="fig-caption">Each number sits between two factors it can pay with, and
+          <span data-78="threes">30 and 42</span> reach across the ring to a third.  Double outline: the promotions,
+          <span data-78="promoted">28 and 30</span>.</figcaption>
+        </figure>
+        <p>Each lists two or three of the nine factors, and every factor is listed twice or more, so peel has no safe
+        step.  Yet no group of the nine lists every factor an even number of times.  It is an odd core, the first that
+        raises the bound.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section class="chapter" id="what-supports-the-scores" data-toc="what-supports-the-scores" aria-labelledby="h-supports">
+  <h2 id="h-supports">What supports the scores</h2>
+  <div class="para">
+    <aside class="note card" aria-label="The corollary of U, proved">
+      <div class="note-head"><span class="note-name">The corollary of U<span class="note-label">Corollary X8</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">The frame model's best score is never above opt(n), and equals it exactly when U holds.</p>
+      <p class="precise"><span class="run">Precisely.</span>ΣU* + P*(Π<sub>n</sub>) ≤ opt(n), with equality iff U holds
+      at n.</p>
+    </aside>
+    <aside class="note card" aria-label="Statement U, open">
+      <div class="note-head"><span class="note-name">Statement U</span><a class="standing is-open" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">open<span class="sr-only">, evidence on GitHub</span></a></div>
+      <p class="plain">Some optimal game plays every number of U* with three or more prime factors.</p>
+      <p class="precise"><span class="run">Precisely.</span>Some optimal set of n contains U*<sub>≥3</sub>.  It holds at
+      every game the prover proves
+      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">the evidence</a>).</p>
+    </aside>
+    <p>Every score up to 2,175 is <a class="gloss" href="glossary.html#opt">opt(n)</a>, proved on the whole board by the
+    <a class="gloss" href="glossary.html#prover">prover</a>.</p>
+    <p>Past 2,175 the scores rest on the <a class="gloss" href="glossary.html#frame-solver">frame solver</a> alone,
+    <span data-rests="past">2,885</span> of them.  Each is the best score of the
+    <a class="gloss" href="glossary.html#frame-model">frame model</a>, and that is opt(n) exactly when
+    <a class="gloss" href="glossary.html#statement-u">statement U</a> holds at n: when some optimal game plays every
+    number of <a class="gloss" href="glossary.html#u-star">U*</a> with three or more prime factors.  U is open in
+    general, so each of those scores is opt(n) given U.</p>
+  </div>
+
+  <figure class="fig rests-fig" id="rests-on" aria-label="What each kind of proof in the chain's records rests on, with the number of games of each kind, and what makes the frame model's best score opt(n).">
+    <div class="rests"></div>
+  </figure>
+
+  <div class="para">
+    <aside class="note tech" aria-label="Proofs and assumptions">
+      <div class="note-head"><span class="note-name">Proofs and assumptions</span></div>
+      <p>Each line of <code>results/optimal.jsonl.gz</code> has a <code>proof</code> and an <code>assumes</code>.  What
+      a game assumes is what its proof rests on beyond the frame model; the verifiers derive both again
+      (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#proof-kinds">proof kinds</a>,
+      <a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#assumptions">assumptions</a>;
+      <a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what
+      supports the scores</a>).</p>
+    </aside>
+    <p>The figure shows what each kind of proof rests on.  A game at the
+    <a class="gloss" href="glossary.html#ceiling">ceiling</a> or by the
+    <a class="gloss" href="glossary.html#prime-formula">prime formula</a> rests on the game before it, and a
+    <a class="gloss" href="glossary.html#repeat">repeat</a> on the game it repeats.  A
+    <a class="gloss" href="glossary.html#search">search</a> rests on the frame model of its own game.  The
+    <span data-rests="known">382</span> games from <span data-rests="knownFrom">3,984</span> to
+    <span data-rests="knownTo">4,783</span> meet an upper bound that an earlier run of the solver proved, so they rest on
+    the frame model of the games that bound came from.</p>
+    <p>Each game's line in the file says this itself: it names its proof and lists what the proof assumes.  A line
+    that assumes nothing is proved within the frame model, given that the solver is right.  The lines of those
+    <span data-rests="known">382</span> games list statement U at each game their bound came from, their own game or
+    others.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note tech" aria-label="The evidence for U">
+      <div class="note-head"><span class="note-name">The evidence for U</span></div>
+      <p>The lower layers: every optimal set holds U*<sub>1</sub> and U*<sub>2</sub>, by
+      <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-bottom-layers-theorem">the
+      bottom-layers theorem (F4)</a>.  The sources: <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#the-sources-conjecture">the
+      sources conjecture (S1)</a>, certified to 100,000.  The barred bounds:
+      <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#the-barred-bound">W2</a>, and
+      their counts by band in <a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md#the-upper-part-game-by-game">the
+      upper part, game by game</a>.  A sketch of what a counterexample would need:
+      <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#where-a-proof-stops">where a
+      proof stops</a>.</p>
+    </aside>
+    <p>What supports U past 2,175:</p>
+    <ul class="rules">
+      <li>It holds at every game the prover reaches, up to 2,175.</li>
+      <li>It is proved for the numbers with one or two prime factors: every optimal set holds those of U*.  U asks
+      the same of the numbers with three or more.</li>
+      <li>Among the <a class="gloss" href="glossary.html#source">sources</a> alone, U* is the heaviest set that can be
+      played, certified game by game up to 100,000.</li>
+      <li>The prover's barred bounds show, number by number, that any game beating the recorded score would have to
+      play most of the numbers U asks about: about 85% of them in the games 2,176 to 3,314, though never all of a
+      game's.</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="chapter-nav" aria-label="Chapters">
+  <a class="prev" href="search.html">5. The search</a>
+  <a class="next" href="results.html"><span class="nav-kicker">Next</span> <span class="nav-title">7. The
+  results.</span>  The games, how each was proven, and what they show.</a>
+</nav>
+
+<footer class="site-foot"><p class="provenance"></p><p><a href="notation.html">Notation</a>: what the marks, pills and symbols mean</p></footer>
+</div></main>
+</div>
+
+<script type="module">
+import { initEssay, registerFigure, mountProvenance } from './js/essay.js';
+import { loadGames, loadSmall } from './js/data.js';
+import { fmt, listWords } from './js/vocab.js';
+import { mountLadder } from './figures/ladder.js';
+import { mountRestsOn } from './figures/rests-on.js';
+import { mountExact78 } from './figures/exact-78.js';
+
+initEssay();
+const [small, games] = await Promise.all([loadSmall(), loadGames()]);
+mountProvenance(games);
+const fill = (attr, facts) => {
+  for (const span of document.querySelectorAll(`[data-${attr}]`)) span.textContent = facts[span.dataset[attr]];
+};
+
+registerFigure('ladder', mountLadder(document.getElementById('ladder')));
+const rests = mountRestsOn(document.getElementById('rests-on'), { games });
+fill('rests', { past: fmt(rests.past), known: fmt(rests.count.known), knownFrom: fmt(rests.knownFrom), knownTo: fmt(rests.knownTo) });
+const e78 = mountExact78(document.getElementById('exact-78'), { small });
+registerFigure('exact-78', e78);
+const f = e78.facts;
+fill('78', {
+  bound: fmt(f.bound), opt: fmt(f.opt), inn: listWords(f.inn), out: listWords(f.out), promotions: listWords(f.promotions),
+  threes: listWords(f.threes), promoted: listWords(f.core.map(([x]) => x).filter((x) => f.promotions.includes(x))),
+});
+</script>
+</body>
+</html>
