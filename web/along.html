@@ -23,28 +23,7 @@
 </header>
 
 <section class="chapter front-along" id="findings" data-toc="findings" aria-label="The findings">
-  <ul class="finding-cards">
-    <li><a href="sets.html#game-40"><span class="where">Game 40</span><span class="title">Three factors of
-    tax</span><span class="line">An optimal game can take 30 while 6, 10 and 15 are all still in the
-    pot.</span></a></li>
-    <li><a href="sets.html#game-833"><span class="where">Game 833</span><span class="title">More moves, fewer
-    points</span><span class="line">Every optimal game makes <span data-833="moves">362</span> moves, but some games
-    make <span data-833="longestMoves">363</span>.</span></a></li>
-    <li><a href="chain.html#cofactor-rule"><span class="where">Every game</span><span class="title">The cofactor
-    rule</span><span class="line">Whether a game needs a search can usually be told from n and its largest prime
-    factor.</span></a></li>
-    <li><a href="top-half.html#game-2873"><span class="where">Game 2873</span><span class="title">The greedy that
-    shouldn’t work</span><span class="line">The usual guarantee for greedy fails here, yet greedy still picks best in
-    every game to 100,000.</span></a></li>
-    <li><a href="frames.html#game-425"><span class="where">Game 425</span><span class="title">Two optimal
-    sets</span><span class="line">Every game up to 424 has one optimal set; game 425 has two.</span></a></li>
-    <li><a href="trust.html#exact-to-77"><span class="where">Games 1 to 77</span><span class="title">Exact to
-    77</span><span class="line">A bound from linear algebra gives the best score of every game up to 77, and misses
-    first at 78.</span></a></li>
-    <li><a href="results.html#share"><span class="where">The whole chain</span><span class="title">The player’s
-    share</span><span class="line">In the large games an optimal game wins about <span data-share>63%</span> of
-    the board, between Hensley’s bounds of 1/2 and 35/48.</span></a></li>
-  </ul>
+  <ul class="finding-cards"></ul>
 </section>
 
 <nav class="chapter-nav" aria-label="Pages">
@@ -53,28 +32,23 @@
   The words of the site.</a>
 </nav>
 
-<footer class="site-foot"><p class="provenance"></p><p><a href="notation.html">Notation</a>: what the marks, pills and symbols mean</p></footer>
+<footer class="site-foot"><p class="provenance"></p></footer>
 </div></main>
 </div>
 
 <script type="module">
-import { ALONG_ICON, initEssay, mountProvenance } from './js/essay.js';
+import { findingCardsHTML, initEssay, mountProvenance } from './js/essay.js';
 import { loadGames } from './js/data.js';
-import { STORY } from './js/site.js';
+import { ALONG } from './js/site.js';
 import { pct } from './js/chart.js';
 import { fill833 } from './figures/longer-833.js';
 import { shareOf } from './figures/share-chart.js';
 
 initEssay();
-// Each finding wears the pin of the findings along the way, and says which chapter tells it, as the front page's do.
-for (const a of document.querySelectorAll('.finding-cards a')) {
-  a.querySelector('.where').insertAdjacentHTML('afterbegin', ALONG_ICON.replace('width="22" height="22"', 'width="18" height="18"'));
-  const chapter = STORY.find((c) => c.href && a.getAttribute('href').split('#')[0] === c.href);
-  if (chapter) a.insertAdjacentHTML('beforeend', `<span class="to">Chapter ${chapter.n}, ${chapter.title}</span>`);
-}
+document.querySelector('.finding-cards').innerHTML = findingCardsHTML(ALONG);
 const games = await loadGames();
 fill833(games);
-document.querySelector('[data-share]').textContent = pct(shareOf(games.columns, games.lastN - 1), 0);
+document.querySelector('[data-share]').textContent = pct(shareOf(games.columns, games.lastN - 1), 1);
 mountProvenance(games, { model: false });
 </script>
 </body>

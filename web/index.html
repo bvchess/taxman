@@ -34,7 +34,7 @@
       <div class="note-head"><span class="note-name">The rules, precisely</span></div>
       <p>Each move the player makes takes a number that still has a <a class="gloss" href="glossary.html#proper-divisor">proper divisor</a> in the pot,
       then the taxman takes all of its divisors still in the pot.  Each move must pay one or more divisors as tax. When no move is left, the taxman takes the
-      rest.  The best score of game n is opt(n), and opt(1), opt(2), opt(3), … is the
+      rest.  The best player score possible for game n is opt(n), and opt(1), opt(2), opt(3), … is the
       <a class="gloss" href="glossary.html#taxman-sequence">Taxman sequence</a>, <a href="https://oeis.org/A019312">A019312</a> in
       the OEIS.</p>
     </aside>
@@ -128,42 +128,12 @@
 <section class="chapter front-along" id="along" data-toc="along" aria-labelledby="h-along">
   <h2 id="h-along">Along the way</h2>
   <p>Finding the games turned up some surprises.  Each one is told in the chapter that explains it.</p>
-  <ul class="finding-cards">
-    <li><a href="sets.html#game-833"><span class="where">Game 833</span><span class="title">More moves, fewer
-    points</span><span class="line">Every optimal game makes <span data-833="moves">362</span> moves, but some games make
-    <span data-833="longestMoves">363</span>.</span></a></li>
-    <li><a href="sets.html#game-40"><span class="where">Game 40</span><span class="title">Three factors of
-    tax</span><span class="line">An optimal game can take 30 while 6, 10 and 15 are all still in the
-    pot.</span></a></li>
-    <li><a href="top-half.html#game-2873"><span class="where">Game
-    2873</span><span class="title">The greedy that shouldn't work</span><span class="line">The usual guarantee for
-    greedy fails here, yet greedy still picks best in every game to 100,000.</span></a></li>
-    <li><a href="frames.html#game-425"><span class="where">Game
-    425</span><span class="title">Two optimal sets</span><span class="line">Every game up to 424 has one optimal
-    set; game 425 has two.</span></a></li>
-    <li><a href="trust.html#exact-to-77"><span class="where">Games
-    1 to 77</span><span class="title">A bound that is exact</span><span class="line">A bound from linear algebra
-    gives the best score of every game up to 77, and misses first at 78.</span></a></li>
-    <li><a href="chain.html#cofactor-rule"><span class="where">Every
-    game</span><span class="title">Easy from n alone</span><span class="line">Whether a game needs a search can
-    usually be told from n and its largest prime factor.</span></a></li>
-  </ul>
+  <ul class="finding-cards"></ul>
 </section>
 
 <section class="chapter front-check" id="check" data-toc="check" aria-labelledby="h-check">
   <h2 id="h-check">Check it yourself</h2>
   <div class="para">
-    <aside class="note tech" aria-label="Checking the chain">
-      <div class="note-head"><span class="note-name">Checking the chain</span></div>
-      <p>From the top of the repository, after building the <a class="gloss" href="glossary.html#frame-solver">frame solver</a>:
-      <code>taxman verify-results results/optimal.jsonl.gz</code>, and the independent check in Python,
-      <code>python3 solver/tools/check_results.py results/optimal.jsonl.gz</code>.  Both replay every game.</p>
-    </aside>
-    <aside class="note tech" aria-label="What supports the scores">
-      <div class="note-head"><span class="note-name">What supports the scores</span></div>
-      <p>Every score up to 2175 is opt(n) on the whole board, and every score past it is opt(n) given statement U.
-      <a href="trust.html#what-supports-the-scores">Chapter 6</a> says what each one rests on.</p>
-    </aside>
     <p>Every game, with its score and its proof, is in one file, and two programs check it.  The code, the theory
     and the record of what we tried are on GitHub.</p>
   </div>
@@ -185,14 +155,14 @@
   </ul>
 </section>
 
-<footer class="site-foot"><p class="provenance"></p><p><a href="notation.html">Notation</a>: what the marks, pills and symbols mean</p></footer>
+<footer class="site-foot"><p class="provenance"></p></footer>
 </div></main>
 </div>
 
 <script type="module">
-import { ALONG_ICON, initEssay, mountProvenance } from './js/essay.js';
+import { findingCardsHTML, initEssay, mountProvenance } from './js/essay.js';
 import { loadGames, loadSmall } from './js/data.js';
-import { STORY } from './js/site.js';
+import { ALONG } from './js/site.js';
 import { fmt } from './js/vocab.js';
 import { mountGame } from './figures/game.js';
 import { mountShrink } from './figures/shrink.js';
@@ -201,12 +171,7 @@ import { settled } from './js/proof.js';
 import { fill833 } from './figures/longer-833.js';
 
 initEssay();
-// Each finding wears the pin of the findings along the way, and says where its link goes.
-for (const a of document.querySelectorAll('.finding-cards a')) {
-  a.querySelector('.where').insertAdjacentHTML('afterbegin', ALONG_ICON.replace('width="22" height="22"', 'width="18" height="18"'));
-  const chapter = STORY.find((c) => c.href && a.getAttribute('href').split('#')[0] === c.href);
-  a.insertAdjacentHTML('beforeend', `<span class="to">${chapter ? `Chapter ${chapter.n}, ${chapter.title}` : 'On GitHub'}</span>`);
-}
+document.querySelector('.finding-cards').innerHTML = findingCardsHTML(ALONG.filter((f) => f.id !== 'share'));
 const [small, games] = await Promise.all([loadSmall(), loadGames()]);
 for (const s of document.querySelectorAll('[data-last-n]')) s.textContent = fmt(games.lastN);
 mountGame(document.getElementById('game'), { small });

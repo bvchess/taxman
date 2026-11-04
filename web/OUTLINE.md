@@ -240,7 +240,7 @@ glossary.
 ## Notation
 
 What the marks, colors, standing pills and symbols mean: the three columns, the legend of the marks flat and raised,
-the two colors, each standing with its meaning, and the table of symbols.  The footer of every page links it.  The style
+the two colors, each standing with its meaning, and the table of symbols.  The navigation links it.  The style
 page, a guide for those who build the site, is not linked.
 
 ## About

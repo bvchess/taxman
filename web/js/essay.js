@@ -218,7 +218,22 @@ function mountFigureLinks() {
 
 // ---- asides: each wears its pin, and a link to one opens it ----------------------------------------------------
 
+/** The cards of findings, as the HTML of the items of a ul.finding-cards: each links to its chapter, with its title and
+ *  line, and at the foot the pin and the chapter's name. */
+export function findingCardsHTML(findings) {
+  const pin = ALONG_ICON.replace('width="22" height="22"', 'width="18" height="18"');
+  return findings.map((f) => {
+    const chapter = STORY.find((c) => c.href === f.href.split('#')[0]);
+    return `<li><a href="${f.href}"><span class="title">${f.title}</span><span class="line">${f.line}</span>`
+      + `<span class="to">${pin}Chapter ${chapter.n}, ${chapter.title}</span></a></li>`;
+  }).join('');
+}
+
 function mountAsides() {
+  for (const title of document.querySelectorAll('details.aside[id] > summary .title')) {
+    const finding = ALONG.find((f) => f.id === title.closest('details').id);
+    if (finding) title.textContent = finding.title;
+  }
   for (const pin of document.querySelectorAll('.aside-pin:empty')) {
     pin.innerHTML = ALONG_ICON.replace('width="22" height="22"', 'width="30" height="30"');
   }

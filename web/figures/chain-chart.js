@@ -185,7 +185,7 @@ export function mountChainChart(host, { games }) {
       if (st.median === null) continue;
       const top = yTime(Math.min(TIME_HI, Math.max(TIME_LO, st.median)));
       el('rect', {
-        x: colX(st), y: top, width: colW(st), height: yTime(TIME_LO) - top, style: 'fill: var(--rule-search)',
+        x: colX(st), y: top, width: colW(st), height: yTime(TIME_LO) - top, style: 'fill: var(--time)',
       }, svg);
     }
     const timeBase = timePlot + timeH + 0.5;
