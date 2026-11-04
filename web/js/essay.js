@@ -47,7 +47,7 @@ export function contentsHTML({ here = herePage() } = {}) {
     const href = hrefOf(c);
     return href ? link(badge(c, href === here), c.title, href) : unwritten(badge(c, false), c.title);
   }).join('');
-  const after = AFTER.map((a) => unwritten(ALONG_ICON, a.title)).join('');
+  const after = AFTER.map((a) => (a.href ? link(`<span class="glyph">${a.mark}</span>`, a.title, a.href) : unwritten(ALONG_ICON, a.title))).join('');
   return `<p class="toc-group">The story</p><ul class="toc">${story}</ul><ul class="toc">${after}</ul>`;
 }
 
@@ -56,7 +56,7 @@ export const homeMark = () => numberSVG('', { rendering: 'raised', looks: ['play
 function mountContents() {
   const rail = document.querySelector('.rail');
   const top = document.querySelector('.topbar');
-  const foot = '<p class="rail-foot"><a href="style.html">The style of the site</a></p>';
+  const foot = herePage() === 'notation.html' ? '' : '<p class="rail-foot"><a href="notation.html">Notation</a>: what the marks, pills and symbols mean</p>';
   if (rail && !rail.dataset.own) {
     rail.innerHTML = `<a class="home" href="index.html">${homeMark()}Taxman</a><nav aria-label="Contents">${contentsHTML()}</nav><div class="progress" aria-hidden="true"><span></span></div>${foot}`;
   }

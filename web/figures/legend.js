@@ -117,7 +117,7 @@ export const ENTRIES = [
   { key: 'named', name: 'Halo', words: 'the number the words beside the figure are about', use: 'Point at a number in the prose; a figure also uses it for what its caption names.', draw: one(19, 'move', 'kept', 'named'), core: true },
   { key: 'lying', name: 'Lying flat', words: 'a number that cannot be taken now', use: 'Raised figures only: a token that stands can be taken, one that lies flat cannot.', draw: lyingSample, core: true },
   { key: 'tag', name: 'Tag', words: 'the place of a move in the game', use: 'Flat figures only, when a game is played in place; a raised game fills the player’s tray in order instead.', draw: tagSample },
-  { key: 'columns', name: 'Layer columns', words: 'a column for each layer, layer 1 at the right', use: 'Every figure that lays a game out by layers or frames; lines run rightward, toward the front.', draw: columnsSample },
+  { key: 'columns', name: 'Layer columns', words: 'a column for each layer, layer 1 at the right', use: 'Every figure that lays a game out by layers or frames; lines run rightward, toward the front.', draw: columnsSample, core: true },
 ];
 
 /** Draw the legend into host: a row an entry, the flat mark, the raised one, and its meaning. */

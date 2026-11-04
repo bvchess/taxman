@@ -16,20 +16,10 @@
 <main class="essay"><div class="column">
 
 <header class="essay-head para">
-  <aside class="note tech" aria-label="Optimal, precisely">
-    <div class="note-head"><span class="note-name">Optimal, precisely</span></div>
-    <p>Every score up to 2175 is opt(n), proven on the whole board by the prover, a second program that shares no
-    proof code with the frame solver.  Past 2175, each score is the best score of the frame model, which is opt(n)
-    wherever <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">statement
-    U</a> holds; U is open in general.  Every game's record says how it was proven and what it assumes
-    (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports
-    the scores</a>).</p>
-  </aside>
   <h1>Playing optimal games of Taxman</h1>
   <p class="lede">Taxman is a number game played against a taxman.  We play an optimal game, one with the best
-  possible score, for every n from 1 to <span data-last-n>the end of our chain</span>.  Every score up to 2175 is
-  proven outright, and every score past it is proven given one statement that is still open.  This site explains how
-  we found the games, and why we can trust them.</p>
+  possible score, for every n from 1 to <span data-last-n>the end of our chain</span>.  This site explains how we did
+  it.</p>
 </header>
 
 <section class="chapter front-play" id="the-game" data-toc="the-game" aria-labelledby="h-game">
@@ -37,11 +27,10 @@
   <div class="para">
     <aside class="note tech" aria-label="The rules, precisely">
       <div class="note-head"><span class="note-name">The rules, precisely</span></div>
-      <p>A move takes a number that still has a proper divisor in the pot, and the taxman takes all of its proper
-      divisors still in the pot.  When no move is left, the taxman takes the rest.  The best score of game n is
+      <p>A move takes a number that still has a <a href="glossary.html#proper-divisor">proper divisor</a> in the pot,
+      and the taxman takes all of its proper divisors still in the pot.  When no move is left, the taxman takes the rest.  The best score of game n is
       opt(n), and opt(1), opt(2), opt(3), … is the Taxman sequence, <a href="https://oeis.org/A019312">A019312</a> in
-      the OEIS.  The rules in full are in
-      <a href="https://github.com/bvchess/taxman/blob/master/docs/GLOSSARY.md#the-game">the glossary</a>.</p>
+      the OEIS.  Every word of the game is defined in <a href="glossary.html#the-game">the glossary</a>.</p>
     </aside>
     <p>Taxman is played on the numbers 1 to n, which start in the <em>pot</em>.</p>
   </div>
@@ -147,6 +136,16 @@
       <code>taxman verify-results results/optimal.jsonl.gz</code>, and the independent check in Python,
       <code>python3 solver/tools/check_results.py results/optimal.jsonl.gz</code>.  Both replay every game.</p>
     </aside>
+    <aside class="note tech" aria-label="What supports the scores">
+      <div class="note-head"><span class="note-name">What supports the scores</span></div>
+      <p>Every score up to 2175 is opt(n), proven on the whole board by the <a href="glossary.html#prover">prover</a>,
+      a second program that shares no proof code with the frame solver.  Past 2175, each score is the best score of
+      the <a href="glossary.html#frame-model">frame model</a>, which is opt(n) wherever
+      <a href="glossary.html#statement-u">statement U</a> holds; U is open in general.  Every game's record says how
+      it was proven and what it assumes
+      (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports
+      the scores</a>).</p>
+    </aside>
     <p>Every game, with its score and its proof, is in one file, and two programs check it.  The code, the theory
     and the record of what we tried are on GitHub.</p>
   </div>
@@ -168,8 +167,7 @@
   </ul>
 </section>
 
-<footer class="site-foot"><p class="provenance"></p><p><a href="style.html">The style of the site</a>: the type, the
-colors, the marks and the motion, on one page.</p></footer>
+<footer class="site-foot"><p class="provenance"></p><p><a href="notation.html">Notation</a>: what the marks, pills and symbols mean</p></footer>
 </div></main>
 </div>
 

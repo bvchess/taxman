@@ -263,15 +263,16 @@ table, .nums, output { font-variant-numeric: tabular-nums lining-nums; }
 .links li span { display: block; color: var(--ink-3); font-size: 0.74rem; }
 
 /* The standing of a statement: a pill told apart by its outline or its fill, never by color: filled for proved, gray
-   under a solid outline for proved by computation, a double outline for proved given U, dotted for measured, dashed
-   for open. */
+   under a solid outline for proved by computation, a double outline for proved given U, gray stripes for certified
+   game by game, dotted for measured, dashed for open. */
 .standing {
   display: inline-block; flex: none; padding: 0.04rem 0.5rem 0.1rem; border: 1.5px solid var(--ink); border-radius: 999px;
   font-size: 0.68rem; font-weight: 700; line-height: 1.35; color: var(--ink); white-space: nowrap; background: var(--paper);
 }
 .standing.is-proved { background: var(--ink); color: var(--paper); }
 .standing.is-computed { background: var(--kept); }
-.standing.is-givenU { border-style: double; border-width: 3.5px; padding: 0 0.42rem 0.04rem; }
+.standing.is-given-u { border-style: double; border-width: 3.5px; padding: 0 0.42rem 0.04rem; }
+.standing.is-certified { background: repeating-linear-gradient(135deg, var(--kept) 0 3px, var(--paper) 3px 6px); }
 .standing.is-measured { border-style: dotted; border-width: 2px; }
 .standing.is-open { border-style: dashed; }
 /* A standing that is a link keeps its look and answers the pointer: it lifts a little, with an underline, and shows a
@@ -436,7 +437,12 @@ figure { margin: 30px 0 34px; }
 .btn:active { transform: translateY(1.5px); box-shadow: 0 0.5px 0 var(--tray-edge); }
 .btn:disabled { opacity: 0.45; cursor: default; }
 .btn.round { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; font-size: 1.05rem; }
-.btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); box-shadow: 0 2px 0 var(--rim); }
+/* The main button plays your game, so it wears the player's color: a raised token's face and rim.  It is never filled with
+   ink, which is the look of the proved pill. */
+.btn.primary { background: var(--player-face); color: var(--player-on); border-color: var(--player-rim); box-shadow: 0 2px 0 var(--player-side); }
+.btn.primary:hover:not(:disabled) { border-color: var(--ink); box-shadow: 0 3px 0 var(--player-rim); transform: translateY(-1px); }
+.btn.primary:active:not(:disabled) { transform: translateY(1.5px); box-shadow: 0 0.5px 0 var(--player-side); }
+.btn:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; }
 
 .tray-box {
   background: var(--tray); border: 1.5px solid var(--tray-edge); border-radius: 18px; padding: 10px 12px 12px;
@@ -749,4 +755,35 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+
+/* ---- the glossary, the standings list and the symbols --------------------------------------------------------- */
+
+.toc .glyph { font-weight: 700; font-size: 0.82rem; color: var(--ink-2); }
+.toc a.is-here .glyph { color: var(--ink); }
+
+/* The glossary: the term in bold on the left, its meaning beside it; one column on a phone.  A term another page links
+   to is marked quietly when the reader arrives at it, and clears the top bar. */
+dl.glossary { display: grid; grid-template-columns: minmax(8.5rem, 12rem) minmax(0, 1fr); gap: 0 24px; margin: 0 0 1rem; }
+dl.glossary dt, dl.glossary dd { margin: 0; padding: 0.7rem 0; border-top: 1px solid var(--hair); }
+dl.glossary dt { font-weight: 700; color: var(--ink); scroll-margin-top: 70px; align-self: start; padding-left: 8px; margin-left: -8px; border-radius: 6px; }
+dl.glossary dt:target { background: var(--wash); box-shadow: inset 3px 0 0 var(--ink-3); }
+dl.glossary dt:first-child, dl.glossary dt:first-child + dd { border-top: 0; }
+
+/* The standings list: each pill as the cards draw it, beside its meaning. */
+dl.standings-list { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0.55rem 18px; align-items: center; margin: 1rem 0 1.4rem; }
+dl.standings-list dt, dl.standings-list dd { margin: 0; }
+
+table.symbols { border-collapse: collapse; margin: 1rem 0 1.4rem; font-size: 0.92rem; }
+table.symbols th, table.symbols td { padding: 0.4rem 1.2rem 0.4rem 0; text-align: left; vertical-align: baseline; border-bottom: 1px solid var(--hair); }
+table.symbols th { font-size: 0.74rem; font-weight: 600; color: var(--ink-3); }
+table.symbols td:first-child { font-weight: 700; white-space: nowrap; }
+
+@media (max-width: 560px) {
+  dl.glossary { grid-template-columns: minmax(0, 1fr); }
+  dl.glossary dt { padding-bottom: 0; border-bottom: 0; }
+  dl.glossary dd { border-top: 0; padding-top: 0.15rem; }
+  dl.standings-list { grid-template-columns: minmax(0, 1fr); gap: 0.2rem 0; }
+  dl.standings-list dd { margin-bottom: 0.7rem; }
+  table.symbols td:first-child { white-space: normal; }
 }

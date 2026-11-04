@@ -16,7 +16,8 @@ merged and cut.
   The words are the theory's ([statements.md](../docs/theory/statements.md#the-statements)).
 * **Numbers come from the data.**  Counts, scores and shares are read from `results/optimal.jsonl.gz` when the page is
   built or loaded, never typed.
-* **One name for each idea**, the glossary's.  A term is defined where it first appears and in the right column.
+* **One name for each idea**, the site glossary's (`glossary.html`).  A term is defined where it first appears, and a
+  page links it to the glossary.
 * **"To our knowledge"** appears once, on the About page, where the site says what this work adds.
 
 ## The arc
@@ -43,8 +44,7 @@ recorded search of game 5060.
 chain's end, and this site explains how.
 
 * **Headline:** *Playing optimal games of Taxman.*
-* **Lede:** what we did: an optimal game for every n from 1 to the chain's end, proven outright to 2175 and, past it,
-  given one open statement.
+* **Lede:** what we did: an optimal game for every n from 1 to the chain's end; this site explains how.
 * **The game:** the rules as a list, ending with what it means to beat the taxman, then a game to play (n from 2 to 30,
   with a button that plays an optimal game).
 * **Playing well is easy:** a simple strategy with no search scores 99.85% of the optimal points up to 1000.  The last
@@ -53,8 +53,10 @@ chain's end, and this site explains how.
 * **The chain:** the chart of every game: the player's share, and how each game was settled.
 * **Along the way:** the findings as cards, each linked to the chapter that explains it.
 * **Check it yourself:** the data, the programs and the theory on GitHub.
-* **Right column:** what "optimal" means here; the rules precisely, opt(n) and the Taxman sequence (OEIS A019312); the
-  heuristics' claims and how they were measured (`heuristics/README.md`); how to check the chain; how to cite the site.
+* **Right column:** the rules precisely, opt(n) and the Taxman sequence (OEIS A019312); the heuristics' claims and how
+  they were measured (`heuristics/README.md`); how to check the chain; what supports the scores (proven outright to
+  2175, given U past it), beside "Check it yourself" and not at the top, until chapter 6 gives it its home; how to cite
+  the site.
 
 ## The story
 
@@ -207,6 +209,18 @@ An index of the findings, each a card linked to the page that explains it: three
 fewer points (833), two optimal sets (425), the greedy that shouldn't work (2873), exact to 77, the cofactor rule, and
 the player's share.
 
+## Glossary
+
+The site's words, each with its meaning and an example, grouped in the order of the story, with their precise forms
+in the right column.  Pages link a term to it, as the front page links *proper divisor*; no page links the repository's
+glossary.
+
+## Notation
+
+What the marks, colors, standing pills and symbols mean: the three columns, the legend of the marks flat and raised,
+the two colors, each standing with its meaning, and the table of symbols.  The footer of every page links it.  The style
+page, a guide for those who build the site, is not linked.
+
 ## About
 
 * What this work adds, where "to our knowledge" appears once: the chain of optimal games, its proofs and its trust
@@ -220,6 +234,6 @@ the player's share.
 
 * Whether the heuristics deserve more than the front page's paragraph and an aside.
 * Whether the explorer is in the first version of the site.
-* Whether trust (6) comes before the search chapter (5), so the reader knows what "proven" means before the search
-  proves anything.
+* How many pages: one a chapter for now, merged or split once the pages' lengths are known.  Trust stays after the
+  search.
 * Where the theory's proofs are read: on GitHub, as now, or as pages of the site in the same style.

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notation · Playing optimal games of Taxman</title>
+<meta name="description" content="What the marks, colors, pills and symbols of the site Playing optimal games of Taxman mean.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2718%27 r=%2713%27 fill=%27%2314478c%27/%3E%3Ccircle cx=%2716%27 cy=%2715%27 r=%2713%27 fill=%27%232166c4%27/%3E%3C/svg%3E">
+<script src="js/tone.js"></script>
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body data-page="notation">
+<header class="topbar"></header>
+<div class="site">
+<aside class="rail" aria-label="Contents"></aside>
+<main class="essay"><div class="column">
+
+<header class="essay-head para">
+  <h1>Notation</h1>
+  <p class="lede">What the marks, colors, pills and symbols of this site mean.  Every figure and every page uses the
+  same ones.</p>
+</header>
+
+<section class="chapter" id="the-page" data-toc="the-page" aria-labelledby="h-n-page">
+  <h2 id="h-n-page">The page</h2>
+  <p>Every page has three columns.  The navigation is on the left.  The story is in the center, and it is written to
+  be read on its own.  The right column holds what is more exact than the story, beside the paragraph it belongs to:
+  the precise statement of each result, technical notes, and links to the code, the data and the literature.</p>
+  <p>On a narrow screen the right column folds into the text, and each of its notes opens when you tap it.</p>
+</section>
+
+<section class="chapter" id="the-marks" data-toc="the-marks" aria-labelledby="h-n-marks">
+  <h2 id="h-n-marks">The marks</h2>
+  <p>Every figure draws numbers with the same marks.  A circle is a number above n/2, or any number taken as a move;
+  a square is a number up to n/2.  The rest of each mark says what has happened to it.</p>
+
+  <div id="legend"></div>
+
+  <p><strong>Flat or raised.</strong>  A number you can play stands up from the page as a token, a coin for a
+  circle and a tile for a square.  A number that cannot be taken lies flat.  The numbers in a figure that explains
+  something are drawn flat, in ink.  So depth means you can touch it.</p>
+  <p><strong>Layers and frames.</strong>  A figure that sets a game out by layers puts each layer in a column, with
+  layer 1 at the right and the highest layer at the left, so every line runs right, toward the frames that are played
+  first.  A frame is drawn as a box around its sources and its factors, and a dashed box is a closed frame.</p>
+  <p><strong>In the text.</strong>  A number in bold with a dotted underline lights up in the figure beside it when
+  you point at it.  An underlined phrase with a small tag moves the figure to the state it names.</p>
+</section>
+
+<section class="chapter" id="color" data-toc="color" aria-labelledby="h-n-color">
+  <h2 id="h-n-color">Color</h2>
+  <p>Two colors mean something, and only two.  Blue is you, the player, and your moves.  Orange is the taxman and his
+  tax.  Every other mark is ink and gray.  Each color is backed by a shape, a place or a label too, so a reader who
+  cannot tell the colors apart misses nothing.</p>
+</section>
+
+<section class="chapter" id="standings" data-toc="standings" aria-labelledby="h-n-standings">
+  <h2 id="h-n-standings">Where a result stands</h2>
+  <p>Each result in the right column wears a pill that says where it stands.  The pill is a link to the result's
+  proof, or to the evidence for it.</p>
+
+  <dl class="standings-list">
+    <dt><span class="standing is-proved">proved</span></dt>
+    <dd>The theory proves it.</dd>
+    <dt><span class="standing is-given-u">proved given U</span></dt>
+    <dd>The theory proves it from statement U, which is open in general.</dd>
+    <dt><span class="standing is-computed">proved by computation</span></dt>
+    <dd>A statement about particular games, proved by running a program on them.</dd>
+    <dt><span class="standing is-certified">certified game by game</span></dt>
+    <dd>An open statement that a computation proves in each game of a range.</dd>
+    <dt><span class="standing is-measured">measured</span></dt>
+    <dd>Observed in the data, with no proof.</dd>
+    <dt><span class="standing is-open">open</span></dt>
+    <dd>Neither proved nor refuted.</dd>
+  </dl>
+  <p>A card gives a result's name and its label in the theory, such as Lemma P1, then the result in plain words, and
+  then, after <em>Precisely</em>, its exact statement.</p>
+</section>
+
+<section class="chapter" id="symbols" data-toc="symbols" aria-labelledby="h-n-symbols">
+  <h2 id="h-n-symbols">Symbols</h2>
+  <p>The story uses few symbols, and the right column uses more.  Each is defined where it first appears, and here.</p>
+  <table class="symbols">
+    <thead><tr><th>symbol</th><th>meaning</th></tr></thead>
+    <tbody>
+      <tr><td>n</td><td>the game: game n is Taxman on the numbers 1 to n</td></tr>
+      <tr><td>opt(n)</td><td>the best score of game n</td></tr>
+      <tr><td>S*(n)</td><td>an optimal set of game n, the set of moves of an optimal game</td></tr>
+      <tr><td>ΣS</td><td>the sum of the members of a set S</td></tr>
+      <tr><td>x | y</td><td>x divides y</td></tr>
+      <tr><td>x/p</td><td>a maximal factor of x, for a prime p that divides x</td></tr>
+      <tr><td>Ω(x)</td><td>the layer of x: its prime factors, counted with repeats</td></tr>
+      <tr><td>q(n)</td><td>the largest prime up to n</td></tr>
+      <tr><td>⌊x⌋</td><td>x rounded down to a whole number</td></tr>
+      <tr><td>U*</td><td>the sources that descending greedy keeps</td></tr>
+      <tr><td>U</td><td>statement U, the open statement that some optimal game plays all of U* in layers 3 and up</td></tr>
+      <tr><td>iff</td><td>if and only if</td></tr>
+      <tr><td>GF(2)</td><td>arithmetic with only 0 and 1, where 1 + 1 = 0</td></tr>
+    </tbody>
+  </table>
+  <p>The words of the game, from <em>pot</em> to <em>promotion</em>, are in the <a href="glossary.html">glossary</a>.</p>
+</section>
+
+</div></main>
+</div>
+<footer class="site-foot"><p class="provenance"></p></footer>
+
+<script type="module">
+import { initEssay, mountProvenance } from './js/essay.js';
+import { loadGames } from './js/data.js';
+import { mountLegend } from './figures/legend.js';
+
+initEssay();
+mountLegend(document.getElementById('legend'));
+mountProvenance(await loadGames(), { model: false });
+</script>
+</body>
+</html>

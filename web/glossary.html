@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glossary · Playing optimal games of Taxman</title>
+<meta name="description" content="The words of the site Playing optimal games of Taxman, each with its meaning and an example.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2718%27 r=%2713%27 fill=%27%2314478c%27/%3E%3Ccircle cx=%2716%27 cy=%2715%27 r=%2713%27 fill=%27%232166c4%27/%3E%3C/svg%3E">
+<script src="js/tone.js"></script>
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body data-page="glossary">
+<header class="topbar"></header>
+<div class="site">
+<aside class="rail" aria-label="Contents"></aside>
+<main class="essay"><div class="column">
+
+<header class="essay-head para">
+  <h1>Glossary</h1>
+  <p class="lede">The words of this site, each with its meaning and an example.  The groups follow the order of the
+  story, and each idea has one name.</p>
+</header>
+
+<section class="chapter" id="the-game" data-toc="the-game" aria-labelledby="h-g-game">
+  <h2 id="h-g-game">The game</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="The game, precisely">
+      <div class="note-head"><span class="note-name">The game, precisely</span></div>
+      <p>A divisor here is always a proper one, smaller than the move.  opt(n) is a maximum over every legal game of
+      n, and opt(1), opt(2), opt(3), … is <a href="https://oeis.org/A019312">A019312</a> in the OEIS.</p>
+    </aside>
+    <dl class="glossary">
+      <dt id="game">game n</dt>
+      <dd>Taxman played on the numbers 1 to n.  Game 21 is Taxman on 1 to 21.  A <em>game</em> also means one play
+      of it, as in "an optimal game of 21".</dd>
+      <dt id="board">board</dt>
+      <dd>The numbers 1 to n of game n.</dd>
+      <dt id="proper-divisor">divisor, proper divisor</dt>
+      <dd>A divisor of a number divides it with nothing left over.  A proper divisor is one smaller than the number
+      itself: the proper divisors of 12 are 1, 2, 3, 4 and 6.  In Taxman, a divisor is always a proper one.</dd>
+      <dt id="pot">pot</dt>
+      <dd>The numbers that neither you nor the taxman has taken yet.  It starts as the whole board.</dd>
+      <dt id="move">move</dt>
+      <dd>A number you take.  It must still have a divisor in the pot, and you score it.</dd>
+      <dt id="tax">tax</dt>
+      <dd>The divisors of a move still in the pot, which the taxman takes with it.  When no move is left, the taxman
+      takes the rest of the pot too.</dd>
+      <dt id="score">score</dt>
+      <dd>The sum of your moves.  You beat the taxman when your score is higher than the total he collects.</dd>
+      <dt id="opt">opt(n)</dt>
+      <dd>The best score anyone can make in game n.  opt(10) = 40.</dd>
+      <dt id="optimal-game">optimal game</dt>
+      <dd>A game that scores opt(n).</dd>
+      <dt id="taxman-sequence">Taxman sequence</dt>
+      <dd>The best scores opt(1), opt(2), opt(3), … in order.</dd>
+    </dl>
+  </div>
+</section>
+
+<section class="chapter" id="sets" data-toc="sets" aria-labelledby="h-g-sets">
+  <h2 id="h-g-sets">Sets and payments</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="Sets, precisely">
+      <div class="note-head"><span class="note-name">Sets, precisely</span></div>
+      <p>The maximal factors of x are x/p for each prime p dividing x.  A payment scheme of a set S gives each member
+      a distinct maximal factor outside S, and a set is playable iff it has a scheme whose precedence, which says what
+      must be played before what, has no cycle.  S*(n) is an optimal set of game n, and ΣS the sum of a set S.</p>
+    </aside>
+    <dl class="glossary">
+      <dt id="playable">playable</dt>
+      <dd>A set of numbers that can all be taken as moves, in some order.  {9, 15} is playable on the board of 21: 9
+      first, then 15.</dd>
+      <dt id="optimal-set">optimal set</dt>
+      <dd>The set of moves of an optimal game: a playable set with the largest sum.  Most games have one; from game
+      425 on, some have two or three.</dd>
+      <dt id="weight">weight</dt>
+      <dd>The sum of a set's members, the score it earns as moves.  A <em>heaviest</em> set has the largest
+      weight.</dd>
+      <dt id="maximal-factor">maximal factor</dt>
+      <dd>A number divided by one of its primes.  12 has the maximal factors 6 and 4, 9 has only 3, and a prime has
+      only 1.  A move is legal exactly when one of its maximal factors is still in the pot.</dd>
+      <dt id="pays-for">pays for</dt>
+      <dd>A maximal factor of a move, still in the pot when the move is made, <em>pays for</em> it.  Two moves can
+      never share a payment.</dd>
+      <dt id="payment-scheme">payment scheme</dt>
+      <dd>A choice of a maximal factor to pay for each number of a set, no two the same.</dd>
+      <dt id="peel">peel</dt>
+      <dd>The quick test of whether a set is playable.  It pairs numbers with their payments one at a time by two
+      safe steps: a number with only one maximal factor left to pay with takes it (a <em>front move</em>), and a
+      factor that only one number can still use goes to that number (a <em>back move</em>).  The set is playable
+      exactly when every number gets paired.</dd>
+      <dt id="loop">loop</dt>
+      <dd>A number with two prime factors can be drawn as an edge between them.  Such numbers can all be played
+      exactly when their edges contain no loop.  10, 14, 15 and 21 make a loop on 2, 5, 3 and 7.</dd>
+    </dl>
+  </div>
+</section>
+
+<section class="chapter" id="the-chain" data-toc="the-chain" aria-labelledby="h-g-chain">
+  <h2 id="h-g-chain">The chain</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="The chain, precisely">
+      <div class="note-head"><span class="note-name">The chain, precisely</span></div>
+      <p>The ceiling is opt(n − 1) + n.  At a prime p, opt(p) = opt(p − 1) + p − q(p − 1), where q(p − 1) is the
+      largest prime below p.  A repeat's answer carries over given statement U at n.</p>
+    </aside>
+    <dl class="glossary">
+      <dt id="chain">chain</dt>
+      <dd>Our optimal games for every n from 1 up, found in order, each built from an optimal game of the one
+      before.</dd>
+      <dt id="ceiling">ceiling</dt>
+      <dd>n more than the best score of game n − 1.  No game of n can beat it, so a game that reaches it is optimal.</dd>
+      <dt id="prime-formula">prime formula</dt>
+      <dd>At a prime n, an optimal game swaps the largest prime below n for n itself, and its score rises by the
+      difference.</dd>
+      <dt id="repeat">repeat</dt>
+      <dd>A game that poses exactly the search problem of an earlier game, so the earlier game's answer carries
+      over.</dd>
+    </dl>
+  </div>
+</section>
+
+<section class="chapter" id="the-top-half" data-toc="the-top-half" aria-labelledby="h-g-top">
+  <h2 id="h-g-top">The top half</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="The top half, precisely">
+      <div class="note-head"><span class="note-name">The top half, precisely</span></div>
+      <p>The sources of game n are the s with n/2 &lt; s ≤ n, and the factors are 1 to ⌊n/2⌋.  The layer of x is
+      Ω(x), its prime factors counted with multiplicity.  Statement U at n says that some optimal set of n contains
+      every member of U* in layers 3 and up.</p>
+    </aside>
+    <dl class="glossary">
+      <dt id="source">source</dt>
+      <dd>A number above n/2.  It divides nothing else on the board, so it is never tax: it is a move or nothing.  On
+      the board of 21 the sources are 11 to 21.</dd>
+      <dt id="factor">factor</dt>
+      <dd>A number up to n/2.  It is tax for some larger number, and sometimes a move itself.</dd>
+      <dt id="layer">layer</dt>
+      <dd>A number's count of prime factors, with repeats.  12 = 2 · 2 · 3 is in layer 3, every prime is in layer 1,
+      and 1 alone is in layer 0.</dd>
+      <dt id="descending-greedy">descending greedy</dt>
+      <dd>The pass that chooses the sources: from the largest down, it keeps each source that can still be played with
+      the ones kept before it.</dd>
+      <dt id="u-star">U*</dt>
+      <dd>The sources that descending greedy keeps.  In game 21, U* is 12, 14, 15, 16, 18, 19, 20 and 21.</dd>
+      <dt id="statement-u">statement U</dt>
+      <dd>The one open statement between our model of the game and the game itself: that some optimal game plays
+      every number of U* with three or more prime factors.  It is proven in every game the prover reaches, and open
+      in general.</dd>
+    </dl>
+  </div>
+</section>
+
+<section class="chapter" id="frames" data-toc="frames" aria-labelledby="h-g-frames">
+  <h2 id="h-g-frames">Frames</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="Frames, precisely">
+      <div class="note-head"><span class="note-name">Frames, precisely</span></div>
+      <p>A frame is a connected component of the graph that joins each source to its maximal factors.  A frame's
+      freedoms are its factors less its moves.  A promotion set is a set of candidates that can be promoted together,
+      keeping every frame winnable.</p>
+    </aside>
+    <dl class="glossary">
+      <dt id="frame">frame</dt>
+      <dd>A group of sources with every factor that can pay for them: a small game inside the big one.  Game 21 has
+      four.</dd>
+      <dt id="in-front">in front of</dt>
+      <dd>One frame is in front of another when a number of the other has a maximal factor in it.  Frames in front
+      are played first, and in the figures they sit to the right.</dd>
+      <dt id="freedom">freedom</dt>
+      <dd>A factor that a frame can spare: its factors less its moves.  A frame with none is <em>closed</em>.</dd>
+      <dt id="candidate">candidate</dt>
+      <dd>A factor that its frame can spare and the frame in front of it can take on.  Game 21 has the candidates 4 and
+      9.</dd>
+      <dt id="promote">promote</dt>
+      <dd>To play a factor as a move.  A promoted factor becomes a move of the frame in front.  Game 21's optimal game
+      promotes 9.</dd>
+      <dt id="frame-model">frame model</dt>
+      <dd>The game seen as frames, with the sources fixed to U*, so that only the promotions are left to choose.  Its
+      best score is the best score of the game wherever statement U holds.</dd>
+    </dl>
+  </div>
+</section>
+
+<section class="chapter" id="the-search" data-toc="the-search" aria-labelledby="h-g-search">
+  <h2 id="h-g-search">The search</h2>
+  <dl class="glossary">
+    <dt id="search">search</dt>
+    <dd>The program's way of choosing the promotions: it tries promoting each candidate or not, and drops any branch
+    that cannot beat the best game found.</dd>
+    <dt id="node">node</dt>
+    <dd>One point of a search: some promotions decided, the rest still open.</dd>
+    <dt id="bound">bound</dt>
+    <dd>An upper limit on what a node could still gain.  A node whose bound cannot beat the best game found is
+    dropped.</dd>
+    <dt id="gap">gap</dt>
+    <dd>How far a bound is above the best game found.  The larger the gap, the larger the search.</dd>
+  </dl>
+</section>
+
+<section class="chapter" id="trust" data-toc="trust" aria-labelledby="h-g-trust">
+  <h2 id="h-g-trust">Trust</h2>
+  <dl class="glossary">
+    <dt id="frame-solver">frame solver</dt>
+    <dd>The program that finds the optimal games, by searching the frame model.</dd>
+    <dt id="prover">prover</dt>
+    <dd>A second program, which shares no proof code with the frame solver and proves the scores on the whole board,
+    without frames.</dd>
+    <dt id="referee">referee</dt>
+    <dd>The check that replays every recorded game: each move legal, the score as recorded, and no move left at the
+    end.</dd>
+  </dl>
+</section>
+
+<nav class="chapter-nav" aria-label="Pages">
+  <a class="prev" href="index.html">Front page</a>
+  <a class="next" href="notation.html">Notation: what the marks, pills and symbols mean</a>
+</nav>
+
+</div></main>
+</div>
+<footer class="site-foot"><p class="provenance"></p><p><a href="notation.html">Notation</a>: what the marks, pills and symbols mean</p></footer>
+
+<script type="module">
+import { initEssay, mountProvenance } from './js/essay.js';
+import { loadGames } from './js/data.js';
+
+initEssay();
+mountProvenance(await loadGames(), { model: false });
+</script>
+</body>
+</html>

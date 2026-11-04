@@ -39,7 +39,7 @@
       <div class="note-head"><span class="note-name">Notation</span></div>
       <p>opt(n) is the best score of game n.  The scores opt(1), opt(2), opt(3), … are the Taxman sequence,
       <a href="https://oeis.org/A019312">A019312</a> in the OEIS.  A divisor here is always a proper one, below the
-      move; the rules in full are in <a href="https://github.com/bvchess/taxman/blob/master/docs/GLOSSARY.md#the-game">the
+      move; the rules in full are in <a href="glossary.html#the-game">the
       glossary</a>.</p>
     </aside>
     <p>Your score is the sum of your moves.  The best score anyone can make on 1 to n is written opt(n), and a game
@@ -233,7 +233,7 @@
       <div class="note-head"><span class="note-name">Freedoms, precisely</span></div>
       <p>A frame D with factors F<sub>D</sub> and kept sources K<sub>D</sub> has |F<sub>D</sub>| − |K<sub>D</sub>|
       freedoms, and is closed when it has none.  In game 21 a candidate is a factor x of a frame with a freedom such
-      that U* ∪ {x} is playable.  The <a href="https://github.com/bvchess/taxman/blob/master/docs/GLOSSARY.md#the-frame-model">glossary</a>
+      that U* ∪ {x} is playable.  The <a href="glossary.html#frames">glossary</a>
       has the solver's own, wider sense of the word.</p>
     </aside>
     <p data-follows="fig21" data-state="6">Each frame is a small game of its own.  <a class="go" href="?fig21=6#fig21" data-fig="fig21" data-state="6">Count
@@ -327,7 +327,7 @@
       at n.  Layers 1 and 2 are settled by the bottom-layers theorem.</p>
     </aside>
     <aside class="note card" aria-label="The chain's scores, proved given U">
-      <div class="note-head"><span class="note-name">The chain's scores</span><a class="standing is-givenU" href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">proved given U<span class="sr-only">, proof on GitHub</span></a></div>
+      <div class="note-head"><span class="note-name">The chain's scores</span><a class="standing is-given-u" href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">proved given U<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Every score of the chain is opt(n) wherever statement U holds at n.</p>
       <p class="precise"><span class="run">Precisely.</span>Each recorded score is ΣU* + P*, optimal in the frame model
       given that the solver is right, and so opt(n) by X8 given U at n.  For the first games of the chain the prover,
@@ -349,8 +349,7 @@
   </div>
 </section>
 
-<footer class="site-foot"><p class="provenance"></p><p><a href="style.html">The style of the site</a>: the type, the
-colors, the marks and the motion, on one page.</p></footer>
+<footer class="site-foot"><p class="provenance"></p><p><a href="notation.html">Notation</a>: what the marks, pills and symbols mean</p></footer>
 </div></main>
 </div>
 
