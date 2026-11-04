@@ -465,7 +465,7 @@ figure { margin: 30px 0 34px; }
 .socket { width: var(--tok, 52px); height: calc(var(--tok, 52px) * 1.08); display: grid; place-items: center; position: relative; }
 .socket::before { content: ""; position: absolute; width: 56%; height: 14%; bottom: 13%; border-radius: 50%; background: rgba(30, 34, 39, 0.06); }
 .trays { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
-.slots { display: flex; flex-wrap: wrap; gap: 0; min-height: calc(var(--tok, 52px) * 1.08); }
+.slots { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 0; min-height: calc(var(--tok, 52px) * 1.08 * var(--tray-rows, 1)); }
 .piece {
   width: var(--tok, 52px); height: calc(var(--tok, 52px) * 1.08); padding: 0; border: 0; background: none; display: grid;
   place-items: center; position: relative; z-index: 1; border-radius: 50%;
@@ -476,9 +476,9 @@ figure { margin: 30px 0 34px; }
 .piece.is-stuck { cursor: not-allowed; }
 .piece.is-moving { z-index: 5; }
 .piece:focus-visible { outline-offset: -2px; }
-/* Below it lies the page's space after a figure; on a phone, where it wraps, it keeps room for two lines so the game does not jump. */
+/* Below it lies the page's space after a figure.  game.js gives the caption the height of its longest message and the
+   trays the rows of their fullest, so that nothing below the game moves while it is played. */
 .game-status { margin: 12px 2px 34px; font-size: 0.92rem; line-height: 1.5; color: var(--ink-2); }
-@media (max-width: 560px) { .game-status { min-height: 3em; } }
 .game-status strong { color: var(--ink); }
 @keyframes nudge { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 .piece.is-refused svg { animation: nudge 0.28s 2; }

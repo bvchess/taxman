@@ -141,24 +141,65 @@ export function mountGame(host, { small, n: startN = 10, minN = 2, maxN = 30, pa
       );
       setTimeout(() => restyle(svg, ...looks), delay + (flips ? 280 : 200));
     }
-    const sum = (xs) => xs.reduce((s, x) => s + x, 0);
     $('.player .score').textContent = sum(state.player);
     $('.taxman .score').textContent = sum(state.taxman);
     $('.pot-sum').textContent = state.pot.size ? `${state.pot.size} left` : 'empty';
     $('[data-act="back"]').disabled = history.length === 0 || playing !== 0;
   }
 
+  // Nothing outside the game moves while it is played, so the game's box keeps one height for the current n and width:
+  // the caption has room for its longest message, and the trays for their fullest.  Called when n or the width
+  // changes, never during play.
+  const sum = (xs) => xs.reduce((a, b) => a + b, 0);
+  const range = (a, b) => Array.from({ length: Math.max(0, b - a + 1) }, (_, i) => a + i);
+  function reserve() {
+    // The longest messages: the divisors that make the longest tax; at the end, the rest is a set with no divisor
+    // pair, so at most ceil(n/2) numbers, longest as the largest ones; the player holds at most that many too.
+    const divisors = (x) => range(1, Math.floor(x / 2)).filter((d) => x % d === 0);
+    const taxOf = range(2, n).map((x) => [x, divisors(x)]).sort((a, b) => b[1].length - a[1].length)[0];
+    const [x, tax] = taxOf ?? [n, []];
+    const top = range(n - Math.ceil(n / 2) + 1, n);
+    const rest = top.filter((t) => t !== x && !tax.includes(t));
+    const messages = [
+      OPENING, refusal(1), refusal(n), tookWords(x, tax), takenBack(top),
+      ...[sum(top), best.get(n)?.score ?? 0].map((mine) => tookWords(x, tax) + endWords(rest, mine, sum(range(1, n)))),
+    ];
+    const keep = status.innerHTML;
+    status.style.minHeight = '0';
+    let tall = 0;
+    for (const m of messages) {
+      status.innerHTML = m;
+      tall = Math.max(tall, status.getBoundingClientRect().height);
+    }
+    status.innerHTML = keep;
+    status.style.minHeight = `${tall}px`;
+    // The fullest tray: the taxman may hold every number but one.
+    const slot = potGrid.querySelector('.socket').getBoundingClientRect();
+    const perRow = Math.max(1, Math.floor(taxmanSlots.clientWidth / slot.width));
+    host.style.setProperty('--tray-rows', Math.ceil((n - 1) / perRow));
+  }
+
   function setStatus(html) {
     status.innerHTML = html;
   }
 
-  function verdict() {
+  function verdict(mine) {
     const opt = best.get(n)?.score;
-    const mine = M.score(state);
     if (opt === undefined) return `You scored ${mine}.`;
     if (mine === opt) return `<strong>${mine} is the best score for n = ${n}</strong>: an optimal game.`;
     return `The best score for n = ${n} is ${opt}, so you were ${opt - mine} short. <strong>Play an optimal game</strong> to see one.`;
   }
+
+  // The caption's messages, built in one place so that reserve() can measure the longest of them.
+  const tookWords = (x, tax) => `${you === 'You' ? 'You' : 'The player'} took ${x}; the taxman took ${listWords(tax)}.`;
+  const endWords = (rest, mine, theirs) => (rest.length
+    ? ` No move is left, so the taxman takes the rest: ${listWords(rest)}.`
+    : ' No move is left, and the pot is empty.') + ` ${you} ${mine}, taxman ${theirs}. ${verdict(mine)}`;
+  const refusal = (x) => (x === 1
+    ? '1 can’t be taken: it has no divisor below it, so the taxman would get nothing.'
+    : `${x} can’t be taken: none of its divisors is left in the pot, so the taxman would get nothing.`);
+  const OPENING = 'Take a number. The taxman takes all of its divisors still in the pot.';
+  const takenBack = (mine) => `Taken back. ${mine.length ? `You have ${listWords(mine)}.` : 'Take a number.'}`;
 
   function take(x, { quiet = false } = {}) {
     if (!state.pot.has(x)) return false;
@@ -169,22 +210,17 @@ export function mountGame(host, { small, n: startN = 10, minN = 2, maxN = 30, pa
       p.classList.remove('is-refused');
       void p.offsetWidth;
       p.classList.add('is-refused');
-      setStatus(x === 1
-        ? '1 can’t be taken: it has no divisor below it, so the taxman would get nothing.'
-        : `${x} can’t be taken: none of its divisors is left in the pot, so the taxman would get nothing.`);
+      setStatus(refusal(x));
       return false;
     }
     history.push(state);
     state = M.play(state, x);
     const { tax } = state.log[state.log.length - 1];
-    let words = `${you === 'You' ? 'You' : 'The player'} took ${x}; the taxman took ${listWords(tax)}.`;
+    let words = tookWords(x, tax);
     if (M.isOver(state)) {
       const rest = [...state.pot].sort((a, b) => a - b);
       state = M.finish(state);
-      words += rest.length
-        ? ` No move is left, so the taxman takes the rest: ${listWords(rest)}.`
-        : ' No move is left, and the pot is empty.';
-      words += ` ${you} ${M.score(state)}, taxman ${state.taxman.reduce((s, t) => s + t, 0)}. ${verdict()}`;
+      words += endWords(rest, M.score(state), state.taxman.reduce((s, t) => s + t, 0));
       place([x, ...tax, ...rest]);
     } else place([x, ...tax]);
     setStatus(words);
@@ -197,8 +233,9 @@ export function mountGame(host, { small, n: startN = 10, minN = 2, maxN = 30, pa
     state = M.newGame(n);
     history = [];
     build();
+    reserve();
     place();
-    setStatus(`Take a number. The taxman takes all of its divisors still in the pot.`);
+    setStatus(OPENING);
   }
 
   async function playBest() {
@@ -227,7 +264,7 @@ export function mountGame(host, { small, n: startN = 10, minN = 2, maxN = 30, pa
     if (act === 'back' && history.length) {
       state = history.pop();
       place();
-      setStatus(`Taken back. ${state.player.length ? `You have ${listWords(state.player)}.` : 'Take a number.'}`);
+      setStatus(takenBack(state.player));
     }
   });
 
@@ -241,6 +278,15 @@ export function mountGame(host, { small, n: startN = 10, minN = 2, maxN = 30, pa
     moves = (b ?? '').split(',').filter(Boolean).map(Number);
   }
   reset(n);
+  // A new width, or the fonts arriving, changes how the messages wrap.
+  let width = host.clientWidth;
+  new ResizeObserver(() => {
+    if (host.clientWidth !== width) {
+      width = host.clientWidth;
+      reserve();
+    }
+  }).observe(host);
+  document.fonts?.ready.then(reserve);
   for (const m of moves) if (!take(m, { quiet: true })) break;
   // Arrive without sliding: the opening position is not news.
   for (const p of pieces.values()) for (const a of p.getAnimations({ subtree: true })) a.finish();

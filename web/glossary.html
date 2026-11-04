@@ -79,6 +79,10 @@
       <dt id="maximal-factor">maximal factor</dt>
       <dd>A number divided by one of its primes.  12 has the maximal factors 6 and 4, 9 has only 3, and a prime has
       only 1.  A move is legal exactly when one of its maximal factors is still in the pot.</dd>
+      <dt id="maximal-factor-graph">maximal-factor graph</dt>
+      <dd>The board drawn with every number joined to its maximal factors.  A move is legal exactly when one of its
+      lines leads to a number still in the pot, and its tax is everything still in the pot that it reaches by
+      following its lines.</dd>
       <dt id="pays-for">pays for</dt>
       <dd>A maximal factor of a move, still in the pot when the move is made, <em>pays for</em> it.  Two moves can
       never share a payment.</dd>
@@ -213,7 +217,7 @@
 </section>
 
 <nav class="chapter-nav" aria-label="Pages">
-  <a class="prev" href="index.html">Front page</a>
+  <a class="prev" href="index.html">Introduction</a>
   <a class="next" href="notation.html">Notation: what the marks, pills and symbols mean</a>
 </nav>
 

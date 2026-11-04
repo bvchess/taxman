@@ -2,6 +2,9 @@
 // chapters all draw from these lists.  The story's pages follow OUTLINE.md.  An entry without href is not yet
 // written.
 
+/** The story's first entry: the front page, which introduces it.  It has no number; the chapters keep theirs. */
+export const INTRO = { title: 'Introduction', mark: 'i', href: 'index.html' };
+
 export const STORY = [
   { n: 1, title: 'A game is a set', line: 'Which numbers you take decides the score; the order follows.', href: 'sets.html' },
   { n: 2, title: 'Walking up the chain', line: 'Most games are easy if you know an optimal game of the one before.' },

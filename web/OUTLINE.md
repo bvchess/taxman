@@ -1,9 +1,9 @@
 # Outline of the site
 
 The plan of the site *Playing optimal games of Taxman*, page by page.  Each entry below is one page of the site: the
-front page, then one page for each chapter of the story.  An entry says the point of its page, the beats of its story,
-its figures, what its right column holds and the findings it carries as asides.  The entries are meant to be moved,
-merged and cut.
+introduction, which is the front page, then one page for each chapter of the story.  An entry says the point of its
+page, the beats of its story, its figures, what its right column holds and the findings it carries as asides.  The
+entries are meant to be moved, merged and cut.
 
 ## What holds on every page
 
@@ -22,9 +22,9 @@ merged and cut.
 
 ## The arc
 
-The front page explains the game and gives the headline.  The story explains how we found optimal games past 5000, a
-chapter a page.  Each chapter takes away part of the problem, and the front page shows the problem shrinking, chapter by
-chapter, for game 5060:
+The story starts with the introduction, the front page, which explains the game and gives the headline.  The chapters
+after it explain how we found optimal games past 5000, a chapter a page.  Each chapter takes away part of the problem,
+and the introduction shows the problem shrinking, chapter by chapter, for game 5060:
 
 | step | what is left to choose | about |
 |---|---|---|
@@ -38,7 +38,7 @@ chapter, for game 5060:
 The figures are rough counts (n!, 2^n, 2^(n/2), 2^candidates) and say so in the right column; the last is the
 recorded search of game 5060.
 
-## The front page
+## Introduction (the front page)
 
 **Point.**  Taxman is easy to play well and hard to play perfectly; we play an optimal game for every n up to the
 chain's end, and this site explains how.

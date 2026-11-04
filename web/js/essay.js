@@ -2,7 +2,7 @@
 // into the text on a narrow window; the words that move a figure; and the numbers in the prose that put a halo on
 // their mark in a figure.
 
-import { AFTER, ALONG, REFERENCE, STORY, hrefOf } from './site.js';
+import { AFTER, ALONG, INTRO, REFERENCE, STORY, hrefOf } from './site.js';
 import { numberSVG } from './vocab.js';
 
 const figures = new Map();
@@ -44,7 +44,8 @@ export function contentsHTML({ here = herePage(), part = 'both' } = {}) {
     `<li><span class="unwritten"><span class="badge">${badgeHTML}</span><span>${title}<small>not yet written</small></span></span></li>`;
   const link = (badgeHTML, title, href) =>
     `<li><a href="${href}"${href === here ? ' aria-current="page" class="is-here"' : ''}><span class="badge">${badgeHTML}</span><span>${title}</span></a></li>`;
-  const story = STORY.map((c) => {
+  const intro = link(`<span class="glyph">${INTRO.mark}</span>`, INTRO.title, INTRO.href);
+  const story = intro + STORY.map((c) => {
     const href = hrefOf(c);
     return href ? link(badge(c, href === here), c.title, href) : unwritten(badge(c, false), c.title);
   }).join('');
@@ -95,7 +96,7 @@ function mountContents() {
     return named ?? section.dataset.title ?? section.querySelector('h2, h3')?.textContent ?? section.getAttribute('aria-label') ?? '';
   };
   const chapter = STORY.find((c) => String(c.n) === document.body.dataset.chapter);
-  const pageTitle = chapter ? `${chapter.n}. ${chapter.title}` : '';
+  const pageTitle = chapter ? `${chapter.n}. ${chapter.title}` : document.body.dataset.page === 'front' ? INTRO.title : '';
   const bars = [...document.querySelectorAll('.rail .progress span, .topbar .bar')];
   const where = top?.querySelector('.where');
   const update = () => {
