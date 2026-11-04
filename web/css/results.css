@@ -1,0 +1,125 @@
+/* The pages of the results: chapter 7, with the explorer, the chart of the player's share and the commands that check
+   the data; Along the way; and About.  The look is site.css's; this file only places the pieces. */
+
+/* ---- the explorer ----------------------------------------------------------------------------------------------- */
+
+.explorer { margin: 26px 0 40px; }
+.ex-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 26px; margin: 0 0 16px; }
+.ex-choose { display: flex; align-items: center; gap: 16px; flex: 1 1 26rem; min-width: 0; }
+.ex-n-label { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 1rem; }
+.ex-n {
+  width: 4.6em; padding: 6px 4px; border: 1.5px solid var(--tray-edge); border-radius: 10px; background: var(--paper);
+  color: var(--ink); font: 700 1.05rem/1.1 var(--font); font-variant-numeric: tabular-nums; text-align: center;
+  -moz-appearance: textfield; appearance: textfield;
+}
+.ex-n::-webkit-inner-spin-button, .ex-n::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.ex-n:hover { border-color: var(--ink-3); }
+.ex-n:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; }
+
+/* The slider across the chain, drawn as the site's time slider is. */
+.ex-range { flex: 1; min-width: 7rem; height: 22px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; }
+.ex-range::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--ink) var(--progress, 0%), var(--hair) var(--progress, 0%));
+}
+.ex-range::-moz-range-track { height: 6px; border-radius: 3px; background: var(--hair); }
+.ex-range::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--ink); }
+.ex-range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%;
+  background: var(--paper); border: 2px solid var(--ink); box-shadow: 0 2.5px 0 var(--rim);
+}
+.ex-range::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); }
+.ex-range:focus-visible { outline: none; }
+.ex-range:focus-visible::-webkit-slider-thumb { outline: 2.5px solid var(--ink); outline-offset: 2px; }
+
+.ex-picks { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ex-picks-word { font-size: 0.8rem; font-weight: 600; color: var(--ink-3); margin-right: 2px; }
+.ex-chip { padding: 6px 10px; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+/* The game shown: its button is pressed in, a quiet wash, never the ink fill of a standing. */
+.ex-chip[aria-pressed="true"] { background: var(--wash); border-color: var(--ink-3); box-shadow: inset 0 1.5px 0 var(--tray-edge); transform: translateY(1px); }
+
+.ex-body {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 23rem); gap: 22px 34px; align-items: start;
+  padding-top: 18px; border-top: 1px solid var(--hair);
+}
+
+/* The record: the two totals, the share, the words, and six numbers. */
+.ex-totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ex-total { display: flex; flex-direction: column; }
+.ex-who { display: inline-flex; align-items: center; gap: 7px; font-size: 0.84rem; font-weight: 700; }
+.ex-who::before { content: ""; width: 11px; height: 11px; flex: none; }
+.ex-total.is-player .ex-who::before { border-radius: 50%; background: var(--player); }
+.ex-total.is-taxman .ex-who::before { border-radius: 2px; background: var(--taxman); }
+.ex-big { font-size: 2rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.ex-share { margin: 8px 0 14px; font-size: 0.92rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+.ex-words { margin: 0 0 14px; }
+.ex-words dt { font-size: 0.74rem; font-weight: 600; color: var(--ink-3); margin: 0; }
+.ex-words dd { margin: 0 0 10px; font-size: 0.92rem; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.ex-words dd b { font-weight: 700; }
+
+.ex-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 18px; margin: 0; padding-top: 12px; border-top: 1px solid var(--hair); }
+.ex-stat dt { font-size: 0.74rem; font-weight: 600; color: var(--ink-3); }
+.ex-stat dd { margin: 0; }
+.ex-val { display: block; font-weight: 700; font-size: 1.08rem; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.ex-sub { display: block; font-size: 0.74rem; line-height: 1.35; color: var(--ink-3); }
+
+/* The board: game n drawn in place, or, past the games drawn, where its moves are.  The two share one place, so the
+   board's room stays when it is not drawn. */
+.ex-stage { display: grid; }
+.ex-stage > * { grid-area: 1 / 1; }
+.ex-svg { width: 100%; height: auto; outline: none; }
+.ex-svg:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 4px; border-radius: 6px; }
+.ex-far { align-self: start; }
+.ex-far-code { display: block; padding: 8px 12px; border-radius: 8px; overflow-wrap: anywhere; font-size: 0.82rem; }
+.ex-caption { margin: 0 2px 10px; font-size: 0.86rem; line-height: 1.5; color: var(--ink-2); }
+
+/* ---- the chart of the player's share ----------------------------------------------------------------------------- */
+
+#share-chart .share-range { fill: var(--wash); }
+#share-chart .share-bound { stroke: var(--mid); stroke-width: 1.2; stroke-dasharray: 5 4; }
+#share-chart .share-dot { fill: var(--player); }
+#share-chart .share-band { fill: none; stroke: var(--player); stroke-width: 2; stroke-linecap: round; }
+
+/* ---- the commands that check the data ---------------------------------------------------------------------------- */
+
+dl.commands { margin: 8px 0 22px; }
+dl.commands dt { font-size: 0.86rem; font-weight: 700; margin: 12px 0 4px; }
+dl.commands dd { margin: 0; }
+dl.commands code {
+  display: block; padding: 8px 12px; border-radius: 8px; font-size: 0.84rem; line-height: 1.5; white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---- the About page: what this work adds, and the citation -------------------------------------------------------- */
+
+ul.adds { list-style: none; margin: 0 0 1.05em; padding: 0; }
+ul.adds li { padding: 12px 0 4px; border-top: 1px solid var(--hair); }
+ul.adds li p { margin: 0 0 8px; }
+ul.adds .adds-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 2px; }
+blockquote.citation { margin: 0 0 1.05em; padding: 12px 16px; border-left: 3px solid var(--ink); background: var(--wash); border-radius: 0 10px 10px 0; }
+blockquote.citation p { margin: 0; overflow-wrap: anywhere; }
+
+/* ---- the way on: the next page is written, so it is pressed as the page before is ----------------------------- */
+
+.chapter-nav a.next {
+  display: flex; flex-direction: column; border: 1.5px solid var(--tray-edge); border-style: solid;
+  box-shadow: 0 3px 0 var(--tray-edge); color: var(--ink); text-decoration: none; transition: border-color var(--ui);
+}
+.chapter-nav a.next:hover { border-color: var(--ink-3); }
+.chapter-nav a.next:active { transform: translateY(1.5px); box-shadow: 0 1px 0 var(--tray-edge); }
+.chapter-nav a.next .nav-kicker { color: var(--ink-3); }
+.chapter-nav a.next .nav-title { color: var(--ink); }
+
+/* ---- narrower ---------------------------------------------------------------------------------------------------- */
+
+@container essay (max-width: 987px) {
+  .ex-body { grid-template-columns: minmax(0, 1fr); }
+  .ex-board { max-width: 26rem; }
+}
+
+@container essay (max-width: 540px) {
+  .ex-choose { flex-wrap: wrap; }
+  .ex-range { flex-basis: 100%; }
+  .ex-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ex-big { font-size: 1.6rem; }
+}
