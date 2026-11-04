@@ -21,42 +21,25 @@ export const STORY = [
  *  page fills with numbers. */
 export const ALONG = [
   {
-    title: 'More moves can score less', where: 'game 833', id: 'game-833', at: 1, href: 'sets.html#game-833',
-    line: `The best game is not always the longest.  Every optimal game of 833 makes
+    title: 'More moves isn\'t always better', where: 'game 833', id: 'game-833', at: 1, href: 'sets.html#game-833',
+    line: `The best game is not always the one with the most moves.  Every optimal game of 833 makes
       <span data-833="moves">362</span> moves, but some games of 833 make <span data-833="longestMoves">363</span>, and
       they score less.`,
   },
   {
-    title: 'Three numbers of tax for one move', where: 'game 40', id: 'game-40', at: 1, href: 'sets.html#game-40',
-    line: `A move usually gives the taxman one or two numbers, yet the best game can give three.  In game 40, an
-      optimal game takes 30 while 6, 10 and 15 are all still in the pot.`,
-  },
-  {
-    title: 'Easy from n alone', where: 'every game', id: 'cofactor-rule', at: 2, href: 'chain.html#cofactor-rule',
-    line: `Whether a game needs a search can usually be told from n alone: divide out its largest prime factor and
-      look at what is left.  Game 3,002 = 79 \u00d7 38 needed no search, since 38 is twice a prime; game 3,003 =
-      13 \u00d7 231 needed one.`,
-  },
-  {
-    title: 'Largest first still works', where: 'game 2873', id: 'game-2873', at: 3, href: 'top-half.html#game-2873',
-    line: `The numbers above n/2 can be chosen by one simple rule: take them from the largest down, keeping each one
-      that can still be played.  In game 2,873 the usual reason to trust such a rule fails, yet it still keeps the
-      heaviest set, as it does in every game up to 100,000.`,
+    title: 'Three numbers for tax on one move', where: 'game 40', id: 'game-40', at: 1, href: 'sets.html#game-40',
+    line: `In an optimal game a move usually gives the taxman one or two numbers, but there are places where an optimal game can give three.  In game 40, an
+      optimal game can claim 30 while 6, 10 and 15 are all still in the pot.`,
   },
   {
     title: 'Not always one best game', where: 'game 425', id: 'game-425', at: 4, href: 'frames.html#game-425',
-    line: `The best set of moves is not always the only one.  Up to game 424 each game has one; game 425 has two,
-      which differ in three numbers and score the same.`,
-  },
-  {
-    title: 'A bound that is exact', where: 'games 1 to 77', id: 'exact-to-77', at: 6, href: 'trust.html#exact-to-77',
-    line: `A quick calculation with odd and even numbers sets an upper limit on a game\u2019s best score.  In every
-      game up to 77 the limit is the best score itself; game 78 is the first it misses, by one point.`,
+    line: `The optimal set of moves is not always unique.  Up to game 424 each game has one unique set of optimal moves,
+     but game 425 has two, which differ in three numbers and score the same.`,
   },
   {
     title: 'The player\u2019s share', where: 'every game', id: 'share', at: 7, href: 'results.html#share',
     line: `As n grows, the best game wins the player an almost steady share of the board, which Hensley proved lies
-      between 1/2 and 35/48.  In game 5,060 it is <span data-share>62.9%</span>.`,
+      between 1/2 and 35/48.  It seems to converge to ~<span data-share>62.9%</span>.`,
   },
 ];
 

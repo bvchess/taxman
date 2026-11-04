@@ -113,14 +113,14 @@ points:* in game 833 every optimal game makes 362 moves, but a game can make 363
 * Often game n poses exactly the search problem of the game before it, and that game's answer carries over: a repeat.
 * Together these settle about 60% of the games with no search.  That is why the result is a chain: game 5000 is reached
   by walking there.
+* Which games need a search can usually be told from n alone, from its cofactor: n over its largest prime factor
+  (measured).
 
 **Figures.**  Adding n to an optimal game of n − 1, animated, with the case where it fits and the case where it does
 not.  The prime swap.  A strip over n of how each game was settled.
 
 **Right column.**  The prime lemma (N1), monotonicity (N3), the ceiling lemma (N4), the prime formula (N5), the step
 theorem (N6), the half lemma (N7), the semiprime formula (J3), the repeat lemma (R6, its last part given U).
-
-**Asides.**  *The cofactor rule:* whether a game needs a search can usually be told from n alone (measured).
 
 ### 3. The top half
 
@@ -132,8 +132,9 @@ greedy pass chooses them.
 * Descending greedy: from n down, keep each source that can still be played with those kept.  What it keeps is U\*.
 * In layers 1 and 2 it is provably right.  A number with two prime factors is an edge between two primes; a set of them
   can be played exactly when it has no loop, and greedy builds the heaviest forest.
-* Above layer 2, why it might fail: at game 2873 the sources lack the property that makes greedy safe in general.  Yet
-  U\* is certified best among the sources in every game to 100,000.
+* Above layer 2, why it might fail: at game 2873 the sources lack the property that makes greedy safe in general, and
+  48 of the 720 orders of six of them trap greedy at four, though five fit.  Taken from the largest down, they do not.
+  Yet U\* is certified best among the sources in every game to 100,000.
 * Whether an optimal game of the whole board plays all of U\* is statement U, the one open statement the frame solver's
   scores rest on past 2175.
 
@@ -143,8 +144,6 @@ share of the score in every searched game.
 
 **Right column.**  The bottom-layers theorem (F4), the square theorem (F10), the sources conjecture (S1) and its
 certificates ((★), (♦)), where exchange breaks (game 2873), statement U, the uniqueness theorem (Q1, given (★)).
-
-**Asides.**  *The greedy that shouldn't work* (game 2873).
 
 ### 4. Frames
 
@@ -197,6 +196,7 @@ register); the design (`solver/docs/DESIGN.md`, `search.md`, `gf2-bound.md`, `ta
   board, with no frames.
 * Its bound: a set that can be played is independent over GF(2), and that bound's gap is about a tenth of the best
   published bound's.
+* The parity bound equals opt(n) for every n up to 77 and misses first at 78, where an odd core weighs in (measured).
 * Past 2175 the scores are exact given U, and here is what supports U.
 * What each game's record says: how it was proven and what it assumes.
 
@@ -206,9 +206,6 @@ opt(n).
 
 **Right column.**  The independence lemma (P10), the parity bound (W1), the counting theorem (C2), the first odd core
 (C3); the verifiers and the proof kinds (`solver/docs/REFERENCE.md`); the prover's README.
-
-**Asides.**  *Exact to 77:* the parity bound equals opt(n) for every n up to 77 and fails first at 78, where an odd core
-weighs in.
 
 ### 7. The results
 
@@ -228,8 +225,7 @@ commands, the open questions (`docs/theory/statements.md#open-questions`).
 ## Along the way
 
 An index of the findings, each a card linked to the page that explains it: three factors of tax (40), more moves and
-fewer points (833), two optimal sets (425), the greedy that shouldn't work (2873), exact to 77, the cofactor rule, and
-the player's share.
+fewer points (833), two optimal sets (425), and the player's share.
 
 ## Glossary
 

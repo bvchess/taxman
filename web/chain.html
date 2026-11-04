@@ -279,6 +279,34 @@
   </div>
 </section>
 
+<section class="chapter" id="cofactor" data-toc="cofactor" aria-labelledby="h-cofactor">
+  <h2 id="h-cofactor">Which games need a search</h2>
+  <div class="para">
+    <aside class="note card" aria-label="The cofactor rule, measured">
+      <div class="note-head"><span class="note-name">The cofactor rule</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/arrival.md#the-cofactor-rule">measured<span class="sr-only">, evidence on GitHub</span></a></div>
+      <p class="plain">Whether a game needs a search can usually be told from n and its largest prime factor.</p>
+      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 28, and m be n − 1, or n − 2 when n − 1 is prime.
+      If no <a class="gloss" href="glossary.html#frame">frame</a> of <a class="gloss" href="glossary.html#layer">layer</a> 2 has a
+      <a class="gloss" href="glossary.html#freedom">freedom</a> in game n or in game m, as for every n ≥ 188, then game n has the root
+      problem of game m if its cofactor is a prime or twice a prime, and is at its ceiling if its cofactor is 9.  The
+      first case is proved, by the layer-2 corollary (J2); the other two are measured.</p>
+    </aside>
+    <p>Whether a game needs a <a class="gloss" href="glossary.html#search">search</a> can usually be told from n alone,
+    before any work.  Write n as its largest prime factor times what is left, the <em>cofactor</em> of n: 3002 = 38 · 79
+    has the cofactor 38, and a prime has the cofactor 1.  From game 188 on, no game whose cofactor is 1, a prime, twice
+    a prime or 9 needed a search.</p>
+  </div>
+
+  <figure class="chart" id="cofactor-fig">
+    <div class="chart-key rule-legend"></div>
+    <div class="chart-box"></div>
+  </figure>
+
+  <p>Those four cofactors take in <span data-cof="named">…</span> of the <span data-cof="total">…</span> games from 188
+  on, and <span data-cof="share">…</span> of the ones settled with no search.  Of the <span data-cof="other">…</span>
+  games with any other cofactor, <span data-cof="otherSearched">…</span> needed a search.</p>
+</section>
+
 <section class="chapter" id="head-start" data-toc="head-start" aria-labelledby="h-head-start">
   <h2 id="h-head-start">A head start</h2>
   <div class="para">
@@ -306,41 +334,6 @@
     <span data-start="capStart">…</span> of them at their start, before a single step.  And where game n poses part of
     the problem game n − 1 posed, the search can drop that part, by the near-repeat lemma
     (<a href="search.html#proof">chapter 5</a>).</p>
-  </div>
-</section>
-
-<section class="chapter" id="along" data-toc="along" aria-label="Along the way">
-  <div class="para">
-    <aside class="note card" aria-label="The cofactor rule, measured">
-      <div class="note-head"><span class="note-name">The cofactor rule</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/arrival.md#the-cofactor-rule">measured<span class="sr-only">, evidence on GitHub</span></a></div>
-      <p class="plain">Whether a game needs a search can usually be told from n and its largest prime factor.</p>
-      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 28, and m be n − 1, or n − 2 when n − 1 is prime.
-      If no <a class="gloss" href="glossary.html#frame">frame</a> of <a class="gloss" href="glossary.html#layer">layer</a> 2 has a
-      <a class="gloss" href="glossary.html#freedom">freedom</a> in game n or in game m, as for every n ≥ 188, then game n has the root
-      problem of game m if its cofactor is a prime or twice a prime, and is at its ceiling if its cofactor is 9.  The
-      first case is proved, by the layer-2 corollary (J2); the other two are measured.</p>
-    </aside>
-    <details class="aside" id="cofactor-rule" data-toc="cofactor-rule">
-      <summary>
-        <span class="aside-pin" aria-hidden="true"></span>
-        <span><span class="where">Along the way: every game</span><span class="title"></span></span>
-        <span class="open-mark"><span class="closed-word">Open</span><span class="open-word">Close</span></span>
-      </summary>
-      <div class="aside-body">
-        <p>Whether a game needs a <a class="gloss" href="glossary.html#search">search</a> can usually be told from n
-        alone, before any work.  Write n as its largest prime factor times what is left, the <em>cofactor</em> of n:
-        3002 = 38 · 79 has the cofactor 38, and a prime has the cofactor 1.  From game 188 on, no game whose cofactor is
-        1, a prime, twice a prime or 9 needed a search.</p>
-        <figure class="chart" id="cofactor-fig">
-          <div class="chart-key rule-legend"></div>
-          <div class="chart-box"></div>
-        </figure>
-        <p>Those four cofactors take in <span data-cof="named">…</span> of the <span data-cof="total">…</span> games from
-        188 on, and
-        <span data-cof="share">…</span> of the ones settled with no search.  Of the <span data-cof="other">…</span> games
-        with any other cofactor, <span data-cof="otherSearched">…</span> needed a search.</p>
-      </div>
-    </details>
   </div>
 </section>
 

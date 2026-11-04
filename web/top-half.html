@@ -194,34 +194,23 @@
       member of Y′ fits into Y: the playable subsets of the six lack the exchange property.  That exactly 48 orders
       trap <a class="gloss" href="glossary.html#descending-greedy">descending greedy</a> is proved by computation, which the figure repeats.</p>
     </aside>
-    <p>That reason is simple.  In layer 2, all the sets of sources that can be played and can take no more have the
-    same size, as all the trees on the same primes have the same number of edges.  So greedy is never stuck with too
-    few.  With three maximal factors this can fail, and in game 2873 it does: six of its sources can be stuck at four,
-    though five fit.</p>
+    <p>That reason is simple.  In layer 2, all the sets of <a class="gloss" href="glossary.html#source">sources</a>
+    that can be played and can take no more have the same size, as all the trees on the same primes have the same
+    number of edges.  So greedy is never stuck with too few.  With three maximal factors this can fail, and in game
+    2873 it does: six of its sources, built from the primes 11, 13 and 17, can be stuck at four, though five fit.
+    Taken in some orders, greedy keeps four of them and then can fit no more.  Taken in others, it keeps five.  No
+    smaller game is known where greedy can be stuck like this.</p>
   </div>
 
-  <details class="aside" id="game-2873" data-toc="game-2873">
-    <summary>
-      <span class="aside-pin" aria-hidden="true"></span>
-      <span><span class="where">Along the way: game 2873</span><span class="title"></span></span>
-      <span class="open-mark"><span class="closed-word">Open</span><span class="open-word">Close</span></span>
-    </summary>
-    <div class="aside-body">
-      <p>A greedy pass is safe when every set it could end with has the same size, for then it cannot stop with too
-      few.  Six <a class="gloss" href="glossary.html#source">sources</a> of game 2873, built from the primes 11, 13 and
-      17, break that rule.  Taken in some orders, greedy keeps four of them and then can fit no more.  Taken in others,
-      it keeps five.</p>
-      <figure class="fig trap-fig" id="trap">
-        <svg role="img" aria-label="Six sources of game 2873 and their maximal factors."></svg>
-        <div class="fig-timeline"></div>
-        <figcaption class="fig-caption"></figcaption>
-      </figure>
-      <p>Of the <span data-trap="orders">720</span> orders of the six, <span data-trap="traps">48</span> trap greedy
-      at four: those that put 1859 and 2197 last.  Descending greedy takes them from the largest down, which is not
-      one of those orders, and keeps the heaviest five.  So the order of the numbers protects it, even here.  No
-      smaller game is known where the sources lose this property.</p>
-    </div>
-  </details>
+  <figure class="fig trap-fig" id="trap">
+    <svg role="img" aria-label="Six sources of game 2873 and their maximal factors."></svg>
+    <div class="fig-timeline"></div>
+    <figcaption class="fig-caption"></figcaption>
+  </figure>
+
+  <p>Of the <span data-trap="orders">720</span> orders of the six, <span data-trap="traps">48</span> trap greedy at
+  four: those that put 1859 and 2197 last.  Descending greedy takes them from the largest down, which is not one of
+  those orders, and keeps the heaviest five.  So the order of the numbers protects it, even here.</p>
 
   <div class="para">
     <aside class="note card" aria-label="The sources conjecture, open, proved to 100,000">
@@ -234,7 +223,7 @@
       theorem</a>; <a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/README.md">the prover's
       record</a>).</p>
     </aside>
-    <p>Yet greedy has never been caught.  In every game up to 100,000, a computation certifies that no set of sources that
+    <p>Greedy has never been caught.  In every game up to 100,000, a computation certifies that no set of sources that
     can be played outweighs <a class="gloss" href="glossary.html#u-star">U*</a>.  It is linear algebra: for each source
     that greedy rejects, its list of maximal factors is shown to be a sum of the lists of sources it kept above it, in
     the arithmetic where 1 + 1 = 0.</p>
