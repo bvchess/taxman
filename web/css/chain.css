@@ -1,16 +1,6 @@
 /* Chapter 2, Walking up the chain: the boards of the arrival of n, the walk through the first hundred games, and the
    charts of how each game was settled.  Loaded after css/site.css. */
 
-/* How a game was settled: the chapter's four rules on a gray ramp, light to dark in the order the chapter meets them,
-   the three that need no search close together and a search far darker, so that the searches stand out (checked with
-   the dataviz validator, --ordinal: lightness monotone, steps of at least 0.06, the light end at 2.2:1 on white).
-   Never blue or orange, which are the player's and the taxman's. */
-:root {
-  --rule-ceiling: #a9b0b9;
-  --rule-prime: #949ca6;
-  --rule-repeat: #7f8792;
-  --rule-search: var(--ink);
-}
 .rule-cell.is-ceiling { fill: var(--rule-ceiling); }
 .rule-cell.is-prime { fill: var(--rule-prime); }
 .rule-cell.is-repeat { fill: var(--rule-repeat); }

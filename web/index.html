@@ -22,7 +22,7 @@
     <p class="subhead">Playing optimal games</p>
   </hgroup>
   <p class="byline">Brian Chess</p>
-  <p class="lede">Taxman is a number game played against a taxman.  We play an optimal game, one with the best
+  <p class="lede">Taxman is a number game originally created to teach kids about factors.  We play an optimal game, one with the best
   possible score, for every n from 1 to <span data-last-n>the end of our chain</span>.  This site explains how we did
   it.</p>
 </header>
@@ -32,13 +32,13 @@
   <div class="para">
     <aside class="note tech" aria-label="The rules, precisely">
       <div class="note-head"><span class="note-name">The rules, precisely</span></div>
-      <p>A move takes a number that still has a <a class="gloss" href="glossary.html#proper-divisor">proper divisor</a> in the pot,
-      and the taxman takes all of its proper divisors still in the pot.  When no move is left, the taxman takes the
+      <p>Each move the player makes takes a number that still has a <a class="gloss" href="glossary.html#proper-divisor">proper divisor</a> in the pot,
+      then the taxman takes all of its divisors still in the pot.  Each move must pay one or more divisors as tax. When no move is left, the taxman takes the
       rest.  The best score of game n is opt(n), and opt(1), opt(2), opt(3), … is the
       <a class="gloss" href="glossary.html#taxman-sequence">Taxman sequence</a>, <a href="https://oeis.org/A019312">A019312</a> in
       the OEIS.</p>
     </aside>
-    <p>Taxman is played on the numbers 1 to n, which start in the <a class="gloss" href="glossary.html#pot"><em>pot</em></a>.</p>
+    <p>Taxman is played with the numbers 1 to n, which start in the <a class="gloss" href="glossary.html#pot"><em>pot</em></a>.</p>
   </div>
   <ul class="rules">
     <li>You take a number from the pot and score it.  That number is your <a class="gloss" href="glossary.html#move"><em>move</em></a>.</li>
@@ -56,8 +56,8 @@
     <aside class="note tech" aria-label="Heuristic strategies">
       <div class="note-head"><span class="note-name">Heuristic strategies</span></div>
       <p>A heuristic strategy plays a good game quickly, by rules such as taking the largest number that can still be
-      taken, or the one that costs the least tax, without proving that the game is the best.  Many have been proposed,
-      and judging one needs the best score to measure it against.  That is one reason to know opt(n).  The repository
+      taken, or the one that costs the least tax.  Many heuristic strategies have been proposed,
+      and judging different heuristics benefits from having the best score possible to measure against.  That is one reason to know opt(n).  The repository
       holds
       <a href="https://github.com/bvchess/taxman/blob/master/heuristics/README.md">our strategies and how they were
       measured</a>, and <a href="https://github.com/bvchess/taxman/tree/master/moniot">Robert Moniot's seven</a>.</p>
@@ -71,15 +71,15 @@
 <section class="chapter front-how" id="how" data-toc="how" aria-labelledby="h-how">
   <h2 id="h-how">How we did it</h2>
   <div class="para">
-    <aside class="note tech" aria-label="The counts, precisely">
-      <div class="note-head"><span class="note-name">The counts, precisely</span></div>
-      <p>Rough sizes, not counts of legal games: n! orders, 2<sup>n</sup> subsets of the <a class="gloss" href="glossary.html#board">board</a>, 2<sup>⌊n/2⌋</sup>
+    <aside class="note tech" aria-label="The counts">
+      <div class="note-head"><span class="note-name">The counts</span></div>
+      <p>Rough sizes, not counts of legal games: n! move orders, 2<sup>n</sup> subsets of the <a class="gloss" href="glossary.html#board">board</a>, 2<sup>⌊n/2⌋</sup>
       subsets of the numbers up to n/2, and 2<sup>c</sup> subsets of the c <a class="gloss" href="glossary.html#candidate">candidates</a>.  The last row is the <a class="gloss" href="glossary.html#node">nodes</a>
       that the game's recorded search explored.  The row before it is no count: it is where the search starts, as a
       score below the best, from the game before and from a start of its own, measured
       (<a href="chain.html#head-start">chapter 2</a>).</p>
     </aside>
-    <p>Game <span data-last-n>n</span>'s numbers can be put in about 10<sup data-orders-exp>…</sup> orders.  No computer could try them all, and we never try them.  Each
+    <p>Game <span data-last-n>n</span>'s numbers can be put in about 10<sup data-orders-exp>…</sup> orders.  No computer could try them all.  Each
     chapter of the story takes away part of the problem, until what is left is small enough for a <a class="gloss" href="glossary.html#search">search</a> to finish.</p>
   </div>
 
@@ -101,12 +101,13 @@
     </aside>
     <aside class="note tech" aria-label="The time of a search">
       <div class="note-head"><span class="note-name">The time of a search</span></div>
-      <p>The chart has a dot for each of the <span data-proof="chainSearches">…</span> searches the chain ran, those that
-      ended at the ceiling among them.  A search’s time is the wall-clock time of its game over every run, on the
-      machine of its run, from 8 threads up to game 2,175 to 88 at the end.  From game 2,176 on, the runs searched
-      several games at a time, four as a rule and for a while sixteen, so their times overlap, and their sum is more
-      than the time the runs took.  The <span data-proof="storeSearch">…</span> games counted as searches that the
-      bounds store proved were searched in runs apart from the chain, and have no time here.</p>
+      <p>Each column is the median time of the searches the chain ran in its 100 games, of
+      <span data-proof="chainSearches">…</span> in all, those that ended at the ceiling among them.  A search’s time is
+      the wall-clock time of its game over every run, on the machine of its run, from 8 threads up to game 2,175 to 88
+      at the end.  From game 2,176 on, the runs searched several games at a time, four as a rule and for a while
+      sixteen, so a search shared its machine, and times from different runs compare only roughly.  The
+      <span data-proof="storeSearch">…</span> games counted as searches that the bounds store proved were searched in
+      runs apart from the chain, and have no time here.</p>
     </aside>
     <aside class="note tech" aria-label="The player's share">
       <div class="note-head"><span class="note-name">The player's share</span></div>
@@ -116,7 +117,7 @@
     <p>We found the games in order, from game 1 up, each one built from an <a class="gloss" href="glossary.html#optimal-game">optimal game</a> of the one before,
     so they form a <a class="gloss" href="glossary.html#chain">chain</a>.  The chart shows every game of it: the share of the
     <a class="gloss" href="glossary.html#board">board</a> that the player wins, how each game was proven, and how
-    long its search took.</p>
+    long a search took.</p>
   </div>
   <figure class="chart" id="chain-chart">
     <p class="chart-sub"></p>

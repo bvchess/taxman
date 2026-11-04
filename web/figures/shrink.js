@@ -20,7 +20,7 @@ const POINTS = {
   3: 'One greedy pass chooses the numbers above n/2.',
   4: 'Only the promotions are left to choose.',
   5: 'A search with a sharp bound finishes.',
-  2: 'The game before starts the search near the best.',
+  2: 'Using the game before starts the search near opt(n).',
 };
 
 /** The first row is the game as played, not a chapter: no number, and a link to the front page's section on it. */
@@ -74,7 +74,7 @@ export function shrinkCounts(games) {
       ? { html: 'nothing to promote' }
       : power(candidates * LOG2, `sets of ${fmt(candidates)} candidates`),
     5: nodes == null ? { html: 'settled with no search' } : { log: Math.log10(nodes), html: `${inWords(nodes)} nodes` },
-    2: { html: `a start ${fmt(start.seededGap)} below the best, not ${fmt(start.ownGap)}` },
+    2: { html: `the search starts only ${fmt(start.seededGap)} points below opt(n)` },
   };
 }
 

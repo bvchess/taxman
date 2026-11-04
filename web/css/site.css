@@ -41,6 +41,15 @@
   --hair: #e3e6ea;
   --wash: #f5f6f8;
 
+  /* How a game was settled: the chapter's four rules on a gray ramp, light to dark in the order the chapter meets them,
+     the three that need no search close together and a search far darker, so that the searches stand out (checked with
+     the dataviz validator, --ordinal: lightness monotone, steps of at least 0.06, the light end at 2.2:1 on white).
+     Never blue or orange, which are the player's and the taxman's. */
+  --rule-ceiling: #a9b0b9;
+  --rule-prime: #949ca6;
+  --rule-repeat: #7f8792;
+  --rule-search: var(--ink);
+
   /* The two renderings: the flat fill of a kept number; the parts of a raised token and its tray */
   --kept: #d4d9e0;
   --kept-face: #d0d6de;
