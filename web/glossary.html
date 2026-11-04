@@ -96,6 +96,8 @@
       <dt id="loop">loop</dt>
       <dd>A number with two prime factors can be drawn as an edge between them.  Such numbers can all be played
       exactly when their edges contain no loop.  10, 14, 15 and 21 make a loop on 2, 5, 3 and 7.</dd>
+      <dt id="forest">forest</dt>
+      <dd>A set of edges with no loop.  Numbers with two prime factors, drawn as edges between their primes, can all be played exactly when they form a forest.</dd>
     </dl>
   </div>
 </section>
@@ -159,6 +161,8 @@
       in general.</dd>
       <dt id="top-half">top half</dt>
       <dd>The numbers above n/2, the sources, and the part of the score they make.  In the games that need a search, it is about 93% of the score.</dd>
+      <dt id="exchange-property">exchange property</dt>
+      <dd>What makes a greedy choice safe in general: a smaller playable set can always take a member from a larger one and stay playable.  The playable sets of sources lack it in game 2873.</dd>
     </dl>
   </div>
 </section>
@@ -190,6 +194,10 @@
       <dt id="frame-model">frame model</dt>
       <dd>The game seen as frames, with the sources fixed to U*, so that only the promotions are left to choose.  Its
       best score is the best score of the game wherever statement U holds.</dd>
+      <dt id="closed">closed</dt>
+      <dd>A frame with as many factors as moves, so it has none to spare.  It takes no part in the search.</dd>
+      <dt id="promotion-set">promotion set</dt>
+      <dd>A set of candidates that can all be promoted together, with every frame still able to play all of its moves.</dd>
     </dl>
   </div>
 </section>

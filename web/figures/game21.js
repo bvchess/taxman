@@ -39,12 +39,13 @@ const TITLES = {
 // The pot: the numbers in order, seven a row.
 const potAt = (m) => [CENTER_X + (((m - 1) % 7) - 3) * 58, 112 + Math.floor((m - 1) / 7) * 56];
 
-// The layers: one column a layer, layer 0 at the right and layer 4 at the left, each rising in value and centered,
-// so that once the columns are cut at n/2 the sources, the top half, stand above the line.
+// The layers: one column a layer, layer 0 at the right and layer 4 at the left, each ascending from the top and
+// centered, so that once the columns are cut at n/2 the factors stand above the line and the sources, the top half,
+// below it.
 const COLUMN_X = [516, 397, 278, 159, 40];
 const MID_Y = 154; // the middle of the columns, and the line at n/2 once they are cut
 const STEP = 34;
-const SPLIT = 22; // once cut, how far the sources stand above the line and the factors below it
+const SPLIT = 22; // once cut, how far the factors stand above the line and the sources below it
 
 // The frames, side by side.  Rows are 48 apart, and each factor stands level with the factor it divides (8 with 4,
 // 4 with 2, 9 with 3, 7 with 1), so that the dotted links run straight across, between the sources they pass.
@@ -123,8 +124,8 @@ const isSource = (x) => x > HALF;
 const shapeOf = (x) => (isSource(x) ? SHAPE.circle : SHAPE.square);
 const allEdges = numbers.flatMap((x) => M.maximalFactors(x).map((f) => [x, f]));
 
-// Each layer's column, rising in value from the bottom; once split at n/2, the sources rise from just above the line
-// and the factors stand below it, the largest nearest the line.
+// Each layer's column, ascending from the top; once split at n/2, the factors stand above the line, the largest
+// nearest it, and the sources below it, the smallest nearest it.
 function layersAt(split) {
   const columns = [[], [], [], [], []];
   for (const x of numbers) columns[M.omega(x)].push(x);
@@ -132,13 +133,13 @@ function layersAt(split) {
   columns.forEach((column, layer) => {
     const x = COLUMN_X[layer];
     if (!split) {
-      column.forEach((n, j) => (at[n] = [x, MID_Y + ((column.length - 1) / 2 - j) * STEP]));
+      column.forEach((n, j) => (at[n] = [x, MID_Y + (j - (column.length - 1) / 2) * STEP]));
       return;
     }
     const factors = column.filter((n) => !isSource(n));
     const srcs = column.filter(isSource);
-    factors.forEach((n, j) => (at[n] = [x, MID_Y + SPLIT + (factors.length - 1 - j) * STEP]));
-    srcs.forEach((n, j) => (at[n] = [x, MID_Y - SPLIT - j * STEP]));
+    factors.forEach((n, j) => (at[n] = [x, MID_Y - SPLIT - (factors.length - 1 - j) * STEP]));
+    srcs.forEach((n, j) => (at[n] = [x, MID_Y + SPLIT + j * STEP]));
   });
   return at;
 }
@@ -177,16 +178,16 @@ function buildStates(f) {
   for (let k = 0; k <= 4; k++) layers[`layer${k}`] = { x: COLUMN_X[k], y: NAME_Y, at: [0.5, 1] };
   S.layers = layers;
 
-  // Sources and factors: each column cut at n/2, the sources above the line and the factors below it.  The line is
+  // Sources and factors: each column cut at n/2, the factors above the line and the sources below it.  The line is
   // named at its left end, below it; the words for its two sides sit clear of the one line that crosses there.
   const split = { _duration: 1100 };
   for (const x of numbers) split[x] = { ...pos(splitAt[x]), shape: shapeOf(x), halo: isSource(x) ? 1 : 0 };
   for (const [a, b] of allEdges) split[`e${a}-${b}`] = { faded: isSource(a) ? 0 : 0.6 };
   for (let k = 0; k <= 4; k++) split[`layer${k}`] = { x: COLUMN_X[k], y: NAME_Y };
   split.rule = {};
-  split.half = { x: 2, y: MID_Y + 11 };
-  split.sourcesName = { x: 100, y: MID_Y - 34 };
-  split.factorsName = { x: 100, y: MID_Y + 38 };
+  split.half = { x: 2, y: MID_Y - 6 };
+  split.sourcesName = { x: 100, y: MID_Y + 38 };
+  split.factorsName = { x: 100, y: MID_Y - 34 };
   S.sources = split;
 
   // Descending greedy, from 21 down, where the sources stand: each kept (gray) or rejected (hollow, dashed) in its
@@ -348,7 +349,7 @@ function captions(f) {
   return {
     pot: `The pot holds the numbers 1 to ${N}. The circles are the numbers above n/2, the squares the rest.`,
     layers: 'Each number stands in the column of its layer, its count of prime factors, with layer 1 at the right. A line runs rightward from each number to each of its maximal factors: 12 to 6 and 4.',
-    sources: `Each column cut at n/2. Above the line are the sources, ${M.sources(N)[0]} to ${N}: they divide no other number on the board, so each is a move or nothing. Below it are the factors, 1 to ${half}.`,
+    sources: `Each column cut at n/2. Below the line are the sources, ${M.sources(N)[0]} to ${N}: they divide no other number on the board, so each is a move or nothing. Above it are the factors, 1 to ${half}.`,
     greedy: `From ${N} down, descending greedy keeps ${listWords(f.keptDown)}, each still playable with those kept before it. It rejects ${listWords(f.rejectedDown)}: their one maximal factor, 1, already pays for ${f1.kept[0]}. U* scores ${f.inTheBag}.`,
     frames: `The ${COUNT[f.frames.length] ?? f.frames.length} frames side by side: each source with the factors that can pay for it, greedy's choice in gray. A frame's sources, at its left, share a layer, and its factors, at its right, lie one layer below. A dotted arrow runs from a factor to its maximal factor in the frame in front.`,
     freedoms: `The frames of layers ${listWords(f.frames.filter((fr) => fr.closed).map((fr) => fr.layer))} are closed, with as many factors as moves, and drop out. The frames of layers ${listWords(f.open.map((fr) => fr.layer))} have one freedom each. The candidates are ${listWords(f.candidates)}.`,

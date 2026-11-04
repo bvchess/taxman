@@ -4,9 +4,11 @@ This folder is the project's explanatory website, *Playing optimal games of Taxm
 navigation on the left, the story in the center, and the technical layer on the right.  The pages are plain HTML, CSS
 and ES modules, and need no build step.  [OUTLINE.md](OUTLINE.md) is the plan of the pages.
 
-* `index.html` is the front page, which explains the game; `sets.html` is chapter 1 of the story; `frames.html` is the
-  prototype that chapters 3 and 4 will grow from, no longer linked from the navigation; and `style.html` shows the
-  site's look.
+* `index.html` is the introduction, which explains the game.  The chapters of the story follow: `sets.html` (1),
+  `chain.html` (2), `top-half.html` (3), `frames.html` (4), `search.html` (5), `trust.html` (6) and `results.html` (7).
+  `along.html` lists the findings along the way, and `glossary.html`, `notation.html` and `about.html` are the reference
+  pages.  `style.html` shows the site's look; no page links it.
+* `css/site.css` holds the look of every page; a page with styles of its own has `css/<page>.css` beside it.
 * `js/` holds the site's modules: `model.js` is the game, the frame model and playability, with names from the
   [glossary](../docs/GLOSSARY.md); `play.js` is the game the reader plays, apart from its board, which
   `figures/game.js` and `figures/graph-game.js` draw; `site.js` lists the pages, and every navigation draws from it.

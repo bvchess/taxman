@@ -49,7 +49,7 @@ export function contentsHTML({ here = herePage(), part = 'both' } = {}) {
     const href = hrefOf(c);
     return href ? link(badge(c, href === here), c.title, href) : unwritten(badge(c, false), c.title);
   }).join('');
-  const entries = (list) => list.map((a) => (a.href ? link(`<span class="glyph">${a.mark}</span>`, a.title, a.href) : unwritten(ALONG_ICON, a.title))).join('');
+  const entries = (list) => list.map((a) => (a.href ? link(a.mark ? `<span class="glyph">${a.mark}</span>` : ALONG_ICON, a.title, a.href) : unwritten(ALONG_ICON, a.title))).join('');
   const first = `<p class="toc-group">The story</p><ul class="toc">${story}</ul><ul class="toc">${entries(AFTER)}</ul>`;
   const reference = `<ul class="toc">${entries(REFERENCE)}</ul>`;
   if (part === 'story') return first;
