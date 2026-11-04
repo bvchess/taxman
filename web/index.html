@@ -75,7 +75,9 @@
       <div class="note-head"><span class="note-name">The counts, precisely</span></div>
       <p>Rough sizes, not counts of legal games: n! orders, 2<sup>n</sup> subsets of the <a class="gloss" href="glossary.html#board">board</a>, 2<sup>⌊n/2⌋</sup>
       subsets of the numbers up to n/2, and 2<sup>c</sup> subsets of the c <a class="gloss" href="glossary.html#candidate">candidates</a>.  The last row is the <a class="gloss" href="glossary.html#node">nodes</a>
-      that the game's recorded search explored.</p>
+      that the game's recorded search explored.  The row before it is no count: it is where the search starts, as a
+      score below the best, from the game before and from a start of its own, measured
+      (<a href="chain.html#head-start">chapter 2</a>).</p>
     </aside>
     <p>Game <span data-last-n>n</span>'s numbers can be put in about 10<sup data-orders-exp>…</sup> orders.  No computer could try them all, and we never try them.  Each
     chapter of the story takes away part of the problem, until what is left is small enough for a <a class="gloss" href="glossary.html#search">search</a> to finish.</p>

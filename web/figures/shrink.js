@@ -1,6 +1,7 @@
 // The problem shrinking, step by step, for the last game of the chain: one row a step, with its title (a link once the
 // chapter is written), the point it makes, and a bar for what is left to choose after it, on a log scale, labeled with
-// its count.  The rows of chapters not yet written are quieter.  Chapters 2, 6 and 7 are about the whole chain, not one
+// its count.  The rows of chapters not yet written are quieter.  Chapter 2's row gives, in words, how near the best the
+// game before starts the search (a measurement, from js/data.js).  Chapters 6 and 7 are about the whole chain, not one
 // game's problem, and have no row.
 //
 // The chapters come from js/site.js; every count is computed from data/games.json.  The counts are rough sizes, as the
@@ -10,6 +11,7 @@
 
 import { STORY, hrefOf } from '../js/site.js';
 import { fmt } from '../js/vocab.js';
+import { headStart } from '../js/data.js';
 
 /** The point of each chapter, as the row says it: what it takes away. */
 const POINTS = {
@@ -18,13 +20,17 @@ const POINTS = {
   3: 'One greedy pass chooses the numbers above n/2.',
   4: 'Only the promotions are left to choose.',
   5: 'A search with a sharp bound finishes.',
+  2: 'The game before starts the search near the best.',
 };
 
 /** The first row is the game as played, not a chapter: no number, and a link to the front page's section on it. */
 const GAME_ROW = { title: 'The game', href: '#the-game' };
 
-/** The chapters whose steps shrink this game's problem. */
-const STEPS = new Set([1, 3, 4, 5]);
+/** The chapters with a row, in the order of the rows. */
+const STEPS = [1, 3, 4, 2, 5];
+
+/** The links of chapters whose row goes somewhere other than the chapter's page. */
+const HREF = { 2: 'chain.html#head-start' };
 
 const LOG2 = Math.log10(2);
 
@@ -53,6 +59,7 @@ export function shrinkCounts(games) {
   const c = games.columns;
   const n = games.lastN;
   const i = c.n.indexOf(n);
+  const start = headStart(games);
   const candidates = c.candidates[i];
   const nodes = c.nodes[i];
   const log1 = log10Factorial(n);
@@ -63,17 +70,21 @@ export function shrinkCounts(games) {
     game: power(log1, 'orders'),
     1: power(log2, 'sets'),
     3: power(log4, 'sets'),
-    4: candidates == null ? { html: 'nothing to promote' } : power(candidates * LOG2, `sets of ${fmt(candidates)} candidates`),
+    4: candidates == null
+      ? { html: 'nothing to promote' }
+      : power(candidates * LOG2, `sets of ${fmt(candidates)} candidates`),
     5: nodes == null ? { html: 'settled with no search' } : { log: Math.log10(nodes), html: `${inWords(nodes)} nodes` },
+    2: { html: `a start ${fmt(start.seededGap)} below the best, not ${fmt(start.ownGap)}` },
   };
 }
 
 export function mountShrink(host, { games }) {
   const counts = shrinkCounts(games);
   const max = counts.game.log;
-  const rows = [GAME_ROW, ...STORY.filter((chapter) => STEPS.has(chapter.n))].map((chapter) => {
+  const chapters = STEPS.map((n) => STORY.find((chapter) => chapter.n === n));
+  const rows = [GAME_ROW, ...chapters].map((chapter) => {
     const key = chapter.n ?? 'game';
-    const href = chapter.href ?? hrefOf(chapter);
+    const href = HREF[chapter.n] ?? chapter.href ?? hrefOf(chapter);
     const count = counts[key];
     const title = href
       ? `<a class="shrink-title" href="${href}">${chapter.title}</a>`
@@ -92,7 +103,8 @@ export function mountShrink(host, { games }) {
       <span class="shrink-measure">${measure}</span>
     </li>`;
   }).join('');
-  host.innerHTML = `<p class="shrink-head"><span class="shrink-head-title">What is left to choose in game ${fmt(counts.n)}</span>
+  host.innerHTML = `<p class="shrink-head"><span class="shrink-head-title">What is left to choose in game
+    ${fmt(counts.n)}</span>
     <span class="shrink-head-sub">on a log scale: a bar is as long as its count has digits</span></p>
     <ol class="shrink-rows">${rows}</ol>`;
   return counts;

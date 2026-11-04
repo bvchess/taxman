@@ -613,6 +613,8 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
 .shrink-row.is-written .shrink-bar { background: var(--ink); }
 .shrink-bar.is-labeled { display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; }
 .shrink-count { font-size: 0.8rem; line-height: 20px; color: var(--ink-2); }
+/* A measure in words alone stands off the axis as a bar's label does. */
+.shrink-measure > .shrink-count:first-child { padding-left: 8px; }
 .shrink-bar.is-labeled .shrink-count { color: var(--paper); font-weight: 700; white-space: nowrap; }
 .shrink-row.is-unwritten .shrink-title { color: var(--ink-3); font-weight: 600; }
 .shrink-row.is-unwritten .shrink-point { color: var(--ink-3); }
@@ -736,6 +738,7 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
   .shrink-head-title, .shrink-head-sub { grid-column: 1; }
   .shrink-text { padding-bottom: 6px; }
   .shrink-measure { grid-column: 1; border-left: 0; padding: 0 6px 14px 0; }
+  .shrink-measure > .shrink-count:first-child { padding-left: 0; }
   .front-along .finding-cards { grid-template-columns: 1fr; }
   .chapter-nav { grid-template-columns: 1fr; }
 }

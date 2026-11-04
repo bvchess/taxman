@@ -279,6 +279,36 @@
   </div>
 </section>
 
+<section class="chapter" id="head-start" data-toc="head-start" aria-labelledby="h-head-start">
+  <h2 id="h-head-start">A head start</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="The two starts of game 5,060">
+      <div class="note-head"><span class="note-name">The two starts of game 5,060</span></div>
+      <p>As sums of promotions, the part of the score a search chooses: the best is <span data-start="best">…</span>,
+      and the search starts at <span data-start="seeded">…</span> from game 5,059’s game and at
+      <span data-start="own">…</span> on its own.  The frame solver measured both, each search stopped after its first
+      thousand nodes
+      (<a href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-start-of-game-5060-with-and-without-the-game-before-2026-11/README.md">the
+      start of game 5,060</a>).  What a start below the best costs a search was measured at game 3,020
+      (<a href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-dear-games-the-problem-or-the-chains-path-2026-10/README.md#4-what-a-start-below-optn-costs">a
+      start below opt(n)</a>).</p>
+    </aside>
+    <p>A game that needs a <a class="gloss" href="glossary.html#search">search</a> still begins from the game before.
+    The search starts from the optimal set of game n − 1, carried over to game n, and that start is usually the best
+    game or close to it.  Game 5,060’s search starts <span data-start="seededGap">…</span> points below the best score
+    this way; from a start of its own, it would begin <span data-start="ownGap">…</span> below.  A search keeps only
+    the branches that might beat the best game it has found, so the nearer it starts to the best, the less it has to
+    search.  A start far below the best can make a search many times longer.</p>
+  </div>
+  <div class="para">
+    <p>The game before helps in two more ways.  Its <a class="gloss" href="glossary.html#ceiling">ceiling</a> ends a
+    search as soon as a game reaches it: <span data-start="cap">…</span> searches of the chain ended there,
+    <span data-start="capStart">…</span> of them at their start, before a single step.  And where game n poses part of
+    the problem game n − 1 posed, the search can drop that part, by the near-repeat lemma
+    (<a href="search.html#proof">chapter 5</a>).</p>
+  </div>
+</section>
+
 <section class="chapter" id="along" data-toc="along" aria-label="Along the way">
   <div class="para">
     <aside class="note card" aria-label="The cofactor rule, measured">
@@ -326,7 +356,7 @@
 
 <script type="module">
 import { initEssay, registerFigure, mountProvenance } from './js/essay.js';
-import { loadGames, loadSmall } from './js/data.js';
+import { headStart, loadGames, loadSmall } from './js/data.js';
 import { fmt, listWords } from './js/vocab.js';
 import { pct } from './js/chart.js';
 import { RULES } from './js/proof.js';
@@ -378,6 +408,13 @@ const settledFacts = {
   recordRepeatAtCeiling: fmt(chain.recordRepeatAtCeiling), searchNothing: fmt(chain.searchNothing),
 };
 fill('settled', (key) => settledFacts[key]);
+
+// The head start: game 5060's two starts, measured (js/data.js), and the searches the ceiling ended.
+const startFacts = {
+  ...headStart(games),
+  cap: c.proof.filter((p) => p === 'cap').length, capStart: c.method.filter((m) => m === 'start').length,
+};
+fill('start', (key) => (key in startFacts ? fmt(startFacts[key]) : undefined));
 
 // The cofactor rule.
 const cof = mountCofactor(document.getElementById('cofactor-fig'), { games });
