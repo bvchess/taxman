@@ -1,0 +1,12 @@
+/* Chapter 3, the top half: the styles of its figures, after css/site.css. */
+
+/* Layer 2 of game 100, and the six sources of game 2873. */
+.forest-fig { margin-top: 22px; }
+.trap-fig { margin: 18px 0 16px; }
+.trap-fig svg { max-width: 26rem; margin: 0 auto; }
+
+#share-chart { margin-top: 18px; }
+
+@container essay (max-width: 540px) {
+  .forest-fig svg { max-width: 21rem; margin: 0 auto; }
+}

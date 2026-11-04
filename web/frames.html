@@ -3,351 +3,255 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Optimal games of Taxman: the story</title>
-<meta name="description" content="How the board of a Taxman game falls apart into frames, small games nearly independent of each other, and how a few promotions settle the best score.">
+<title>Frames · Playing optimal games of Taxman</title>
+<meta name="description" content="Once the numbers above n/2 are chosen, a game of Taxman splits into frames, small games that barely touch, and only the promotions are left to choose.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2718%27 r=%2713%27 fill=%27%2314478c%27/%3E%3Ccircle cx=%2716%27 cy=%2715%27 r=%2713%27 fill=%27%232166c4%27/%3E%3C/svg%3E">
 <script src="js/tone.js"></script>
 <link rel="stylesheet" href="css/site.css">
+<link rel="stylesheet" href="css/frames.css">
 </head>
-<body data-page="story">
+<body data-page="story" data-chapter="4">
 <header class="topbar"></header>
 <div class="site">
 <aside class="rail" aria-label="Contents"></aside>
 <main class="essay"><div class="column">
 
 <header class="essay-head para">
-  <p class="kicker">The story</p>
-  <h1>Optimal games of Taxman</h1>
-  <p class="lede">We found an optimal game of Taxman for every n from 1 to <span data-last-n>the end of the chain</span>.
-  This essay explains how, from the rules up.  Its first four chapters are written: they take the board of a game
-  apart into frames, small games that hardly touch each other, and show the one choice that is left.</p>
+  <p class="kicker">Chapter 4</p>
+  <h1>Frames</h1>
+  <p class="lede">Once greedy has chosen the numbers above n/2, the board splits into frames, small games that
+  barely touch.  Only the promotions are left to choose.</p>
 </header>
 
-<!-- 1. The game ------------------------------------------------------------------------------------------------ -->
-<section class="chapter" id="the-game" data-toc="the-game" data-title="The game" aria-labelledby="h-the-game">
-  <div class="chapter-head"><span class="chapno" data-chapno="1"></span><h2 id="h-the-game">The game</h2></div>
-  <p>Taxman is a game for one player, played against a taxman on the numbers 1 to n.  The numbers start in the
-  <em>pot</em>.</p>
-  <ul class="rules">
-    <li>You take a number from the pot, and score it.  That number is your <em>move</em>.</li>
-    <li>The taxman then takes every divisor of your move still in the pot: its <em>tax</em>.</li>
-    <li>You may take only a number that has a divisor left in the pot.  The taxman must always get something.</li>
-    <li>When no number you could take is left, the taxman takes the rest.</li>
-  </ul>
-  <div class="para">
-    <aside class="note tech" aria-label="Notation: opt(n)">
-      <div class="note-head"><span class="note-name">Notation</span></div>
-      <p>opt(n) is the best score of game n.  The scores opt(1), opt(2), opt(3), … are the Taxman sequence,
-      <a href="https://oeis.org/A019312">A019312</a> in the OEIS.  A divisor here is always a proper one, below the
-      move; the rules in full are in <a href="glossary.html#the-game">the
-      glossary</a>.</p>
-    </aside>
-    <p>Your score is the sum of your moves.  The best score anyone can make on 1 to n is written opt(n), and a game
-    that scores it is an <em>optimal game</em>.  Game 10, on the numbers 1 to 10, is a good start.</p>
-  </div>
-
-  <div class="game-host" id="game"></div>
-
-  <div class="para">
-    <aside class="note card" aria-label="The prime lemma, proved">
-      <div class="note-head"><span class="note-name">The prime lemma<span class="note-label">Lemma N1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-prime-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Every optimal game opens with the largest prime on the board, and plays no other prime.</p>
-      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2, and let q(n) be the largest prime up to n.
-      Every optimal game of n plays q(n) as its first move, and plays no other prime.</p>
-    </aside>
-    <p>The coins in the pot are the numbers above n/2, and the tiles are the rest.  A coin divides no other number
-    on the board, so the taxman never takes one as tax: he gets a coin only at the end, if you never took it.  A number
-    you may take stands up; one you may not lies flat.</p>
-    <p>One rule of thumb is always right: open with the largest prime on the board.  It costs you only the 1, and a
-    prime can only ever open a game, since the 1 is its one divisor.</p>
-  </div>
-</section>
-
-<!-- 2. Sets, not orders ----------------------------------------------------------------------------------------- -->
-<section class="chapter" id="sets-not-orders" data-toc="sets-not-orders" data-title="Sets, not orders" aria-labelledby="h-sets">
-  <div class="chapter-head"><span class="chapno" data-chapno="2"></span><h2 id="h-sets">Sets, not orders</h2></div>
-  <p>What you score depends on which numbers you take, not on the order you take them in.  The order matters only to
-  keep each move legal, with a divisor still in the pot when you take it.</p>
-  <p>Here are the nine moves of an optimal game of 21, each above the divisor the taxman takes with it.  Step through
-  the orders that work.</p>
-
-  <figure class="fig fig-panel" id="orders">
-    <svg role="img" aria-label="The nine moves of an optimal game of 21, each above the tax it takes, in one of the orders that play a legal game."></svg>
-    <div class="fig-controls">
-      <button type="button" class="btn round" data-act="prev" aria-label="Previous order">&lsaquo;</button>
-      <output aria-live="polite"></output>
-      <button type="button" class="btn round" data-act="next" aria-label="Next order">&rsaquo;</button>
-    </div>
-    <figcaption class="orders-status"></figcaption>
-  </figure>
-
-  <div class="para">
-    <aside class="note tech" aria-label="Playable sets, precisely">
-      <div class="note-head"><span class="note-name">Playable, precisely</span></div>
-      <p>A set S ⊆ {2, …, n} is <em>playable</em> when some order of it is the moves of a legal game of n.  Its weight
-      is ΣS, and an optimal set is a playable set of weight opt(n).  The theory decides playability by
-      <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#payment-schemes">payment schemes</a>.</p>
-    </aside>
-    <aside class="note card" aria-label="The uniqueness of the optimal set to 424, measured">
-      <div class="note-head"><span class="note-name">One optimal set, to 424</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board">measured<span class="sr-only">, evidence on GitHub</span></a></div>
-      <p class="plain">Up to game 424 every game has exactly one optimal set; from 425 on, a few have two or three.</p>
-      <p class="precise"><span class="run">Precisely.</span>The prover enumerates the optimal sets of the games it
-      proves.  Game 425 has two, which trade {110, 132, 168} for {98, 150, 162}, each of sum 410.</p>
-    </aside>
-    <p>So the question for game n is which sets of numbers can be played, in some order.  We call such a set
-    <em>playable</em>.  The sum of a set is its <em>weight</em>, and an <em>optimal set</em>, the set of moves of an
-    optimal game, is a heaviest playable set.</p>
-  </div>
-  <div class="para">
-    <aside class="note card" aria-label="The lifting lemma, proved">
-      <div class="note-head"><span class="note-name">The lifting lemma<span class="note-label">Lemma P1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-lifting-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">A number can be played exactly when one of its maximal factors is still in the pot.</p>
-      <p class="precise"><span class="run">Precisely.</span>At any point of a game, if a proper divisor d of x is in
-      the pot, so is a maximal factor f of x with d | f.  The maximal factors of x are x/p, for each prime p dividing x.</p>
-    </aside>
-    <p>Whether a move is legal depends only on its <em>maximal factors</em>: the number divided by one of its primes.
-    12 has the maximal factors 6 and 4, and 9 has only 3.  If any divisor of a move is still in the pot, so is a
-    maximal factor, so a move is legal exactly when one of its maximal factors is in the pot.  That factor is the one
-    that <em>pays for</em> the move.  In the figure each move stands on the maximal factor that pays for it, and it is
-    the same one in every order.</p>
-  </div>
-
-  <div class="para">
-    <aside class="note card" aria-label="The length proposition, proved">
-      <div class="note-head"><span class="note-name">The length proposition<span class="note-label">Proposition Q4</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-length-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">In game 833 every optimal game has 362 moves, and the longest games have 363.</p>
-      <p class="precise"><span class="run">Precisely.</span>In game 833 = 7² · 17 a heaviest game of 363 moves scores
-      218,197, which is 29 less than opt(833) = 218,226.  Proved by computation, with the prover and a maximum
-      matching.</p>
-    </aside>
-    <details class="aside" id="game-833" data-toc="game-833">
-      <summary>
-        <span class="aside-pin" aria-hidden="true"></span>
-        <span><span class="where">Along the way: game 833</span><span class="title">More moves, fewer points</span></span>
-        <span class="open-mark"><span class="closed-word">Open</span><span class="open-word">Close</span></span>
-      </summary>
-      <div class="aside-body">
-        <p>Taking more numbers does not always score more.  In game 833, every optimal game makes
-        <span data-833="moves">362</span> moves, yet some games make one more.  The longest of those still scores
-        less: they play five smaller numbers where the optimal game plays four larger ones.</p>
-        <div id="exchange-833"></div>
-        <p>The trade happens below n/2.  Each of the nine numbers is a maximal factor of a source the optimal game
-        plays, and a number taken as a move cannot also pay for a source.  The optimal game takes the four large ones
-        and pays for those sources some other way; the longest game leaves the four to pay and takes five smaller ones
-        instead.</p>
-      </div>
-    </details>
-  </div>
-</section>
-
-<!-- 3. Layers and frames ---------------------------------------------------------------------------------------- -->
-<section class="chapter" id="layers-and-frames" data-toc="layers-and-frames" data-title="Layers and frames" data-fig="fig21" aria-labelledby="h-frames">
-  <div class="chapter-head"><span class="chapno" data-chapno="3"></span><h2 id="h-frames">Layers and frames</h2></div>
-  <p>A board is not one big game.  It falls apart into small ones, <em>frames</em>, which touch each other only
-  through a few numbers.  To see how, we take the board of game 21 apart in one figure, a step at a time.  The same 21
-  numbers move through every step, so you can follow any one of them.</p>
-
-  <h3 class="section-head" id="the-marks">The marks</h3>
-  <p>Every figure on this site uses the same marks.  The numbers you play stand up from the page, as raised tokens; the
-  numbers in a figure that explains are drawn flat, in ink.  The two share their shapes and their meanings.</p>
-  <div id="legend"></div>
-
-  <p data-follows="fig21" data-state="1">Start with <a class="go" href="?fig21=1#fig21" data-fig="fig21" data-state="1">the pot</a>,
-  the numbers 1 to 21.  The figure follows the words: the underlined ones move it, and so do the slider under it and
-  the arrow keys.  A number named in the text, such as <span class="n" data-n="12">12</span>, gets a halo in the
-  figure when you point at it.</p>
-
-  <figure class="fig fig21" id="fig21">
-    <div class="fig-state"><span class="fig-state-name">The pot</span><span class="fig-state-n">1 of 8</span></div>
-    <svg role="img" aria-label="Game 21, from the board to the frames. The current state is described under the figure."></svg>
-    <div class="fig-timeline"></div>
-    <figcaption class="fig-caption"></figcaption>
-  </figure>
-
-  <div class="para">
-    <aside class="note tech" aria-label="Layers, precisely">
-      <div class="note-head"><span class="note-name">Layers, precisely</span></div>
-      <p>The layer of x is Ω(x), its count of prime factors with multiplicity: Ω(12) = Ω(2 · 2 · 3) = 3, and
-      Ω(1) = 0.  Each maximal factor x/p lies in layer Ω(x) − 1, so every line of the maximal factor graph joins two
-      neighboring layers.</p>
-    </aside>
-    <p data-follows="fig21" data-state="2">Every number has a <em>layer</em>: its count of prime factors, with repeats.
-    <span class="n" data-n="12">12</span> = 2 · 2 · 3 is in layer 3, a prime is in layer 1, and
-    <span class="n" data-n="1">1</span> alone is in layer 0.  When we <a class="go" href="?fig21=2#fig21" data-fig="fig21" data-state="2">set
-    the numbers out in layers</a>, a column each with layer 1 at the right, and join each one to its maximal factors,
-    every line runs one column to the right, toward the front: <span class="n" data-n="12">12</span> to
-    <span class="n" data-n="6">6</span> and <span class="n" data-n="4">4</span>, and every prime to 1.</p>
-  </div>
-
-  <div class="para">
-    <aside class="note tech" aria-label="Sources, precisely">
-      <div class="note-head"><span class="note-name">Sources, precisely</span></div>
-      <p>The sources of game n are the s with n/2 &lt; s ≤ n.  Since 2s &gt; n, no multiple of s but s itself is on the
-      board, so s is never tax.  The factors are 1 to ⌊n/2⌋.</p>
-    </aside>
-    <p data-follows="fig21" data-state="3">Next we <a class="go" href="?fig21=3#fig21" data-fig="fig21" data-state="3">cut every column at
-    n/2</a>, factors above the line and sources below it.  The numbers above n/2, <span class="n" data-n="11">11</span>
-    to <span class="n" data-n="21">21</span> here, are the <em>sources</em>.  A source divides no other number on the
-    board, so it is never tax: it is a move or nothing.  The numbers up to n/2 are the <em>factors</em>.  Each is tax
-    for some larger number, and sometimes a move itself.  The lines that matter from here on are the ones from a source
-    to a factor.</p>
-  </div>
-
+<section class="chapter" id="frames-section" data-toc="frames-section" aria-labelledby="h-frames">
+  <h2 id="h-frames">Splitting the board</h2>
   <div class="para">
     <aside class="note card" aria-label="The frame lemma, proved">
       <div class="note-head"><span class="note-name">The frame lemma<span class="note-label">Lemma F1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-frame-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Every number lies in exactly one frame.  A frame's sources share a layer, and its factors lie in
       the layer just below.</p>
-      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  The frame graph of game n joins each source to
-      its maximal factors, and a frame is one of its connected components.  Every number of the board lies in exactly
-      one frame.  In each frame the sources all lie in one layer k and the factors in layer k − 1.  A frame in front of
-      a frame of layer k lies in layer k − 1.</p>
+      <p class="precise"><span class="run">Precisely.</span>The frame graph of game n joins each source to its
+      <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a>, and a frame is one of its connected
+      components.  For n ≥ 2, each frame's sources lie in one layer k and its factors in layer k − 1, and a frame in
+      front of it lies in layer k − 1.</p>
     </aside>
-    <p data-follows="fig21" data-state="4">Then we <a class="go" href="?fig21=4#fig21" data-fig="fig21" data-state="4">group the numbers into
-    frames</a>.  A frame is a group of sources that share factors, together with every factor that can pay for them.
-    Game 21 has four frames, one a layer.  They sit side by side, the frame in front always to the right, each with its
-    sources in a column at its left and its factors at its right.  Every number lies in exactly one frame, a frame's
-    sources share a layer, and its factors lie in the layer just below.</p>
+    <p data-follows="fig21" data-state="1">Chapter 3 left game 21 with its
+  <a class="gloss" href="glossary.html#source">sources</a> chosen: <a class="gloss" href="glossary.html#u-star">U*</a>
+  in gray, and <span class="n" data-n="11">11</span>, <span class="n" data-n="13">13</span> and
+  <span class="n" data-n="17">17</span> rejected.  Now join each source to the
+  <a class="gloss" href="glossary.html#factor">factors</a> that can pay for it, and
+  <a class="go" href="?fig21=1#fig21" data-fig="fig21" data-state="1">the board falls apart</a> into four groups.
+  Each is a <a class="gloss" href="glossary.html#frame"><em>frame</em></a>: some sources with every factor that can pay
+  for one of them.</p>
   </div>
 
-  <div class="para">
-    <aside class="note card" aria-label="The bottom-layers theorem, proved">
-      <div class="note-head"><span class="note-name">The bottom-layers theorem<span class="note-label">Theorem F4</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-bottom-layers-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">In layers 1 and 2, every optimal game plays exactly the sources descending greedy keeps.</p>
-      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2 and S an optimal set of n.  Then S holds q(n) and
-      no other prime, and the sources of S in layer 2 are exactly U*<sub>2</sub>, the members of U* in layer 2.  U* is
-      what descending greedy keeps of the sources, deciding each step by
-      <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-peel-theorem">peel</a>.</p>
-    </aside>
-    <p data-follows="fig21" data-state="5">Which sources should we play?  <a class="go" href="?fig21=5#fig21" data-fig="fig21" data-state="5">Descending
-    greedy</a> goes through the sources from the largest down and keeps each one that can still be played together
-    with those it kept before.  It keeps <span class="n" data-n="21">21</span>, <span class="n" data-n="20">20</span>
-    and <span class="n" data-n="19">19</span>, then rejects <span class="n" data-n="17">17</span>: 19, 17, 13 and 11
-    are primes, whose one maximal factor is 1, and 1 already pays for 19.  The sources it keeps are called U*.  Here
-    they score <span data-g21="inTheBag">135</span>, the score of the game that promotes nothing.  Keeping them is a
-    choice, and chapter 4 says what it costs.</p>
-  </div>
+  <figure class="fig fig21" id="fig21">
+    <div class="fig-state"><span class="fig-state-name">Frames</span><span class="fig-state-n">1 of 4</span></div>
+    <svg role="img" aria-label="Game 21, from its frames to the game played. The current state is described under the figure."></svg>
+    <div class="fig-timeline"></div>
+    <figcaption class="fig-caption"></figcaption>
+  </figure>
+
+  <p>Every number lies in exactly one frame.  A frame's sources share a
+    <a class="gloss" href="glossary.html#layer">layer</a>, and its factors lie in the layer just below.  Game 21 has
+    one frame in each of layers 1 to 4.  One frame is <a class="gloss" href="glossary.html#in-front">in front of</a>
+    another when a number of the other has a maximal factor in it, as <span class="n" data-n="9">9</span> has
+    <span class="n" data-n="3">3</span>.  The frame in front stands to the right, and a dotted arrow runs to it.</p>
 
   <div class="para">
-    <aside class="note tech" aria-label="Freedoms and candidates, precisely">
-      <div class="note-head"><span class="note-name">Freedoms, precisely</span></div>
-      <p>A frame D with factors F<sub>D</sub> and kept sources K<sub>D</sub> has |F<sub>D</sub>| − |K<sub>D</sub>|
-      freedoms, and is closed when it has none.  In game 21 a candidate is a factor x of a frame with a freedom such
-      that U* ∪ {x} is playable.  The <a href="glossary.html#frames">glossary</a>
-      has the solver's own, wider sense of the word.</p>
+    <aside class="note card" aria-label="The layer theorem, proved">
+      <div class="note-head"><span class="note-name">The layer theorem<span class="note-label">Theorem F3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-layer-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">A set can be played exactly when the moves of each layer can be paid for by the factors one layer
+      down that the set does not play.</p>
+      <p class="precise"><span class="run">Precisely.</span>S ⊆ {2, …, n} is
+      <a class="gloss" href="glossary.html#playable">playable</a> iff each of its layer instances is: at layer k, the
+      members S<sub>k</sub> against the numbers of layer k − 1 up to n/2 that are not in S.</p>
     </aside>
-    <p data-follows="fig21" data-state="6">Each frame is a small game of its own.  <a class="go" href="?fig21=6#fig21" data-fig="fig21" data-state="6">Count
-    each frame's freedoms</a>: its factors less its moves.  The frames of layers 1 and 4 have one factor and one move
-    each.  They are <em>closed</em>: every factor is needed to pay, and they drop out.  The frames of layers 2 and 3
-    have four factors and three moves, so each has one factor to spare.  Frame X is <em>in front of</em> frame Y when a
-    number of Y has a maximal factor in X, as <span class="n" data-n="9">9</span> has <span class="n" data-n="3">3</span>.
-    A <em>candidate</em> is a factor that its frame can spare and that the frame in front can take on as one more move:
-    here <span class="n" data-n="4">4</span> and <span class="n" data-n="9">9</span>.  The dotted arrows point from a
-    factor to its maximal factor in the frame in front.</p>
+    <p>Each frame is a small game of its own: its sources pay only with its own factors.  Two frames meet only where a
+    factor of one is played as a <a class="gloss" href="glossary.html#move">move</a>.  That takes it away from its own frame and makes it one more move of the frame
+    in front, where its maximal factors are.</p>
   </div>
 </section>
 
-<!-- 4. Promotions ----------------------------------------------------------------------------------------------- -->
-<section class="chapter" id="promotions" data-toc="promotions" data-title="Promotions" data-fig="fig21" aria-labelledby="h-promotions">
-  <div class="chapter-head"><span class="chapno" data-chapno="4"></span><h2 id="h-promotions">Promotions</h2></div>
+<section class="chapter" id="freedoms-section" data-toc="freedoms-section" aria-labelledby="h-freedoms">
+  <h2 id="h-freedoms">Freedoms</h2>
   <div class="para">
-    <aside class="note tech" aria-label="Promotion sets, precisely">
-      <div class="note-head"><span class="note-name">Promotion sets</span></div>
-      <p>A promotion set is a set L of numbers up to n/2 such that U* ∪ L is playable.  The frame solver's answer is
-      ΣU* + P*, where P* is the largest ΣL; in game 21, L = {9} and 135 + 9 = 144.  The search explores these sets,
-      and the exactness theorem, below, says they are all there is.</p>
+    <aside class="note card" aria-label="The winnability lemma, proved">
+      <div class="note-head"><span class="note-name">The winnability lemma<span class="note-label">Lemma F5</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-winnability-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">A <a class="gloss" href="glossary.html#frame">frame</a>'s own game can be won exactly when its <a class="gloss" href="glossary.html#move">moves</a> can be paid
+      for, so a frame never has fewer factors than moves.</p>
+      <p class="precise"><span class="run">Precisely.</span>A pair W of moves in one
+      <a class="gloss" href="glossary.html#layer">layer</a> and factors in the layer below can be won, every move taken
+      while it has a <a class="gloss" href="glossary.html#maximal-factor">maximal factor</a> left, iff W read as an
+      instance is <a class="gloss" href="glossary.html#playable">playable</a>.</p>
     </aside>
-    <p data-follows="fig21" data-state="7">To <em>promote</em> a factor is to play it as a move.  When we
-    <a class="go" href="?fig21=7#fig21" data-fig="fig21" data-state="7">promote 9</a>, it makes a short hop to the right:
-    it leaves the factors of the layer-3 frame and becomes a move of the layer-2 frame in front of it, paid for by
-    <span class="n" data-n="3">3</span>.  Only one candidate fits, since each frame had one factor to spare, and 9 is
-    the larger.  The score is <span data-g21="inTheBag">135</span>, what U* scores, plus 9:
-    <span data-g21="score">144</span>.</p>
+    <aside class="note tech" aria-label="Freedoms, precisely">
+      <div class="note-head"><span class="note-name">Freedoms, precisely</span></div>
+      <p>A frame D with the factors F<sub>D</sub> has |F<sub>D</sub>| − |<a class="gloss" href="glossary.html#u-star">U*</a> ∩ D| freedoms, and is closed when it has
+      none.  In a game that plays all of U*, a closed frame's factors pay exactly its moves
+      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#the-exactness-theorem">the
+      closed-frames lemma</a>).</p>
+    </aside>
+    <p data-follows="fig21" data-state="2">In each frame, the <a class="gloss" href="glossary.html#source">sources</a> that greedy kept are its moves, and each needs a
+    factor of its own to pay for it.  A frame's <a class="gloss" href="glossary.html#freedom"><em>freedoms</em></a> are
+    its factors less its moves: how many factors it can spare.  <a class="go" href="?fig21=2#fig21" data-fig="fig21"
+    data-state="2">Count them</a>.  The frames of layers 1 and 4 have as many factors as moves.  They are
+    <em>closed</em>: every <a class="gloss" href="glossary.html#factor">factor</a> <a class="gloss" href="glossary.html#pays-for">pays for</a> a move, and nothing in them is left to choose.  The frames of layers 2 and 3
+    have four factors and three moves, one freedom each.</p>
   </div>
-  <p>This is what the frame solver searches: which candidates to promote together.  Everything else is settled before
-  its search begins.  Game 21 has two candidates; larger games have hundreds, and a search settles which to
-  promote.</p>
+</section>
 
-  <p data-follows="fig21" data-state="8">The frames also give an order of play: frames in front first, from the right.
-  When we <a class="go" href="?fig21=8#fig21" data-fig="fig21" data-state="8">play the game</a>, the player takes
-  <span class="n" data-n="19">19</span>, 9, 15, 21, 14, 18, 12, 20 and 16, each with the one tax its thick line marks.
-  Then no move is left, and the taxman takes <span class="n" data-n="11">11</span>, <span class="n" data-n="13">13</span>
-  and <span class="n" data-n="17">17</span>.  The game ends <span data-g21="score">144</span> to
-  <span data-g21="taxman">87</span>, and 144 is opt(21).</p>
+<section class="chapter" id="promotions" data-toc="promotions" aria-labelledby="h-promotions">
+  <h2 id="h-promotions">Promotions</h2>
+  <p>A <a class="gloss" href="glossary.html#factor">factor</a> that its <a class="gloss" href="glossary.html#frame">frame</a> can spare can be played as a <a class="gloss" href="glossary.html#move">move</a>.  To
+  <a class="gloss" href="glossary.html#promote"><em>promote</em></a> a factor is to play it: it leaves its frame, which
+  no longer needs it, and becomes one more move of the frame in front, where one of its own
+  <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a> pays for it.  A
+  <a class="gloss" href="glossary.html#candidate"><em>candidate</em></a> is a factor that its frame can spare and that
+  the frame in front can take on.  In game 21 the candidates are <span class="n" data-n="4">4</span> and
+  <span class="n" data-n="9">9</span>, drawn with a second outline.</p>
 
-  <h3 class="section-head" id="the-loop">Why 9 and not 10: the loop</h3>
-  <p>Why could the layer-2 frame take <span class="n" data-n="9">9</span> on, and not 10?  The numbers 10, 14, 15 and
-  21 have two prime factors each, so each is a line between two primes.  Together they make a square on 2, 5, 3 and
-  7: 10 = 2 · 5, 15 = 5 · 3, 21 = 3 · 7 and 14 = 7 · 2.  Play them, with only the four primes as tax.</p>
-
-  <figure class="fig fig-panel" id="loop" data-fig="loop">
-    <svg role="img" aria-label="The numbers 10, 15, 21 and 14 on the sides of a square whose corners are the primes 2, 5, 3 and 7. Take them one at a time; the primes go to the taxman."></svg>
-    <div class="fig-controls"><button type="button" class="btn" data-act="reset">Start over</button></div>
-    <figcaption class="loop-status" aria-live="polite"></figcaption>
-  </figure>
+  <p>Why not <span class="n" data-n="10">10</span>, or <span class="n" data-n="6">6</span>?  10 = 2 · 5 would join
+  14 = 2 · 7, 21 = 3 · 7 and 15 = 3 · 5 in the frame of layer 2, and those four are
+  <a href="sets.html#loop-section">chapter 1's loop</a>: they cannot all be played.  6 = 2 · 3 would close a smaller
+  <a class="gloss" href="glossary.html#loop">loop</a> with 14 and 21.  But 9 = 3 · 3 has the single maximal factor 3,
+  closes no loop, and fits, and so does 4 = 2 · 2.</p>
 
   <div class="para">
-    <aside class="note card" aria-label="The loop rule, proved">
-      <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11, the two-factor proposition</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Numbers with two prime factors can all be played exactly when their lines form no loop.</p>
-      <p class="precise"><span class="run">Precisely.</span>Let S ⊆ {2, …, n}, each member with at most two maximal
-      factors outside S.  Its graph has a vertex for each of those factors and one more, the ground, and an edge for
-      each member: between its two factors, or from its one factor to the ground.  Then S is playable if and only if
-      the graph has no cycle, two members joining the same factor to the ground counting as one.</p>
-      <p>The theory draws the same square in <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/img/cycle-21.svg">cycle-21.svg</a>.</p>
+    <aside class="note card" aria-label="The promotion-limit lemma, proved">
+      <div class="note-head"><span class="note-name">The promotion-limit lemma<span class="note-label">Lemma F9</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-promotion-limit-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">Each promotion spends a freedom of the frame it leaves and one of the frame it joins, so the
+      freedoms cap how many promotions fit.</p>
+      <p class="precise"><span class="run">Precisely.</span>With ρ<sub>h</sub> freedoms and κ<sub>h</sub>
+      candidates in frame h, numbered from the front, no promotion set has more members than the largest
+      c<sub>1</sub> + ⋯ + c<sub>t</sub> with 0 ≤ c<sub>h</sub> ≤ κ<sub>h</sub> and
+      c<sub>h</sub> + c<sub>h+1</sub> ≤ ρ<sub>h</sub>.  In game 21 it is 1.</p>
     </aside>
-    <p>Whatever the order, the first move takes both of its primes, and at least one of the four is stuck.  Four
-    numbers need four primes to pay with, one each, and the first move spends two.  The rule: numbers with two prime
-    factors can all be played, in some order, exactly when their lines form no loop.</p>
+    <p data-follows="fig21" data-state="3">Only one of the two can go, since each frame here has one
+    <a class="gloss" href="glossary.html#freedom">freedom</a> and a promotion spends one in each.  <a class="go" href="?fig21=3#fig21" data-fig="fig21" data-state="3">Promote 9</a>,
+    the larger.  It hops to the right, into the frame of <a class="gloss" href="glossary.html#layer">layer</a> 2, where 3 <a class="gloss" href="glossary.html#pays-for">pays for</a> it, and the score is
+    <span data-g21="inTheBag">135</span> + 9 = <span data-g21="score">144</span>.</p>
   </div>
-  <p>In the layer-2 frame of game 21, 14, 21 and 15 already make three sides of the square, so 10 would close it, and
-  6 = 2 · 3 would close a triangle with 14 and 21.  But <span class="n" data-n="9">9</span> has a single maximal
-  factor, 3.  It hangs from one prime, closes nothing, and fits.</p>
 
-  <h3 class="section-head" id="exact">What the model costs</h3>
+  <p data-follows="fig21" data-state="4">The frames also give the order of play: the frames in front first, from the
+  right.  <a class="go" href="?fig21=4#fig21" data-fig="fig21" data-state="4">Play the game</a>: the moves are
+  <span data-g21="moves">19, 9, 15, 21, 14, 18, 12, 20 and 16</span>, each taking the one <a class="gloss" href="glossary.html#tax">tax</a> its thick line marks.
+  Then no move is left, and the taxman takes <span data-g21="rest">11, 13 and 17</span>.  The game ends
+  <span data-g21="score">144</span> to <span data-g21="taxman">87</span>, and 144 is
+  <a class="gloss" href="glossary.html#opt">opt(21)</a>.</p>
+</section>
+
+<section class="chapter" id="frame-model-section" data-toc="frame-model-section" aria-labelledby="h-model">
+  <h2 id="h-model">The frame model</h2>
+  <p>So once <a class="gloss" href="glossary.html#u-star">U*</a> is chosen, a game is settled by one choice: which
+    <a class="gloss" href="glossary.html#candidate">candidates</a> to <a class="gloss" href="glossary.html#promote">promote</a> together.  A set of
+    candidates that can all be promoted together is a <em>promotion set</em>, and the
+    <a class="gloss" href="glossary.html#frame-model"><em>frame model</em></a> asks for the heaviest one.  Everything
+  else follows from it: the frames, the order of play and the game.</p>
+
   <div class="para">
     <aside class="note card" aria-label="The exactness theorem, proved">
       <div class="note-head"><span class="note-name">The exactness theorem<span class="note-label">Theorem X7</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#the-exactness-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">The frame model's best score is the best score of a game that plays all of U*.</p>
-      <p class="precise"><span class="run">Precisely.</span>The promotion sets of every root problem of game n are
-      exactly the sets L of numbers up to n/2 for which U* ∪ L is playable.  So ΣU* + P* is the largest weight of a
-      playable set that contains U*.</p>
+      <p class="plain">The promotion sets are exactly the sets of numbers up to n/2 that a game playing all of U* can
+      add.</p>
+      <p class="precise"><span class="run">Precisely.</span>In every root problem of game n, U* ∪ L is
+      <a class="gloss" href="glossary.html#playable">playable</a> iff L is a promotion set.  So ΣU* + P*, with P* the
+      weight of the heaviest promotion set, is the largest weight of a playable set that contains U*.</p>
     </aside>
-    <p>The frame model fixes the sources to U* and searches only the promotions.  Is anything lost?  The answer has
-    two parts.</p>
-    <p>First, nothing is lost given U*: the best score of the frame model is the best score of any game that plays
-    every source in U*.</p>
-  </div>
-  <div class="para">
-    <aside class="note card" aria-label="Statement U, open">
-      <div class="note-head"><span class="note-name">Statement U<span class="note-label">and corollary X8</span></span><a class="standing is-open" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">open<span class="sr-only">, evidence on GitHub</span></a></div>
-      <p class="plain">Some optimal game plays every source that descending greedy keeps in layers 3 and up.</p>
-      <p class="precise"><span class="run">Precisely.</span>U at n: some optimal set of n contains U*<sub>≥3</sub>, the
-      members of U* in layers 3 and up.  Corollary X8, proved: ΣU* + P* ≤ opt(n), with equality if and only if U holds
-      at n.  Layers 1 and 2 are settled by the bottom-layers theorem.</p>
+    <aside class="note card" aria-label="The corollary of U, proved">
+      <div class="note-head"><span class="note-name">The corollary of U<span class="note-label">Corollary X8</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">The frame model's best score is at most opt(n), and equal to it exactly where statement U
+      holds.</p>
+      <p class="precise"><span class="run">Precisely.</span>ΣU* + P* ≤ <a class="gloss" href="glossary.html#opt">opt(n)</a>, with equality iff U holds at n.  The
+      <a class="gloss" href="glossary.html#chain">chain</a>'s scores past 2175 are proven within the frame model, so they are opt(n) given U
+      (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what
+      supports the scores</a>).</p>
     </aside>
-    <aside class="note card" aria-label="The chain's scores, proved given U">
-      <div class="note-head"><span class="note-name">The chain's scores</span><a class="standing is-given-u" href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">proved given U<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Every score of the chain is opt(n) wherever statement U holds at n.</p>
-      <p class="precise"><span class="run">Precisely.</span>Each recorded score is ΣU* + P*, optimal in the frame model
-      given that the solver is right, and so opt(n) by X8 given U at n.  For the first games of the chain the prover,
-      which knows nothing of frames, proves the scores on the whole board.</p>
-    </aside>
-    <aside class="note links" aria-label="Further reading">
-      <div class="note-head"><span class="note-name">Further reading</span></div>
-      <ul>
-        <li><a href="https://github.com/bvchess/taxman/blob/master/docs/THEORY.md">docs/THEORY.md</a><span>the theorems both programs rest on, with their proofs</span></li>
-        <li><a href="https://github.com/bvchess/taxman/blob/master/results/README.md">results/README.md</a><span>the results files, and what supports each score</span></li>
-        <li><a href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a><span>the chain of optimal games, one line a game</span></li>
-        <li><a href="https://github.com/bvchess/taxman/blob/master/solver/frame/README.md">solver/frame/README.md</a><span>the frame solver, the program that found the games</span></li>
-        <li><a href="https://arxiv.org/abs/2211.00461">Franklín and Moniot</a><span>“The difficulty of beating the Taxman”, the paper the theory builds on</span></li>
-      </ul>
-    </aside>
-    <p>Second, whether some optimal game plays all of U* is a statement of its own, statement U, and it is open.  So
-    the frame solver's answer is opt(n) wherever U holds.  For the games at the start of the chain, a second program,
-    the prover, which knows nothing of frames, proves the scores on the whole board.</p>
+    <p>Nothing is lost by looking only at promotions, as long as the game plays all of U*.  The promotion sets are
+    exactly what a game that plays U* can add below n/2, so the frame model's best score is the best score of any game
+    that plays U*.  That is the best score of the game itself exactly where
+    <a class="gloss" href="glossary.html#statement-u">statement U</a> holds, which
+    <a href="top-half.html#statement-u">chapter 3</a> states.</p>
   </div>
 </section>
+
+<section class="chapter" id="scale" data-toc="scale" aria-labelledby="h-scale">
+  <h2 id="h-scale">How much is left</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="The frame model in the code">
+      <div class="note-head"><span class="note-name">The frame model in the code</span></div>
+      <p>The <a class="gloss" href="glossary.html#frame-solver">frame solver</a> forms the frames, keeps U* and finds
+      the candidates in its setup, then <a class="gloss" href="glossary.html#search">searches</a> the promotion sets
+      (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/design/frame-model.md#setup-in-the-code">the
+      design</a>; <a href="https://github.com/bvchess/taxman/tree/master/solver/frame/src/frames">solver/frame/src/frames</a>).</p>
+    </aside>
+  <p>Game 21 has two <a class="gloss" href="glossary.html#candidate">candidates</a>.  Game
+  <span data-scale="n">5,060</span> has <span data-scale="candidates">1,380</span>, in
+  <span data-scale="frames">19</span> <a class="gloss" href="glossary.html#frame">frames</a>.  Its
+  <a class="gloss" href="glossary.html#optimal-game">optimal game</a> <a class="gloss" href="glossary.html#promote">promotes</a>
+  <span data-scale="promotions">268</span> of them, and they carry <span data-scale="promoted">570,330</span> of its
+  <span data-scale="score">8,053,621</span> points: about <span data-scale="rest">7%</span> of the score.  The other
+  <span data-scale="top">93%</span> is <a class="gloss" href="glossary.html#u-star">U*</a>, which one greedy pass chose.</p>
+  </div>
+
+  <figure class="fig wide chart frames-row" id="frames-row">
+    <p class="chart-title">The frames of game <span data-scale="n">5,060</span>, by layer</p>
+    <div class="row-box"></div>
+    <figcaption class="fig-caption"></figcaption>
+  </figure>
+
+  <p>Each candidate is promoted or not, so <span data-scale="candidates">1,380</span> candidates allow about
+  10<sup data-scale="sets">415</sup> sets, and most of them break some frame.  Which set is the heaviest is the one
+  choice left, and a search makes it.</p>
+</section>
+
+<section class="chapter" id="along" data-toc="along" aria-label="Along the way">
+  <div class="para">
+    <aside class="note card" aria-label="One optimal set to 424, measured">
+      <div class="note-head"><span class="note-name">One optimal set to 424</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-relaxation-proposition">measured<span class="sr-only">, evidence on GitHub</span></a></div>
+      <p class="plain">Every game up to 424 has one optimal set, and game 425 has two.</p>
+      <p class="precise"><span class="run">Precisely.</span>The <a class="gloss" href="glossary.html#prover">prover</a>
+      lists every optimal set of the games it proved.  There is one in every game n ≤ 424; from 425 on a few games
+      have two or three.  In every game listed, the optimal sets share U* and their size, and differ by an exchange of
+      equal sum below n/2.  Which one a run records depends on the order of its
+      <a class="gloss" href="glossary.html#search">search</a>
+      (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#games-with-several-optimal-sets">games
+      with several optimal sets</a>).</p>
+    </aside>
+    <aside class="note card" aria-label="The relaxation proposition, proved">
+      <div class="note-head"><span class="note-name">The relaxation proposition<span class="note-label">Proposition Q2</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-relaxation-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">A game with two optimal sets has no greedy shortcut to its best score.</p>
+      <p class="precise"><span class="run">Precisely.</span>In a game with two or more optimal sets, such as 425, every
+      family of subsets of 2..n that is closed under subsets, holds every <a class="gloss" href="glossary.html#playable">playable</a> set, and on which the greedy
+      algorithm finds a heaviest member for every nonnegative weighting has a member that weighs more than <a class="gloss" href="glossary.html#opt">opt(n)</a>.</p>
+    </aside>
+    <details class="aside" id="game-425" data-toc="game-425">
+      <summary>
+        <span class="aside-pin" aria-hidden="true"></span>
+        <span><span class="where">Along the way: game 425</span><span class="title">Two optimal sets</span></span>
+        <span class="open-mark"><span class="closed-word">Open</span><span class="open-word">Close</span></span>
+      </summary>
+      <div class="aside-body">
+        <p>Every game up to 424 has one <a class="gloss" href="glossary.html#optimal-set">optimal set</a> of
+        <a class="gloss" href="glossary.html#move">moves</a>.
+        Game 425 has two.  They play the same numbers above n/2, <a class="gloss" href="glossary.html#u-star">U*</a>, and the same
+        <span data-425="shared">20</span> promotions, and differ in three more: one plays 168, 132 and 110, the other
+        162, 150 and 98.</p>
+        <div id="two-sets"></div>
+        <p>Both threes sum to <span data-425="swap">410</span>, so both games score
+        <span data-425="score">57,010</span>, the best possible, and they trade one number in each of layers 5, 4 and
+        3.  A tie like this rules out a shortcut like chapter 3's for the whole game.  On a family of sets where a
+        greedy pass always finds the heaviest, distinct numbers give only one heaviest set, and game 425 has two.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<nav class="chapter-nav" aria-label="Chapters">
+  <a class="prev" href="top-half.html">3. The top half</a>
+  <a class="next" href="search.html"><span class="nav-kicker">Next</span> <span class="nav-title">5. The search.</span>
+  A search tries promotion sets, and a bound proves when nothing better is left.</a>
+</nav>
 
 <footer class="site-foot"><p class="provenance"></p><p><a href="notation.html">Notation</a>: what the marks, pills and symbols mean</p></footer>
 </div></main>
@@ -356,42 +260,43 @@
 <script type="module">
 import { initEssay, registerFigure, mountProvenance } from './js/essay.js';
 import { loadGames, loadSmall } from './js/data.js';
-import { numberSVG } from './js/vocab.js';
-import { mountGame } from './figures/game.js';
-import { mountOrders } from './figures/orders.js';
-import { mountLegend } from './figures/legend.js';
-import { mountGame21 } from './figures/game21.js';
-import { mountLoop } from './figures/loop.js';
-import { mountLonger833 } from './figures/longer-833.js';
+import { fmt, listWords } from './js/vocab.js';
+import { pct } from './js/chart.js';
 import * as M from './js/model.js';
-
-// A chapter's number in its heading is drawn flat: it is not a thing to press.
-for (const b of document.querySelectorAll('[data-chapno]')) {
-  b.appendChild(numberSVG(Number(b.dataset.chapno), { rendering: 'flat', looks: ['move', 'kept'], size: 38, pad: 3 }));
-}
+import { mountGame21 } from './figures/game21.js';
+import { mountFramesRow } from './figures/frames-row.js';
+import { fill425, mountTwoSets } from './figures/two-sets-425.js';
 
 initEssay();
-mountLegend(document.getElementById('legend'));
 const [small, games] = await Promise.all([loadSmall(), loadGames()]);
-for (const s of document.querySelectorAll('[data-last-n]')) s.textContent = games.lastN.toLocaleString('en-US');
 mountProvenance(games);
 
-// Game 21's numbers in the prose come from the model and the recorded game, like the figure's.
-const g21 = small.find((g) => g.n === 21);
-const played = M.replay(21, g21.moves);
-const facts21 = {
-  inTheBag: M.descendingGreedy(21).reduce((a, b) => a + b, 0),
-  score: g21.score,
-  taxman: played.taxman.reduce((a, b) => a + b, 0),
+const fig21 = mountGame21(document.getElementById('fig21'), {
+  small, states: ['frames', 'freedoms', 'promote', 'play'],
+  label: 'Game 21, from its frames to the game played. The current state is described under the figure.',
+});
+registerFigure('fig21', fig21);
+const f = fig21.facts;
+const words21 = {
+  inTheBag: fmt(f.inTheBag), score: fmt(f.score), taxman: fmt(f.taxman), moves: listWords(f.game.moves), rest: listWords(f.rest),
 };
-for (const s of document.querySelectorAll('[data-g21]')) s.textContent = facts21[s.dataset.g21];
+for (const s of document.querySelectorAll('[data-g21]')) s.textContent = words21[s.dataset.g21];
 
-mountGame(document.getElementById('game'), { small });
-mountOrders(document.getElementById('orders'), { small });
-registerFigure('fig21', mountGame21(document.getElementById('fig21'), { small }));
-registerFigure('loop', mountLoop(document.getElementById('loop')));
-const r833 = mountLonger833(document.getElementById('exchange-833'), { games });
-document.querySelector('[data-833="moves"]').textContent = r833.moves;
+// The scale of the last game of the chain.
+const c = games.columns;
+const n = games.lastN;
+const i = c.n.indexOf(n);
+const promoted = c.score[i] - c.inTheBag[i];
+const scale = {
+  n: fmt(n), candidates: fmt(c.candidates[i]), frames: fmt(M.frames(n).length), promotions: fmt(c.promotions[i]),
+  promoted: fmt(promoted), score: fmt(c.score[i]), rest: pct(promoted / c.score[i], 0), top: pct(c.inTheBag[i] / c.score[i], 0),
+  sets: fmt(Math.round(c.candidates[i] * Math.log10(2))),
+};
+for (const s of document.querySelectorAll('[data-scale]')) s.textContent = scale[s.dataset.scale];
+mountFramesRow(document.getElementById('frames-row'), { games });
+
+mountTwoSets(document.getElementById('two-sets'), { games });
+fill425(games);
 </script>
 </body>
 </html>

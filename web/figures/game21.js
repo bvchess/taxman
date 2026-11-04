@@ -1,5 +1,7 @@
-// Game 21, from the board to the frames: one flat figure in eight named states, the last of them the game itself,
-// played move by move.  Every number keeps its mark from the pot to the game.
+// Game 21, from the pot to the game played: one flat figure in eight named states, the last of them the game itself,
+// played move by move.  Every number keeps its mark from the pot to the game.  A page shows the states it needs, in
+// this order: chapter 3 the first four (the pot, the layers, the sources, descending greedy), chapter 4 the last four
+// (the frames, the freedoms, the promotion, the game).
 //
 // Every fact comes from js/model.js and the recorded game of data/small.json: the layers (omega), the
 // lines (maximalFactors), the sources, the frames (frameModel), what descending greedy keeps, the freedoms, the
@@ -7,11 +9,13 @@
 // of the wiki's walkthrough of game 21, and they are checked against the model, so a change the layout does not fit
 // fails loudly.
 //
-// URL parameter: fig21=k opens state k (1 to 8); fig21=8.3 opens the game after its third move.
+// URL parameter (fig21 unless the page names another): k opens the page's state k, from 1; where the page plays the
+// game, its last state k plays it through, and k.3 opens it after its third move.
 
 import * as M from '../js/model.js';
-import { SHAPE, fmt, listWords } from '../js/vocab.js';
+import { SHAPE, listWords } from '../js/vocab.js';
 import { scene, timeline } from '../js/scene.js';
+import { holdHeight } from './hold-height.js';
 
 const N = 21;
 const HALF = N / 2;
@@ -19,12 +23,12 @@ const W = 556;
 const H = 370;
 const CENTER_X = W / 2;
 
-/** The named stops of the slider, and the title of each state. */
-export const STOPS = ['pot', 'layers', 'sources', 'frames', 'greedy', 'freedoms', 'promote', 'play'];
-export const TITLES = [
-  'The pot', 'Layers', 'Sources and factors', 'Frames', 'Descending greedy', 'Freedoms and candidates', 'The promotion',
-  'The game',
-];
+/** The named states, in order, and the title of each. */
+export const STOPS = ['pot', 'layers', 'sources', 'greedy', 'frames', 'freedoms', 'promote', 'play'];
+const TITLES = {
+  pot: 'The pot', layers: 'Layers', sources: 'Sources and factors', greedy: 'Descending greedy', frames: 'Frames',
+  freedoms: 'Freedoms and candidates', promote: 'The promotion', play: 'The game',
+};
 
 // ---------------------------------------------------------------------------------------------------------------
 // Places, by hand, in the wiki's layout: the layers are columns, layer 0 at the right and the last layer at the
@@ -35,11 +39,12 @@ export const TITLES = [
 // The pot: the numbers in order, seven a row.
 const potAt = (m) => [CENTER_X + (((m - 1) % 7) - 3) * 58, 112 + Math.floor((m - 1) / 7) * 56];
 
-// The layers: one column a layer, layer 0 at the right and layer 4 at the left, each in order and centered.
+// The layers: one column a layer, layer 0 at the right and layer 4 at the left, each rising in value and centered,
+// so that once the columns are cut at n/2 the sources, the top half, stand above the line.
 const COLUMN_X = [516, 397, 278, 159, 40];
-const MID_Y = 154; // the middle of the columns, and the line at n/2 in the state "sources"
+const MID_Y = 154; // the middle of the columns, and the line at n/2 once they are cut
 const STEP = 34;
-const SPLIT = 22; // in the state "sources", how far the factors stand above the line and the sources below it
+const SPLIT = 22; // once cut, how far the sources stand above the line and the factors below it
 
 // The frames, side by side.  Rows are 48 apart, and each factor stands level with the factor it divides (8 with 4,
 // 4 with 2, 9 with 3, 7 with 1), so that the dotted links run straight across, between the sources they pass.
@@ -68,12 +73,15 @@ const NAME_Y = 302; // the names of the layers and the frames, under them
 const NOTE_Y = 322; // the notes under the frames
 const SCORE_Y = 352;
 const boxMiddle = (layer) => BOX_AT[layer].x + BOX_AT[layer].w / 2;
+const COUNT = { 2: 'two', 3: 'three', 4: 'four', 5: 'five' };
 
 // ---------------------------------------------------------------------------------------------------------------
 // The facts, from the model
 // ---------------------------------------------------------------------------------------------------------------
 
-function facts(small) {
+/** The facts of game 21 that the figure and its page state: the recorded game, the frames, U* and what it scores,
+ *  the candidates, the promotion and the final tally. */
+export function facts21(small) {
   const game = small.find((g) => g.n === N);
   const frames = M.frameModel(N);
   const uStar = M.descendingGreedy(N);
@@ -98,9 +106,11 @@ function facts(small) {
   }
   for (const x of game.promotions) if (!PROMOTED_AT[x]) throw new Error(`game 21: no place for the promotion of ${x}`);
   for (const t of turns) if (t.tax.length !== 1) throw new Error(`game 21: move ${t.move} takes ${t.tax.length} numbers`);
+  const scan = M.sources(N).reverse(); // descending greedy's order
   return {
     game, frames, uStar, kept, open, candidates, turns, rest, frameOf, promoted: game.promotions, score: game.score,
-    inTheBag, player: sum(played.player), taxman: sum(played.taxman),
+    inTheBag, player: sum(played.player), taxman: sum(played.taxman), scan,
+    keptDown: scan.filter((x) => kept.has(x)), rejectedDown: scan.filter((x) => !kept.has(x)),
   };
 }
 
@@ -113,6 +123,8 @@ const isSource = (x) => x > HALF;
 const shapeOf = (x) => (isSource(x) ? SHAPE.circle : SHAPE.square);
 const allEdges = numbers.flatMap((x) => M.maximalFactors(x).map((f) => [x, f]));
 
+// Each layer's column, rising in value from the bottom; once split at n/2, the sources rise from just above the line
+// and the factors stand below it, the largest nearest the line.
 function layersAt(split) {
   const columns = [[], [], [], [], []];
   for (const x of numbers) columns[M.omega(x)].push(x);
@@ -120,17 +132,18 @@ function layersAt(split) {
   columns.forEach((column, layer) => {
     const x = COLUMN_X[layer];
     if (!split) {
-      column.forEach((n, j) => (at[n] = [x, MID_Y + (j - (column.length - 1) / 2) * STEP]));
+      column.forEach((n, j) => (at[n] = [x, MID_Y + ((column.length - 1) / 2 - j) * STEP]));
       return;
     }
     const factors = column.filter((n) => !isSource(n));
     const srcs = column.filter(isSource);
-    factors.forEach((n, j) => (at[n] = [x, MID_Y - SPLIT - (factors.length - 1 - j) * STEP]));
-    srcs.forEach((n, j) => (at[n] = [x, MID_Y + SPLIT + j * STEP]));
+    factors.forEach((n, j) => (at[n] = [x, MID_Y + SPLIT + (factors.length - 1 - j) * STEP]));
+    srcs.forEach((n, j) => (at[n] = [x, MID_Y - SPLIT - j * STEP]));
   });
   return at;
 }
 
+/** Every state, by name; the game is a list of states, its start, one a move and the end. */
 function buildStates(f) {
   const pos = (at) => ({ x: at[0], y: at[1] });
   const closed = new Set(f.frames.filter((fr) => fr.closed).flatMap((fr) => [...fr.sources, ...fr.factors]));
@@ -138,23 +151,23 @@ function buildStates(f) {
   const placeAfter = (x) => PROMOTED_AT[x] || FRAME_AT[x];
   const layerAt = layersAt(false);
   const splitAt = layersAt(true);
-  const scan = numbers.filter(isSource).reverse(); // descending greedy's order
   const scanSlot = (x) => {
-    const i = scan.indexOf(x);
+    const i = f.scan.indexOf(x);
     return [0.04 + i * 0.078, 0.04 + i * 0.078 + 0.14];
   };
   const frame1 = f.frames.find((fr) => fr.layer === 1);
   const firstKept = Math.max(...frame1.kept);
   const linkDrawn = new Set(LINKS_DRAWN.map(([a, b]) => `${a}-${b}`));
   const payOf = new Map(f.turns.map((t) => [t.move, t.tax[0]]));
-  const S = []; // the states, in order
+  const firstPay = `p${firstKept}-${payOf.get(firstKept)}`;
+  const decided = (x) => (isSource(x) ? { kept: f.kept.has(x) ? 1 : 0, dashed: f.kept.has(x) ? 0 : 1 } : {});
+  const S = {};
 
-  // 1. The pot.
-  const pot = { potName: { x: CENTER_X, y: 50 } };
-  for (const x of numbers) pot[x] = { ...pos(potAt(x)), shape: shapeOf(x) };
-  S.push(pot);
+  // The pot.
+  S.pot = { potName: { x: CENTER_X, y: 50 } };
+  for (const x of numbers) S.pot[x] = { ...pos(potAt(x)), shape: shapeOf(x) };
 
-  // 2. Layers: each number in the column of its layer, joined to its maximal factors; 12 and its two are named.
+  // Layers: each number in the column of its layer, joined to its maximal factors; 12 and its two are named.
   const layers = { _duration: 1300 };
   for (const x of numbers) {
     const k = M.omega(x);
@@ -162,61 +175,62 @@ function buildStates(f) {
   }
   for (const [a, b] of allEdges) layers[`e${a}-${b}`] = { halo: a === 12 ? 1 : 0, at: [0.55, 1] };
   for (let k = 0; k <= 4; k++) layers[`layer${k}`] = { x: COLUMN_X[k], y: NAME_Y, at: [0.5, 1] };
-  S.push(layers);
+  S.layers = layers;
 
-  // 3. Sources and factors: each column cut at n/2, the factors above the line and the sources below it.
+  // Sources and factors: each column cut at n/2, the sources above the line and the factors below it.  The line is
+  // named at its left end, below it; the words for its two sides sit clear of the one line that crosses there.
   const split = { _duration: 1100 };
   for (const x of numbers) split[x] = { ...pos(splitAt[x]), shape: shapeOf(x), halo: isSource(x) ? 1 : 0 };
   for (const [a, b] of allEdges) split[`e${a}-${b}`] = { faded: isSource(a) ? 0 : 0.6 };
   for (let k = 0; k <= 4; k++) split[`layer${k}`] = { x: COLUMN_X[k], y: NAME_Y };
   split.rule = {};
-  // The line at n/2 is named at its left end; the words for its two sides sit where only one line crosses.
-  split.half = { x: 2, y: MID_Y - 9 };
-  split.factorsName = { x: (COLUMN_X[3] + COLUMN_X[4]) / 2, y: MID_Y - 13 };
-  split.sourcesName = { x: (COLUMN_X[3] + COLUMN_X[4]) / 2, y: MID_Y + 13 };
-  S.push(split);
+  split.half = { x: 2, y: MID_Y + 11 };
+  split.sourcesName = { x: 100, y: MID_Y - 34 };
+  split.factorsName = { x: 100, y: MID_Y + 38 };
+  S.sources = split;
 
-  // 4. Frames: each source with the factors that can pay for it, frame by frame, the frame in front at the right.
+  // Descending greedy, from 21 down, where the sources stand: each kept (gray) or rejected (hollow, dashed) in its
+  // turn, with a brief halo as the scan reaches it.  1 pays for 19, the first prime kept, and the lines of a rejected
+  // source go out of focus.
+  const greedy = {};
+  for (const x of numbers) {
+    greedy[x] = { ...pos(splitAt[x]), shape: shapeOf(x), ...decided(x), ...(isSource(x) ? { at: scanSlot(x), via: { halo: 1 } } : {}) };
+  }
+  for (const [a, b] of allEdges) {
+    const spec = { ...split[`e${a}-${b}`] };
+    greedy[`e${a}-${b}`] = isSource(a) && !f.kept.has(a) ? { ...spec, faded: 1, at: scanSlot(a) } : spec;
+  }
+  greedy[firstPay] = { at: scanSlot(firstKept) };
+  for (const key of ['rule', 'half', 'sourcesName', 'factorsName']) greedy[key] = { ...split[key] };
+  for (let k = 0; k <= 4; k++) greedy[`layer${k}`] = { ...split[`layer${k}`] };
+  greedy.scoreU = { x: CENTER_X, y: SCORE_Y, at: [0.85, 1] };
+  S.greedy = greedy;
+
+  // Frames: each source, as greedy left it, with the factors that can pay for it, frame by frame, the frame in front
+  // at the right.
   const framesView = { _duration: 1500 };
   for (const x of numbers) {
     const k = f.frameOf.get(x).layer;
-    framesView[x] = { ...pos(FRAME_AT[x]), shape: shapeOf(x), at: [0.1 * (4 - k), 0.1 * (4 - k) + 0.6] };
+    framesView[x] = { ...pos(FRAME_AT[x]), shape: shapeOf(x), ...decided(x), at: [0.1 * (4 - k), 0.1 * (4 - k) + 0.6] };
   }
   for (const [a, b] of allEdges) {
-    if (isSource(a)) framesView[`e${a}-${b}`] = { at: [0.5, 1] };
+    if (isSource(a)) framesView[`e${a}-${b}`] = f.kept.has(a) ? { at: [0.5, 1] } : { faded: 1, at: [0.5, 1] };
     if (!isSource(a) && linkDrawn.has(`${a}-${b}`)) framesView[`l${a}-${b}`] = { at: [0.6, 1] };
   }
+  framesView[firstPay] = { at: [0.5, 1] };
   for (const fr of f.frames) {
     framesView[`box${fr.layer}`] = { ...BOX_AT[fr.layer], at: [0.45, 1] };
     framesView[`layer${fr.layer}`] = { x: boxMiddle(fr.layer), y: NAME_Y };
   }
-  S.push(framesView);
+  framesView.scoreU = { x: CENTER_X, y: SCORE_Y };
+  S.frames = framesView;
 
-  // 5. Descending greedy, from 21 down: each source kept (gray) or rejected (hollow, dashed) in its turn, with a
-  // brief halo as the scan reaches it.  1 pays for 19, the first prime kept.
-  const greedy = {};
-  for (const x of numbers) {
-    const decided = isSource(x) ? { kept: f.kept.has(x) ? 1 : 0, dashed: f.kept.has(x) ? 0 : 1 } : {};
-    greedy[x] = { ...pos(FRAME_AT[x]), shape: shapeOf(x), ...decided, ...(isSource(x) ? { at: scanSlot(x), via: { halo: 1 } } : {}) };
-  }
-  for (const [a, b] of allEdges) {
-    if (isSource(a)) greedy[`e${a}-${b}`] = isSource(a) && !f.kept.has(a) ? { faded: 1, at: scanSlot(a) } : {};
-    if (!isSource(a) && linkDrawn.has(`${a}-${b}`)) greedy[`l${a}-${b}`] = {};
-  }
-  greedy[`p${firstKept}-${payOf.get(firstKept)}`] = { at: scanSlot(firstKept) };
-  for (const fr of f.frames) {
-    greedy[`box${fr.layer}`] = { ...BOX_AT[fr.layer] };
-    greedy[`layer${fr.layer}`] = { x: boxMiddle(fr.layer), y: NAME_Y };
-  }
-  greedy.scoreU = { x: CENTER_X, y: SCORE_Y, at: [0.85, 1] };
-  S.push(greedy);
-
-  // 6. Freedoms: the closed frames drop out of focus; the candidates take a second outline.
+  // Freedoms: the closed frames drop out of focus; the candidates take a second outline.
   const freedoms = { _duration: 1100 };
   for (const x of numbers) {
     const isCandidate = f.candidates.includes(x);
     freedoms[x] = {
-      ...greedy[x], at: undefined, via: undefined,
+      ...framesView[x], at: undefined,
       faded: closed.has(x) ? 1 : 0, opacity: closed.has(x) ? 0.6 : 1, ring: isCandidate ? 1 : 0, halo: isCandidate ? 1 : 0,
     };
   }
@@ -228,16 +242,16 @@ function buildStates(f) {
       freedoms[lid] = f.candidates.includes(a) ? { halo: 1 } : { faded: 1, opacity: 0.5 };
     }
   }
-  freedoms[`p${firstKept}-${payOf.get(firstKept)}`] = { faded: 1, opacity: 0.6 };
+  freedoms[firstPay] = { faded: 1, opacity: 0.6 };
   for (const fr of f.frames) {
     freedoms[`box${fr.layer}`] = { ...BOX_AT[fr.layer], dashed: fr.closed ? 1 : 0, faded: fr.closed ? 1 : 0 };
     freedoms[`layer${fr.layer}`] = { x: boxMiddle(fr.layer), y: NAME_Y, opacity: fr.closed ? 0.6 : 1 };
     freedoms[`free${fr.layer}`] = { x: boxMiddle(fr.layer), y: NOTE_Y, opacity: fr.closed ? 0.6 : 1 };
   }
   freedoms.scoreU = { x: CENTER_X, y: SCORE_Y };
-  S.push(freedoms);
+  S.freedoms = freedoms;
 
-  // 7. The promotion: 9 rounds into a circle as it hops rightward, from the factors of the layer-3 frame into the
+  // The promotion: 9 rounds into a circle as it hops rightward, from the factors of the layer-3 frame into the
   // moves of the layer-2 frame, where 3 pays for it.  Its old place keeps a dashed ghost.
   const promote = { _duration: 1600 };
   for (const x of numbers) {
@@ -263,7 +277,7 @@ function buildStates(f) {
       promote[lid] = promotedSet.has(a) ? { opacity: 0, at: [0, 0.25] } : { faded: 1, opacity: 0.4 };
     } else if (freedoms[lid]) promote[lid] = { ...freedoms[lid] };
   }
-  promote[`p${firstKept}-${payOf.get(firstKept)}`] = { ...freedoms[`p${firstKept}-${payOf.get(firstKept)}`] };
+  promote[firstPay] = { ...freedoms[firstPay] };
   for (const fr of f.frames) {
     promote[`box${fr.layer}`] = { ...freedoms[`box${fr.layer}`] };
     promote[`layer${fr.layer}`] = { ...freedoms[`layer${fr.layer}`] };
@@ -276,15 +290,14 @@ function buildStates(f) {
   }
   promote.scoreU = { x: CENTER_X, y: SCORE_Y, opacity: 0, at: [0, 0.4] };
   promote.scoreP = { x: CENTER_X, y: SCORE_Y, at: [0.5, 0.9] };
-  S.push(promote);
+  S.promote = promote;
 
-  // 8. The game: every frame back in focus, every payment drawn; then the moves, from the right.  Each turn makes a
+  // The game: every frame back in focus, every payment drawn; then the moves, from the right.  Each turn makes a
   // move the player's (blue) and its tax the taxman's (orange), with a tag for its place in the game, and the last
   // turn wears a halo.  At the end the taxman takes the rest.
   const start = { _duration: 900 };
   for (const x of numbers) {
-    const decided = isSource(x) ? { kept: f.kept.has(x) ? 1 : 0, dashed: f.kept.has(x) ? 0 : 1 } : {};
-    start[x] = { ...pos(placeAfter(x)), shape: promotedSet.has(x) ? SHAPE.circle : shapeOf(x), ...decided, ...(promotedSet.has(x) ? { kept: 1 } : {}) };
+    start[x] = { ...pos(placeAfter(x)), shape: promotedSet.has(x) ? SHAPE.circle : shapeOf(x), ...decided(x), ...(promotedSet.has(x) ? { kept: 1 } : {}) };
   }
   for (const [a, b] of allEdges) if (isSource(a) && !promotedSet.has(b)) start[`e${a}-${b}`] = { faded: 1, opacity: 0.7 };
   for (const t of f.turns) start[`p${t.move}-${t.tax[0]}`] = {};
@@ -297,7 +310,7 @@ function buildStates(f) {
   start.tallyPlayer = { x: CENTER_X - 99, y: SCORE_Y };
   start.keyTaxman = { x: CENTER_X + 14, y: SCORE_Y, shape: SHAPE.square, scale: 0.42, taxman: 1 };
   start.tallyTaxman = { x: CENTER_X + 27, y: SCORE_Y };
-  S.push(start);
+  const play = [start];
   let prev = start;
   f.turns.forEach((t, i) => {
     const s = structuredClone(prev);
@@ -309,7 +322,7 @@ function buildStates(f) {
     s[`p${t.move}-${t.tax[0]}`] = { halo: 1 };
     const [mx, my] = placeAfter(t.move);
     s[`tag${i + 1}`] = { x: mx - 15, y: my - 17, at: [0, 0.5] };
-    S.push(s);
+    play.push(s);
     prev = s;
   });
   const end = structuredClone(prev);
@@ -317,7 +330,8 @@ function buildStates(f) {
   for (const x of numbers) end[x].halo = 0;
   for (const key of Object.keys(end)) if (key.startsWith('p') && end[key]) end[key].halo = 0;
   f.rest.forEach((x, j) => (end[x] = { ...end[x], taxman: 1, halo: 1, at: [0.15 * j, 0.15 * j + 0.6] }));
-  S.push(end);
+  play.push(end);
+  S.play = play;
   return S;
 }
 
@@ -326,19 +340,20 @@ function buildStates(f) {
 // ---------------------------------------------------------------------------------------------------------------
 
 function captions(f) {
-  const f1 = f.frames.find((fr) => fr.layer === 1);
+  const half = Math.floor(HALF);
   const fp = f.frameOf.get(f.promoted[0]);
   const into = f.frames.find((fr) => fr.layer === M.omega(f.promoted[0]));
   const payer = f.turns.find((t) => t.move === f.promoted[0]).tax[0];
-  return [
-    `The pot holds the numbers 1 to ${N}. The circles are the numbers above n/2, the squares the rest.`,
-    'Each number stands in the column of its layer, its count of prime factors, with layer 1 at the right. A line runs rightward from each number to each of its maximal factors: 12 to 6 and 4.',
-    `The sources, ${M.sources(N)[0]} to ${N}, lie above n/2. They divide no other number on the board, so they are never tax: each is a move or nothing. The factors are 1 to ${Math.floor(HALF)}.`,
-    `${f.frames.length} frames side by side: each source with the factors that can pay for it. A frame's sources, at its left, share a layer, and its factors, at its right, lie one layer below. A dotted arrow runs from a factor to its maximal factor in the frame in front.`,
-    `Descending greedy keeps each source, from ${N} down, that is still playable with those kept. It keeps ${listWords(f1.kept)} and rejects ${listWords([...f1.rejected].reverse())}: their only factor, 1, pays for ${f1.kept[0]}. U* scores ${f.inTheBag}.`,
-    `The frames of layers ${listWords(f.frames.filter((fr) => fr.closed).map((fr) => fr.layer))} are closed, with as many factors as moves, and drop out. The frames of layers ${listWords(f.open.map((fr) => fr.layer))} have one freedom each. The candidates are ${listWords(f.candidates)}.`,
-    `${f.promoted[0]} hops rightward: it leaves the factors of the layer-${fp.layer} frame and becomes a move of the layer-${into.layer} frame, paid by ${payer}. Only one candidate fits, and ${f.promoted[0]} is the larger. The score: ${f.inTheBag} + ${f.promoted.join(' + ')} = ${f.score}.`,
-  ];
+  const f1 = f.frames.find((fr) => fr.layer === 1);
+  return {
+    pot: `The pot holds the numbers 1 to ${N}. The circles are the numbers above n/2, the squares the rest.`,
+    layers: 'Each number stands in the column of its layer, its count of prime factors, with layer 1 at the right. A line runs rightward from each number to each of its maximal factors: 12 to 6 and 4.',
+    sources: `Each column cut at n/2. Above the line are the sources, ${M.sources(N)[0]} to ${N}: they divide no other number on the board, so each is a move or nothing. Below it are the factors, 1 to ${half}.`,
+    greedy: `From ${N} down, descending greedy keeps ${listWords(f.keptDown)}, each still playable with those kept before it. It rejects ${listWords(f.rejectedDown)}: their one maximal factor, 1, already pays for ${f1.kept[0]}. U* scores ${f.inTheBag}.`,
+    frames: `The ${COUNT[f.frames.length] ?? f.frames.length} frames side by side: each source with the factors that can pay for it, greedy's choice in gray. A frame's sources, at its left, share a layer, and its factors, at its right, lie one layer below. A dotted arrow runs from a factor to its maximal factor in the frame in front.`,
+    freedoms: `The frames of layers ${listWords(f.frames.filter((fr) => fr.closed).map((fr) => fr.layer))} are closed, with as many factors as moves, and drop out. The frames of layers ${listWords(f.open.map((fr) => fr.layer))} have one freedom each. The candidates are ${listWords(f.candidates)}.`,
+    promote: `${f.promoted[0]} hops rightward: it leaves the factors of the layer-${fp.layer} frame and becomes a move of the layer-${into.layer} frame, paid for by ${payer}. Only one candidate fits, and ${f.promoted[0]} is the larger. The score: ${f.inTheBag} + ${f.promoted.join(' + ')} = ${f.score}.`,
+  };
 }
 
 function gameWords(f, done) {
@@ -355,12 +370,19 @@ function gameWords(f, done) {
 // Mounting
 // ---------------------------------------------------------------------------------------------------------------
 
-/** Mount the figure in host, which holds .fig-state, an <svg>, .fig-timeline and .fig-caption. */
-export function mountGame21(host, { small }) {
-  const f = facts(small);
+/** Mount the figure in host, which holds .fig-state, an <svg>, .fig-timeline and .fig-caption.  states names the
+ *  states the page shows, in the order of STOPS; param is the URL parameter that opens the figure at a state.  The
+ *  paragraphs with data-follows set to the host's id and data-state k are marked while the figure is at its state k. */
+export function mountGame21(host, { small, states = STOPS, param = 'fig21', label } = {}) {
+  const names = [...states];
+  const order = names.map((name) => STOPS.indexOf(name));
+  if (order.some((i, j) => i < 0 || (j > 0 && i <= order[j - 1]))) {
+    throw new Error(`game 21: the states ${names.join(', ')} are not states of the figure in its order`);
+  }
+  const f = facts21(small);
   const s = scene(host.querySelector('svg'), {
     width: W, height: H, className: 'is-dense',
-    label: 'Game 21, from the board to the frames. The current state is described under the figure.',
+    label: label ?? 'Game 21, a state at a time. The current state is described under the figure.',
   });
   for (const x of numbers) s.number(x, x);
   for (const x of f.promoted) {
@@ -380,18 +402,26 @@ export function mountGame21(host, { small }) {
   for (let layer = 0; layer <= 4; layer++) s.text(`layer${layer}`, `layer ${layer}`, { kind: 'name', anchor: 'middle' });
   s.line('rule', { x: 12, y: MID_Y }, { x: W - 12, y: MID_Y }, 'rule');
   s.text('half', 'n/2');
-  s.text('factorsName', 'factors', { anchor: 'middle' });
   s.text('sourcesName', 'sources', { anchor: 'middle' });
+  s.text('factorsName', 'factors', { anchor: 'middle' });
   s.text('scoreU', `U* scores ${f.inTheBag}`, { kind: 'score', anchor: 'middle' });
   s.text('scoreP', `${f.inTheBag} + ${f.promoted.join(' + ')} = ${f.score}`, { kind: 'score', anchor: 'middle' });
   for (const fr of f.frames) {
     s.text(`free${fr.layer}`, fr.closed ? 'closed' : `${fr.freedoms} freedom${fr.freedoms === 1 ? '' : 's'}`, { anchor: 'middle' });
     if (!fr.closed) s.text(`left${fr.layer}`, 'no freedom left', { anchor: 'middle' });
   }
-  const GAME_START = STOPS.length - 1;
+
+  const all = buildStates(f);
+  const list = names.flatMap((name) => (name === 'play' ? all.play : [all[name]]));
+  // The game, when the page plays it, is its last state, and its moves share the last stretch of the track.
+  const gameStart = names.indexOf('play');
+  const count = names.length;
+  const last = list.length - 1;
+  const turnsDone = (pos) => Math.max(0, Math.min(f.turns.length + 1, Math.round(pos) - gameStart));
   // The tally, counted from the moves played by the state the figure is nearest.
   const tally = (pos) => {
-    const done = Math.max(0, Math.min(f.turns.length + 1, Math.round(pos) - GAME_START));
+    if (gameStart < 0) return { player: 0, taxman: 0 };
+    const done = turnsDone(pos);
     const turns = f.turns.slice(0, done);
     const player = turns.reduce((a, t) => a + t.move, 0);
     const taxman = turns.reduce((a, t) => a + t.tax[0], 0) + (done > f.turns.length ? f.rest.reduce((a, b) => a + b, 0) : 0);
@@ -401,37 +431,35 @@ export function mountGame21(host, { small }) {
   s.text('tallyTaxman', (pos) => `taxman ${tally(pos).taxman}`, { kind: 'score', anchor: 'start' });
   s.number('keyPlayer', '');
   s.number('keyTaxman', '');
-  s.states(buildStates(f));
+  s.states(list);
 
-  const last = s.count - 1;
   const words = captions(f);
-  const stateNumber = (k) => Math.min(k, GAME_START) + 1;
-  const describe = (k) => (k < GAME_START ? words[k] : gameWords(f, k - GAME_START));
+  const inGame = (k) => gameStart >= 0 && k >= gameStart;
+  const stateNumber = (k) => (inGame(k) ? gameStart : k) + 1;
+  const nameOf = (k) => names[stateNumber(k) - 1];
+  const describe = (k) => (inGame(k) ? gameWords(f, k - gameStart) : words[nameOf(k)]);
   const titleBox = host.querySelector('.fig-state');
   const captionBox = host.querySelector('.fig-caption');
+  holdHeight(captionBox, list.map((_, k) => describe(k)));
   timeline(s, host.querySelector('.fig-timeline'), {
-    stops: [
-      ...STOPS.slice(0, -1).map((name, i) => ({ at: i, name })),
-      { at: GAME_START, until: last, name: STOPS[GAME_START] },
-    ],
-    // The game's ten turns share the last stretch of the track.
-    places: Array.from({ length: s.count }, (_, k) => (k <= GAME_START ? k : GAME_START + (k - GAME_START) * 0.12)),
-    param: 'fig21',
+    stops: names.map((name, i) => (name === 'play' ? { at: i, until: last, name } : { at: i, name })),
+    places: Array.from({ length: list.length }, (_, k) => (inGame(k) ? gameStart + (k - gameStart) * 0.12 : k)),
+    param,
     fromParam: (value) => {
       const [whole, part] = value.split('.');
       const st = Number(whole);
-      if (!Number.isInteger(st) || st < 1 || st > STOPS.length) return null;
-      if (st < STOPS.length) return st - 1;
-      return part === undefined ? last : Math.min(last, GAME_START + Number(part));
+      if (!Number.isInteger(st) || st < 1 || st > count) return null;
+      if (st - 1 !== gameStart) return st - 1;
+      return part === undefined ? last : Math.min(last, gameStart + Number(part));
     },
-    toParam: (k) => (k < GAME_START ? String(k + 1) : k === last ? String(STOPS.length) : `${STOPS.length}.${k - GAME_START}`),
-    describe: (k) => `${TITLES[stateNumber(k) - 1]}, state ${stateNumber(k)} of ${STOPS.length}. ${describe(k)}`,
+    toParam: (k) => (!inGame(k) ? String(k + 1) : k === last ? String(gameStart + 1) : `${gameStart + 1}.${k - gameStart}`),
+    describe: (k) => `${TITLES[nameOf(k)]}, state ${stateNumber(k)} of ${count}. ${describe(k)}`,
     title: (k) => {
-      titleBox.querySelector('.fig-state-n').textContent = `${stateNumber(k)} of ${STOPS.length}`;
-      titleBox.querySelector('.fig-state-name').textContent = TITLES[stateNumber(k) - 1];
+      titleBox.querySelector('.fig-state-n').textContent = `${stateNumber(k)} of ${count}`;
+      titleBox.querySelector('.fig-state-name').textContent = TITLES[nameOf(k)];
       captionBox.textContent = describe(k);
       host.dataset.state = stateNumber(k);
-      for (const p of document.querySelectorAll('[data-follows="fig21"]')) {
+      for (const p of document.querySelectorAll(`[data-follows="${host.id}"]`)) {
         p.classList.toggle('is-current', p.dataset.state === String(stateNumber(k)));
       }
     },
@@ -441,16 +469,16 @@ export function mountGame21(host, { small }) {
   return {
     scene: s,
     facts: f,
-    stopName: (label) => STOPS[Number(String(label).split('.')[0]) - 1],
-    /** Send the figure to a state named as in the URL: "4", or "8" to play the game through, or "8.3". */
-    async goState(label) {
+    stopName: (value) => names[Number(String(value).split('.')[0]) - 1],
+    /** Send the figure to a state named as in the URL: "2", or the game's state to play it through, or "4.3". */
+    async goState(value) {
       const id = ++playId;
-      const [whole, part] = String(label).split('.');
-      const st = Number(whole);
-      if (st < STOPS.length) return s.go(st - 1);
-      if (part !== undefined) return s.go(GAME_START + Number(part));
-      await s.go(GAME_START);
-      for (let k = GAME_START + 1; k <= last && id === playId; k++) {
+      const [whole, part] = String(value).split('.');
+      const st = Number(whole) - 1;
+      if (st !== gameStart) return s.go(st);
+      if (part !== undefined) return s.go(gameStart + Number(part));
+      await s.go(gameStart);
+      for (let k = gameStart + 1; k <= last && id === playId; k++) {
         await new Promise((r) => setTimeout(r, 380));
         if (id !== playId || Math.round(s.pos) !== k - 1) return;
         await s.go(k);

@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The top half · Playing optimal games of Taxman</title>
+<meta name="description" content="In Taxman, the numbers above n/2 carry most of the score of an optimal game, and one greedy pass chooses them: provably in the bottom two layers, and given statement U above them.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2718%27 r=%2713%27 fill=%27%2314478c%27/%3E%3Ccircle cx=%2716%27 cy=%2715%27 r=%2713%27 fill=%27%232166c4%27/%3E%3C/svg%3E">
+<script src="js/tone.js"></script>
+<link rel="stylesheet" href="css/site.css">
+<link rel="stylesheet" href="css/top-half.css">
+</head>
+<body data-page="story" data-chapter="3">
+<header class="topbar"></header>
+<div class="site">
+<aside class="rail" aria-label="Contents"></aside>
+<main class="essay"><div class="column">
+
+<header class="essay-head para">
+  <p class="kicker">Chapter 3</p>
+  <h1>The top half</h1>
+  <p class="lede">The numbers above n/2 carry most of the score: about <span data-share="median">93%</span> of it in
+  the games that need a search.  One greedy pass chooses them.</p>
+</header>
+
+<section class="chapter" id="sources-section" data-toc="sources-section" aria-labelledby="h-sources">
+  <h2 id="h-sources">Sources</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="Layers, precisely">
+      <div class="note-head"><span class="note-name">Layers, precisely</span></div>
+      <p>The layer of x is Ω(x), its prime factors counted with multiplicity: Ω(12) = Ω(2 · 2 · 3) = 3, and Ω(1) = 0.
+      A maximal factor x/p has the layer Ω(x) − 1, so every line of the
+      <a class="gloss" href="glossary.html#maximal-factor-graph">maximal-factor graph</a> joins two neighboring
+      layers.</p>
+    </aside>
+    <p data-follows="fig21" data-state="2">Start from <a class="go" href="?fig21=1#fig21" data-fig="fig21"
+    data-state="1">the pot of game 21</a>, and set its numbers out as chapter 1's graph does,
+    <a class="go" href="?fig21=2#fig21" data-fig="fig21" data-state="2">in columns by layer</a>.  A number's
+    <a class="gloss" href="glossary.html#layer"><em>layer</em></a> is its count of prime factors, with repeats:
+    <span class="n" data-n="12">12</span> = 2 · 2 · 3 is in layer 3, every prime is in layer 1, and
+    <span class="n" data-n="1">1</span> alone is in layer 0.  A number's
+    <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a> lie one layer down, so every line runs one
+    column to the right.</p>
+  </div>
+
+  <figure class="fig fig21" id="fig21">
+    <div class="fig-state"><span class="fig-state-name">The pot</span><span class="fig-state-n">1 of 4</span></div>
+    <svg role="img" aria-label="Game 21, from the pot to the sources that descending greedy keeps. The current state is described under the figure."></svg>
+    <div class="fig-timeline"></div>
+    <figcaption class="fig-caption"></figcaption>
+  </figure>
+
+  <div class="para">
+    <aside class="note tech" aria-label="Sources, precisely">
+      <div class="note-head"><span class="note-name">Sources, precisely</span></div>
+      <p>The sources of game n are the s with n/2 &lt; s ≤ n.  Since 2s &gt; n, no multiple of s but s itself is on the
+      board, so s is never <a class="gloss" href="glossary.html#tax">tax</a>.  The factors are 1 to ⌊n/2⌋.</p>
+    </aside>
+    <p data-follows="fig21" data-state="3">Now <a class="go" href="?fig21=3#fig21" data-fig="fig21"
+    data-state="3">cut every column at n/2</a>.  A number above n/2 divides no other number on the board, since twice
+    it is already more than n.  So the taxman can never take it as tax: it is a
+    <a class="gloss" href="glossary.html#move">move</a> or nothing.  We call the numbers above n/2 the
+    <a class="gloss" href="glossary.html#source"><em>sources</em></a>, and the numbers up to n/2 the
+    <a class="gloss" href="glossary.html#factor"><em>factors</em></a>.  In game 21 the sources are
+    <span class="n" data-n="11">11</span> to <span class="n" data-n="21">21</span>, above the line.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="The top half's share, measured">
+      <div class="note-head"><span class="note-name">The top half's share</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/results/README.md#optimaljsonlgz">measured<span class="sr-only">, evidence on GitHub</span></a></div>
+      <p class="plain">In the games of the chain that needed a search, the numbers above n/2 carry about
+      <span data-share="median">93%</span> of the score.</p>
+      <p class="precise"><span class="run">Precisely.</span>Over the <span data-share="count">1,618</span> games whose
+      recorded search explored nodes, in_the_bag / score runs from <span data-share="low">91.9%</span> to
+      <span data-share="high">97.1%</span>, and from <span data-share="lowLater">92.1%</span> to
+      <span data-share="highLater">93.2%</span> past game 500.  The recorded game plays exactly <a class="gloss" href="glossary.html#u-star">U*</a> above n/2, so
+      in_the_bag, the sum of U*, is what its sources score.</p>
+    </aside>
+    <p>The sources are the larger half of the numbers, so they are where most of the points are.  In the games of the
+    <a class="gloss" href="glossary.html#chain">chain</a> that needed a <a class="gloss" href="glossary.html#search">search</a>,
+    the sources the <a class="gloss" href="glossary.html#optimal-game">optimal game</a> plays carry about
+    <span data-share="median">93%</span> of its score.</p>
+  </div>
+
+  <figure class="chart" id="share-chart">
+    <p class="chart-title">The top half's share of the score</p>
+    <p class="chart-sub"></p>
+    <div class="chart-box"></div>
+  </figure>
+</section>
+
+<section class="chapter" id="greedy-section" data-toc="greedy-section" aria-labelledby="h-greedy">
+  <h2 id="h-greedy">Descending greedy</h2>
+  <p>Which <a class="gloss" href="glossary.html#source">sources</a> should a game play?  It cannot always play them all.  In game 21 the primes
+  <span class="n" data-n="11">11</span>, <span class="n" data-n="13">13</span>,
+  <span class="n" data-n="17">17</span> and <span class="n" data-n="19">19</span> each have one
+  <a class="gloss" href="glossary.html#maximal-factor">maximal factor</a>, 1, and two <a class="gloss" href="glossary.html#move">moves</a> cannot share a payment, so at
+  most one of the four can be played.</p>
+
+  <div class="para">
+    <aside class="note tech" aria-label="Descending greedy, precisely">
+      <div class="note-head"><span class="note-name">Descending greedy, precisely</span></div>
+      <p>It takes the sources in decreasing order and keeps each one that, with the sources kept so far, is
+      <a class="gloss" href="glossary.html#playable">playable</a>, which <a class="gloss" href="glossary.html#peel">peel</a>
+      decides (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#descending-greedy">the
+      theory</a>).  The <a class="gloss" href="glossary.html#frame-solver">frame solver</a> runs it as part of its setup
+      (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/design/frame-model.md#setup-in-the-code">setup
+      in the code</a>).</p>
+    </aside>
+    <p data-follows="fig21" data-state="4"><a class="gloss" href="glossary.html#descending-greedy"><em>Descending
+    greedy</em></a> chooses the sources in one pass.  It takes them from the largest down and keeps each one that can
+    still be played together with those it kept before.  In game 21 it <a class="go" href="?fig21=4#fig21"
+    data-fig="fig21" data-state="4">keeps 21, 20, 19 and 18</a>, then rejects
+    <span class="n" data-n="17">17</span>, since 1 already <a class="gloss" href="glossary.html#pays-for">pays for</a> 19.  It keeps 16, 15 and 14, rejects 13, keeps 12
+    and rejects 11.  The sources it keeps are called <a class="gloss" href="glossary.html#u-star">U*</a>, and here they
+    sum to <span data-g21="inTheBag">135</span>.  The <a class="gloss" href="glossary.html#optimal-game">optimal game</a> of 21 plays all of them and one factor more,
+    <span class="n" data-n="9">9</span>, for <span data-g21="score">144</span>.</p>
+  </div>
+</section>
+
+<section class="chapter" id="bottom-layers" data-toc="bottom-layers" aria-labelledby="h-bottom">
+  <h2 id="h-bottom">Layers 1 and 2</h2>
+  <div class="para">
+    <aside class="note card" aria-label="The bottom-layers theorem, proved">
+      <div class="note-head"><span class="note-name">The bottom-layers theorem<span class="note-label">Theorem F4</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-bottom-layers-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">In layers 1 and 2, every optimal game plays exactly the <a class="gloss" href="glossary.html#source">sources</a> that
+      <a class="gloss" href="glossary.html#descending-greedy">descending greedy</a> keeps.</p>
+      <p class="precise"><span class="run">Precisely.</span>Let S be an <a class="gloss" href="glossary.html#optimal-set">optimal set</a> of n.  Then S plays q(n), the
+      largest prime up to n, and no other prime; its sources in layer 2 are exactly U*<sub>2</sub>, the members of <a class="gloss" href="glossary.html#u-star">U*</a> in
+      layer 2; and its members in layer 2 form a forest in the graph on the primes, on which descending greedy is the
+      greedy algorithm.</p>
+    </aside>
+    <p>In the two bottom layers, descending greedy is provably right.  <a class="gloss" href="glossary.html#layer">Layer</a>
+    1 holds the primes, and every prime above n/2 needs the same factor, 1, to pay for it.  Greedy keeps the largest
+    and rejects the rest, which is what every <a class="gloss" href="glossary.html#optimal-game">optimal game</a> does,
+    by chapter 2's prime lemma.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note tech" aria-label="Layer 2 as a graph">
+      <div class="note-head"><span class="note-name">Layer 2 as a graph</span></div>
+      <p>The graph has a vertex for each prime up to n/2 and one more, g, and an edge for each number of layer 2: pq is
+      the edge p–q, and p² the edge p–g.  A set of such numbers can be paid for by the primes exactly when its edges
+      form a forest, a graph with no loop (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">the
+      loop rule</a>).  Game 100 has no square among its sources, since 7² = 49 is below 50 and 11² = 121 above 100.</p>
+    </aside>
+    <aside class="note card" aria-label="The square theorem, proved">
+      <div class="note-head"><span class="note-name">The square theorem<span class="note-label">Theorem F10</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-square-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">From game 187 on, the sources greedy keeps in layer 2 need every prime up to n/2, so an optimal
+      game plays no other number with two prime factors.</p>
+      <p class="precise"><span class="run">Precisely.</span>Greedy's layer-2 sources leave one prime to spare in each
+      piece of the graph with no square among its sources, and none in a piece with one.  From n = 187 on, the graph is
+      one piece with a square.  The proof checks the boards 187 to 2499, and primes in short intervals, by
+      computation.</p>
+    </aside>
+    <p>Layer 2 holds the numbers with two prime factors, and there chapter 1's
+    <a class="gloss" href="glossary.html#loop">loop</a> does the work.  A source such as
+    <span class="n" data-n="95">95</span> = 5 · 19 is an edge between its two primes, as 10, 14, 15 and 21 were the
+    edges of <a href="sets.html#loop-section">a square on 2, 5, 3 and 7</a>.  Numbers like these can all be played
+    exactly when their edges contain no loop.  So greedy keeps a source of layer 2 exactly when it closes no loop with
+    the ones it kept.  Here it is on game 100, whose 17 sources with two prime factors lie on the 15 primes up to 50.</p>
+  </div>
+
+  <figure class="fig forest-fig" id="forest">
+    <svg role="img" aria-label="Layer 2 of game 100: the primes up to 50 joined by the sources with two prime factors, which descending greedy takes from the largest down."></svg>
+    <div class="fig-timeline"></div>
+    <figcaption class="fig-caption"></figcaption>
+  </figure>
+
+  <p>Greedy keeps 14 of the 17.  It refuses <a class="go" href="?forest=15#forest" data-fig="forest"
+  data-forest-at="58" data-state="15">58</a>, <a class="go" href="?forest=17#forest" data-fig="forest"
+  data-forest-at="55" data-state="17">55</a> and <a class="go" href="?forest=18#forest" data-fig="forest"
+  data-forest-at="51" data-state="18">51</a>, and each would close a loop of four, chapter 1's loop again.  What it
+  keeps joins all 15 primes with no loop: a tree.  Taking the edges from the heaviest down and refusing any that closes
+  a loop builds the heaviest tree, a classic fact, and here it settles the game: every optimal game plays exactly the
+  sources of layer 2 that greedy keeps.</p>
+  <p>Game 100's tree has 14 edges, so it needs 14 of the 15 primes to pay for them, and one is to spare.  From game
+  187 on, none ever is, and layer 2 is settled completely.</p>
+</section>
+
+<section class="chapter" id="above-layer-two" data-toc="above-layer-two" aria-labelledby="h-above">
+  <h2 id="h-above">Above layer 2</h2>
+  <p>From <a class="gloss" href="glossary.html#layer">layer</a> 3 up, a number can have three different prime factors, and then it has three
+  <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a>: 30 = 2 · 3 · 5 has 15, 10 and 6.  It is no
+  longer an edge between two numbers, and the reason greedy is safe in layer 2 is gone.</p>
+
+  <div class="para">
+    <aside class="note card" aria-label="Where exchange breaks, proved">
+      <div class="note-head"><span class="note-name">Where exchange breaks</span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#where-exchange-breaks">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">Six sources of game 2873 have sets that can take no more of them at two sizes, four and five.</p>
+      <p class="precise"><span class="run">Precisely.</span>Y = {1573, 2057, 2431, 2873} and
+      Y′ = {1573, 1859, 2057, 2197, 2873} are both <a class="gloss" href="glossary.html#playable">playable</a>, and no
+      member of Y′ fits into Y: the playable subsets of the six lack the exchange property.  That exactly 48 orders
+      trap <a class="gloss" href="glossary.html#descending-greedy">descending greedy</a> is proved by computation, which the figure repeats.</p>
+    </aside>
+    <p>That reason is simple.  In layer 2, all the sets of sources that can be played and can take no more have the
+    same size, as all the trees on the same primes have the same number of edges.  So greedy is never stuck with too
+    few.  With three maximal factors this can fail, and in game 2873 it does: six of its sources can be stuck at four,
+    though five fit.</p>
+  </div>
+
+  <details class="aside" id="game-2873" data-toc="game-2873">
+    <summary>
+      <span class="aside-pin" aria-hidden="true"></span>
+      <span><span class="where">Along the way: game 2873</span><span class="title">The greedy that shouldn't work</span></span>
+      <span class="open-mark"><span class="closed-word">Open</span><span class="open-word">Close</span></span>
+    </summary>
+    <div class="aside-body">
+      <p>A greedy pass is safe when every set it could end with has the same size, for then it cannot stop with too
+      few.  Six <a class="gloss" href="glossary.html#source">sources</a> of game 2873, built from the primes 11, 13 and
+      17, break that rule.  Taken in some orders, greedy keeps four of them and then can fit no more.  Taken in others,
+      it keeps five.</p>
+      <figure class="fig trap-fig" id="trap">
+        <svg role="img" aria-label="Six sources of game 2873 and their maximal factors."></svg>
+        <div class="fig-timeline"></div>
+        <figcaption class="fig-caption"></figcaption>
+      </figure>
+      <p>Of the <span data-trap="orders">720</span> orders of the six, <span data-trap="traps">48</span> trap greedy
+      at four: those that put 1859 and 2197 last.  Descending greedy takes them from the largest down, which is not
+      one of those orders, and keeps the heaviest five.  So the order of the numbers protects it, even here.  No
+      smaller game is known where the sources lose this property.</p>
+    </div>
+  </details>
+
+  <div class="para">
+    <aside class="note card" aria-label="The sources conjecture, certified game by game">
+      <div class="note-head"><span class="note-name">The sources conjecture<span class="note-label">Conjecture S1</span></span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#the-open-statements-about-the-sources">certified game by game<span class="sr-only">, evidence on GitHub</span></a></div>
+      <p class="plain">No set of sources that can be played outweighs U*.</p>
+      <p class="precise"><span class="run">Precisely.</span>Every playable set S of sources of game n has
+      ΣS ≤ ΣU*.  A check of the span conjecture (♦) by the
+      <a class="gloss" href="glossary.html#prover">prover</a> proves it in every game from 2 to 100,000
+      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#the-span-theorem">the span
+      theorem</a>; <a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/README.md">the prover's
+      record</a>).</p>
+    </aside>
+    <p>Yet greedy has never been caught.  In every game up to 100,000, a computation certifies that no set of sources that
+    can be played outweighs <a class="gloss" href="glossary.html#u-star">U*</a>.  It is linear algebra: for each source
+    that greedy rejects, its list of maximal factors is shown to be a sum of the lists of sources it kept above it, in
+    the arithmetic where 1 + 1 = 0.</p>
+  </div>
+</section>
+
+<section class="chapter" id="statement-u" data-toc="statement-u" aria-labelledby="h-u">
+  <h2 id="h-u">Statement U</h2>
+  <div class="para">
+    <aside class="note card" aria-label="The uniqueness theorem, proved">
+      <div class="note-head"><span class="note-name">The uniqueness theorem<span class="note-label">Theorem Q1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-uniqueness-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">Wherever the cardinality conjecture (★) holds, U* is the only heaviest set of
+      <a class="gloss" href="glossary.html#source">sources</a> that can be played.</p>
+      <p class="precise"><span class="run">Precisely.</span>Given (★), every <a class="gloss" href="glossary.html#playable">playable</a> set S of sources has
+      |S ∩ [t, n]| ≤ |U* ∩ [t, n]| for every t.  The check of (♦) proves (★) wherever it passes.</p>
+    </aside>
+    <p>So wherever the certificate holds, <a class="gloss" href="glossary.html#u-star">U*</a> is the heaviest set of sources, and the only one.  That does not yet
+    make it the top half of an optimal game.  A game that gives up a source frees the factor that paid for it, and
+    that factor can then be played as a <a class="gloss" href="glossary.html#move">move</a> itself.  An
+    <a class="gloss" href="glossary.html#optimal-game">optimal game</a> might, for all we can prove, play a lighter set
+    of sources and win the points back below n/2.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="Statement U, certified game by game">
+      <div class="note-head"><span class="note-name">Statement U</span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">certified game by game<span class="sr-only">, evidence on GitHub</span></a></div>
+      <p class="plain">Some optimal game plays every source that
+      <a class="gloss" href="glossary.html#descending-greedy">descending greedy</a> keeps.  It is open in general, and proven in every game up to
+      2,175.</p>
+      <p class="precise"><span class="run">Precisely.</span>U at n: some <a class="gloss" href="glossary.html#optimal-set">optimal set</a> of n contains U*<sub>≥3</sub>,
+      the members of U* in layers 3 and up
+      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">the statement</a>).
+      It holds wherever the prover's <a class="gloss" href="glossary.html#opt">opt(n)</a> is the score of a game that plays U*, every n up to 2175
+      (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what
+      supports the scores</a>).</p>
+    </aside>
+    <p><a class="gloss" href="glossary.html#statement-u"><em>Statement U</em></a> says it never has to.  It says that
+    in every game, some optimal game plays every source that descending greedy keeps.  In <a class="gloss" href="glossary.html#layer">layers</a> 1 and 2 that is
+    proved, so U is a statement about the sources with three or more prime factors.  It is open in general.</p>
+    <p>It is proven in every game up to 2,175.  There a second program, the
+    <a class="gloss" href="glossary.html#prover">prover</a>, proves the best score on the whole board without assuming
+    U, and the best score is that of a game that plays all of U*.  Past 2,175 our scores rest on U: each is the
+    best score of a game that plays U*, and that is the best score of the game wherever U holds.</p>
+  </div>
+</section>
+
+<nav class="chapter-nav" aria-label="Chapters">
+  <a class="prev" href="chain.html">2. Walking up the chain</a>
+  <a class="next" href="frames.html"><span class="nav-kicker">Next</span> <span class="nav-title">4. Frames.</span>
+  What is left splits into frames, and only the promotions are left to choose.</a>
+</nav>
+
+<footer class="site-foot"><p class="provenance"></p><p><a href="notation.html">Notation</a>: what the marks, pills and symbols mean</p></footer>
+</div></main>
+</div>
+
+<script type="module">
+import { initEssay, registerFigure, mountProvenance } from './js/essay.js';
+import { loadGames, loadSmall } from './js/data.js';
+import { fmt } from './js/vocab.js';
+import { pct } from './js/chart.js';
+import { mountGame21 } from './figures/game21.js';
+import { mountShareChart } from './figures/top-share.js';
+import { mountForest } from './figures/forest.js';
+import { mountTrap } from './figures/trap-2873.js';
+
+initEssay();
+const [small, games] = await Promise.all([loadSmall(), loadGames()]);
+mountProvenance(games);
+
+const fig21 = mountGame21(document.getElementById('fig21'), {
+  small, states: ['pot', 'layers', 'sources', 'greedy'],
+  label: 'Game 21, from the pot to the sources that descending greedy keeps. The current state is described under the figure.',
+});
+registerFigure('fig21', fig21);
+for (const s of document.querySelectorAll('[data-g21]')) s.textContent = fmt(fig21.facts[s.dataset.g21]);
+
+const share = mountShareChart(document.getElementById('share-chart'), { games });
+const shareWords = {
+  median: pct(share.median, 0), count: fmt(share.count), low: pct(share.low.share), high: pct(share.high.share),
+  lowLater: pct(share.lowLater), highLater: pct(share.highLater),
+};
+for (const s of document.querySelectorAll('[data-share]')) s.textContent = shareWords[s.dataset.share];
+
+const forest = mountForest(document.getElementById('forest'));
+for (const a of document.querySelectorAll('[data-forest-at]')) {
+  const k = forest.stateOf(Number(a.dataset.forestAt));
+  a.dataset.state = String(k);
+  a.setAttribute('href', `?forest=${k}#forest`);
+}
+registerFigure('forest', forest);
+
+const trap = mountTrap(document.getElementById('trap'));
+registerFigure('trap', trap);
+for (const s of document.querySelectorAll('[data-trap]')) s.textContent = fmt(trap.facts[s.dataset.trap]);
+</script>
+</body>
+</html>
