@@ -14,8 +14,8 @@
 // URL parameters: n=N opens game N, and at=x, with a game up to 100, opens it pointing at the number x.
 
 import * as M from '../js/model.js';
-import { NUMBER, fmt, listWords, numberMark, setNumber } from '../js/vocab.js';
-import { PROOFS } from './chain-chart.js';
+import { NUMBER, duration, fmt, listWords, numberMark, setNumber } from '../js/vocab.js';
+import { PROOFS } from '../js/proof.js';
 
 // The prover proves every score from 2 to here on the whole board, without the frame model (results/README.md, "The
 // files"); past it, a score is the frame model's best, which is opt(n) wherever statement U holds.
@@ -38,16 +38,6 @@ const upper = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 function primeBelow(n) {
   for (let q = n - 1; q >= 2; q--) if (M.primeFactors(q).length === 1 && M.primeFactors(q)[0] === q) return q;
   return null;
-}
-
-/** Two significant figures, in the unit that suits: 0.0011 s as 1.1 ms, 16,094 s as 4.5 h. */
-export function duration(s) {
-  if (s == null) return '—';
-  const two = (x) => fmt(Number(x.toPrecision(2)));
-  if (s < 1) return `${two(s * 1000)} ms`;
-  if (s < 60) return `${two(s)} s`;
-  if (s < 3600) return `${two(s / 60)} min`;
-  return `${two(s / 3600)} h`;
 }
 
 /** What the chain records for game n, read from the columns of games.json, with the words the explorer shows. */

@@ -1,6 +1,6 @@
 // Along the way: the cofactor rule.  The games from 188 to the chain's end, grouped by the cofactor of n, n divided by
-// its largest prime factor: a bar for each group, split by the rule that settles each game, in the cells and tones of
-// figures/settled.js.  Only the last group, the cofactors the rule does not name, holds a search.  From data/games.json.
+// its largest prime factor: a bar for each group, split by the rule of each game (js/proof.js), in the cells and tones
+// of figures/settled.js.  Only the last group, the cofactors the rule does not name, holds a search.  From data/games.json.
 //
 // From 188 on, layer 2 of every board is one closed frame (the square theorem, docs/theory/frame-model.md), which is
 // the rule's hypothesis (docs/theory/arrival.md, "The cofactor rule").
@@ -8,7 +8,8 @@
 import { primeFactors } from '../js/model.js';
 import { el, fmt } from '../js/vocab.js';
 import { freshSVG, pct, responsive, tableView, tooltip } from '../js/chart.js';
-import { NO_SEARCH, RULE, RULES, isPrime, legendHTML, ruleCell, ruleOf } from './settled.js';
+import { NO_SEARCH, RULE, RULES, isPrime, ruleOf } from '../js/proof.js';
+import { legendHTML, ruleCell } from './settled.js';
 
 export const FROM = 188;
 

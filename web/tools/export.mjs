@@ -4,6 +4,12 @@
 //
 // Writes data/games.json (one column of numbers or strings per field, for every game in the chain) and data/small.json
 // (the full records of games 1 to 100).  Run it again after the results file changes, and commit both.
+//
+// Two columns need a word.  seconds is the game's time over every run of its search: a resumed search's line keeps in
+// seconds.total only the last run's, so the column is total − search + search_all_runs (the time outside the search,
+// plus the search over all runs); it falls back to total where a line lacks those keys.  storeRule is, for a line of
+// proof known, the rule of the upper bound it cites (known.upper.rule: exhausted, repeat, ceiling or prime), and null
+// for every other line.
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -18,6 +24,17 @@ const SMALL_LAST_N = 100;
 const orNull = (value) => value ?? null;
 const significant = (value, digits) => (value == null ? null : Number(value.toPrecision(digits)));
 
+// The game's time over every run (see the top of the file).
+function allRunsSeconds(record) {
+  const t = record.seconds;
+  if (t?.total == null) return null;
+  if (t.search == null || t.search_all_runs == null) return t.total;
+  if (t.search_all_runs < t.search) {
+    throw new Error(`game ${record.n}: search_all_runs ${t.search_all_runs} is less than search ${t.search}`);
+  }
+  return t.total - t.search + t.search_all_runs;
+}
+
 const records = readResults();
 const lastN = records[records.length - 1].n;
 
@@ -28,11 +45,12 @@ const columns = {
   proof: records.map((r) => orNull(r.proof)),
   method: records.map((r) => orNull(r.method)),
   nodes: records.map((r) => orNull(r.nodes)),
-  seconds: records.map((r) => significant(r.seconds?.total, 3)),
+  seconds: records.map((r) => significant(allRunsSeconds(r), 3)),
   moves: records.map((r) => (r.moves == null ? null : r.moves.length)),
   promotions: records.map((r) => (r.promotions == null ? null : r.promotions.length)),
   candidates: records.map((r) => orNull(r.setup?.candidates)),
   inTheBag: records.map((r) => orNull(r.in_the_bag)),
+  storeRule: records.map((r) => (r.proof === 'known' ? orNull(r.known?.upper?.rule) : null)),
 };
 
 const commit = execFileSync('git', ['log', '-1', '--format=%h', '--', resultsFile], { cwd: repoRoot })

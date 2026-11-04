@@ -1,75 +1,20 @@
 // How every game of the chain was settled, in the terms of chapter 2: a cell for each game, a hundred to a row, game 1
-// at the bottom left, so that the chain climbs as the board of the walker does.  Each cell is shaded by the first of
-// the chapter's rules that settles its game, from data/games.json alone:
+// at the top left, so that the grid grows downward as the chain does, like the boards of the walker.  Each cell is
+// shaded by the rule of its game (js/proof.js), from data/games.json alone:
 //
-//   the ceiling        a composite n whose score is n + opt(n − 1), found with no search
+//   the ceiling        a game whose score is n + opt(n − 1), found with no search
 //   the prime formula  a prime n
-//   a repeat           a game below its ceiling that the chain proves as a repeat of an earlier game's search
-//   a search           a game whose search ran (method search)
-// and two that no rule of the chapter settles: nothing to choose (proof trivial) and the bounds store (proof known).
-// A game at its ceiling is counted there whatever its record says, since the ceiling lemma proves it from the game
-// before; the record is in its tooltip.  The four rules take a gray ramp, light to dark in the order the chapter
-// meets them, checked with the dataviz validator (--ordinal: monotone lightness, the light end at 2.2:1 on white).
+//   a repeat           a game that repeats an earlier game's search, in the chain or in the bounds store
+//   a search           every other game: a search of its own, in the chain or in the bounds store, or nothing to promote
+//
+// A game that the ceiling or the prime formula settles is counted there whatever its record says, since both prove it
+// from the game before; the record is in its tooltip.  The four rules take a gray ramp, light to dark in the order the
+// chapter meets them, checked with the dataviz validator (--ordinal: monotone lightness, the light end at 2.2:1 on
+// white).
 
-import { primeFactors } from '../js/model.js';
 import { el, fmt } from '../js/vocab.js';
 import { freshSVG, keyboard, pct, responsive, tableView, tooltip } from '../js/chart.js';
-
-export const isPrime = (n) => n >= 2 && primeFactors(n)[0] === n;
-
-/** The chapter's rules, in the order it meets them, and the two kinds of game no rule of it settles.  Each is drawn
- *  by its class, rule-cell is-<key>, in css/chain.css: the rules a gray ramp, nothing to choose a hollow cell and the
- *  bounds store the palest gray.  proof is the record's proof kind that is the rule's own. */
-export const RULES = [
-  { key: 'ceiling', name: 'at the ceiling', proof: 'cap' },
-  { key: 'prime', name: 'the prime formula', proof: 'prime_formula' },
-  { key: 'repeat', name: 'a repeat', proof: 'same_search' },
-  { key: 'search', name: 'a search', proof: 'exhausted' },
-  { key: 'nothing', name: 'nothing to choose', proof: 'trivial' },
-  { key: 'store', name: 'the bounds store', proof: 'known' },
-];
-export const RULE = Object.fromEntries(RULES.map((r) => [r.key, r]));
-/** The rules that settle a game with no search. */
-export const NO_SEARCH = ['ceiling', 'prime', 'repeat'];
-
-/** The rule that settles the game in row i of games.json's columns c. */
-export function ruleOf(c, i) {
-  const n = c.n[i];
-  if (isPrime(n)) return 'prime';
-  if (c.method[i] === 'search') return 'search';
-  if (i > 0 && c.score[i] === c.score[i - 1] + n) return 'ceiling';
-  if (c.proof[i] === 'same_search') return 'repeat';
-  if (c.proof[i] === 'known') return 'store';
-  return 'nothing';
-}
-
-/** The game whose search a repeat n repeats: the game before it, or the one before that when n − 1 is prime, since a
- *  prime game runs no search (results/README.md, the paragraph on repeats, which every repeat of the chain keeps). */
-export const repeatOf = (n) => (isPrime(n - 1) ? n - 2 : n - 1);
-
-/** How the chain's record proves the game in row i, in words: "a repeat of game 21's search". */
-export function recordWords(c, i) {
-  const n = c.n[i];
-  switch (c.proof[i]) {
-    case 'prime_formula': return 'the prime formula';
-    case 'cap': return 'the ceiling';
-    case 'same_search': return `a repeat of game ${fmt(repeatOf(n))}’s search`;
-    case 'exhausted': return `a search of ${fmt(c.nodes[i])} node${c.nodes[i] === 1 ? '' : 's'}`;
-    case 'trivial': return 'nothing to choose';
-    case 'known': return 'the bounds store';
-    default: return c.proof[i];
-  }
-}
-
-/** Every game's rule, and the count of each. */
-export function settled(games) {
-  const c = games.columns;
-  const rules = c.n.map((_, i) => ruleOf(c, i));
-  const counts = Object.fromEntries(RULES.map((r) => [r.key, 0]));
-  for (const r of rules) counts[r]++;
-  const noSearch = NO_SEARCH.reduce((s, k) => s + counts[k], 0);
-  return { rules, counts, noSearch, total: rules.length };
-}
+import { NO_SEARCH, RULE, RULES, recordWords, settled } from '../js/proof.js';
 
 /** A legend swatch for a rule, as HTML. */
 export function swatch(key) {
@@ -91,7 +36,8 @@ export function ruleCell(parent, key, x, y, w, h = w) {
 
 export function mountSettled(host, { games }) {
   const c = games.columns;
-  const { rules, counts, total } = settled(games);
+  const facts = settled(games);
+  const { rules, counts, total } = facts;
   const last = games.lastN;
   const box = host.querySelector('.chart-box');
   const tip = tooltip(box);
@@ -109,10 +55,10 @@ export function mountSettled(host, { games }) {
     const top = 6;
     const height = top + rows * pitch + 8;
     const svg = freshSVG(box, width, height, `Every game of the chain from 1 to ${last}, a cell each, ${cols} to a row `
-      + 'from game 1 at the bottom left, shaded by how it was settled. The counts are in the legend and in the table below.');
+      + 'from game 1 at the top left, shaded by how it was settled. The counts are in the legend and in the table below.');
     const at = (i) => {
       const r = Math.floor(i / cols);
-      return { x: labelW + (i % cols) * pitch, y: top + (rows - 1 - r) * pitch };
+      return { x: labelW + (i % cols) * pitch, y: top + r * pitch };
     };
     const g = el('g', {}, svg);
     rules.forEach((key, i) => {
@@ -143,7 +89,7 @@ export function mountSettled(host, { games }) {
       const key = rules[i];
       const lines = [`Game ${fmt(c.n[i])}`, ['opt(n)', fmt(c.score[i])], ['settled by', RULE[key].name]];
       if (c.proof[i] !== RULE[key].proof) lines.push(['the chain’s proof', recordWords(c, i)]);
-      if (key === 'search') lines.push(['nodes', fmt(c.nodes[i])]);
+      if (c.proof[i] === 'exhausted') lines.push(['nodes', fmt(c.nodes[i])]);
       tip.show(lines, p.x + size / 2, p.y);
     };
     const hide = () => {
@@ -153,7 +99,7 @@ export function mountSettled(host, { games }) {
     hit.addEventListener('pointermove', (e) => {
       const r = svg.getBoundingClientRect();
       const col = Math.floor((e.clientX - r.left - labelW) / pitch);
-      const row = rows - 1 - Math.floor((e.clientY - r.top - top) / pitch);
+      const row = Math.floor((e.clientY - r.top - top) / pitch);
       const i = row * cols + col;
       if (col < 0 || col >= cols || row < 0 || i >= total) hide();
       else show(i);
@@ -172,5 +118,5 @@ export function mountSettled(host, { games }) {
   }
   rows.push(['all', ...RULES.map((r) => fmt(counts[r.key])), pct(NO_SEARCH.reduce((s, k) => s + counts[k], 0) / total, 0)]);
   tableView(host, 'The numbers behind the chart', ['games', ...RULES.map((r) => r.name), 'no search'], rows);
-  return settled(games);
+  return facts;
 }

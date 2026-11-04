@@ -1,8 +1,8 @@
 // The walk up the chain, game by game: the board of game n, drawn as figures/arrival.js draws it, and under it a strip
-// of the games from 2 to 100, each cell shaded by the rule that settles it (figures/settled.js), which the reader drags
-// along or steps with the two buttons.  Each step moves the board from game n − 1 to game n: n appears at the top, the
-// moves that change wear a halo, and the caption says what happened and how the chain proved it.  The caption keeps
-// the height of its longest message, so nothing below the figure moves while the reader walks.
+// of the games from 2 to 100, each cell shaded by the rule that settles it (js/proof.js), which the reader drags
+// along or steps with the two buttons.  Each step moves the board from game n − 1 to game n: n appears after the
+// numbers before it, the moves that change wear a halo, and the caption says what happened and how the chain proved it.
+// The caption keeps the height of its longest message, so nothing below the figure moves while the reader walks.
 //
 // URL parameter: walk=N opens the figure at game N.
 
@@ -10,7 +10,8 @@ import { scene } from '../js/scene.js';
 import { el } from '../js/vocab.js';
 import { responsive } from '../js/chart.js';
 import { COLS, arrival, arrivalWords, boardLooks, boardSize, cell } from './arrival.js';
-import { RULE, legendHTML, ruleCell, swatch } from './settled.js';
+import { RULE } from '../js/proof.js';
+import { legendHTML, ruleCell, swatch } from './settled.js';
 
 export function mountWalker(host, data, { from = 2, to = 100, start = 22, param = 'walk' } = {}) {
   const steps = [];
@@ -19,16 +20,16 @@ export function mountWalker(host, data, { from = 2, to = 100, start = 22, param 
   const { width, height } = boardSize(rows);
   const sc = scene(host.querySelector('svg'), {
     width, height,
-    label: 'The board of the game the strip below names, ten numbers to a row from 1 at the bottom left. The moves of '
+    label: 'The board of the game the strip below names, ten numbers to a row from 1 at the top left. The moves of '
       + 'its optimal game are blue circles, and what changed from the game before wears a halo.',
   });
   // The places of the numbers still to come, as faint dots under the marks, so that the reader sees the board fill.
   for (let x = 1; x <= to; x++) {
-    const at = cell(x, rows);
+    const at = cell(x);
     el('circle', { cx: at.x, cy: at.y, r: 1.8, class: 'walk-slot' }, sc.layer.box);
   }
   for (let x = 1; x <= to; x++) sc.number(x, x);
-  sc.states(steps.map((f) => boardLooks(f, rows)));
+  sc.states(steps.map((f) => boardLooks(f)));
 
   const caption = host.querySelector('.walk-caption');
   const words = (f) => `<span class="walk-n">${swatch(f.rule)}Game ${f.n}</span> ${arrivalWords(f, { record: true })}`;

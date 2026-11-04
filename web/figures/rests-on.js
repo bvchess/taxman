@@ -7,7 +7,7 @@
 // results/README.md's, "What supports the scores", item 6.
 
 import { fmt, standingBadge } from '../js/vocab.js';
-import { PROOFS } from './chain-chart.js';
+import { PROOFS } from '../js/proof.js';
 
 /** The last game the prover proves on the whole board (results/README.md, "What supports the scores"). */
 export const PROVER_TO = 2175;

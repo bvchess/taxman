@@ -579,6 +579,18 @@ export function fmt(n) {
   return Number(n).toLocaleString('en-US');
 }
 
+/** A time in seconds, to two significant figures in the unit that suits: 0.0011 s as 1.1 ms, 16,094 s as 4.5 h, and
+ *  from two days on in days. */
+export function duration(s) {
+  if (s == null) return '—';
+  const two = (x) => fmt(Number(x.toPrecision(2)));
+  if (s < 1) return `${two(s * 1000)} ms`;
+  if (s < 60) return `${two(s)} s`;
+  if (s < 3600) return `${two(s / 60)} min`;
+  if (s < 2 * 86400) return `${two(s / 3600)} h`;
+  return `${two(s / 86400)} days`;
+}
+
 /** A list in words: [11, 13, 17] as "11, 13 and 17". */
 export function listWords(items) {
   const xs = items.map(String);

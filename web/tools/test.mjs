@@ -5,11 +5,15 @@
 // Prints a one-line summary, and exits nonzero if any check fails.  It takes about 20 seconds on a laptop, nearly all
 // of it in descending greedy, whose cost grows with the cube of n.  The bounds below say what is covered.
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import {
   descendingGreedy, finish, frameModel, frames, isOver, isPlayable, legalMoves, maximalFactors, newGame, omega, peel,
   play, primeFactors, properDivisors, replay, score, sources,
 } from '../js/model.js';
-import { readResults } from './results.mjs';
+import { GROUPS, RULES, settled } from '../js/proof.js';
+import { readResults, repoRoot } from './results.mjs';
 
 // Descending greedy is checked against the results file's in_the_bag for every game up to GREEDY_ALL_UP_TO, then for
 // the games in GREEDY_SPREAD.  Replay is much faster, so every game in the file is replayed.
@@ -238,6 +242,48 @@ for (let n = 1; n <= FRAME_MODEL_UP_TO; n++) {
   same(`the kept sources of frameModel(${n}) sum to in_the_bag`, sum(kept), inTheBag);
 }
 
+// --- How each game was proven (js/proof.js) ---------------------------------------------------------------------
+
+// The committed data/games.json is what the site's figures sort, so it must be this results file's export: the seconds
+// over every run of a search, and the store rule of a line of proof known.
+const games = JSON.parse(readFileSync(join(repoRoot, 'web', 'data', 'games.json'), 'utf8'));
+const cols = games.columns;
+same('games.json holds every game of the results file', cols.n.length, records.length);
+const stale = [];
+records.forEach((r, i) => {
+  const t = r.seconds;
+  const seconds = Number((t.total - t.search + t.search_all_runs).toPrecision(3));
+  const storeRule = r.proof === 'known' ? r.known.upper.rule : null;
+  if (t.search_all_runs < t.search) stale.push(`game ${r.n}: search_all_runs is less than search`);
+  if (cols.seconds[i] !== seconds) stale.push(`game ${r.n}: seconds ${cols.seconds[i]}, expected ${seconds}`);
+  if (cols.storeRule[i] !== storeRule) stale.push(`game ${r.n}: storeRule ${cols.storeRule[i]}, expected ${storeRule}`);
+  if (cols.proof[i] !== r.proof || cols.score[i] !== r.score) stale.push(`game ${r.n}: proof or score differs`);
+});
+same('games.json is the export of the results file (run node web/tools/export.mjs)', stale.slice(0, 5), []);
+
+// Every game has exactly one rule (ruleOf throws on one it does not cover), and the groups add up to all of them.
+const sorted = settled(games);
+same('every game has a rule', sorted.rules.every((rule) => RULES.some((r) => r.key === rule)), true);
+same('the rules add up to every game', sum(Object.values(sorted.counts)), records.length);
+same('the groups add up to every game', sum(Object.values(sorted.groupCounts)), records.length);
+const badGroup = [];
+const badSearch = [];
+sorted.rules.forEach((rule, i) => {
+  const { proof, storeRule } = { proof: cols.proof[i], storeRule: cols.storeRule[i] };
+  const before = proof === 'cap' || proof === 'prime_formula' || (proof === 'known' && ['ceiling', 'prime'].includes(storeRule));
+  if (before && sorted.groups[i] !== 'before') badGroup.push(cols.n[i]);
+  const ok = proof === 'exhausted' || proof === 'trivial' || (proof === 'known' && storeRule === 'exhausted');
+  if (sorted.groups[i] === 'search' && !ok) badSearch.push(cols.n[i]);
+  if (sorted.groups[i] === 'repeat' && !(proof === 'same_search' || (proof === 'known' && storeRule === 'repeat'))) {
+    badSearch.push(cols.n[i]);
+  }
+});
+same('every cap, prime formula and store ceiling or prime record is derived from n − 1', badGroup.slice(0, 5), []);
+same('every game of the search group is exhausted, trivial or a store search, and of the repeat group a repeat',
+  badSearch.slice(0, 5), []);
+const groupLine = GROUPS.map((g) => `${g.name} ${sorted.groupCounts[g.key].toLocaleString('en-US')}`).join(', ');
+const ruleLine = RULES.map((r) => `${r.key} ${sorted.counts[r.key].toLocaleString('en-US')}`).join(', ');
+
 // --- Summary ----------------------------------------------------------------------------------------------------
 
 const seconds = ((performance.now() - started) / 1000).toFixed(1);
@@ -251,3 +297,4 @@ console.log(
   `ok: ${checks} checks passed in ${seconds} s (replayed games 1 to ${lastN}; ` +
     `descending greedy against in_the_bag on ${compared} games up to ${Math.max(...greedyGames)})`,
 );
+console.log(`proofs of ${records.length} games, by group: ${groupLine}; by rule: ${ruleLine}`);

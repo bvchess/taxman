@@ -1,7 +1,8 @@
-// The arrival of n: the board of game n, ten numbers to a row with 1 at the bottom left, so that the board grows upward
-// as n does.  The moves of an optimal game of n are the player's (blue circles); the other numbers are out of focus, a
-// dashed circle for a number above n/2 that is not played and a square for one up to n/2.  A halo marks what changed
-// from game n − 1: n itself and any move that joins it, and, dashed, a move that game n gives up.  A flat figure.
+// The arrival of n: the board of game n, ten numbers to a row with 1 at the top left, like the pot of the front page's
+// game, so that the board grows downward as n does.  The moves of an optimal game of n are the player's (blue
+// circles); the other numbers are out of focus, a dashed circle for a number above n/2 that is not played and a square
+// for one up to n/2.  A halo marks what changed from game n − 1: n itself and any move that joins it, and, dashed, a
+// move that game n gives up.  A flat figure.
 //
 // The sets and scores come from data/small.json and the record from data/games.json.  Whether n fits, that is,
 // whether the optimal set of game n − 1 with n added can be played, is decided by peel (js/model.js, isPlayable), and
@@ -11,7 +12,7 @@
 import * as M from '../js/model.js';
 import { scene } from '../js/scene.js';
 import { fmt, listWords } from '../js/vocab.js';
-import { isPrime, recordWords, repeatOf, ruleOf } from './settled.js';
+import { isPrime, recordWords, repeatOf, ruleOf } from '../js/proof.js';
 
 export const COLS = 10;
 const PITCH = 36;
@@ -25,11 +26,11 @@ const ascending = (a, b) => a - b;
 /** The size of a board of the given rows, in figure units. */
 export const boardSize = (rows) => ({ width: 2 * PAD + COLS * PITCH, height: 2 * PAD + 2 * R + ROW * (rows - 1) });
 
-/** The center of number x on a board of the given rows: 1 at the bottom left, ten to a row. */
-export function cell(x, rows) {
+/** The center of number x on a board: 1 at the top left, ten to a row, the rows going down. */
+export function cell(x) {
   const c = (x - 1) % COLS;
   const r = Math.floor((x - 1) / COLS);
-  return { x: PAD + PITCH * (c + 0.5), y: PAD + R + ROW * (rows - 1 - r) };
+  return { x: PAD + PITCH * (c + 0.5), y: PAD + R + ROW * r };
 }
 
 function largestPrimeBelow(n) {
@@ -72,11 +73,11 @@ export function arrival({ small, games }, n) {
   };
 }
 
-/** The looks of the numbers 1 to n of game n's board, of the given rows. */
-export function boardLooks(f, rows) {
+/** The looks of the numbers 1 to n of game n's board. */
+export function boardLooks(f) {
   const looks = {};
   for (let x = 1; x <= f.n; x++) {
-    const at = { ...cell(x, rows), scale: SCALE };
+    const at = { ...cell(x), scale: SCALE };
     if (f.after.has(x)) looks[x] = { ...at, shape: 1, player: 1, halo: x === f.n || f.joined.includes(x) ? 1 : 0 };
     else if (f.left.includes(x)) looks[x] = { ...at, shape: 1, dashed: 1, halo: 1 };
     else if (x > f.n / 2) looks[x] = { ...at, shape: 1, dashed: 1, faded: 1 };
@@ -147,7 +148,7 @@ export function mountArrival(host, data, n, { says = host.querySelector('.arriva
   const plain = arrivalWords(f, { short: true }).replace(/<[^>]+>/g, '');
   const sc = scene(svg, { width, height, label: `The board of game ${n}. ${plain}` });
   for (let x = 1; x <= n; x++) sc.number(x, x);
-  sc.states([boardLooks(f, rows)]).show(0);
+  sc.states([boardLooks(f)]).show(0);
   if (says) says.innerHTML = `<strong>Game ${n}.</strong> ${arrivalWords(f, { short: true })}`;
   return { facts: f, highlight: (x, on) => sc.highlight(x, on) };
 }
