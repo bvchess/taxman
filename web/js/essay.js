@@ -2,7 +2,7 @@
 // into the text on a narrow window; the words that move a figure; and the numbers in the prose that put a halo on
 // their mark in a figure.
 
-import { AFTER, ALONG, STORY, hrefOf } from './site.js';
+import { AFTER, ALONG, REFERENCE, STORY, hrefOf } from './site.js';
 import { numberSVG } from './vocab.js';
 
 const figures = new Map();
@@ -36,9 +36,10 @@ function badge(entry, here) {
 /** The page the reader is on, as site.js names pages: its file name, index.html for the folder itself. */
 export const herePage = () => decodeURIComponent(location.pathname.split('/').pop() || 'index.html');
 
-/** The contents of the site: the story's chapters as the outline lists them, each a link once it is written, the
- *  findings along the way and the about page.  here is the page the reader is on. */
-export function contentsHTML({ here = herePage() } = {}) {
+/** The contents of the site: the story's chapters as the outline lists them, each a link once it is written, and the
+ *  findings along the way; below them, the reference pages.  part is 'story' or 'reference' for one of the two, else
+ *  both, with a rule between.  here is the page the reader is on. */
+export function contentsHTML({ here = herePage(), part = 'both' } = {}) {
   const unwritten = (badgeHTML, title) =>
     `<li><span class="unwritten"><span class="badge">${badgeHTML}</span><span>${title}<small>not yet written</small></span></span></li>`;
   const link = (badgeHTML, title, href) =>
@@ -47,8 +48,12 @@ export function contentsHTML({ here = herePage() } = {}) {
     const href = hrefOf(c);
     return href ? link(badge(c, href === here), c.title, href) : unwritten(badge(c, false), c.title);
   }).join('');
-  const after = AFTER.map((a) => (a.href ? link(`<span class="glyph">${a.mark}</span>`, a.title, a.href) : unwritten(ALONG_ICON, a.title))).join('');
-  return `<p class="toc-group">The story</p><ul class="toc">${story}</ul><ul class="toc">${after}</ul>`;
+  const entries = (list) => list.map((a) => (a.href ? link(`<span class="glyph">${a.mark}</span>`, a.title, a.href) : unwritten(ALONG_ICON, a.title))).join('');
+  const first = `<p class="toc-group">The story</p><ul class="toc">${story}</ul><ul class="toc">${entries(AFTER)}</ul>`;
+  const reference = `<ul class="toc">${entries(REFERENCE)}</ul>`;
+  if (part === 'story') return first;
+  if (part === 'reference') return reference;
+  return `${first}<hr class="toc-rule">${reference}`;
 }
 
 export const homeMark = () => numberSVG('', { rendering: 'raised', looks: ['player'], size: 24, pad: 2 }).outerHTML;
@@ -56,9 +61,8 @@ export const homeMark = () => numberSVG('', { rendering: 'raised', looks: ['play
 function mountContents() {
   const rail = document.querySelector('.rail');
   const top = document.querySelector('.topbar');
-  const foot = herePage() === 'notation.html' ? '' : '<p class="rail-foot"><a href="notation.html">Notation</a>: what the marks, pills and symbols mean</p>';
   if (rail && !rail.dataset.own) {
-    rail.innerHTML = `<a class="home" href="index.html">${homeMark()}Taxman</a><nav aria-label="Contents">${contentsHTML()}</nav><div class="progress" aria-hidden="true"><span></span></div>${foot}`;
+    rail.innerHTML = `<a class="home" href="index.html">${homeMark()}Taxman</a><nav aria-label="Contents">${contentsHTML({ part: 'story' })}</nav><div class="progress" aria-hidden="true"><span></span></div><nav aria-label="Reference pages">${contentsHTML({ part: 'reference' })}</nav>`;
   }
   if (top) {
     const own = rail?.dataset.own ? rail.querySelector('nav').outerHTML : `<nav aria-label="Contents">${contentsHTML()}</nav>`;

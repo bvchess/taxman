@@ -20,9 +20,13 @@ export const ALONG = [
   { title: 'Games with several optimal sets', where: 'from game 425 on', at: 7 },
 ];
 
-/** The entries after the story in the navigation; one without href is not yet written. */
+/** The entry that follows the story in the navigation; one without href is not yet written. */
 export const AFTER = [
   { title: 'Along the way', line: 'The smaller findings' },
+];
+
+/** The entries below the navigation's line: the reference pages. */
+export const REFERENCE = [
   { title: 'Glossary', mark: 'Aa', line: 'The words of the site', href: 'glossary.html' },
   { title: 'Notation', mark: 'Σ', line: 'The marks, pills and symbols', href: 'notation.html' },
   { title: 'About', line: 'What this work adds' },

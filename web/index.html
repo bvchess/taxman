@@ -27,37 +27,37 @@
   <div class="para">
     <aside class="note tech" aria-label="The rules, precisely">
       <div class="note-head"><span class="note-name">The rules, precisely</span></div>
-      <p>A move takes a number that still has a <a href="glossary.html#proper-divisor">proper divisor</a> in the pot,
-      and the taxman takes all of its proper divisors still in the pot.  When no move is left, the taxman takes the rest.  The best score of game n is
-      opt(n), and opt(1), opt(2), opt(3), … is the Taxman sequence, <a href="https://oeis.org/A019312">A019312</a> in
+      <p>A move takes a number that still has a <a class="gloss" href="glossary.html#proper-divisor">proper divisor</a> in the pot,
+      and the taxman takes all of its proper divisors still in the pot.  When no move is left, the taxman takes the
+      rest.  The best score of game n is opt(n), and opt(1), opt(2), opt(3), … is the
+      <a class="gloss" href="glossary.html#taxman-sequence">Taxman sequence</a>, <a href="https://oeis.org/A019312">A019312</a> in
       the OEIS.  Every word of the game is defined in <a href="glossary.html#the-game">the glossary</a>.</p>
     </aside>
-    <p>Taxman is played on the numbers 1 to n, which start in the <em>pot</em>.</p>
+    <p>Taxman is played on the numbers 1 to n, which start in the <a class="gloss" href="glossary.html#pot"><em>pot</em></a>.</p>
   </div>
   <ul class="rules">
-    <li>You take a number from the pot and score it.  That number is your <em>move</em>.</li>
-    <li>The taxman then takes every divisor of your move still in the pot: its <em>tax</em>.</li>
+    <li>You take a number from the pot and score it.  That number is your <a class="gloss" href="glossary.html#move"><em>move</em></a>.</li>
+    <li>The taxman then takes every divisor of your move still in the pot: its <a class="gloss" href="glossary.html#tax"><em>tax</em></a>.</li>
     <li>You may take only a number that has a divisor left in the pot, so the taxman always gets something.</li>
     <li>When no number you could take is left, the taxman takes the rest.</li>
     <li>You beat the taxman when your total is higher than the total he collects.</li>
   </ul>
-  <p>The best total you can reach in game n is written opt(n), and a game that reaches it is an <em>optimal
-  game</em>.  Try game 10.</p>
+  <p>The best total you can reach in game n is written <a class="gloss" href="glossary.html#opt">opt(n)</a>, and a game that reaches it is an
+  <a class="gloss" href="glossary.html#optimal-game"><em>optimal game</em></a>.  Try game 10.</p>
 
   <div class="game-host" id="game"></div>
 
   <div class="para">
     <aside class="note tech" aria-label="Heuristic strategies">
       <div class="note-head"><span class="note-name">Heuristic strategies</span></div>
-      <p>A heuristic strategy plays a good game quickly, by rules such as taking the largest prime first or the number
-      that costs the least tax, without proving that the game is the best.  Many have been proposed, and judging one
-      needs the best score to measure it against.  That is one reason to know opt(n).  Against it, the strategy
-      called Solvent, which needs no search, scores 99.85% of the optimal points over the games 1 to 1000, and never
-      less than 99.08% in any of them (measured).  The repository holds
+      <p>A heuristic strategy plays a good game quickly, by rules such as taking the largest number that can still be
+      taken, or the one that costs the least tax, without proving that the game is the best.  Many have been proposed,
+      and judging one needs the best score to measure it against.  That is one reason to know opt(n).  The repository
+      holds
       <a href="https://github.com/bvchess/taxman/blob/master/heuristics/README.md">our strategies and how they were
       measured</a>, and <a href="https://github.com/bvchess/taxman/tree/master/moniot">Robert Moniot's seven</a>.</p>
     </aside>
-    <p>The button plays an optimal game, the best you can do.  For game 10 you can find one by hand.  Playing well is
+    <p>The blue button plays an optimal game, the best you can do.  For game 10 you can find one by hand.  Playing well is
     easy even in large games: a simple strategy with no search comes within a fraction of a percent of the best
     score.  But only a perfect game is optimal, and only a proof shows that a game is perfect.</p>
   </div>
@@ -68,13 +68,13 @@
   <div class="para">
     <aside class="note tech" aria-label="The counts, precisely">
       <div class="note-head"><span class="note-name">The counts, precisely</span></div>
-      <p>Rough sizes, not counts of legal games: n! orders, 2<sup>n</sup> subsets of the board, 2<sup>⌊n/2⌋</sup>
-      subsets of the numbers up to n/2, and 2<sup>c</sup> subsets of the c candidates.  The last row is the nodes
+      <p>Rough sizes, not counts of legal games: n! orders, 2<sup>n</sup> subsets of the <a class="gloss" href="glossary.html#board">board</a>, 2<sup>⌊n/2⌋</sup>
+      subsets of the numbers up to n/2, and 2<sup>c</sup> subsets of the c <a class="gloss" href="glossary.html#candidate">candidates</a>.  The last row is the <a class="gloss" href="glossary.html#node">nodes</a>
       that the game's recorded search explored.</p>
     </aside>
     <p>The published table of best scores stopped at game 1000.  Game <span data-last-n>n</span>'s numbers can be
     put in about 10<sup data-orders-exp>…</sup> orders.  No computer could try them all, and we never try them.  Each
-    chapter of the story takes away part of the problem, until what is left is small enough for a search to finish.</p>
+    chapter of the story takes away part of the problem, until what is left is small enough for a <a class="gloss" href="glossary.html#search">search</a> to finish.</p>
   </div>
 
   <figure class="fig wide shrink" id="shrink" aria-label="The problem of playing the last game of the chain, shrinking from chapter to chapter."></figure>
@@ -85,8 +85,10 @@
   <div class="para">
     <aside class="note tech" aria-label="How each game was settled">
       <div class="note-head"><span class="note-name">How each game was settled</span></div>
-      <p>By a search of its whole tree; as a repeat of an earlier game's search, which poses the same problem; at its
-      ceiling, n + opt(n − 1); by the prime formula; by an upper bound in the bounds store, which the referee checks
+      <p>By a <a class="gloss" href="glossary.html#search">search</a> of its whole tree; as a <a class="gloss" href="glossary.html#repeat">repeat</a> of an earlier game's search, which
+      poses the same problem; at its <a class="gloss" href="glossary.html#ceiling">ceiling</a>, n + opt(n − 1); by the
+      <a class="gloss" href="glossary.html#prime-formula">prime formula</a>; by an upper bound in the bounds store, which the
+      <a class="gloss" href="glossary.html#referee">referee</a> checks
       against a game that meets it; or trivially, with nothing to choose.  The proof kinds are defined in
       <a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#4-why-the-answers-can-be-trusted">the
       frame solver's reference</a>.</p>
@@ -96,8 +98,9 @@
       <p>The share is opt(n) / (1 + 2 + ⋯ + n).  Hensley proved in 1988 that opt(n) / (n²/2) tends to a constant
       between 1/2 and 35/48.  The chain's games put it near 0.63, which is a measurement, not a proof.</p>
     </aside>
-    <p>We found the games in order, from game 1 up, each one built from an optimal game of the one before, so they
-    form a chain.  The chart shows every game of it: the share of the board that the player wins, and how each game
+    <p>We found the games in order, from game 1 up, each one built from an <a class="gloss" href="glossary.html#optimal-game">optimal game</a> of the one before,
+    so they form a <a class="gloss" href="glossary.html#chain">chain</a>.  The chart shows every game of it: the share of the
+    <a class="gloss" href="glossary.html#board">board</a> that the player wins, and how each game
     was settled.</p>
   </div>
   <figure class="chart" id="chain-chart">
@@ -136,16 +139,16 @@
   <div class="para">
     <aside class="note tech" aria-label="Checking the chain">
       <div class="note-head"><span class="note-name">Checking the chain</span></div>
-      <p>From the top of the repository, after building the frame solver:
+      <p>From the top of the repository, after building the <a class="gloss" href="glossary.html#frame-solver">frame solver</a>:
       <code>taxman verify-results results/optimal.jsonl.gz</code>, and the independent check in Python,
       <code>python3 solver/tools/check_results.py results/optimal.jsonl.gz</code>.  Both replay every game.</p>
     </aside>
     <aside class="note tech" aria-label="What supports the scores">
       <div class="note-head"><span class="note-name">What supports the scores</span></div>
-      <p>Every score up to 2175 is opt(n), proven on the whole board by the <a href="glossary.html#prover">prover</a>,
+      <p>Every score up to 2175 is opt(n), proven on the whole board by the <a class="gloss" href="glossary.html#prover">prover</a>,
       a second program that shares no proof code with the frame solver.  Past 2175, each score is the best score of
-      the <a href="glossary.html#frame-model">frame model</a>, which is opt(n) wherever
-      <a href="glossary.html#statement-u">statement U</a> holds; U is open in general.  Every game's record says how
+      the <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is opt(n) wherever
+      <a class="gloss" href="glossary.html#statement-u">statement U</a> holds; U is open in general.  Every game's record says how
       it was proven and what it assumes
       (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports
       the scores</a>).</p>
