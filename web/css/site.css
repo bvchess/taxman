@@ -582,24 +582,22 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
   max-width: none; margin-right: calc(-1 * (var(--gutter) + var(--margin))); clear: right; position: relative; background: var(--paper);
 }
 
-/* What is left to choose, chapter by chapter: a row a chapter, its number, title and point at the left and its bar at
+/* What is left to choose, chapter by chapter: a row a step, its title and point at the left and its bar at
    the right, every bar from one baseline.  A bar is ink for a written chapter and a quieter gray for the others. */
 /* The figure stays in the center column, so that it starts right after its paragraph, beside the note's float. */
 .fig.wide.shrink { clear: none; max-width: var(--measure); margin-right: 0; }
-.shrink { --shrink-cols: 30px minmax(0, 13.4rem) minmax(0, 1fr); --shrink-gap: 14px; margin: 26px 0 36px; }
+.shrink { --shrink-cols: minmax(0, 13.4rem) minmax(0, 1fr); --shrink-gap: 14px; margin: 26px 0 36px; }
 .shrink-head {
   display: grid; grid-template-columns: var(--shrink-cols); column-gap: var(--shrink-gap); margin: 0 0 4px;
   font-size: 0.8rem; line-height: 1.35;
 }
-.shrink-head-title { grid-column: 3; font-weight: 700; }
-.shrink-head-sub { grid-column: 3; color: var(--ink-3); }
+.shrink-head-title { grid-column: 2; font-weight: 700; }
+.shrink-head-sub { grid-column: 2; color: var(--ink-3); }
 .shrink-rows { list-style: none; margin: 0; padding: 0; }
 .shrink-row {
   position: relative; display: grid; grid-template-columns: var(--shrink-cols); column-gap: var(--shrink-gap);
   align-items: start; border-radius: 10px;
 }
-.shrink-badge { padding: 9px 0 0; }
-.shrink-badge svg { display: block; }
 .shrink-text { display: flex; flex-direction: column; min-width: 0; padding: 10px 0 11px; }
 .shrink-title { font-weight: 700; line-height: 1.3; color: var(--ink); }
 .shrink-point { font-size: 0.82rem; line-height: 1.4; color: var(--ink-2); }
@@ -612,19 +610,12 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
 .shrink-bar.is-labeled { display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; }
 .shrink-count { font-size: 0.8rem; line-height: 20px; color: var(--ink-2); }
 .shrink-bar.is-labeled .shrink-count { color: var(--paper); font-weight: 700; white-space: nowrap; }
-.shrink-measure.is-strip { flex-direction: column; gap: 4px; }
-.shrink-measure.is-strip .shrink-count { line-height: 1.4; }
-.shrink-strip { display: block; width: 100%; height: 20px; }
-.strip-ground { fill: var(--hair); }
-.strip-marks { fill: var(--mid); }
-.shrink-row.is-written .strip-marks { fill: var(--ink); }
 .shrink-row.is-unwritten .shrink-title { color: var(--ink-3); font-weight: 600; }
 .shrink-row.is-unwritten .shrink-point { color: var(--ink-3); }
-/* A written chapter's row is one link: the whole row answers the pointer, and its token lifts. */
+/* A written chapter's row is one link: the whole row answers the pointer. */
 .shrink-row.is-written a::after { content: ""; position: absolute; inset: 0; border-radius: 10px; }
 .shrink-row.is-written:hover { background: var(--wash); }
 .shrink-row.is-written:hover a { text-decoration-color: var(--ink); text-decoration-thickness: 2px; }
-.shrink-row.is-written:hover .tk-hover { transform: translateY(-2px); }
 .shrink-row.is-written a:focus-visible { outline: none; }
 .shrink-row.is-written:has(a:focus-visible) { outline: 2.5px solid var(--ink); outline-offset: 2px; }
 
@@ -737,10 +728,10 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
 /* A phone's width of essay: the figure of the chapters sets each bar under its title, the findings and the way on
    stand in one column. */
 @container essay (max-width: 540px) {
-  .shrink { --shrink-cols: 30px minmax(0, 1fr); --shrink-gap: 12px; }
-  .shrink-head-title, .shrink-head-sub { grid-column: 2; }
+  .shrink { --shrink-cols: minmax(0, 1fr); --shrink-gap: 12px; }
+  .shrink-head-title, .shrink-head-sub { grid-column: 1; }
   .shrink-text { padding-bottom: 6px; }
-  .shrink-measure { grid-column: 2; border-left: 0; padding: 0 6px 14px 0; }
+  .shrink-measure { grid-column: 1; border-left: 0; padding: 0 6px 14px 0; }
   .front-along .finding-cards { grid-template-columns: 1fr; }
   .chapter-nav { grid-template-columns: 1fr; }
 }

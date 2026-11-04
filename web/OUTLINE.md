@@ -20,23 +20,45 @@ entries are meant to be moved, merged and cut.
   page links it to the glossary.
 * **"To our knowledge"** appears once, on the About page, where the site says what this work adds.
 
+## How the site is written
+
+The rules the owner's reviews have set, on top of [docs/WRITING.md](../docs/WRITING.md):
+
+* **Lead with what the reader came for.**  The game, the play and the result come first; qualifications such as what
+  a score rests on go lower, or to the right, never in a page's first lines.
+* **Say less.**  A sentence that does not move the story goes: history, a statistic the paragraph does not need, a
+  pointer to another page.
+* **Do not explain the site to its reader.**  No note on what a column is for, no "defined in the glossary", no link to
+  the style page.  The notation page is there for a reader who wants it.
+* **Be exact about standing, even in an example.**  A passing example must be as true as a theorem: taking the largest
+  prime first is proven (the prime lemma), so it is never offered as a heuristic.
+* **Name things unambiguously.**  "The blue button", when a figure has several.
+* **One look, one meaning.**  A control never looks like a standing pill; a hover never resizes anything; a color means
+  one thing everywhere.
+* **Calm interaction.**  Nothing on the page moves while a reader plays a figure.
+* **A figure says one thing.**  What does not fit its idea leaves it.
+* **The site is self-contained.**  Its own glossary, notation and fonts; GitHub is for depth: proofs, code and data.
+* **Let the reader play the idea** wherever an idea can be played, as the game on the maximal-factor graph lets them
+  play the lifting lemma.
+* **Link lightly.**  A glossary term links once a section, at its first use, with the quiet `gloss` style.
+
 ## The arc
 
 The story starts with the introduction, the front page, which explains the game and gives the headline.  The chapters
-after it explain how we found optimal games past 5000, a chapter a page.  Each chapter takes away part of the problem,
-and the introduction shows the problem shrinking, chapter by chapter, for game 5060:
+after it explain how we found optimal games past 5000, a chapter a page.  Each chapter takes away part of the problem.
+The introduction shows one game's problem shrinking, for game 5060, in the chapters that shrink it; its rows carry the
+chapters' titles but no numbers, since the chain, trust and the results do not shrink one game's problem:
 
 | step | what is left to choose | about |
 |---|---|---|
 | the game as it is played (the front page) | an order of moves | 10^16,548 orders |
-| 1. a game is a set | a set of moves | 10^1,523 sets |
-| 2. the chain | (60% of games are settled here) | |
-| 3. the top half | which numbers up to n/2 to play | 10^762 sets |
-| 4. frames | which candidates to promote | 10^415 sets of 1,380 candidates |
-| 5. the search | the nodes a search explores | 3.2 billion nodes |
+| a game is a set | a set of moves | 10^1,523 sets |
+| the top half | which numbers up to n/2 to play | 10^762 sets |
+| frames | which candidates to promote | 10^415 sets of 1,380 candidates |
+| the search | the nodes a search explores | 3.2 billion nodes |
 
-The figures are rough counts (n!, 2^n, 2^(n/2), 2^candidates) and say so in the right column; the last is the
-recorded search of game 5060.
+The chain settles 60% of the games with no search at all, which the chain's chart shows.  The figures are rough counts
+(n!, 2^n, 2^(n/2), 2^candidates) and say so in the right column; the last is the recorded search of game 5060.
 
 ## Introduction (the front page)
 

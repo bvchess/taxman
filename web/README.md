@@ -27,6 +27,9 @@ python3 -m http.server 8780 --directory web
 
 Then open `http://localhost:8780/`.
 
+While we edit, we use `node web/tools/serve.mjs` instead.  It serves the same folder with caching off, so a reload
+always gets the current scripts and styles together.  For a plain look, any static server works.
+
 ## Re-export the data and run the test
 
 From the repository root, with Node and no packages:
