@@ -38,6 +38,10 @@ The rules the owner's reviews have set, on top of [docs/WRITING.md](../docs/WRIT
 * **Calm interaction.**  Nothing on the page moves while a reader plays a figure.
 * **A figure says one thing.**  What does not fit its idea leaves it.
 * **The site is self-contained.**  Its own glossary, notation and fonts; GitHub is for depth: proofs, code and data.
+* **Game n is not a game of n.**  Game n, the game on 1 to n, has a board, a best score, a ceiling and optimal sets;
+  a game of n, one play of it, has moves, opens with a prime and scores.  Never give game n a play's verbs ("game 22
+  opens with 19" is "an optimal game of 22 opens with 19"), and never say one is the other ("the moves of a game of
+  n − 1 are a legal game of n", not "a game of n − 1 is a game of n").
 * **The prose never cites the site's own code.**  Notes point to the theory and to the Rust programs, never to the
   JavaScript that draws the figures.
 * **Say why a narrow case matters.**  A result stated for a narrow case says what part of the problem the case is, as
