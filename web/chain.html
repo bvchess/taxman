@@ -45,13 +45,15 @@
     <p>Take n = 12.  Game 11's best score is <span data-opt="11">44</span>, from the optimal game 11, 9, 6, 10, 8,
     whose moves take 1, 3, 2, 5 and 4 as tax.  Played in game 12, the same moves take the same tax, and 12 stays in
     the pot.</p>
-    <p>In fact the best score always rises.  In a game of n − 1, play n just before the move that takes the last divisor
-    of n from the pot, or at the end if a divisor is left, and leave that move out if it can no longer be played.
-    Everything after it stays legal, and the game gains n and loses at most that move, which is smaller than n.  So the
-    moves of a game of n − 1 are never an optimal game of n, and every optimal game of n plays n.</p>
-    <p>In game 12, the game above cannot simply end with 12, since by then 1, 2, 3, 4 and 6 are all gone.  The last of
-    them to go is 4, taken by the last move, 8.  So 12 is played just before 8, and takes 4 itself.  Then 8 has no
-    divisor left and is left out, and 11, 9, 6, 10, 12 scores <span data-opt="11">44</span> + 12 − 8 = 48.</p>
+    <p>In fact the best score always rises from one game to the next.  In a game of n − 1, play n just before the move
+    that takes the last divisor of n from the pot, or at the end if a divisor is left, and leave that move out if it
+    can no longer be played.  Everything after it stays legal, and the game gains n and loses at most that move, which
+    is smaller than n.  So the moves of a game of n − 1 are never an optimal game of n, and every optimal game of n
+    plays n.</p>
+    <p>In game 12, the game above cannot simply end with <span class="n" data-n="12">12</span>, since by then 1, 2, 3,
+    4 and 6 are all gone.  The last of them to go is <span class="n" data-n="4">4</span>, taken by the last move,
+    <span class="n" data-n="8">8</span>.  So 12 is played just before 8, and takes 4 itself.  Then 8 has no divisor
+    left and is left out, and 11, 9, 6, 10, 12 scores <span data-opt="11">44</span> + 12 − 8 = 48.</p>
   </div>
 
   <div class="para">
@@ -70,8 +72,16 @@
     in the pot and is a game of 11, which scores 38, below game 11's best score of <span data-opt="11">44</span>.</p>
     <p>So opt(n − 1) + n is the most that any game of n can score.  It is the
     <a class="gloss" href="glossary.html#ceiling"><em>ceiling</em></a> of game n, and a game that reaches it is
-    optimal, with nothing more to check.  Game 12's ceiling is <span data-opt="11">44</span> + 12 =
-    <span data-ceiling="12">56</span>, and its best score, <span data-opt="12">50</span>, falls short of it.</p>
+    optimal, with nothing more to check.  For n = 12:</p>
+    <div class="algebra">
+      <span class="lhs">opt(11)</span><span class="rel">=</span><span class="rhs"><span data-opt="11">44</span></span>
+      <span class="why">game 11's best score</span>
+      <span class="lhs">opt(12)</span><span class="rel">≤</span><span class="rhs">opt(11) + 12 =
+      <span data-opt="11">44</span> + 12 = <span data-ceiling="12">56</span></span>
+      <span class="why">game 12's ceiling</span>
+      <span class="lhs">opt(12)</span><span class="rel">=</span><span class="rhs"><span data-opt="12">50</span></span>
+      <span class="why">game 12's best score, <span data-gap="12">6</span> below its ceiling</span>
+    </div>
   </div>
 </section>
 
@@ -89,9 +99,10 @@
     <p>The quickest way to a good game of n is to take an
     <a class="gloss" href="glossary.html#optimal-set">optimal set</a> of game n − 1 and add n.  If the set can still be
     <a class="gloss" href="glossary.html#playable">played</a>, it scores opt(n − 1) + n, the
-    <a class="gloss" href="glossary.html#ceiling">ceiling</a>, and game n is done.  We say that game n <em>fits</em>.</p>
-    <p>Game 9's optimal set is <span data-set="9">6, 7, 8 and 9</span>, and it scores <span data-opt="9">30</span>.
-    Game <span class="n" data-n="10">10</span> fits.  Its half, <span class="n" data-n="5">5</span>, divides nothing
+    <a class="gloss" href="glossary.html#ceiling">ceiling</a>, and game n is done.  We say that n <em>fits</em> into that
+    optimal set.</p>
+    <p>Game 9's optimal set, <span data-set="9">6, 7, 8 and 9</span>, scores <span data-opt="9">30</span>, and
+    <span class="n" data-n="10">10</span> fits into it.  Its half, <span class="n" data-n="5">5</span>, divides nothing
     else up to 9, so it is never tax, and game 9's optimal set does not hold it.  So 7, 9, 6, 8, an optimal game of 9,
     leaves 5 in the <a class="gloss" href="glossary.html#pot">pot</a> at the end, and 10 can follow it, paid for by 5.
     Game 10's best score is <span data-opt="9">30</span> + 10 = <span data-opt="10">40</span>, its ceiling.</p>
@@ -118,9 +129,9 @@
       <a class="gloss" href="glossary.html#prover">prover</a> finds by listing them all (measured); game 425 has two.  So
       in these games one test decides whether n fits.</p>
     </aside>
-    <p>Game <span class="n" data-n="12">12</span> does not fit.  Game 11 has only one optimal set,
-    <span data-set="11">6, 8, 9, 10 and 11</span>.  With 12 added, the set holds <span class="n" data-n="8">8</span> and
-    12, and only <span class="n" data-n="4">4</span> can pay for either.  The
+    <p>Game 11 has only one optimal set, <span data-set="11">6, 8, 9, 10 and 11</span>, and
+    <span class="n" data-n="12">12</span> does not fit into it.  With 12 added, the set holds
+    <span class="n" data-n="8">8</span> and 12, and only <span class="n" data-n="4">4</span> can pay for either.  The
     <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a> of 12 are 4 and
     <span class="n" data-n="6">6</span>, and 6 is in the set; the only maximal factor of 8 is 4.  Each number of a
     <a class="gloss" href="glossary.html#playable">playable</a> set is paid for by a maximal factor of its own, so this
@@ -192,7 +203,7 @@
       of m makes an optimal game of n.  The first part needs no U.  Every game up to 2,175 is also proven by the prover,
       without U.</p>
     </aside>
-    <p>Most games that neither fit nor are prime still need no search.  Before the
+    <p>Most games in which n neither fits nor is prime still need no search.  Before the
     <a class="gloss" href="glossary.html#frame-solver">frame solver</a> searches a game, rules settle most of it, and what
     is left is the game's search problem: which few numbers up to n/2 to play as moves as well.  Often n does not change
     that problem at all.  Then game n is a <a class="gloss" href="glossary.html#repeat"><em>repeat</em></a>, and the
