@@ -325,6 +325,9 @@ a.standing:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px;
 .aside-body { padding: 14px 18px 16px; font-size: 0.94rem; border-top: 1.5px solid var(--hair); }
 .aside-pin svg { display: block; }
 
+/* A formula inside a sentence, kept on one line. */
+.formula { white-space: nowrap; }
+
 /* A few lines of algebra: each line's left side, relation and right side in aligned columns, and why it holds. */
 .algebra {
   display: grid; grid-template-columns: auto auto auto minmax(0, 1fr); align-items: baseline; row-gap: 0.35em;

@@ -32,7 +32,7 @@
       the best score always rises.</p>
       <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  The moves of a legal game of n − 1, in their
       order, are a legal game of n, with the same taxes, and the moves of a game of n that does not play n are a legal
-      game of n − 1.  Playing n in a game of n − 1, just before the move after which no proper divisor of n is left in
+      game of n − 1.  Playing n in a game of n − 1, just before the move after which no maximal factor of n is left in
       the pot, and leaving that move out if it can no longer be played, gives a game of n that scores more.  So
       opt(n − 1) < opt(n), every optimal game of n plays n, and a set without n is
       <a class="gloss" href="glossary.html#playable">playable</a> in game n exactly when it is playable in game n − 1.</p>
@@ -45,15 +45,17 @@
     <p>Take n = 12.  Game 11's best score is <span data-opt="11">44</span>, from the optimal game 11, 9, 6, 10, 8,
     whose moves take 1, 3, 2, 5 and 4 as tax.  Played in game 12, the same moves take the same tax, and 12 stays in
     the pot.</p>
-    <p>In fact the best score always rises from one game to the next.  In a game of n − 1, play n just before the move
-    that takes the last divisor of n from the pot, or at the end if a divisor is left, and leave that move out if it
-    can no longer be played.  Everything after it stays legal, and the game gains n and loses at most that move, which
-    is smaller than n.  So the moves of a game of n − 1 are never an optimal game of n, and every optimal game of n
-    plays n.</p>
-    <p>In game 12, the game above cannot simply end with <span class="n" data-n="12">12</span>, since by then 1, 2, 3,
-    4 and 6 are all gone.  The last of them to go is <span class="n" data-n="4">4</span>, taken by the last move,
-    <span class="n" data-n="8">8</span>.  So 12 is played just before 8, and takes 4 itself.  Then 8 has no divisor
-    left and is left out, and 11, 9, 6, 10, 12 scores <span data-opt="11">44</span> + 12 − 8 = 48.</p>
+    <p>In fact the best score always rises from one game to the next.  In a game of n − 1 played in game n, n can be
+    played as long as one of its <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a> is still in
+    the pot.  So play n just before the move that takes the last of them from the pot, or at the end if one is left,
+    and leave that move out if it can no longer be played.  Everything after it stays legal, and the game gains n and
+    loses at most that move, which is smaller than n.  So the moves of a game of n − 1 are never an optimal game of n,
+    and every optimal game of n plays n.</p>
+    <p>The maximal factors of <span class="n" data-n="12">12</span> are <span class="n" data-n="4">4</span> and
+    <span class="n" data-n="6">6</span>.  In game 11's optimal game, 6 is a move and 4 is taken by the last move,
+    <span class="n" data-n="8">8</span>, so by the end both are gone, and 12 cannot simply come last.  It is played
+    just before 8 instead, and takes 4 itself.  Then nothing is left to pay for 8, whose only maximal factor is 4, so 8
+    is left out, and 11, 9, 6, 10, 12 scores <span data-opt="11">44</span> + 12 − 8 = 48.</p>
   </div>
 
   <figure class="fig slip-fig" id="slip">
@@ -71,17 +73,22 @@
       their order, are a legal game of n − 1.  So opt(n) ≤ opt(n − 1) + n, the ceiling of game n, and if S is playable in
       game n, then S without n is playable in game n − 1.</p>
     </aside>
-    <p>Nor can it rise by more than n.  Take an optimal game of n and leave out its move n.  Everything n would have
-    taken stays in the <a class="gloss" href="glossary.html#pot">pot</a>, so every other move still has its divisor,
-    and what is left is a game of n − 1.  It scores opt(n) − n, which is at most opt(n − 1).</p>
+    <p>An optimal game of n − 1 thus gives game n a lower bound, the score of the game built from it.  It gives an
+    upper bound too, since the best score never rises by more than n.  Take an optimal game of n and leave out its
+    move n.  Everything n would have taken stays in the <a class="gloss" href="glossary.html#pot">pot</a>, so every
+    other move still has tax to take, and what is left is a game of n − 1.  It scores opt(n) − n, which is at most
+    opt(n − 1).</p>
     <p>An optimal game of 12 is 11, 9, 10, 8, 12, which scores <span data-opt="12">50</span>.  Without 12, it leaves 6
     in the pot and is a game of 11, which scores 38, below game 11's best score of <span data-opt="11">44</span>.</p>
     <p>So opt(n − 1) + n is the most that any game of n can score.  It is the
     <a class="gloss" href="glossary.html#ceiling"><em>ceiling</em></a> of game n, and a game that reaches it is
-    optimal, with nothing more to check.  For n = 12:</p>
+    optimal, with nothing more to check.  Put together, an optimal game of n − 1 bounds game n from both
+    sides: <span class="formula">opt(n − 1) < opt(n) ≤ opt(n − 1) + n</span>.  For <span class="formula">n = 12</span>:</p>
     <div class="algebra">
       <span class="lhs">opt(11)</span><span class="rel">=</span><span class="rhs"><span data-opt="11">44</span></span>
       <span class="why">game 11's best score</span>
+      <span class="lhs">opt(12)</span><span class="rel">≥</span><span class="rhs"><span data-opt="11">44</span> + 12 − 8 = 48</span>
+      <span class="why">the score of 11, 9, 6, 10, 12</span>
       <span class="lhs">opt(12)</span><span class="rel">≤</span><span class="rhs">opt(11) + 12 =
       <span data-opt="11">44</span> + 12 = <span data-ceiling="12">56</span></span>
       <span class="why">game 12's ceiling</span>
@@ -108,10 +115,11 @@
     <a class="gloss" href="glossary.html#ceiling">ceiling</a>, and game n is done.  We say that n <em>fits</em> into that
     optimal set.</p>
     <p>Game 9's optimal set, <span data-set="9">6, 7, 8 and 9</span>, scores <span data-opt="9">30</span>, and
-    <span class="n" data-n="10">10</span> fits into it.  Its half, <span class="n" data-n="5">5</span>, divides nothing
-    else up to 9, so it is never tax, and game 9's optimal set does not hold it.  So 7, 9, 6, 8, an optimal game of 9,
-    leaves 5 in the <a class="gloss" href="glossary.html#pot">pot</a> at the end, and 10 can follow it, paid for by 5.
-    Game 10's best score is <span data-opt="9">30</span> + 10 = <span data-opt="10">40</span>, its ceiling.</p>
+    <span class="n" data-n="10">10</span> fits into it.  Its maximal factors are 2 and 5, and its half,
+    <span class="n" data-n="5">5</span>, divides nothing else up to 9, so it is never tax, and game 9's optimal set
+    does not hold it.  So 7, 9, 6, 8, an optimal game of 9, leaves 5 in the
+    <a class="gloss" href="glossary.html#pot">pot</a> at the end, and 10 can follow it, paid for by 5.  Game 10's best
+    score is <span data-opt="9">30</span> + 10 = <span data-opt="10">40</span>, its ceiling.</p>
   </div>
 
   <div class="para">
@@ -163,10 +171,11 @@
       optimal game of n plays q(n), as its first move, and no other prime: a game without it can take q(n) in place of
       its first move, or in front of it, and score more.</p>
     </aside>
-    <p>Past game 2, a prime never fits.  Its only divisor is 1, and the first move of every game takes 1 as
-    <a class="gloss" href="glossary.html#tax">tax</a>, so a prime can be played only as the first move.  Every
-    <a class="gloss" href="glossary.html#optimal-game">optimal game</a> opens with the largest prime of its board: a
-    game that does not can always play that prime in place of its first move, or in front of it, and score more.</p>
+    <p>Past game 2, when n is a prime, it never fits.  Its only maximal factor is 1, and the first move of every game
+    takes 1 as <a class="gloss" href="glossary.html#tax">tax</a>, so a prime can be played only as the first move.
+    Every <a class="gloss" href="glossary.html#optimal-game">optimal game</a> opens with the largest prime of its
+    board: a game that does not can always play that prime in place of its first move, or in front of it, and score
+    more.</p>
   </div>
 
   <div class="para">
