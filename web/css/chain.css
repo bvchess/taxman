@@ -34,8 +34,12 @@
 .arrival-n { font-weight: 700; color: var(--ink); margin-right: 0.35em; }
 
 /* The two panels of game rows: each panel's rows, and under them its words. */
-.game-rows .arrival svg { max-width: 24rem; }
-.slip-fig svg { max-width: 26rem; margin: 0 auto; }
+.slip-fig svg { margin: 0 auto; }
+/* The panels of rows stack at the size of the slip figure's marks, and stand side by side (is-side, set from the
+   figure's width) only when each keeps most of that size. */
+.arrival-pair.game-rows { grid-template-columns: minmax(0, 1fr); row-gap: 1.6rem; }
+.arrival-pair.game-rows.is-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.game-rows .arrival svg { margin: 0 auto 0 0; }
 
 /* ---- the walk ------------------------------------------------------------------------------------------------- */
 

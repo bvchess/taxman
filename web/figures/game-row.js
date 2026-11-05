@@ -32,6 +32,17 @@ export const columnX = (c, left = PAD) => left + COLUMN * (c + 0.5);
 /** The width of a row of the given columns, the pot of the given size and the row's label of the given width. */
 export const rowWidth = (columns, pot, label = 0) => 2 * PAD + label + COLUMN * (columns + POT_GAP + pot);
 
+/** The row of the slip figure, which every figure of rows is drawn beside: six columns and a pot of two, drawn at most
+ *  this many rem wide.  A figure of rows is drawn at the same size of mark, so that the marks look alike from figure to
+ *  figure. */
+export const REFERENCE = { columns: 6, pot: 2, rem: 26 };
+
+/** The screen pixels of one figure unit of a row of the reference's size, in a space of the given width. */
+export function unitPx(width) {
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  return Math.min(width, REFERENCE.rem * rem) / rowWidth(REFERENCE.columns, REFERENCE.pot);
+}
+
 /** The height of rows of the given taxes: as tall as the longest of them. */
 export const rowHeight = (rows) => TAX_Y + TAX_STEP * (Math.max(...rows.flatMap((r) => r.turns.map((t) => t.tax.length))) - 1) + 20;
 

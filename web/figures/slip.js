@@ -13,11 +13,10 @@ import { timeline, scene } from '../js/scene.js';
 import { fmt, listWords } from '../js/vocab.js';
 import { holdHeight } from './hold-height.js';
 import {
-  MOVE_Y, PAD, POT_GAP, addRow, columnX, gameRow, payId, potLook, rowHeight, rowLooks, rowWidth,
+  MOVE_Y, PAD, POT_GAP, REFERENCE, addRow, columnX, gameRow, payId, potLook, rowHeight, rowLooks, rowWidth,
 } from './game-row.js';
 
 const N = 12;
-const POT = 2; // the numbers the pot holds: 7 and 12, then 7 and 8
 const ARC = 26; // how high 12 rises on its way from the pot to its column
 
 /** Play n into the game of n − 1 given by moves: just before the first move after which no proper divisor of n is left
@@ -103,7 +102,7 @@ function states(f) {
   });
   const fourth = { ...built([]), ...score('score-b') };
   fourth[dropped] = { ...fourth[dropped], ...potLook(dropped, n, { given: true }) };
-  return { list: [first, second, third, fourth], height, width: rowWidth(slotted.length, POT) };
+  return { list: [first, second, third, fourth], height, width: rowWidth(REFERENCE.columns, REFERENCE.pot) };
 }
 
 /** Mount the figure in host, which holds an <svg>, .fig-timeline and .fig-caption; returns the facts and the figure's
@@ -117,6 +116,7 @@ export function mountSlip(host, { small }) {
     label: `Game ${N}'s game built from game ${N - 1}'s optimal game: ${N} goes just before ${cut}, takes the tax `
       + `of ${cut} and leaves ${cut} out, in four states.  The current state is described under the figure.`,
   });
+  s.svg.style.maxWidth = `${REFERENCE.rem}rem`;
   addRow(s, before);
   s.line(payId('', N), N, after.turns.find((t) => t.move === N).tax[0], 'pay');
   s.text('score-a', fmt(before.score), { kind: 'score' });

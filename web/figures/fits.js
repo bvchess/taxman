@@ -12,11 +12,11 @@ import * as M from '../js/model.js';
 import { scene } from '../js/scene.js';
 import { fmt, listWords } from '../js/vocab.js';
 import { slipFacts } from './slip.js';
+import { responsive } from '../js/chart.js';
 import {
-  MOVE_Y, PAD, addRow, gameRow, rowHeight, rowLooks, rowWidth,
+  COLUMN, addRow, columnX, gameRow, rowHeight, rowLooks, rowWidth, unitPx,
 } from './game-row.js';
 
-const LABEL = 82; // the width of a row's name
 const ascending = (a, b) => a - b;
 const sum = (list) => list.reduce((total, x) => total + x, 0);
 
@@ -73,36 +73,48 @@ export function fitsWords(f) {
 const rowName = (row) => `Game ${row.n}`;
 const plain = (html) => html.replace(/<[^>]+>/g, '');
 
-/** Draw the panels of fig: each .arrival in it with a data-board n, its svg and its .arrival-says.  Returns the facts
- *  of each panel and a highlight for the prose. */
+const NAME_H = 26; // the room above a row for its name
+const ROWS_GAP = 14; // between a row's tax and the next row's name
+const SIDE = 0.85; // the panels stand side by side when each keeps this much of the slip figure's size
+const SPACE = 22; // between the panels, in px
+
+/** Draw the panels of fig: each .arrival in it with a data-board n, its svg and its .arrival-says.  Each row's name
+ *  stands over its row.  The panels are drawn at the slip figure's size, side by side if each keeps SIDE of it and
+ *  stacked if not, and again when the figure's width changes.  Returns the facts of each panel and a highlight for the
+ *  prose. */
 export function mountFits(fig, { small }) {
   const hosts = [...fig.querySelectorAll('.arrival')];
   const panels = hosts.map((host) => ({ host, f: fitsFacts(small, Number(host.dataset.board)) }));
   // Every panel is drawn at one scale: the widest sets the width.
   const columns = Math.max(...panels.map(({ f }) => f.slots.length));
   const pot = Math.max(...panels.flatMap(({ f }) => [f.above.rest.length, f.below.rest.length]));
-  const rows = panels.flatMap(({ f }) => [f.above, f.below]);
-  const rowTop = rowHeight(rows) + 10;
-  const height = rowTop + rowHeight(rows) - 10 + 6;
+  const width = rowWidth(columns, pot);
   const scenes = panels.map(({ host, f }) => {
     const words = fitsWords(f);
+    const block = NAME_H + rowHeight([f.above, f.below]) + ROWS_GAP;
     const s = scene(host.querySelector('svg'), {
-      width: rowWidth(columns, pot, LABEL), height, className: 'is-dense',
+      width, height: 2 * block - ROWS_GAP, className: 'is-dense',
       label: `${rowName(f.above)} and game ${f.n}, each move over the tax it takes. ${plain(words)}`,
     });
-    const left = PAD + LABEL;
     const halo = { a: new Set(f.uses), b: new Set([f.n, ...f.tax]) };
     const looks = {};
-    [['a', f.above, 0], ['b', f.below, rowTop]].forEach(([tag, row, top]) => {
+    [['a', f.above], ['b', f.below]].forEach(([tag, row], i) => {
       addRow(s, row, tag);
       s.text(`${tag}name`, rowName(row), { kind: 'name' });
-      Object.assign(looks, rowLooks(row, { slots: f.slots, left, top, tag, halo: halo[tag] }));
-      looks[`${tag}name`] = { x: PAD, y: top + MOVE_Y };
+      Object.assign(looks, rowLooks(row, { slots: f.slots, top: i * block + NAME_H, tag, halo: halo[tag] }));
+      looks[`${tag}name`] = { x: columnX(0) - COLUMN / 2 + 3, y: i * block + NAME_H / 2 };
     });
     s.states([looks]).show(0);
     const says = host.querySelector('.arrival-says');
     if (says) says.innerHTML = words;
     return s;
+  });
+  responsive(fig, (space) => {
+    const unit = unitPx(space);
+    const each = (space - SPACE) / 2;
+    fig.classList.toggle('is-side', each >= SIDE * unit * width);
+    const avail = fig.classList.contains('is-side') ? each : space;
+    for (const { host } of panels) host.querySelector('svg').style.width = `${Math.min(width * unit, avail)}px`;
   });
   return {
     facts: panels.map(({ f }) => f),
