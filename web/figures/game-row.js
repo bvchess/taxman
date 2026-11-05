@@ -2,8 +2,8 @@
 // header line above the row names the moves at the left and, at the right, the numbers left out.  The moves are the
 // player's (blue circles), their tax the taxman's (orange squares), joined by the thick line of a payment (as in
 // figures/game40.js); a move that takes several numbers stacks them.  The numbers left in the pot at the end are out of
-// focus, as in figures/arrival.js: a dashed circle for a number above n/2 and a square for one up to n/2, and a move
-// given up is a faded dashed circle with a halo.  A halo marks what the prose beside the figure names.  Two rows can
+// focus: a dashed circle for a number above n/2 and a square for one up to n/2, and a move given up is a faded dashed
+// circle with a halo.  A halo marks what the prose beside the figure names.  Two rows can
 // share their columns, an empty column standing where a move of the other row has no move of this one.  A flat figure.
 //
 // The game is replayed with js/model.js (replay), so a row cannot show an illegal game: the taxes and the numbers left

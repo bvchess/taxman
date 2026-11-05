@@ -96,8 +96,8 @@
       <span class="why">game 12's ceiling</span>
     </div>
     <p>Each game's best score bounds the next one's, so the games, from game 1 up, hang together like the links of a
-    <a class="gloss" href="glossary.html#chain">chain</a>.  In the figure, each game's link runs from opt(n − 1) up to
-    its ceiling, and its dot is opt(n), the start of the next link.  A dot at the top of its link is a game at its
+    <a class="gloss" href="glossary.html#chain">chain</a>.  In the figure, each game's link runs from its floor,
+    opt(n − 1), up to its ceiling, opt(n − 1) + n, and its dot is opt(n), the start of the next link.  A dot at the top of its link is a game at its
     ceiling, settled by game n − 1 alone.</p>
   </div>
 
@@ -200,11 +200,13 @@
       optimal game of n plays q(n), as its first move, and no other prime: a game without it can take q(n) in place of
       its first move, or in front of it, and score more.</p>
     </aside>
-    <p>Past game 2, when n is a prime, it never fits.  Its only maximal factor is 1, and the first move of every game
-    takes 1 as <a class="gloss" href="glossary.html#tax">tax</a>, so a prime can be played only as the first move.
-    Every <a class="gloss" href="glossary.html#optimal-game">optimal game</a> opens with the largest prime of its
-    board: a game that does not can always play that prime in place of its first move, or in front of it, and score
-    more.</p>
+    <p>Past game 2, when n is a prime, it never fits, but an optimal game of n is still easy to find: take an optimal
+    game of n − 1 and let n take the place of its first move, the largest prime below n.</p>
+    <p>A prime's only maximal factor is 1, and the first move of every game takes 1 as
+    <a class="gloss" href="glossary.html#tax">tax</a>, so a prime can be played only as the first move.  Every
+    <a class="gloss" href="glossary.html#optimal-game">optimal game</a> opens with the largest prime of its board: a
+    game that does not can always play that prime in place of its first move, or in front of it, and score more.  So an
+    optimal set of n − 1 already holds a prime, and n, a second one, does not fit.</p>
   </div>
 
   <div class="para">
@@ -217,9 +219,8 @@
       opt(p) = opt(p − 1) + p − q(p − 1).  The exchange maps the optimal sets of p − 1 one to one onto those of p
       (the step theorem).</p>
     </aside>
-    <p>So at a prime n, an optimal game of n − 1 opens with the largest prime below n, and n takes its place.  Neither
-    prime divides any other number on the board, so the rest of the game cannot tell them apart, and every other move
-    stays legal.  The score rises by the gap between the two primes.  Run backward, the same exchange turns an optimal
+    <p>The swap works because neither prime divides any other number on the board: the rest of the game cannot tell
+    them apart, and every other move stays legal.  The score rises by the gap between the two primes.  Run backward, the same exchange turns an optimal
     game of n into a game of n − 1, so no game of n can beat the swap.  This is the
     <a class="gloss" href="glossary.html#prime-formula">prime formula</a>.</p>
     <p>An optimal game of 12 opens with <span class="n" data-n="11">11</span>.  In game 13,
@@ -287,39 +288,6 @@
   </details>
 </section>
 
-<section class="chapter" id="walk" data-toc="walk" aria-labelledby="h-walk">
-  <h2 id="h-walk">The first hundred games</h2>
-  <p>Walk from game 2 to game 100, each game's optimal set built from the one before.  Drag along the strip or step
-  with the buttons: the board shows each game's optimal set and what changed, and the strip says how each game was
-  settled.</p>
-
-  <figure class="fig walker" id="walker">
-    <svg role="img"></svg>
-    <div class="walk-controls">
-      <button type="button" class="btn round" data-act="prev" aria-label="The game before">&lsaquo;</button>
-      <div class="walk-strip"></div>
-      <button type="button" class="btn round" data-act="next" aria-label="The next game">&rsaquo;</button>
-    </div>
-    <div class="chart-key rule-legend"></div>
-    <figcaption class="walk-caption" aria-live="polite"></figcaption>
-  </figure>
-
-  <div class="para">
-    <aside class="note tech" aria-label="How the figure decides">
-      <div class="note-head"><span class="note-name">How the figure decides</span></div>
-      <p>The figure decides whether n fits by peel, on the recorded optimal set of game n − 1 with n added.  Every game
-      in which it finds n fitting is at its ceiling, and every other game's best score falls below it.  How each game
-      was proved is
-      the record of
-      <a href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a>.</p>
-    </aside>
-    <p>Of games 2 to 100, <span data-walk="ceiling">…</span> are at the ceiling, <span data-walk="prime">…</span> are
-    prime and <span data-walk="repeat">…</span> are repeats.  <span data-walk="search">…</span> needed a
-    <a class="gloss" href="glossary.html#search">search</a>, and in <span data-walk="nothing">…</span> of those nothing
-    was left to choose once the numbers above n/2 were chosen.</p>
-  </div>
-</section>
-
 <section class="chapter" id="whole-chain" data-toc="whole-chain" aria-labelledby="h-whole">
   <h2 id="h-whole">The whole chain</h2>
   <div class="para">
@@ -333,12 +301,13 @@
       The searches include <span data-settled="searchNothing">…</span> small games with nothing to choose.</p>
     </aside>
     <p>The same rules carry the <a class="gloss" href="glossary.html#chain">chain</a> to its end.  Of its
-    <span data-settled="total">…</span> games, <span data-settled="noSearch">…</span> were proven with no search of
-    their own, or <span data-settled="share">…</span>: <span data-settled="ceiling">…</span> at the ceiling,
-    <span data-settled="prime">…</span> by the prime formula and <span data-settled="repeat">…</span> as repeats.</p>
+    <span data-settled="total">…</span> games, <span data-settled="share">…</span> were proven with no search of their
+    own: <span data-settled="ceilingShare">…</span> at the ceiling, <span data-settled="primeShare">…</span> by the
+    prime formula and <span data-settled="repeatShare">…</span> as repeats.  The other
+    <span data-settled="searchShare">…</span> needed a search.</p>
   </div>
 
-  <figure class="fig wide chart" id="settled">
+  <figure class="fig chart" id="settled">
     <p class="chart-sub">Every game of the chain, a cell each, a hundred to a row from game 1 at the top left, shaded
     by how it was proven.  The dark cells are the searches.</p>
     <div class="chart-key rule-legend"></div>
@@ -430,11 +399,10 @@ import { initEssay, registerFigure } from './js/essay.js';
 import { headStart, loadGames, loadSmall } from './js/data.js';
 import { fmt } from './js/vocab.js';
 import { pct } from './js/chart.js';
-import { RULES, fillOneSearch } from './js/proof.js';
+import { fillOneSearch } from './js/proof.js';
 import { mountFits, mountPrime } from './figures/fits.js';
 import { mountSlip } from './figures/slip.js';
 import { mountLinks } from './figures/links.js';
-import { mountWalker } from './figures/walker.js';
 import { mountSettled } from './figures/settled.js';
 import { mountCofactor } from './figures/cofactor.js';
 
@@ -457,21 +425,12 @@ registerFigure('arrival-prime', mountPrime(document.getElementById('arrival-prim
 registerFigure('slip', mountSlip(document.getElementById('slip'), data));
 mountLinks(document.getElementById('links'), data);
 
-// The walk through the first hundred games, and its counts.
-const walker = mountWalker(document.getElementById('walker'), data, { from: 2, to: 100, start: 12 });
-registerFigure('walker', walker);
-const walked = {
-  ...Object.fromEntries(RULES.map((r) => [r.key, walker.steps.filter((f) => f.rule === r.key).length])),
-  nothing: walker.steps.filter((f) => f.rule === 'search' && f.proof === 'trivial').length,
-};
-fill('walk', (key) => (key in walked ? fmt(walked[key]) : undefined));
-
 // The whole chain.
 const chain = mountSettled(document.getElementById('settled'), { games });
 const settledFacts = {
-  total: fmt(chain.total), noSearch: fmt(chain.noSearch), share: pct(chain.noSearch / chain.total, 1),
-  ceiling: fmt(chain.counts.ceiling), prime: fmt(chain.counts.prime), repeat: fmt(chain.counts.repeat),
-  search: fmt(chain.counts.search), before: fmt(chain.groupCounts.before),
+  total: fmt(chain.total), share: pct(chain.noSearch / chain.total, 1),
+  ceilingShare: pct(chain.counts.ceiling / chain.total, 1), primeShare: pct(chain.counts.prime / chain.total, 1),
+  repeatShare: pct(chain.counts.repeat / chain.total, 1), searchShare: pct(chain.counts.search / chain.total, 1),
   storeRepeat: fmt(chain.store.repeat), storeSearch: fmt(chain.store.search), storeBefore: fmt(chain.store.before),
   recordRepeatAtCeiling: fmt(chain.recordRepeatAtCeiling), searchNothing: fmt(chain.searchNothing),
 };

@@ -67,7 +67,7 @@ chapters' titles but no numbers, since the chain, trust and the results do not s
 | frames | which candidates to promote | 10^415 sets of 1,380 candidates |
 | the search | the nodes a search explores | 3.2 billion nodes |
 
-The chain settles 60% of the games with no search at all, which the chain's chart shows.  The figures are rough counts
+The chain settles 65% of the games with no search at all, which the chain's chart shows.  The figures are rough counts
 (n!, 2^n, 2^(n/2), 2^candidates) and say so in the right column; the last is the recorded search of game 5060.
 
 ## Introduction (the front page)
@@ -123,7 +123,7 @@ points:* in game 833 every optimal game makes 362 moves, but a game can make 363
 * When an optimal set of n − 1 still plays with n added, game n is at its ceiling, and done.
 * At a prime n, swap the old largest prime for n: the prime formula.
 * Often game n poses exactly the search problem of the game before it, and that game's answer carries over: a repeat.
-* Together these settle about 60% of the games with no search.  That is why the result is a chain: game 5000 is reached
+* Together these settle about 65% of the games with no search.  That is why the result is a chain: game 5000 is reached
   by walking there.
 * Which games need a search can usually be told from n alone, from its cofactor: n over its largest prime factor
   (measured).
@@ -133,7 +133,7 @@ and 13 is a prime.  The repeat is game 39, which the semiprime formula also sett
 
 **Figures.**  Game 12 built from game 11's optimal game, animated.  The chain of bounds, games 1 to 16.  Game n − 1's
 optimal game over game n's, where n fits (10) and where it does not (12), each after its paragraph.  The prime swap
-(13), in the same rows.  A strip over n of how each game was settled.
+(13), in the same rows.  The whole chain, a cell for each game, shaded by how it was proven.
 
 **Right column.**  The prime lemma (N1), monotonicity (N3), the ceiling lemma (N4), the prime formula (N5), the step
 theorem (N6), the half lemma (N7), the semiprime formula (J3), the repeat lemma (R6, its last part given U).

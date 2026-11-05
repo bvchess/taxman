@@ -1,4 +1,4 @@
-/* Chapter 2, Walking up the chain: the boards of the arrival of n, the walk through the first hundred games, and the
+/* Chapter 2, Walking up the chain: the boards of the arrival of n, the chain of bounds, and the
    charts of how each game was settled.  Loaded after css/site.css. */
 
 .rule-cell.is-ceiling { fill: var(--rule-ceiling); }
@@ -54,25 +54,6 @@
   paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round;
 }
 
-/* ---- the walk ------------------------------------------------------------------------------------------------- */
-
-.walker { position: relative; max-width: var(--measure); }
-.walker > svg { display: block; width: 100%; max-width: 26rem; height: auto; margin: 0 auto; }
-.walk-controls { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-.walk-strip { position: relative; flex: 1; min-width: 0; cursor: pointer; touch-action: none; border-radius: 4px; }
-.walk-strip svg { display: block; overflow: visible; }
-.walk-strip:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 3px; }
-.walk-slot { fill: var(--faint); }
-.walk-thumb { fill: none; stroke: var(--ink); stroke-width: 2; pointer-events: none; }
-.walk-tick { stroke: var(--faint); stroke-width: 1; }
-.walk-tick-label { font-family: var(--font); font-size: 10.5px; fill: var(--ink-3); font-variant-numeric: tabular-nums; }
-.walker .rule-legend { margin: 8px 0 0 44px; }
-.walk-caption { font-size: 0.9rem; line-height: 1.5; color: var(--ink-2); margin: 12px 2px 0; }
-.walk-caption strong { color: var(--ink); }
-.walk-n { display: flex; align-items: center; font-weight: 700; font-size: 1rem; color: var(--ink); margin-bottom: 2px; }
-.walk-record { display: block; margin-top: 5px; color: var(--ink-3); }
-.walk-measure { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: none; }
-
 /* ---- the whole chain, and the cofactors ------------------------------------------------------------------------ */
 
 #settled .chart-box, #cofactor-fig .chart-box { position: relative; }
@@ -80,7 +61,6 @@
 
 @container essay (max-width: 540px) {
   .arrival-pair { grid-template-columns: minmax(0, 1fr); }
-  .walker .rule-legend { margin-left: 0; }
 }
 
 /* The table under a chart inside an aside keeps a table's own disclosure, not the aside's summary. */

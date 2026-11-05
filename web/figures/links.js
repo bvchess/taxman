@@ -32,7 +32,7 @@ export function linksFacts(small, to = LAST) {
 
 /** The caption's words for one game. */
 export function linkWords({ n, from, ceiling, opt, atCeiling }) {
-  return `Game ${n}'s link runs from opt(${n - 1}) = ${fmt(from)} up to its ceiling, ${fmt(from)} + ${n} = `
+  return `Game ${n}'s link runs from its floor, opt(${n - 1}) = ${fmt(from)}, up to its ceiling, ${fmt(from)} + ${n} = `
     + `${fmt(ceiling)}, and opt(${n}) = ${fmt(opt)}${atCeiling ? ' is at the top' : ''}.`;
 }
 
@@ -112,7 +112,7 @@ export function mountLinks(host, { small }) {
       hit.addEventListener('pointerenter', () => select(f.n));
       hit.addEventListener('pointerdown', () => select(f.n));
     }
-    marks = { bars, labels, left, top, base, pad, dots: dots.map((d, i) => [i + 1, d]) };
+    marks = { bars, labels, left, top, base, pad, width, dots: dots.map((d, i) => [i + 1, d]) };
     paint();
   }
 
@@ -120,13 +120,14 @@ export function mountLinks(host, { small }) {
   // with the dot at the same share of its height, and the labels level with the marks, to the right.  A dot close to
   // the top or the foot has its label nudged, so that the lines stay a line apart.
   function paint() {
-    const { bars, labels, left, top, base, pad } = marks;
+    const { bars, labels, left, top, base, pad, width } = marks;
     const f = facts.find((g) => g.n === selected);
     for (const [n, bar] of bars) bar.classList.toggle('is-selected', n === selected);
     for (const [n, dot] of marks.dots) dot.classList.toggle('is-selected', n === selected);
     labels.replaceChildren();
     const lineH = LABEL_SIZE * 1.25;
-    const h = Math.min(0.42 * (base - top), 120);
+    // A short bar where the box is wide for the plot, so that it clears the links beside it.
+    const h = Math.min((width < 520 ? 0.22 : 0.42) * (base - top), 120);
     const yTop = top + BOX_PAD + 26;
     const yFoot = yTop + h;
     const yDot = yFoot - ((f.opt - f.from) / f.n) * h;
@@ -141,9 +142,9 @@ export function mountLinks(host, { small }) {
       x: x - MAG_W / 2, y: yTop, width: MAG_W, height: h, rx: MAG_W / 2, class: 'link-bar is-selected',
     }, labels);
     el('circle', { cx: x, cy: yDot, r: MAG_DOT, class: 'link-dot is-selected' }, labels);
-    word(`ceiling ${fmt(f.ceiling)}`, yTop);
+    word(`ceiling = opt(${f.n - 1}) + ${f.n} = ${fmt(f.ceiling)}`, yTop);
     word(`opt(${f.n}) = ${fmt(f.opt)}`, Math.min(Math.max(yDot, yTop + lineH), yFoot - lineH));
-    word(`opt(${f.n - 1}) = ${fmt(f.from)}`, yFoot);
+    word(`floor = opt(${f.n - 1}) = ${fmt(f.from)}`, yFoot);
     // The box behind it, with its paper fill, says that the inset is not data.
     const at = labels.getBBox();
     labels.prepend(el('rect', {

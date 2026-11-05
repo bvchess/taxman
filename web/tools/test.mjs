@@ -341,9 +341,9 @@ same('linksFacts(10): game 10 is at its ceiling', shape(link10), [30, 40, 40, tr
 same('linksFacts: every game has from < opt <= ceiling', links.every((l) => l.from < l.opt && l.opt <= l.ceiling),
   true);
 same('linkWords(12)', linkWords(link12),
-  "Game 12's link runs from opt(11) = 44 up to its ceiling, 44 + 12 = 56, and opt(12) = 50.");
+  "Game 12's link runs from its floor, opt(11) = 44, up to its ceiling, 44 + 12 = 56, and opt(12) = 50.");
 same('linkWords(10)', linkWords(link10),
-  "Game 10's link runs from opt(9) = 30 up to its ceiling, 30 + 10 = 40, and opt(10) = 40 is at the top.");
+  "Game 10's link runs from its floor, opt(9) = 30, up to its ceiling, 30 + 10 = 40, and opt(10) = 40 is at the top.");
 
 // --- The links at the foot of each page (js/site.js, js/essay.js) ---------------------------------------------------
 

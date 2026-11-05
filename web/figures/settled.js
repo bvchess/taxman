@@ -1,5 +1,5 @@
 // How every game of the chain was settled, in the terms of chapter 2: a cell for each game, a hundred to a row, game 1
-// at the top left, so that the grid grows downward as the chain does, like the boards of the walker.  Each cell is
+// at the top left, so that the grid grows downward as the chain does.  Each cell is
 // shaded by the rule of its game (js/proof.js), from data/games.json alone:
 //
 //   the ceiling        a game whose score is n + opt(n − 1), found with no search
@@ -47,7 +47,7 @@ export function mountSettled(host, { games }) {
 
   responsive(box, (width) => {
     const labelW = 46;
-    const cols = (width - labelW) / 100 >= 4 ? 100 : 50;
+    const cols = 100;
     const pitch = (width - labelW - 2) / cols;
     const gap = pitch >= 7 ? 2 : 1;
     const size = pitch - gap;
@@ -66,7 +66,7 @@ export function mountSettled(host, { games }) {
       ruleCell(g, key, p.x, p.y, size);
     });
     // The first game of every thousandth row at its left, and the last game after its cell.
-    const every = cols === 100 ? 10 : 20;
+    const every = 10;
     for (let r = 0; r < rows; r += every) {
       const t = el('text', { x: labelW - 8, y: at(r * cols).y + size / 2 + 4, 'text-anchor': 'end', class: 'tick' }, svg);
       t.textContent = fmt(r * cols + 1);
