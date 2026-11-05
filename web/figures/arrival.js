@@ -12,7 +12,7 @@
 import * as M from '../js/model.js';
 import { scene } from '../js/scene.js';
 import { fmt, listWords } from '../js/vocab.js';
-import { isPrime, recordWords, repeatOf, ruleOf } from '../js/proof.js';
+import { isPrime, recordWords, ruleOf, searchOf } from '../js/proof.js';
 
 export const COLS = 10;
 const PITCH = 36;
@@ -69,7 +69,7 @@ export function arrival({ small, games }, n) {
   return {
     n, before, after, prevScore, score, ceiling, gap: ceiling - score, prime, q, fits, left, joined,
     rule: ruleOf(c, i), proof: c.proof[i], record: recordWords(c, i),
-    repeats: c.proof[i] === 'same_search' ? repeatOf(n) : null,
+    repeats: c.proof[i] === 'same_search' ? searchOf(c, i) : null,
   };
 }
 

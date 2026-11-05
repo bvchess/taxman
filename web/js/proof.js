@@ -68,6 +68,21 @@ export function ruleOf(c, i) {
  *  prime game runs no search (results/README.md, the paragraph on repeats, which every repeat of the chain keeps). */
 export const repeatOf = (n) => (isPrime(n - 1) ? n - 2 : n - 1);
 
+// For each game, the game whose search its record rests on: itself, or, for a record same_search, the root of the game
+// it repeats (repeatOf).  Cached for the columns of one games.json.
+const ROOTS = new WeakMap();
+function rootsOf(c) {
+  if (!ROOTS.has(c)) {
+    const roots = [];
+    c.n.forEach((n, i) => roots.push(c.proof[i] === 'same_search' ? roots[repeatOf(n) - 1] : n));
+    ROOTS.set(c, roots);
+  }
+  return ROOTS.get(c);
+}
+
+/** The game whose search the record of row i rests on: game 1386 for each of games 1386 to 1391. */
+export const searchOf = (c, i) => rootsOf(c)[i];
+
 const STORE_WORDS = {
   exhausted: 'a search in the bounds store',
   repeat: 'a repeat in the bounds store',
@@ -81,7 +96,7 @@ export function recordWords(c, i) {
   switch (c.proof[i]) {
     case 'prime_formula': return 'the prime formula';
     case 'cap': return 'the ceiling';
-    case 'same_search': return `a repeat of game ${fmt(repeatOf(n))}’s search`;
+    case 'same_search': return `a repeat of game ${fmt(searchOf(c, i))}’s search`;
     case 'exhausted': return `a search of ${fmt(c.nodes[i])} node${c.nodes[i] === 1 ? '' : 's'}`;
     case 'trivial': return 'nothing to choose';
     case 'known': return STORE_WORDS[c.storeRule[i]] ?? 'the bounds store';
@@ -98,29 +113,16 @@ export function nodesWords(k) {
 
 /** How the game in row i was proven by its rule, as one phrase that reads after "proven by" in a tooltip. */
 export function ruleWords(c, i, rule = ruleOf(c, i)) {
-  const n = c.n[i];
   const stored = c.proof[i] === 'known';
   switch (rule) {
     case 'prime': return 'the prime formula';
     case 'ceiling': return 'the ceiling';
-    case 'repeat': return stored ? 'a repeat, in the bounds store' : `a repeat of game ${fmt(repeatOf(n))}’s search`;
+    case 'repeat': return stored ? 'a repeat, in the bounds store' : recordWords(c, i);
     default:
       if (stored) return 'a search, in the bounds store';
       if (c.proof[i] === 'trivial') return 'a search of one node';
       return `a search of ${nodesWords(c.nodes[i])} node${c.nodes[i] === 1 ? '' : 's'}`;
   }
-}
-
-// For each game, the game whose search its record rests on: itself, or, for a record same_search, the root of the game
-// it repeats (repeatOf).  Cached for the columns of one games.json.
-const ROOTS = new WeakMap();
-function rootsOf(c) {
-  if (!ROOTS.has(c)) {
-    const roots = [];
-    c.n.forEach((n, i) => roots.push(c.proof[i] === 'same_search' ? roots[repeatOf(n) - 1] : n));
-    ROOTS.set(c, roots);
-  }
-  return ROOTS.get(c);
 }
 
 /** The games that rest on one search of the chain: game n, which the chain searched, and every later game whose

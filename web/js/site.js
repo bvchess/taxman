@@ -33,9 +33,9 @@ export const ALONG = [
   },
   {
     title: 'One search, six games', where: 'games 1386 to 1391', id: 'one-search', at: 2, href: 'chain.html#one-search',
-    line: `A game often poses exactly the search problem of an earlier game, and then needs no search of its own.  Games
-      1,386 to 1,391 all pose the same one, so game 1,386’s search, of <span data-run="nodes">278,935</span> nodes, was
-      the only one the six needed.`,
+    line: `A game often poses exactly the search problem of an earlier game and so needs no search of its own.  Game
+      1,386 poses a new one, and games 1,387 to 1,391 all pose it again, so game 1,386’s search was the only one all six
+      needed.`,
   },
   {
     title: 'Not always one best game', where: 'game 425', id: 'game-425', at: 4, href: 'frames.html#game-425',
@@ -45,7 +45,7 @@ export const ALONG = [
   {
     title: 'The player\u2019s share', where: 'every game', id: 'share', at: 7, href: 'results.html#share',
     line: `As n grows, the best game wins the player an almost steady share of the board, which Hensley proved lies
-      between 1/2 and 35/48.  It seems to converge to ~<span data-share>62.9%</span>.`,
+      between 50% and about 73%.  It seems to converge to ~<span data-share>62.9%</span>.`,
   },
 ];
 

@@ -91,28 +91,42 @@
   <div class="para">
     <aside class="note tech" aria-label="How each game was proven">
       <div class="note-head"><span class="note-name">How each game was proven</span></div>
-      <p>A game counts under the first of these that applies.  Derived from n − 1: n is prime, and the
-      <a class="gloss" href="glossary.html#prime-formula">prime formula</a> gives its score from game n − 1’s, or its
-      score is its <a class="gloss" href="glossary.html#ceiling">ceiling</a>, n + opt(n − 1).  Repeats an earlier
-      search: the game poses the same problem as an earlier game, whose search settled it.  Search: the game’s own tree
-      was searched.  A game of the <a class="gloss" href="glossary.html#bounds-store">bounds store</a> counts by the
-      bound it cites, and the <span data-proof="searchNothing">…</span> small games with nothing to promote count as
-      searches, of a tree of one node.</p>
+      <p>Each game counts in the first group that fits it.</p>
+      <ul>
+        <li><b>Derived from n&nbsp;−&nbsp;1.</b>  n is prime, and the
+        <a class="gloss" href="glossary.html#prime-formula">prime formula</a> gives its score from game
+        n&nbsp;−&nbsp;1’s.  Or it reaches its <a class="gloss" href="glossary.html#ceiling">ceiling</a>: its score is
+        n&nbsp;+&nbsp;opt(n&nbsp;−&nbsp;1), the most it can be.</li>
+        <li><b>Repeats an earlier search.</b>  The game poses the same search problem as an earlier game, and that
+        game’s answer is its answer too.</li>
+        <li><b>Search.</b>  Every other game.  A search proved its score.</li>
+      </ul>
+      <p>Some games were proven by the <a class="gloss" href="glossary.html#bounds-store">bounds store</a>, in runs
+      apart from the chain; each counts by how it was proven there.  The <span data-proof="searchNothing">…</span>
+      small games with nothing left to choose count as searches of one node.</p>
     </aside>
     <aside class="note tech" aria-label="The time of a search">
       <div class="note-head"><span class="note-name">The time of a search</span></div>
-      <p>Each column is the median time of the searches the chain ran in its 100 games, of
-      <span data-proof="chainSearches">…</span> in all, those that ended at the ceiling among them.  A search’s time is
-      the wall-clock time of its game over every run, on the machine of its run, from 8 threads up to game 2,175 to 88
-      at the end.  From game 2,176 on, the runs searched several games at a time, four as a rule and for a while
-      sixteen, so a search shared its machine, and times from different runs compare only roughly.  The
-      <span data-proof="storeSearch">…</span> games counted as searches that the bounds store proved were searched in
-      runs apart from the chain, and have no time here.</p>
+      <p>Each column is the median time of a search in its stretch of 100 games: half the stretch’s searches took less
+      time, and half took more.</p>
+      <ul>
+        <li>It counts every search the chain ran, <span data-proof="chainSearches">…</span> in all, even the few that
+        ended at the ceiling.</li>
+        <li>A search’s time is its wall-clock time.  A search that was stopped and resumed counts the time of every
+        run.</li>
+        <li>The machines grew, from 8 threads up to game 2,175 to 88 at the end.  From game 2,176 on, a run searched
+        several games at once, usually four and for a while sixteen, so times from different runs compare only
+        roughly.</li>
+        <li>The <span data-proof="storeSearch">…</span> searches of the bounds store ran apart from the chain, and have
+        no time here.</li>
+      </ul>
     </aside>
     <aside class="note tech" aria-label="The player's share">
       <div class="note-head"><span class="note-name">The player's share</span></div>
-      <p>The share is opt(n) / (1 + 2 + ⋯ + n).  Hensley proved in 1988 that opt(n) / (n²/2) tends to a constant
-      between 1/2 and 35/48.  The chain's games put it near 0.63, which is a measurement, not a proof.</p>
+      <p>The share is the player’s score, opt(n), divided by the total of the board,
+      1&nbsp;+&nbsp;2&nbsp;+&nbsp;⋯&nbsp;+&nbsp;n.</p>
+      <p>In 1988 Hensley proved that as n grows, the share settles toward one value, somewhere between 50% and about
+      73%.  The chain’s games put it near 63%.  That is a measurement, not a proof.</p>
     </aside>
     <p>We found the games in order, from game 1 up, each one built from an <a class="gloss" href="glossary.html#optimal-game">optimal game</a> of the one before,
     so they form a <a class="gloss" href="glossary.html#chain">chain</a>.  The chart shows every game of it: the share of the

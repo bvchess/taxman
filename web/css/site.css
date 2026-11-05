@@ -256,6 +256,9 @@ table, .nums, output { font-variant-numeric: tabular-nums lining-nums; }
   font-size: 0.8rem; line-height: 1.45; color: var(--ink-2);
 }
 .note p { margin: 0 0 0.5rem; }
+.note ul { margin: 0 0 0.5rem; padding-left: 1.1em; }
+.note li { margin: 0 0 0.3em; }
+.note li::marker { color: var(--ink-3); }
 .note a { color: var(--ink-2); }
 .note-fold { display: none; }
 .note-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem; margin-bottom: 0.4rem; }
