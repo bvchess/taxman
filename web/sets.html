@@ -45,7 +45,7 @@
       <div class="note-head"><span class="note-name">Sets, precisely</span></div>
       <p>A set S ⊆ {2, …, n} is <em>playable</em> when some order of it is the moves of a legal game of n.  Its
       <a class="gloss" href="glossary.html#weight">weight</a> is ΣS, the sum of its members.  An <em>optimal set</em>, written S*(n), is the set of moves of an optimal
-      game: a heaviest playable set.  From game 425 on, a game can have more than one, so we say <em>an</em> optimal
+      game: a heaviest playable set.  Some games can have more than one (game 425 is the first), so we say <em>an</em> optimal
       set (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/statements.md#notation">the theory's
       notation</a>).</p>
     </aside>
@@ -61,7 +61,7 @@
   <div class="para">
     <aside class="note card" aria-label="The lifting lemma, proved">
       <div class="note-head"><span class="note-name">The lifting lemma<span class="note-label">Lemma P1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-lifting-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">A number can be played exactly when one of its maximal factors is still in the pot.</p>
+      <p class="plain">A number can be played if and only if one of its maximal factors is still in the pot.</p>
       <p class="precise"><span class="run">Precisely.</span>The maximal factors of x are x/p, for each prime p that
       divides x.  At any point of a game, if a <a class="gloss" href="glossary.html#proper-divisor">proper divisor</a> d of x is in the pot, so is a maximal factor f of x with
       d | f.</p>
@@ -79,18 +79,23 @@
   <div class="para">
     <aside class="note tech" aria-label="The graph, precisely">
       <div class="note-head"><span class="note-name">The graph, precisely</span></div>
-      <p>The maximal-factor graph of game n joins each number x of the board to x/p, for each prime p that divides x.
-      The divisors of x are exactly the numbers that x reaches by following its lines, so the tax of a move is what it
-      reaches that is still in the pot.  The move is legal exactly when a number one line away is still in the pot,
-      by the lifting lemma.  The columns are the numbers'
-      <a class="gloss" href="glossary.html#layer">layers</a>.</p>
+      <p>The maximal-factor graph of game n is a directed graph, with an edge from each number x to each of its
+      maximal factors.  Every edge leads to a smaller number, so the figures draw the edges as lines without
+      arrowheads; in the board below, every edge runs one column to the right.  The divisors of x are exactly the
+      numbers that x reaches along its edges, so the tax of a move is what it reaches that is still in the pot.  By the
+      lifting lemma, a move is legal when one of its edges leads to a number still in the pot.  The columns are the
+      numbers' <a class="gloss" href="glossary.html#layer">layers</a>.</p>
+      <p>The graph is the <em>Hasse diagram</em> of divisibility on {1, …, n}.  The Hasse diagram of an order has an
+      edge from each element to each element directly below it, and is drawn so that every edge points the same way,
+      which is why it needs no arrowheads.  A divisor d of x is directly below x when no third number is a multiple of
+      d and a divisor of x, and that happens exactly when x/d is prime.</p>
     </aside>
     <p>Draw every number joined to its maximal factors, and the game becomes much easier to play.  The board below
     is that <a class="gloss" href="glossary.html#maximal-factor-graph"><em>maximal-factor graph</em></a>.  Its columns
     count prime factors: the primes stand in the column at the right, 1 beyond them, and each number sits one column
     to the left of its maximal factors, so every line runs to the right.  Taking a number sends the taxman everything
-    it reaches by following its lines, and every number taken leaves the graph with its lines.  A number stands up
-    while it still has a line to its right.</p>
+    it reaches by following its lines to the right, and every number taken leaves the graph with its lines.  A number
+    stands up while it still has a line to its right.</p>
   </div>
 
   <div class="game-host graph-game-host" id="graph-game"></div>
