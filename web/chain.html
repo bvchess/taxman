@@ -20,39 +20,41 @@
 <header class="essay-head para">
   <p class="kicker">Chapter 2</p>
   <h1>Walking up the chain</h1>
-  <p class="lede">Most games are easy if you know an optimal game of the one before.  So we play them in order, from
-  game 1 up, and most steps need no search at all.</p>
+  <p class="lede">Game n is often easy if you have an optimal game of n − 1.  So we play them in order, from
+  game 1 up, and this way most games need no search at all.</p>
 </header>
 
 <section class="chapter" id="ceiling" data-toc="ceiling" aria-label="The ceiling">
   <div class="para">
     <aside class="note card" aria-label="Monotonicity, proved">
       <div class="note-head"><span class="note-name">Monotonicity<span class="note-label">Lemma N3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#monotonicity">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">A game of n − 1 is a game of n, so the best score never falls.</p>
-      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  A game of n − 1 is a game of n, with the same
-      taxes, and a game of n that does not play n is a game of n − 1.  So opt(n − 1) ≤ opt(n), and a set without n is
+      <p class="plain">The moves of any game of n − 1 are also a legal way to play game n, so the best score never
+      falls.</p>
+      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  The moves of a legal game of n − 1, in their
+      order, are a legal game of n, with the same taxes, and the moves of a game of n that does not play n are a legal
+      game of n − 1.  So opt(n − 1) ≤ opt(n), and a set without n is
       <a class="gloss" href="glossary.html#playable">playable</a> in game n exactly when it is playable in game n − 1.</p>
     </aside>
     <p>Game n has the numbers of game n − 1 and one more, n.  The new number divides nothing else on the
     <a class="gloss" href="glossary.html#board">board</a>, so it is never <a class="gloss" href="glossary.html#tax">tax</a>.
-    A game of n − 1 is therefore still a legal game of n, with every <a class="gloss" href="glossary.html#move">move</a>
-    taking the same tax as before.  So the best score never falls: <a class="gloss" href="glossary.html#opt">opt(n)</a>
+    The moves of any game of n − 1 can therefore be played, in the same order, in game n, with every
+    <a class="gloss" href="glossary.html#move">move</a> taking the same tax as before.  So the best score never falls: <a class="gloss" href="glossary.html#opt">opt(n)</a>
     is at least opt(n − 1).</p>
   </div>
 
   <div class="para">
     <aside class="note card" aria-label="The ceiling lemma, proved">
       <div class="note-head"><span class="note-name">The ceiling lemma<span class="note-label">Lemma N4</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-ceiling-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Leave the move n out of a game of n, and a game of n − 1 is left, so the best score rises by at
-      most n.</p>
+      <p class="plain">Leave the move n out of a game of n, and the moves left are a legal game of n − 1, so the best
+      score rises by at most n.</p>
       <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  The moves of a game of n other than n, in
-      their order, are a game of n − 1.  So opt(n) ≤ opt(n − 1) + n, the ceiling of game n, and if S is playable in
+      their order, are a legal game of n − 1.  So opt(n) ≤ opt(n − 1) + n, the ceiling of game n, and if S is playable in
       game n, then S without n is playable in game n − 1.</p>
     </aside>
-    <p>Nor can it rise by more than n.  Take an optimal game of n and leave out the move n.  Everything n would have
-    taken stays in the <a class="gloss" href="glossary.html#pot">pot</a>, so every other move still has its divisor,
-    and what is left is a game of n − 1.  It scores opt(n) − n, which is at most opt(n − 1).</p>
-    <p>So opt(n − 1) + n is the most that game n can score.  It is the
+    <p>Nor can it rise by more than n.  Take an optimal game of n and leave out its move n, if it has one.  Everything
+    n would have taken stays in the <a class="gloss" href="glossary.html#pot">pot</a>, so every other move still has its
+    divisor, and what is left is a game of n − 1.  It scores at least opt(n) − n, and at most opt(n − 1).</p>
+    <p>So opt(n − 1) + n is the most that any game of n can score.  It is the
     <a class="gloss" href="glossary.html#ceiling"><em>ceiling</em></a> of game n, and a game that reaches it is
     optimal, with nothing more to check.</p>
   </div>
@@ -63,7 +65,7 @@
   <div class="para">
     <aside class="note card" aria-label="The step theorem, proved">
       <div class="note-head"><span class="note-name">The step theorem<span class="note-label">Theorem N6</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-step-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Game n reaches its ceiling exactly when some optimal set of n − 1 can still be played with n
+      <p class="plain">Game n is at its ceiling exactly when some optimal set of n − 1 can still be played with n
       added, and its optimal sets are then exactly those sets with n.</p>
       <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  Game n is at its ceiling iff some optimal set T
       of game n − 1 has T ∪ {n} playable in game n, and the optimal sets of game n are then exactly these sets
@@ -75,10 +77,10 @@
     <a class="gloss" href="glossary.html#ceiling">ceiling</a>, and game n is done.  We say that game n <em>fits</em>.</p>
     <p>Game 21's optimal set is <span data-set="21">9, 12, 14, 15, 16, 18, 19, 20 and 21</span>, and it scores
     <span data-opt="21">144</span>.  Game <span class="n" data-n="22">22</span> fits.  Its half,
-    <span class="n" data-n="11">11</span>, divides nothing else up to 21, so it is never tax, and game 21 does not
-    play it.  So 11 is still in the <a class="gloss" href="glossary.html#pot">pot</a> at the end, and 22 can be played
-    last, paid for by 11.  Game 22 scores <span data-opt="21">144</span> + 22 = <span data-opt="22">166</span>, its
-    ceiling.</p>
+    <span class="n" data-n="11">11</span>, divides nothing else up to 21, so it is never tax, and game 21's optimal set
+    does not hold it.  So an optimal game of 21 leaves 11 in the <a class="gloss" href="glossary.html#pot">pot</a> at
+    the end, and 22 can be played last, paid for by 11.  Game 22's best score is <span data-opt="21">144</span> + 22 =
+    <span data-opt="22">166</span>, its ceiling.</p>
   </div>
 
   <div class="para">
@@ -90,8 +92,9 @@
       end, n can follow, and opt(n) = opt(n − 1) + n.  For n twice a prime, an optimal game of n − 1 plays only its
       largest prime, which exceeds n/2, so game n is always at its ceiling.</p>
     </aside>
-    <p>The same holds at every even n whose half the game before leaves alone.  When n is twice a prime, it always does:
-    an optimal game plays only one prime, the largest, so the smaller prime n/2 is still in the pot at the end.</p>
+    <p>The same holds at every even n whose half an optimal game of n − 1 leaves alone.  When n is twice a prime, it
+    always does: an optimal game plays only one prime, the largest, so the smaller prime n/2 is still in the pot at the
+    end.</p>
   </div>
 
   <div class="para">
@@ -107,17 +110,17 @@
     <span data-set="20">10, 12, 14, 15, 16, 18, 19 and 20</span>.  With 21 added it holds
     <span class="n" data-n="10">10</span>, <span class="n" data-n="14">14</span>, <span class="n" data-n="15">15</span>
     and 21, the <a class="gloss" href="glossary.html#loop">loop</a> of chapter 1 on the primes 2, 5, 3 and 7, and no game
-    plays all four.  So game 21 cannot reach its ceiling of <span data-opt="20">124</span> + 21 =
-    <span data-ceiling="21">145</span>.  Its optimal game gives up 10 and plays <span class="n" data-n="9">9</span>
-    instead, and scores <span data-opt="21">144</span>.</p>
+    plays all four.  So no game of 21 reaches its ceiling of <span data-opt="20">124</span> + 21 =
+    <span data-ceiling="21">145</span>.  An optimal game of 21 gives up 10 and plays
+    <span class="n" data-n="9">9</span> instead, and scores <span data-opt="21">144</span>.</p>
   </div>
 
   <figure class="fig arrival-pair" id="arrival-fits">
     <div class="arrival" data-board="21"><svg role="img"></svg><p class="arrival-says"></p></div>
     <div class="arrival" data-board="22"><svg role="img"></svg><p class="arrival-says"></p></div>
-    <figcaption class="fig-caption">Each board holds the game's numbers, ten to a row.  The blue
-    circles are the moves of its optimal game.  A halo marks what changed from the game before: n and any move that
-    joins it, and, dashed, a move given up.</figcaption>
+    <figcaption class="fig-caption">The board of game n holds its numbers, ten to a row.  The blue circles are its
+    optimal set.  A halo marks what changed from the optimal set of game n − 1: n and any move that joins it, and,
+    dashed, a move given up.</figcaption>
   </figure>
 </section>
 
@@ -152,8 +155,9 @@
     stays legal.  The score rises by the gap between the two primes.  Run backward, the same exchange turns an optimal
     game of n into a game of n − 1, so no game of n can beat the swap.  This is the
     <a class="gloss" href="glossary.html#prime-formula">prime formula</a>.</p>
-    <p>Game 22 opens with <span class="n" data-n="19">19</span>.  In game 23, <span class="n" data-n="23">23</span> takes
-    its place, and the game scores <span data-opt="22">166</span> + 23 − 19 = <span data-opt="23">170</span>.</p>
+    <p>An optimal game of 22 opens with <span class="n" data-n="19">19</span>.  In game 23,
+    <span class="n" data-n="23">23</span> takes its place, and the best score is <span data-opt="22">166</span> + 23 − 19
+    = <span data-opt="23">170</span>.</p>
   </div>
 
   <figure class="fig arrival-one" id="arrival-prime">
@@ -185,18 +189,18 @@
   <div class="para">
     <aside class="note card" aria-label="The semiprime formula, proved">
       <div class="note-head"><span class="note-name">The semiprime formula<span class="note-label">Theorem J3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/arrival.md#the-semiprime-formula">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">At an odd n with two prime factors that closes a loop with the moves of game n − 1, as every one from
-      game 189 on does, n takes the place of one move with two prime factors, and the score rises by the difference: no
-      search, and no statement U.</p>
+      <p class="plain">At an odd n with two prime factors that closes a loop with the moves of an optimal game of
+      n − 1, as every one from game 189 on does, n takes the place of one move with two prime factors, and the best
+      score rises by the difference: no search, and no statement U.</p>
       <p class="precise"><span class="run">Precisely.</span>Let n be odd with two prime factors, closing a cycle with
       U*₂(n − 1), as every such n ≥ 189 does, and x the smallest other member of the cycle.  Then
       opt(n) = opt(n − 1) + n − x, and exchanging x for n maps the optimal sets of n − 1 onto those of n.  In game 39,
       x = 22.</p>
     </aside>
-    <p>Game <span class="n" data-n="39">39</span> = 3 · 13 is one.  It poses the search problem of game 38, and its
-    optimal game is game 38's with one exchange: 39 takes the place of <span class="n" data-n="22">22</span> = 2 · 11.
-    It scores <span data-opt="38">486</span> + 39 − 22 = <span data-opt="39">503</span>, <span data-gap="39">22</span> below its
-    ceiling.  Here a
+    <p>Game <span class="n" data-n="39">39</span> = 3 · 13 is one.  It poses the search problem of game 38, and an
+    optimal game of 39 is an optimal game of 38 with one exchange: 39 takes the place of
+    <span class="n" data-n="22">22</span> = 2 · 11.  Game 39's best score is <span data-opt="38">486</span> + 39 − 22 =
+    <span data-opt="39">503</span>, <span data-gap="39">22</span> below its ceiling.  Here a
     theorem proves the same exchange with no search at all, and it covers every odd n with two prime factors from game
     189 on.</p>
   </div>
@@ -214,7 +218,7 @@
     <div class="aside-body">
       <p>Games 1,386 to 1,391 all pose the search problem of game 1,386.  Its search explored
       <span data-run="nodes">278,935</span> nodes, and the next five games needed no search of their own: each is a
-      <a class="gloss" href="glossary.html#repeat">repeat</a> or reaches its
+      <a class="gloss" href="glossary.html#repeat">repeat</a> or is at its
       <a class="gloss" href="glossary.html#ceiling">ceiling</a>.</p>
       <p>The longest such run in the chain is <span data-run="longestCount">8</span> games,
       from game <span data-run="longestFirst">2,512</span> to game <span data-run="longestLast">2,519</span>, all
@@ -225,8 +229,9 @@
 
 <section class="chapter" id="walk" data-toc="walk" aria-labelledby="h-walk">
   <h2 id="h-walk">The first hundred games</h2>
-  <p>Walk from game 2 to game 100, each built from the one before.  Drag along the strip or step with the buttons: the
-  board shows each game and what changed, and the strip says how each was settled.</p>
+  <p>Walk from game 2 to game 100, each game's optimal set built from the one before.  Drag along the strip or step
+  with the buttons: the board shows each game's optimal set and what changed, and the strip says how each game was
+  settled.</p>
 
   <figure class="fig walker" id="walker">
     <svg role="img"></svg>
@@ -243,7 +248,8 @@
     <aside class="note tech" aria-label="How the figure decides">
       <div class="note-head"><span class="note-name">How the figure decides</span></div>
       <p>The figure decides whether n fits by peel, on the recorded optimal set of game n − 1 with n added.  Every game
-      in which it finds n fitting reaches its ceiling, and every other game falls below it.  How each game was proved is
+      in which it finds n fitting is at its ceiling, and every other game's best score falls below it.  How each game
+      was proved is
       the record of
       <a href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a>.</p>
     </aside>
@@ -261,7 +267,7 @@
       <div class="note-head"><span class="note-name">How the chart counts</span></div>
       <p>A game counts under the first rule that applies, in the order prime, ceiling, repeat, search.  So the ceiling
       holds <span data-settled="recordRepeatAtCeiling">…</span> games the chain records as repeats, since the ceiling
-      proves them from the game before alone.  A game of the bounds store, which proves bounds apart from the chain,
+      proves them from game n − 1 alone.  A game of the bounds store, which proves bounds apart from the chain,
       counts by the bound it cites: <span data-settled="storeBefore">…</span> by the ceiling or the prime formula,
       <span data-settled="storeRepeat">…</span> as repeats and <span data-settled="storeSearch">…</span> by searches.
       The searches include <span data-settled="searchNothing">…</span> small games with nothing to choose.</p>
@@ -282,15 +288,16 @@
   <div class="para">
     <aside class="note tech" aria-label="What each rule rests on">
       <div class="note-head"><span class="note-name">What each rule rests on</span></div>
-      <p>The ceiling and the prime formula prove a game optimal wherever the game before it is optimal.  A repeat rests
+      <p>The ceiling and the prime formula prove the chain's game of n optimal wherever its game of n − 1 is.  A repeat
+      rests
       on <a class="gloss" href="glossary.html#statement-u">statement U</a> at n too, and a search on the
       <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is exact where U holds.  Every game up to
       2,175 is also proven by the <a class="gloss" href="glossary.html#prover">prover</a>, on the whole board, without U
       (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports
       the scores</a>).</p>
     </aside>
-    <p>That is why the result is a chain.  Each of those games is built from the one before, so the games are found in
-    order, from game 1 up: game 5,000 is reached by walking there.</p>
+    <p>That is why the result is a chain.  For each of those games, the chain builds its optimal game from the one of
+    game n − 1, so the games are found in order, from game 1 up: game 5,000 is reached by walking there.</p>
   </div>
 </section>
 
@@ -336,16 +343,17 @@
       (<a href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-dear-games-the-problem-or-the-chains-path-2026-10/README.md#4-what-a-start-below-optn-costs">a
       start below opt(n)</a>).</p>
     </aside>
-    <p>A game that needs a <a class="gloss" href="glossary.html#search">search</a> still begins from the game before.
-    The search starts from the optimal set of game n − 1, carried over to game n, and that start is usually the best
-    game or close to it.  Game 5,060’s search starts <span data-start="seededGap">…</span> points below the best score
+    <p>A game that needs a <a class="gloss" href="glossary.html#search">search</a> still gets a start from the game
+    before.  The search of game n starts from the optimal set of game n − 1, carried over to game n, and that start is
+    usually optimal or close to it.  Game 5,060’s search starts <span data-start="seededGap">…</span> points below the best score
     this way; from a start of its own, it would begin <span data-start="ownGap">…</span> below.  A search keeps only
     the branches that might beat the best game it has found, so the nearer it starts to the best, the less it has to
     search.  A start far below the best can make a search many times longer.</p>
   </div>
   <div class="para">
-    <p>The game before helps in two more ways.  Its <a class="gloss" href="glossary.html#ceiling">ceiling</a> ends a
-    search as soon as a game reaches it: <span data-start="cap">…</span> searches of the chain ended there,
+    <p>Game n − 1 helps in two more ways.  The <a class="gloss" href="glossary.html#ceiling">ceiling</a> it gives game n
+    ends a search as soon as the search finds a game that reaches it: <span data-start="cap">…</span> searches of the
+    chain ended there,
     <span data-start="capStart">…</span> of them at their start, before a single step.  And where game n poses part of
     the problem game n − 1 posed, the search can drop that part, by the near-repeat lemma
     (<a href="search.html#proof">chapter 5</a>).</p>
