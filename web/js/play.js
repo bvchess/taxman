@@ -15,8 +15,9 @@
 //   mount(host)    called once the markup is in the page
 //   build(n)       draw the board of game n
 //   show(state, { legal, order })   draw a state: legal is the set of legal moves, and order lists the numbers that
-//                  move in this step, in the order they should start (the move, its tax, then the rest); with no order
-//                  the board jumps to the state
+//                  move in this step, in the order they should start (the move, its tax, then the rest); a number
+//                  that the state brings back from a tray to the pot travels back, whatever the order, and every other
+//                  number is drawn at once as the state says
 //   refuse(x)      x cannot be taken: shake it
 //   reserve(n)     keep the room that the fullest state of game n needs at the present width
 //   settle()       end every motion, for a game that opens with moves played

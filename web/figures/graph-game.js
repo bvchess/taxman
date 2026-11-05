@@ -31,7 +31,7 @@
 import * as M from '../js/model.js';
 import { mountPlay, shapeOf } from '../js/play.js';
 import { scene } from '../js/scene.js';
-import { boxAround, glide, makePiece, reserveRows, traysHTML } from '../js/trays.js';
+import { boxAround, glide, makePiece, reserveRows, returnDelays, startOf, traysHTML } from '../js/trays.js';
 import { MOTION, NS, SIZE, listWords, look, reducedMotion, restyle } from '../js/vocab.js';
 
 export function mountGraphGame(host, { small, n = 21 }) {
@@ -42,7 +42,6 @@ export function mountGraphGame(host, { small, n = 21 }) {
 
 const ROW = 38; // the distance between rows, in the units of a token, which is 30 across as a coin
 const POINT_MS = 150; // the halo answering the pointer, as --ui does
-const startOf = (k) => (k === 0 ? 0 : 170 + 120 * (k - 1)); // when the k-th number of a step sets out, as in game.js
 
 // Where every number of game n stands on a board width pixels wide.  deepest is the largest layer of the largest game,
 // which sets the pitch of the columns.
@@ -261,11 +260,10 @@ function graphBoard({ you, take, maxN, playing }) {
     for (const x of state.taxman) target.set(x, 'taxman');
     // The pieces the state does not hold go back to their tokens, the last to leave the first to return.
     const back = [...held].filter(([x]) => !target.has(x));
-    const mostBack = new Map();
-    for (const [, p] of back) mostBack.set(p._batch, Math.max(mostBack.get(p._batch) ?? 0, p._k));
-    for (const [x, p] of back) {
+    const delays = returnDelays(back.map(([, p]) => ({ step: p._batch, place: p._k })));
+    for (const [i, [x, p]] of back.entries()) {
       held.delete(x);
-      const delay = startOf(mostBack.get(p._batch)) - startOf(p._k);
+      const delay = delays[i];
       at.set(x, animate ? delay + MOTION.move : 0);
       if (!animate) {
         p.remove();

@@ -3,14 +3,28 @@
 // is the maximal-factor graph.  A piece is a raised token in an HTML button, so that it can travel from anywhere on the
 // page, and a tray holds the pieces of the numbers taken.
 //
-// glide() is the motion of a take, which the two boards share: the piece is lifted on the way, and a tile taken as a
-// move turns over halfway and lands as a coin.  A piece travels between its place in its tray and a box on the page,
-// by a transform that moves and scales it about its center, so that a piece coming from a token of another size
-// grows or shrinks on the way.
+// glide() is the motion of a take, and of a take back, which the two boards share: the piece is lifted on the way, and
+// a tile taken as a move turns over halfway and lands as a coin, or, going back, turns over again.  A piece travels
+// between its place in its tray and a box on the page, by a transform that moves and scales it about its center, so
+// that a piece coming from a token of another size grows or shrinks on the way.  A piece sent somewhere while it is
+// still traveling leaves its first journey at once.  startOf() and returnDelays() say when the pieces of a step set
+// out, going and coming back.
 
 import { MOTION, numberSVG, restyle } from './vocab.js';
 
 const EASE = MOTION.settleCSS; // out, with a little overshoot: a raised token is set down
+
+/** When the k-th number of a step sets out, in milliseconds: the move (k = 0) at once, the rest one after another. */
+export const startOf = (k) => (k === 0 ? 0 : 170 + 120 * (k - 1));
+
+/** When each of the pieces going back to the pot sets out, the last of its step to leave being the first to return.
+ *  back lists the pieces, each as { step, place }: the step that took it and its place in that step (0 for the move).
+ *  Returns their delays in milliseconds, in the same order. */
+export function returnDelays(back) {
+  const last = new Map();
+  for (const { step, place } of back) last.set(step, Math.max(last.get(step) ?? 0, place));
+  return back.map(({ step, place }) => startOf(last.get(step)) - startOf(place));
+}
 
 /** The markup of the two trays, with the scores in .player .score and .taxman .score and the pieces in .slots. */
 export function traysHTML(you) {
@@ -68,10 +82,13 @@ function transformTo(box, home) {
 }
 
 /** Slide a piece to its place from the box it was in, or, with to, from its place to that box; delay is when it sets
- *  out.  With flips the tile turns over on the way.  When it is halfway, the piece is drawn with looks.  Returns the
- *  travel. */
+ *  out.  With flips the tile turns over on the way.  When it is halfway, the piece is drawn with looks.  First stops
+ *  any motion of the piece in progress and the restyle it had scheduled.  Returns the travel. */
 export function glide(piece, { from = null, to = null, delay = 0, flips = false, looks }) {
   const svg = piece.querySelector('svg');
+  // A journey in progress ends here: neither its motion nor its restyle may arrive after this one is begun.
+  for (const a of [...piece.getAnimations(), ...svg.getAnimations()]) a.cancel();
+  clearTimeout(piece._restyle);
   const home = piece.getBoundingClientRect();
   piece.classList.add('is-moving');
   const travel = piece.animate(
@@ -88,6 +105,6 @@ export function glide(piece, { from = null, to = null, delay = 0, flips = false,
     flips ? flip : lift,
     { duration: MOTION.move, delay, easing: 'ease-in-out', fill: 'backwards' },
   );
-  setTimeout(() => restyle(svg, ...looks), delay + (flips ? 280 : 200));
+  piece._restyle = setTimeout(() => restyle(svg, ...looks), delay + (flips ? 280 : 200));
   return travel;
 }
