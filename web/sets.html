@@ -173,13 +173,14 @@
 
 <section class="chapter" id="loop-section" data-toc="loop-section" aria-labelledby="h-loop">
   <h2 id="h-loop">The loop</h2>
-  <p>When <a class="gloss" href="glossary.html#peel">peel</a> gets stuck, a <a class="gloss" href="glossary.html#loop">loop</a> is to blame.  Take the numbers <span class="n" data-n="10">10</span>,
-  <span class="n" data-n="14">14</span>, <span class="n" data-n="15">15</span> and
-  <span class="n" data-n="21">21</span>, with only the primes 2, 3, 5 and 7 left to pay with.  Each of the four has two
-  prime factors, so in the maximal-factor graph it has a line to each of two primes.  Unfold the graph, putting each
-  number between its two primes, and the loop appears: the four make a square, 10 = 2 · 5, 15 = 5 · 3, 21 = 3 · 7 and
-  14 = 7 · 2.  Every number has two ways to pay, and every prime can pay for two numbers, so peel has no safe step.  Try
-  to play all four.</p>
+  <p>When <a class="gloss" href="glossary.html#peel">peel</a> gets stuck on numbers with two maximal factors, a <a class="gloss" href="glossary.html#loop">loop</a> is to blame.  Take the numbers
+  <span class="n" data-n="10">10</span>, <span class="n" data-n="14">14</span>,
+  <span class="n" data-n="15">15</span> and <span class="n" data-n="21">21</span>, with only the primes 2, 3, 5 and 7
+  left to pay with.  Each of the four is the product of two primes, which are its maximal factors, so in the
+  maximal-factor graph it has a line to each of two primes.  Unfold the graph, putting each number between its two
+  primes, and the loop appears: the four make a square, 10 = 2 · 5, 15 = 5 · 3, 21 = 3 · 7 and 14 = 7 · 2.  Every
+  number has two ways to pay, and every prime can pay for two numbers, so peel has no safe step.  Try to play all
+  four.</p>
 
   <figure class="fig fig-panel" id="loop" data-fig="loop">
     <svg role="img" aria-label="The numbers 10, 14, 15 and 21 in a column, each joined by lines to its two prime factors among 2, 3, 5 and 7 in a column beside it. A button unfolds them into a square with the primes at the corners and the numbers on its sides, 10 between 2 and 5, 15 between 5 and 3, 21 between 3 and 7, 14 between 7 and 2. Take the numbers one at a time; the primes go to the taxman."></svg>
@@ -190,25 +191,38 @@
   <div class="para">
     <aside class="note card" aria-label="The two-factor proposition, proved">
       <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Numbers with two prime factors can all be played exactly when their edges form no loop.</p>
+      <p class="plain">Numbers that each have at most two maximal factors can all be played exactly when their edges
+      form no loop.</p>
       <p class="precise"><span class="run">Precisely.</span>An instance whose members each list at most two factors
-      is <a class="gloss" href="glossary.html#playable">playable</a> iff its lists are linearly independent over GF(2), iff its graph, with an edge for each member, is a
-      forest.</p>
+      is <a class="gloss" href="glossary.html#playable">playable</a> iff its lists are linearly independent over GF(2), iff its graph is a forest.  The graph's
+      vertices are the factors and one more, the ground, and each member is an edge, between the two factors it lists or
+      from the one it lists to the ground.</p>
     </aside>
     <p>Whatever order you choose, the first number takes both of its primes as <a class="gloss" href="glossary.html#tax">tax</a>.  That leaves two primes for the
     other three numbers, and one of them is always stuck.</p>
-    <p>The same holds for any set of numbers with two prime factors: they can all be played exactly when their edges
-    contain no loop.  The rule comes back in chapter 3, where it settles those numbers in every game.</p>
+    <p>The same holds for any numbers that each have at most two maximal factors.  Draw each one as an edge between
+    its two maximal factors, or, if it has only one, as an edge from that factor to the <em>ground</em>, one more point
+    that all such numbers share.  They can all be played exactly when their edges contain no loop.  The ground
+    matters: <span class="n" data-n="4">4</span> can pay only with 2, <span class="n" data-n="9">9</span> only with 3,
+    and <span class="n" data-n="6">6</span> needs one of the two, so one of the three is always stuck.  Their edges make
+    the loop ground – 2 – 3 – ground.</p>
+    <p>Three maximal factors are too many for the rule.  With 4, 6, 10 and 15 left to pay with, the lines of
+    <span class="n" data-n="12">12</span>, <span class="n" data-n="20">20</span> and
+    <span class="n" data-n="30">30</span> close a loop, 30 – 6 – 12 – 4 – 20 – 10 – 30, yet all three can be played:
+    20, then 12, then 30.  A number with three maximal factors is not an edge, and for it the question goes back to
+    peel.</p>
+    <p>So the rule covers only part of the game, but an important part.  Every number with two prime factors, such as
+    95 = 5 · 19 or 49 = 7 · 7, has at most two maximal factors, all of them primes.  These numbers make up layer 2 of
+    the graph, and chapter 3 uses the rule to find exactly which of them above n/2 every optimal game plays.</p>
   </div>
 </section>
 
 <section class="chapter" id="along" data-toc="along" aria-label="Along the way">
   <div class="para">
-    <aside class="note tech" aria-label="Three factors, precisely">
+    <aside class="note tech of-aside" aria-label="Three factors, precisely">
       <div class="note-head"><span class="note-name">Three factors, precisely</span></div>
       <p>30 has the <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a> 15, 10 and 6.  Once 1, 2, 3 and 5 are gone, those three are all of its divisors
-      in the pot.  The game shown is legal and scores <a class="gloss" href="glossary.html#opt">opt(40)</a>, which the <a class="gloss" href="glossary.html#prover">prover</a> proves; this page finds it and checks
-      it with <a href="https://github.com/bvchess/taxman/blob/master/web/js/model.js">web/js/model.js</a>.</p>
+      in the pot.  The game shown is legal and scores <a class="gloss" href="glossary.html#opt">opt(40)</a>, which the <a class="gloss" href="glossary.html#prover">prover</a> proves.</p>
     </aside>
     <details class="aside" id="game-40" data-toc="game-40">
       <summary>

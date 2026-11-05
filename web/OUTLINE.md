@@ -38,6 +38,12 @@ The rules the owner's reviews have set, on top of [docs/WRITING.md](../docs/WRIT
 * **Calm interaction.**  Nothing on the page moves while a reader plays a figure.
 * **A figure says one thing.**  What does not fit its idea leaves it.
 * **The site is self-contained.**  Its own glossary, notation and fonts; GitHub is for depth: proofs, code and data.
+* **The prose never cites the site's own code.**  Notes point to the theory and to the Rust programs, never to the
+  JavaScript that draws the figures.
+* **Say why a narrow case matters.**  A result stated for a narrow case says what part of the problem the case is, as
+  the loop rule's paragraph says that layer 2 is its case and chapter 3 relies on it.
+* **A note stands beside what it is about.**  A margin note on what a collapsed along-the-way shows appears only while
+  it is open.
 * **Let the reader play the idea** wherever an idea can be played, as the game on the maximal-factor graph lets them
   play the lifting lemma.
 * **Link lightly.**  A glossary term links once a section, at its first use, with the quiet `gloss` style.

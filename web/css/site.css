@@ -261,6 +261,8 @@ table, .nums, output { font-variant-numeric: tabular-nums lining-nums; }
 .note li::marker { color: var(--ink-3); }
 .note a { color: var(--ink-2); }
 .note-fold { display: none; }
+/* A note about what an along-the-way shows stands beside it only while it is open. */
+.para:has(> details.aside:not([open])) > .note.of-aside { display: none; }
 .note-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem; margin-bottom: 0.4rem; }
 .note-name { color: var(--ink); font-weight: 700; font-size: 0.88rem; line-height: 1.3; }
 .note-label { display: block; font-weight: 400; font-size: 0.72rem; color: var(--ink-3); margin-top: 1px; }

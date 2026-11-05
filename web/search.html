@@ -57,9 +57,7 @@
     <aside class="note tech" aria-label="The figure's bound">
       <div class="note-head"><span class="note-name">The figure's bound</span></div>
       <p>The figure prunes with a simpler bound than the solver's: the sum of every candidate that could still be
-      promoted alone with the node's promotions.  The page runs the search with
-      <a href="https://github.com/bvchess/taxman/blob/master/web/js/model.js">web/js/model.js</a>, where candidates can
-      be promoted together exactly when <a class="gloss" href="glossary.html#u-star">U*</a> with them is
+      promoted alone with the node's promotions.  In its search, candidates can be promoted together exactly when <a class="gloss" href="glossary.html#u-star">U*</a> with them is
       <a class="gloss" href="glossary.html#playable">playable</a> (Theorem X7).</p>
     </aside>
     <p>The whole search of game 45 takes <span data-tree="nodes">13</span> nodes, and its bound drops

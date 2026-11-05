@@ -96,10 +96,12 @@
       factor that only one number can still use goes to that number (a <em>back move</em>).  The set is playable
       exactly when every number gets paired.</dd>
       <dt id="loop">loop</dt>
-      <dd>A number with two prime factors can be drawn as an edge between them.  Such numbers can all be played
-      exactly when their edges contain no loop.  10, 14, 15 and 21 make a loop on 2, 5, 3 and 7.</dd>
+      <dd>A number with two maximal factors can be drawn as an edge between them, and a number with one as an edge from
+      it to the ground, one more point that all such numbers share.  Numbers with at most two maximal factors can all
+      be played exactly when their edges contain no loop.  10, 14, 15 and 21 make a loop on 2, 5, 3 and 7.</dd>
       <dt id="forest">forest</dt>
-      <dd>A set of edges with no loop.  Numbers with two prime factors, drawn as edges between their primes, can all be played exactly when they form a forest.</dd>
+      <dd>A set of edges with no loop.  Numbers with at most two maximal factors, drawn as edges, can all be played
+      exactly when they form a forest.</dd>
     </dl>
   </div>
 </section>

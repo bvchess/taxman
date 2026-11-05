@@ -242,10 +242,9 @@
   <div class="para">
     <aside class="note tech" aria-label="How the figure decides">
       <div class="note-head"><span class="note-name">How the figure decides</span></div>
-      <p>Whether n fits is decided in the page by peel
-      (<a href="https://github.com/bvchess/taxman/blob/master/web/js/model.js">web/js/model.js</a>), on the recorded
-      optimal set of game n − 1 with n added.  The page checks that every game it finds n fitting reaches its ceiling,
-      and every other game falls below it.  How each game was proved is the record of
+      <p>The figure decides whether n fits by peel, on the recorded optimal set of game n − 1 with n added.  Every game
+      in which it finds n fitting reaches its ceiling, and every other game falls below it.  How each game was proved is
+      the record of
       <a href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a>.</p>
     </aside>
     <p>Of games 2 to 100, <span data-walk="ceiling">…</span> are at the ceiling, <span data-walk="prime">…</span> are
