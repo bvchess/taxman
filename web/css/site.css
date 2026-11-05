@@ -572,20 +572,20 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
 .chapter-nav .prev, .chapter-nav .next { padding: 14px 16px; border-radius: 16px; font-size: 0.9rem; line-height: 1.4; }
 .chapter-nav .prev, .chapter-nav .next { border: 1.5px dashed var(--faint); color: var(--ink-3); }
 .chapter-nav .next { grid-column: 2; }
-.chapter-nav .next .nav-kicker { display: block; font-size: 0.74rem; font-weight: 600; }
-.chapter-nav .next .nav-title { font-weight: 700; color: var(--ink-2); }
+.chapter-nav .nav-kicker { display: block; font-size: 0.74rem; font-weight: 600; color: var(--ink-3); }
+.chapter-nav .nav-title { font-weight: 700; color: var(--ink-2); }
+.chapter-nav .prev .nav-title { display: flex; align-items: center; gap: 10px; }
 .chapter-nav a.prev, .chapter-nav a.next {
   border: 1.5px solid var(--tray-edge); box-shadow: 0 3px 0 var(--tray-edge); color: var(--ink); text-decoration: none;
   transition: border-color var(--ui);
 }
-.chapter-nav a.prev { display: flex; align-items: center; gap: 10px; align-self: start; font-weight: 700; }
+.chapter-nav a.prev { display: flex; flex-direction: column; align-self: start; }
 .chapter-nav a.next { display: flex; flex-direction: column; }
 .chapter-nav .prev svg { flex: none; display: block; }
 .chapter-nav a.prev:hover, .chapter-nav a.next:hover { border-color: var(--ink-3); }
 .chapter-nav a.prev:hover .tk-hover { transform: translateY(-2px); }
 .chapter-nav a.prev:active, .chapter-nav a.next:active { transform: translateY(1.5px); box-shadow: 0 1px 0 var(--tray-edge); }
-.chapter-nav a.next .nav-kicker { color: var(--ink-3); }
-.chapter-nav a.next .nav-title { color: var(--ink); }
+.chapter-nav a.prev .nav-title, .chapter-nav a.next .nav-title { color: var(--ink); }
 
 /* ---- the footer, on every page -------------------------------------------------------------------------------- */
 

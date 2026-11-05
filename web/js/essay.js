@@ -268,8 +268,11 @@ function mountChapterNav() {
   const parts = [];
   const before = pages[at - 1];
   if (before) {
-    const label = (before.href === INTRO.href ? homeMark() : '') + name(before);
-    parts.push(hrefOf(before) ? `<a class="prev" href="${before.href}">${label}</a>` : `<span class="prev">${label}</span>`);
+    const written = Boolean(hrefOf(before));
+    const mark = before.href === INTRO.href ? homeMark() : '';
+    const body = `<span class="nav-kicker">${written ? 'Previous' : 'Previous, not yet written:'}</span> `
+      + `<span class="nav-title">${mark}${name(before)}</span>`;
+    parts.push(written ? `<a class="prev" href="${before.href}">${body}</a>` : `<span class="prev">${body}</span>`);
   }
   const after = pages[at + 1];
   if (after) {
