@@ -56,6 +56,12 @@
     left and is left out, and 11, 9, 6, 10, 12 scores <span data-opt="11">44</span> + 12 − 8 = 48.</p>
   </div>
 
+  <figure class="fig slip-fig" id="slip">
+    <svg role="img" aria-label="Game 12 built from game 11's optimal game."></svg>
+    <div class="fig-timeline"></div>
+    <figcaption class="fig-caption"></figcaption>
+  </figure>
+
   <div class="para">
     <aside class="note card" aria-label="The ceiling lemma, proved">
       <div class="note-head"><span class="note-name">The ceiling lemma<span class="note-label">Lemma N4</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-ceiling-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
@@ -139,12 +145,11 @@
     12, and scores <span data-opt="11">44</span> + 12 − 6 = <span data-opt="12">50</span>.</p>
   </div>
 
-  <figure class="fig arrival-pair" id="arrival-fits">
+  <figure class="fig arrival-pair game-rows" id="arrival-fits">
     <div class="arrival" data-board="10"><svg role="img"></svg><p class="arrival-says"></p></div>
     <div class="arrival" data-board="12"><svg role="img"></svg><p class="arrival-says"></p></div>
-    <figcaption class="fig-caption">The board of game n holds its numbers, ten to a row.  The blue circles are its
-    optimal set.  A halo marks what changed from the optimal set of game n − 1: n and any move that joins it, and,
-    dashed, a move given up.</figcaption>
+    <figcaption class="fig-caption">Each row is a game: each move over the tax it takes, and at the right what is left
+    in the pot.  A halo marks what n uses and what changes from game n − 1 to game n.</figcaption>
   </figure>
 </section>
 
@@ -396,6 +401,8 @@ import { fmt, listWords } from './js/vocab.js';
 import { pct } from './js/chart.js';
 import { RULES, fillOneSearch } from './js/proof.js';
 import { mountArrival } from './figures/arrival.js';
+import { mountFits } from './figures/fits.js';
+import { mountSlip } from './figures/slip.js';
 import { mountWalker } from './figures/walker.js';
 import { mountSettled } from './figures/settled.js';
 import { mountCofactor } from './figures/cofactor.js';
@@ -416,12 +423,15 @@ fill('gap', (n) => fmt(c.score[Number(n) - 2] + Number(n) - c.score[Number(n) - 
 fill('set', (n) => listWords([...small[Number(n) - 1].moves].sort((a, b) => a - b)));
 
 // The boards beside the prose, each figure under its own name for the numbers in the text.
-for (const fig of document.querySelectorAll('#arrival-fits, #arrival-prime, #arrival-repeat')) {
+for (const fig of document.querySelectorAll('#arrival-prime, #arrival-repeat')) {
   const boards = [...fig.querySelectorAll('.arrival')].map((host) => mountArrival(host, data, Number(host.dataset.board), {
     says: host.querySelector('.arrival-says') ?? fig.querySelector(':scope > .arrival-says'),
   }));
   registerFigure(fig.id, { highlight: (x, on) => boards.forEach((b) => b.highlight(x, on)), goState() {} });
 }
+
+registerFigure('arrival-fits', mountFits(document.getElementById('arrival-fits'), data));
+registerFigure('slip', mountSlip(document.getElementById('slip'), data));
 
 // The walk through the first hundred games, and its counts.
 const walker = mountWalker(document.getElementById('walker'), data, { from: 2, to: 100, start: 12 });

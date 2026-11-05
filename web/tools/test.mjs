@@ -13,6 +13,8 @@ import {
   play, primeFactors, properDivisors, replay, score, sources,
 } from '../js/model.js';
 import { AFTER, INTRO, REFERENCE, STORY } from '../js/site.js';
+import { fitsFacts, fitsWords } from '../figures/fits.js';
+import { slipFacts, slipOfRecord } from '../figures/slip.js';
 import { GROUPS, RULES, oneSearchFacts, settled } from '../js/proof.js';
 import { readResults, repoRoot } from './results.mjs';
 
@@ -291,6 +293,23 @@ try {
 }
 checks++;
 const ruleLine = RULES.map((r) => `${r.key} ${sorted.counts[r.key].toLocaleString('en-US')}`).join(', ');
+
+// --- The figures of chapter 2 that draw games as rows (figures/slip.js, figures/fits.js) ---------------------------
+
+const smallGames = JSON.parse(readFileSync(join(repoRoot, 'web', 'data', 'small.json'), 'utf8'));
+const slip12 = slipFacts(12, [11, 9, 6, 10, 8]);
+same('slipFacts(12): the game', slip12.after.moves, [11, 9, 6, 10, 12]);
+same('slipFacts(12): 12 takes 4, 8 is left out', [slip12.after.turns[4].tax, slip12.dropped, slip12.cut, slip12.last], [[4], 8, 8, 4]);
+same('slipFacts(12): the score', [slip12.before.score, slip12.after.score, slip12.gain], [44, 48, 4]);
+same('slipOfRecord(12): the same game from the record', slipOfRecord(smallGames, 12).after.moves, slip12.after.moves);
+const slip10 = slipFacts(10, [7, 9, 6, 8]);
+same('slipFacts(10): 10 goes last, nothing is left out', [slip10.after.moves, slip10.dropped, slip10.before], [[7, 9, 6, 8, 10], null, null]);
+for (const [n, fits, below, words] of [[10, true, [7, 9, 6, 8, 10], '30 + 10 = 40, the ceiling.'], [12, false, [11, 9, 10, 8, 12], '44 + 12 − 6 = 50.']]) {
+  const f = fitsFacts(smallGames, n);
+  same(`fitsFacts(${n}): fits, the game below, what pays for n`, [f.fits, f.below.moves, f.uses], [fits, below, fits ? [5] : [4, 6]]);
+  same(`fitsWords(${n}) ends with the scores`, fitsWords(f).endsWith(words), true);
+}
+same('fitsFacts(12): the columns of both rows', fitsFacts(smallGames, 12).slots, [11, 9, 6, 10, 8, 12]);
 
 // --- The links at the foot of each page (js/site.js, js/essay.js) ---------------------------------------------------
 

@@ -6,7 +6,7 @@
 //
 // The sets and scores come from data/small.json and the record from data/games.json.  Whether n fits, that is,
 // whether the optimal set of game n − 1 with n added can be played, is decided by peel (js/model.js, isPlayable), and
-// the figure checks what it says against the recorded games: a game n fits exactly when it scores its ceiling, and a
+// the figure checks what it says against the recorded games: n fits exactly when game n scores its ceiling, and a
 // prime takes the place of the largest prime below it.
 
 import * as M from '../js/model.js';
@@ -99,9 +99,9 @@ export function arrivalWords(f, { record = false, short = false } = {}) {
   const added = `${fmt(f.prevScore)} + ${n} = ${fmt(f.score)}`;
   if (short) {
     if (f.prime && f.q) return `${n} takes the place of ${f.q}, and the game scores ${swap}.`;
-    if (f.fits) return `Game ${n} fits, and it scores ${added}, the ceiling.`;
+    if (f.fits) return `${n} fits, and the game scores ${added}, the ceiling.`;
     const alone = takers.length === 1 ? `it takes the place of ${listWords(f.left)}` : take;
-    return `Game ${n} does not fit: ${alone}, and it scores ${below}.`;
+    return `${n} does not fit: ${alone}, and the game scores ${below}.`;
   }
   let lead;
   let text;
@@ -113,17 +113,17 @@ export function arrivalWords(f, { record = false, short = false } = {}) {
     text = `It takes the place of ${f.q}, the largest prime below it, and the rest of game ${was}’s set `
       + `stays.  The game scores ${swap}.`;
   } else if (f.fits) {
-    lead = `Game ${n} fits.`;
+    lead = `${n} fits.`;
     text = `Game ${was}’s optimal set, with ${n} added, can still be played.  It scores ${added}, the ceiling, so it is `
       + 'optimal.';
   } else {
-    lead = `Game ${n} does not fit.`;
+    lead = `${n} does not fit.`;
     text = `Game ${was}’s optimal set, with ${n} added, cannot be played.  In game ${n}’s optimal set, ${take}, `
       + `and it scores ${below}.`;
   }
   let proof = '';
   if (record) {
-    // A game that fits is proved by the ceiling too, and the record's proof gives the same game.
+    // When n fits, game n is proved by the ceiling too, and the record's proof gives the same game.
     const same = ', which gives the same game';
     const carries = `: game ${n} poses the same search problem, so game ${f.repeats}’s answer carries over`;
     const nothing = `: once the numbers above ${half} are chosen, no number up to ${half} can join them`;

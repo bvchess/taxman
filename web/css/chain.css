@@ -33,6 +33,10 @@
 .arrival-says strong { color: var(--ink); }
 .arrival-n { font-weight: 700; color: var(--ink); margin-right: 0.35em; }
 
+/* The two panels of game rows: each panel's rows, and under them its words. */
+.game-rows .arrival svg { max-width: 24rem; }
+.slip-fig svg { max-width: 26rem; margin: 0 auto; }
+
 /* ---- the walk ------------------------------------------------------------------------------------------------- */
 
 .walker { position: relative; max-width: var(--measure); }
