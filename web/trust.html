@@ -253,12 +253,11 @@
 
 <nav class="chapter-nav" aria-label="Pages"></nav>
 
-<footer class="site-foot"><p class="provenance"></p></footer>
 </div></main>
 </div>
 
 <script type="module">
-import { initEssay, registerFigure, mountProvenance } from './js/essay.js';
+import { initEssay, registerFigure } from './js/essay.js';
 import { loadGames, loadSmall } from './js/data.js';
 import { fmt, listWords } from './js/vocab.js';
 import { mountLadder } from './figures/ladder.js';
@@ -267,7 +266,6 @@ import { mountExact78 } from './figures/exact-78.js';
 
 initEssay();
 const [small, games] = await Promise.all([loadSmall(), loadGames()]);
-mountProvenance(games);
 const fill = (attr, facts) => {
   for (const span of document.querySelectorAll(`[data-${attr}]`)) span.textContent = facts[span.dataset[attr]];
 };

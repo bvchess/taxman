@@ -250,12 +250,11 @@
 
 <nav class="chapter-nav" aria-label="Pages"></nav>
 
-<footer class="site-foot"><p class="provenance"></p></footer>
 </div></main>
 </div>
 
 <script type="module">
-import { initEssay, mountProvenance } from './js/essay.js';
+import { initEssay } from './js/essay.js';
 import { loadGames, loadSmall } from './js/data.js';
 import { fmt, listWords } from './js/vocab.js';
 import { pct } from './js/chart.js';
@@ -265,7 +264,6 @@ import { fill833 } from './figures/longer-833.js';
 
 initEssay();
 const [small, games] = await Promise.all([loadSmall(), loadGames()]);
-mountProvenance(games);
 const c = games.columns;
 const last = games.lastN;
 const SETTLED_FROM = 4000; // the stretch the prose reads the settled share from

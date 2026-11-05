@@ -101,20 +101,17 @@
   <p>The words of the game, from <em>pot</em> to <em>promotion</em>, are in the <a href="glossary.html">glossary</a>.</p>
 </section>
 
-</div></main>
-</div>
 <nav class="chapter-nav" aria-label="Pages"></nav>
 
-<footer class="site-foot"><p class="provenance"></p></footer>
+</div></main>
+</div>
 
 <script type="module">
-import { initEssay, mountProvenance } from './js/essay.js';
-import { loadGames } from './js/data.js';
+import { initEssay } from './js/essay.js';
 import { mountLegend } from './figures/legend.js';
 
 initEssay();
 mountLegend(document.getElementById('legend'));
-mountProvenance(await loadGames(), { model: false });
 </script>
 </body>
 </html>

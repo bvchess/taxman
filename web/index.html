@@ -170,12 +170,11 @@
 
 <nav class="chapter-nav" aria-label="Pages"></nav>
 
-<footer class="site-foot"><p class="provenance"></p></footer>
 </div></main>
 </div>
 
 <script type="module">
-import { findingCardsHTML, initEssay, mountProvenance } from './js/essay.js';
+import { findingCardsHTML, initEssay } from './js/essay.js';
 import { loadGames, loadSmall } from './js/data.js';
 import { ALONG } from './js/site.js';
 import { fmt } from './js/vocab.js';
@@ -201,7 +200,6 @@ const proofFacts = {
 for (const s of document.querySelectorAll('[data-proof]')) s.textContent = fmt(proofFacts[s.dataset.proof]);
 fill833(games);
 fillOneSearch(games);
-mountProvenance(games, { model: false });
 </script>
 </body>
 </html>

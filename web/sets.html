@@ -253,12 +253,11 @@
 
 <nav class="chapter-nav" aria-label="Pages"></nav>
 
-<footer class="site-foot"><p class="provenance"></p></footer>
 </div></main>
 </div>
 
 <script type="module">
-import { initEssay, registerFigure, mountProvenance } from './js/essay.js';
+import { initEssay, registerFigure } from './js/essay.js';
 import { loadGames, loadSmall } from './js/data.js';
 import { fmt } from './js/vocab.js';
 import { mountOrders } from './figures/orders.js';
@@ -270,7 +269,6 @@ import { fill833, mountLonger833 } from './figures/longer-833.js';
 
 initEssay();
 const [small, games] = await Promise.all([loadSmall(), loadGames()]);
-mountProvenance(games);
 
 const orders = mountOrders(document.getElementById('orders'), { small });
 registerFigure('orders', orders);

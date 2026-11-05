@@ -255,16 +255,6 @@ function mountAsides() {
   openTarget();
 }
 
-/** The line at the foot of a page that says where its numbers come from: the results file at its commit, and, on a
- *  page whose figures run it, the model of the game. */
-export function mountProvenance(games, { model = true } = {}) {
-  const line = document.querySelector('.provenance');
-  if (!line) return;
-  const { file, commit } = games.source;
-  line.textContent = `The numbers on this page come from ${file}, as of commit ${commit} of the repository${
-    model ? ', and from the project\'s model of the game, which every figure runs in the page' : ''}.`;
-}
-
 // The way on at the foot of a page, drawn from site.js: the pages in the order of the contents, each linking to the
 // page before it and the page after.  A page not in the map has no way on.  The link before wears the site's icon when
 // it is the front page, as in the contents; a page not yet written is a dashed span, not a link.

@@ -128,12 +128,11 @@
 
 <nav class="chapter-nav" aria-label="Pages"></nav>
 
-<footer class="site-foot"><p class="provenance"></p></footer>
 </div></main>
 </div>
 
 <script type="module">
-import { initEssay, mountProvenance } from './js/essay.js';
+import { initEssay } from './js/essay.js';
 import { loadGames } from './js/data.js';
 import { fmt } from './js/vocab.js';
 
@@ -142,7 +141,6 @@ const games = await loadGames();
 for (const s of document.querySelectorAll('[data-last-n]')) s.textContent = fmt(games.lastN);
 document.querySelector('[data-source-file]').textContent = games.source.file;
 document.querySelector('[data-source-commit]').textContent = games.source.commit;
-mountProvenance(games, { model: false });
 </script>
 </body>
 </html>

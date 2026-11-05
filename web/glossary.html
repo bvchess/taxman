@@ -265,14 +265,11 @@
 
 </div></main>
 </div>
-<footer class="site-foot"><p class="provenance"></p></footer>
 
 <script type="module">
-import { initEssay, mountProvenance } from './js/essay.js';
-import { loadGames } from './js/data.js';
+import { initEssay } from './js/essay.js';
 
 initEssay();
-mountProvenance(await loadGames(), { model: false });
 </script>
 </body>
 </html>
