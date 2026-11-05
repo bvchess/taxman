@@ -11,16 +11,22 @@
 // turn over when their shape changes, and settle with a little overshoot (vocab.js, MOTION).  With
 // prefers-reduced-motion the scene jumps.
 //
-// Three optional keys of a look change how a mark moves into it from the state before:
+// Four optional keys of a look change how a mark moves into it from the state before:
 //   at:   [a, b]  the mark moves only between a and b of the step, so that marks can move one after another;
 //   via:  {...}   its look halfway, for a mark that does something on the way, such as a brief halo;
-//   keys: [[u, {...}], ...]  looks at points u of the step, each over the state's own look.
+//   keys: [[u, {...}], ...]  looks at points u of the step, each over the state's own look;
+//   through: { x, y }  a place the mark passes through on its way, without stopping: it travels along the one smooth
+//         curve (a quadratic Bezier) from its place to the look's, bent so that it crosses through at the curve's
+//         middle, with the motion's own easing on the curve, so that there is one lift and one landing.  Unlike via,
+//         it is a place, not a look, and the mark's other looks move as they do without it.  It works in morph and in
+//         a state's step that has no via or keys (a step cut into parts has no one curve); there, a state's through
+//         is ignored.
 // A state may also carry _duration, the milliseconds of the step into it.
 
 import * as v from './vocab.js';
 
 const { MOTION, clamp01 } = v;
-const SPECIAL = new Set(['at', 'via', 'keys']);
+const SPECIAL = new Set(['at', 'via', 'keys', 'through']);
 
 // Numbers glide from a to b; anything else switches halfway.
 function lerpLook(a, b, t) {
@@ -35,12 +41,29 @@ function lerpLook(a, b, t) {
   return out;
 }
 
-const blendFlat = (a, b, t) => lerpLook(a, b, MOTION.glide(t));
+// The place at s of the way from a to b along the quadratic Bezier that crosses through at s = 0.5: its control point
+// is 2 * through - (a + b) / 2.  Beyond 1 (a settling overshoot) the curve goes on, so the landing is the same.
+function bend(a, b, s, through) {
+  const at = (k) => {
+    const c = 2 * through[k] - (a[k] + b[k]) / 2;
+    return (1 - s) * (1 - s) * a[k] + 2 * s * (1 - s) * c + s * s * b[k];
+  };
+  return { x: at('x'), y: at('y') };
+}
+
+const blendFlat = (a, b, t, through) => {
+  const s = MOTION.glide(t);
+  return { ...lerpLook(a, b, s), ...(through && bend(a, b, s, through)) };
+};
 
 // A raised token is picked up, carried and set down: its place settles with an overshoot, it is lifted on the way,
 // and a token whose shape changes turns over, edge on at the halfway point, where it changes face.
-function blendRaised(a, b, t) {
-  const place = lerpLook({ x: a.x, y: a.y, scale: a.scale }, { x: b.x, y: b.y, scale: b.scale }, MOTION.settle(t));
+function blendRaised(a, b, t, through) {
+  const s = MOTION.settle(t);
+  const place = {
+    ...lerpLook({ x: a.x, y: a.y, scale: a.scale }, { x: b.x, y: b.y, scale: b.scale }, s),
+    ...(through && bend(a, b, s, through)),
+  };
   const out = { ...lerpLook(a, b, MOTION.smooth(t)), ...place };
   const travel = Math.hypot(b.x - a.x, b.y - a.y);
   let hop = (a.hop ?? 0) * (1 - MOTION.smooth(t)) + Math.min(MOTION.lift, travel / 18) * Math.sin(Math.PI * t);
@@ -118,7 +141,7 @@ export function scene(target, { width, height, label = '', className = '', rende
         }
         const look = { ...m.defaults, ...strip(spec) };
         if (hidden) look.opacity = 0;
-        const entry = { look, at: hidden ? null : spec.at };
+        const entry = { look, at: hidden ? null : spec.at, through: hidden || spec.via || spec.keys ? null : spec.through };
         if (s > 0) entry.path = path(looks[s - 1].get(id).look, look, hidden ? {} : spec);
         looks[s].set(id, entry);
       });
@@ -155,20 +178,21 @@ export function scene(target, { width, height, label = '', className = '', rende
       while (i < points.length - 2 && local > points[i + 1][0]) i++;
       const [u0, from] = points[i];
       const [u1, to] = points[i + 1];
-      now.set(id, blendOf(id)(from, to, clamp01((local - u0) / Math.max(1e-6, u1 - u0))));
+      now.set(id, blendOf(id)(from, to, clamp01((local - u0) / Math.max(1e-6, u1 - u0)), b.through));
     }
     return now;
   }
 
-  // The looks between two sets of looks, all marks at once or each in its own window (at).
-  function between(from, to, t, windows = {}) {
+  // The looks between two sets of looks, all marks at once or each in its own window (at), a mark with a place in
+  // throughs passing through it.
+  function between(from, to, t, windows = {}, throughs = {}) {
     const now = new Map();
     for (const [id] of marks) {
       const a = from.get(id);
       const b = to.get(id);
       const w = windows[id];
       const local = w ? clamp01((t - w[0]) / Math.max(1e-6, w[1] - w[0])) : t;
-      now.set(id, blendOf(id)(a, b, local));
+      now.set(id, blendOf(id)(a, b, local, throughs[id]));
     }
     return now;
   }
@@ -324,16 +348,19 @@ export function scene(target, { width, height, label = '', className = '', rende
       });
     },
     /** Move from wherever the scene is to the looks given, { id: look }, for a figure whose next state depends on
-     *  the reader's move.  A mark left out is hidden where it stands; a look's at gives its window. */
+     *  the reader's move.  A mark left out is hidden where it stands; a look's at gives its window, and its through
+     *  a place to pass through. */
     morph(given, { duration = 800 } = {}) {
       const from = current ?? new Map([...marks].map(([id, m]) => [id, { ...m.defaults, opacity: 0 }]));
       const to = new Map();
       const windows = {};
+      const throughs = {};
       for (const [id, m] of marks) {
         const spec = given[id];
         if (spec) {
           to.set(id, { ...m.defaults, ...strip(spec) });
           if (spec.at) windows[id] = spec.at;
+          if (spec.through) throughs[id] = spec.through;
         } else to.set(id, { ...(from.get(id) ?? m.defaults), opacity: 0, hop: 0 });
       }
       if (v.reducedMotion() || duration === 0) {
@@ -341,7 +368,7 @@ export function scene(target, { width, height, label = '', className = '', rende
         draw(to, api.pos);
         return Promise.resolve();
       }
-      return run(duration, (t) => draw(t < 1 ? between(from, to, t, windows) : to, api.pos));
+      return run(duration, (t) => draw(t < 1 ? between(from, to, t, windows, throughs) : to, api.pos));
     },
     /** Stop a running move where it is. */
     stop,
