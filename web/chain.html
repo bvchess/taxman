@@ -90,12 +90,11 @@
     <a class="gloss" href="glossary.html#optimal-set">optimal set</a> of game n − 1 and add n.  If the set can still be
     <a class="gloss" href="glossary.html#playable">played</a>, it scores opt(n − 1) + n, the
     <a class="gloss" href="glossary.html#ceiling">ceiling</a>, and game n is done.  We say that game n <em>fits</em>.</p>
-    <p>Game 21's optimal set is <span data-set="21">9, 12, 14, 15, 16, 18, 19, 20 and 21</span>, and it scores
-    <span data-opt="21">144</span>.  Game <span class="n" data-n="22">22</span> fits.  Its half,
-    <span class="n" data-n="11">11</span>, divides nothing else up to 21, so it is never tax, and game 21's optimal set
-    does not hold it.  So an optimal game of 21 leaves 11 in the <a class="gloss" href="glossary.html#pot">pot</a> at
-    the end, and 22 can be played last, paid for by 11.  Game 22's best score is <span data-opt="21">144</span> + 22 =
-    <span data-opt="22">166</span>, its ceiling.</p>
+    <p>Game 9's optimal set is <span data-set="9">6, 7, 8 and 9</span>, and it scores <span data-opt="9">30</span>.
+    Game <span class="n" data-n="10">10</span> fits.  Its half, <span class="n" data-n="5">5</span>, divides nothing
+    else up to 9, so it is never tax, and game 9's optimal set does not hold it.  So 7, 9, 6, 8, an optimal game of 9,
+    leaves 5 in the <a class="gloss" href="glossary.html#pot">pot</a> at the end, and 10 can follow it, paid for by 5.
+    Game 10's best score is <span data-opt="9">30</span> + 10 = <span data-opt="10">40</span>, its ceiling.</p>
   </div>
 
   <div class="para">
@@ -117,22 +116,21 @@
       <div class="note-head"><span class="note-name">One optimal set</span></div>
       <p>The step theorem asks about every optimal set of n − 1.  Every game up to 424 has only one, which the
       <a class="gloss" href="glossary.html#prover">prover</a> finds by listing them all (measured); game 425 has two.  So
-      in these games one test decides whether n fits.  The optimal sets of games 20 to 23 are also checked by an
-      exhaustive search (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-step-theorem">the
-      step theorem's examples</a>).</p>
+      in these games one test decides whether n fits.</p>
     </aside>
-    <p>Game <span class="n" data-n="21">21</span> does not fit.  Game 20 has only one optimal set,
-    <span data-set="20">10, 12, 14, 15, 16, 18, 19 and 20</span>.  With 21 added it holds
-    <span class="n" data-n="10">10</span>, <span class="n" data-n="14">14</span>, <span class="n" data-n="15">15</span>
-    and 21, the <a class="gloss" href="glossary.html#loop">loop</a> of chapter 1 on the primes 2, 5, 3 and 7, and no game
-    plays all four.  So no game of 21 reaches its ceiling of <span data-opt="20">124</span> + 21 =
-    <span data-ceiling="21">145</span>.  An optimal game of 21 gives up 10 and plays
-    <span class="n" data-n="9">9</span> instead, and scores <span data-opt="21">144</span>.</p>
+    <p>Game <span class="n" data-n="12">12</span> does not fit.  Game 11 has only one optimal set,
+    <span data-set="11">6, 8, 9, 10 and 11</span>.  With 12 added, the set holds <span class="n" data-n="8">8</span> and
+    12, and only <span class="n" data-n="4">4</span> can pay for either.  The
+    <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a> of 12 are 4 and
+    <span class="n" data-n="6">6</span>, and 6 is in the set; the only maximal factor of 8 is 4.  Each number of a
+    <a class="gloss" href="glossary.html#playable">playable</a> set is paid for by a maximal factor of its own, so this
+    set cannot be played, and game 12 falls short of its ceiling.  An optimal game of 12 gives up 6, which then pays for
+    12, and scores <span data-opt="11">44</span> + 12 − 6 = <span data-opt="12">50</span>.</p>
   </div>
 
   <figure class="fig arrival-pair" id="arrival-fits">
-    <div class="arrival" data-board="21"><svg role="img"></svg><p class="arrival-says"></p></div>
-    <div class="arrival" data-board="22"><svg role="img"></svg><p class="arrival-says"></p></div>
+    <div class="arrival" data-board="10"><svg role="img"></svg><p class="arrival-says"></p></div>
+    <div class="arrival" data-board="12"><svg role="img"></svg><p class="arrival-says"></p></div>
     <figcaption class="fig-caption">The board of game n holds its numbers, ten to a row.  The blue circles are its
     optimal set.  A halo marks what changed from the optimal set of game n − 1: n and any move that joins it, and,
     dashed, a move given up.</figcaption>
@@ -170,13 +168,13 @@
     stays legal.  The score rises by the gap between the two primes.  Run backward, the same exchange turns an optimal
     game of n into a game of n − 1, so no game of n can beat the swap.  This is the
     <a class="gloss" href="glossary.html#prime-formula">prime formula</a>.</p>
-    <p>An optimal game of 22 opens with <span class="n" data-n="19">19</span>.  In game 23,
-    <span class="n" data-n="23">23</span> takes its place, and the best score is <span data-opt="22">166</span> + 23 − 19
-    = <span data-opt="23">170</span>.</p>
+    <p>An optimal game of 12 opens with <span class="n" data-n="11">11</span>.  In game 13,
+    <span class="n" data-n="13">13</span> takes its place, and the best score is <span data-opt="12">50</span> + 13 − 11
+    = <span data-opt="13">52</span>.</p>
   </div>
 
   <figure class="fig arrival-one" id="arrival-prime">
-    <div class="arrival" data-board="23"><svg role="img"></svg></div>
+    <div class="arrival" data-board="13"><svg role="img"></svg></div>
     <p class="arrival-says"></p>
   </figure>
 </section>
@@ -415,7 +413,7 @@ for (const fig of document.querySelectorAll('#arrival-fits, #arrival-prime, #arr
 }
 
 // The walk through the first hundred games, and its counts.
-const walker = mountWalker(document.getElementById('walker'), data, { from: 2, to: 100, start: 22 });
+const walker = mountWalker(document.getElementById('walker'), data, { from: 2, to: 100, start: 12 });
 registerFigure('walker', walker);
 const walked = {
   ...Object.fromEntries(RULES.map((r) => [r.key, walker.steps.filter((f) => f.rule === r.key).length])),

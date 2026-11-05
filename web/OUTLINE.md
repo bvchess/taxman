@@ -126,6 +126,9 @@ points:* in game 833 every optimal game makes 362 moves, but a game can make 363
 * Which games need a search can usually be told from n alone, from its cofactor: n over its largest prime factor
   (measured).
 
+**Examples.**  Games 9 to 13, small enough to follow by hand: game 12 from game 11 in the opening, game 10 fits, game 12
+does not, and game 13 is a prime.  The repeat is game 39, which the semiprime formula also settles.
+
 **Figures.**  Adding n to an optimal game of n − 1, animated, with the case where it fits and the case where it does
 not.  The prime swap.  A strip over n of how each game was settled.
 
