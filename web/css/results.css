@@ -99,17 +99,6 @@ ul.adds .adds-head { display: flex; justify-content: space-between; align-items:
 blockquote.citation { margin: 0 0 1.05em; padding: 12px 16px; border-left: 3px solid var(--ink); background: var(--wash); border-radius: 0 10px 10px 0; }
 blockquote.citation p { margin: 0; overflow-wrap: anywhere; }
 
-/* ---- the way on: the next page is written, so it is pressed as the page before is ----------------------------- */
-
-.chapter-nav a.next {
-  display: flex; flex-direction: column; border: 1.5px solid var(--tray-edge); border-style: solid;
-  box-shadow: 0 3px 0 var(--tray-edge); color: var(--ink); text-decoration: none; transition: border-color var(--ui);
-}
-.chapter-nav a.next:hover { border-color: var(--ink-3); }
-.chapter-nav a.next:active { transform: translateY(1.5px); box-shadow: 0 1px 0 var(--tray-edge); }
-.chapter-nav a.next .nav-kicker { color: var(--ink-3); }
-.chapter-nav a.next .nav-title { color: var(--ink); }
-
 /* ---- narrower ---------------------------------------------------------------------------------------------------- */
 
 @container essay (max-width: 987px) {

@@ -5,13 +5,14 @@
 // Prints a one-line summary, and exits nonzero if any check fails.  It takes about 20 seconds on a laptop, nearly all
 // of it in descending greedy, whose cost grows with the cube of n.  The bounds below say what is covered.
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
   descendingGreedy, finish, frameModel, frames, isOver, isPlayable, legalMoves, maximalFactors, newGame, omega, peel,
   play, primeFactors, properDivisors, replay, score, sources,
 } from '../js/model.js';
+import { AFTER, INTRO, REFERENCE, STORY } from '../js/site.js';
 import { GROUPS, RULES, oneSearchFacts, settled } from '../js/proof.js';
 import { readResults, repoRoot } from './results.mjs';
 
@@ -290,6 +291,19 @@ try {
 }
 checks++;
 const ruleLine = RULES.map((r) => `${r.key} ${sorted.counts[r.key].toLocaleString('en-US')}`).join(', ');
+
+// --- The links at the foot of each page (js/site.js, js/essay.js) ---------------------------------------------------
+
+// Every page of the map has exactly one empty nav.chapter-nav, which essay.js fills from the map; no page has a
+// hand-written one.  A page outside the map (style.html) has none.
+const webDir = join(repoRoot, 'web');
+const mapped = new Set([INTRO, ...STORY, ...AFTER, ...REFERENCE].map((p) => p.href).filter(Boolean));
+for (const file of readdirSync(webDir).filter((f) => f.endsWith('.html'))) {
+  const html = readFileSync(join(webDir, file), 'utf8');
+  const navs = [...html.matchAll(/<nav\b[^>]*\bclass="chapter-nav"[^>]*>(.*?)<\/nav>/gs)];
+  same(`${file}: nav.chapter-nav, empty`, mapped.has(file) ? navs.map((m) => m[1].trim()) : [], mapped.has(file) ? [''] : []);
+  same(`${file}: no nav.chapter-nav outside the map`, mapped.has(file) ? 0 : navs.length, 0);
+}
 
 // --- Summary ----------------------------------------------------------------------------------------------------
 

@@ -566,22 +566,26 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
 
 /* ---- the way on, at the foot of a chapter ------------------------------------------------------------------- */
 
-/* The page before is a link, raised as a pressed thing is; a chapter not yet written is a dashed outline with
-   nothing to press, as in the contents. */
+/* A written page, before or after, is a link, raised as a pressed thing is; a page not yet written is a dashed outline
+   with nothing to press, as in the contents.  The page after keeps the wide right column, alone or not. */
 .chapter-nav { clear: both; display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 14px; margin: 76px 0 0; }
 .chapter-nav .prev, .chapter-nav .next { padding: 14px 16px; border-radius: 16px; font-size: 0.9rem; line-height: 1.4; }
-.chapter-nav .prev {
-  display: flex; align-items: center; gap: 10px; align-self: start; border: 1.5px solid var(--tray-edge);
-  box-shadow: 0 3px 0 var(--tray-edge); font-weight: 700; color: var(--ink); text-decoration: none;
-  transition: border-color var(--ui);
-}
-.chapter-nav .prev svg { flex: none; display: block; }
-.chapter-nav .prev:hover { border-color: var(--ink-3); }
-.chapter-nav .prev:hover .tk-hover { transform: translateY(-2px); }
-.chapter-nav .prev:active { transform: translateY(1.5px); box-shadow: 0 1px 0 var(--tray-edge); }
-.chapter-nav .next { border: 1.5px dashed var(--faint); color: var(--ink-3); }
+.chapter-nav .prev, .chapter-nav .next { border: 1.5px dashed var(--faint); color: var(--ink-3); }
+.chapter-nav .next { grid-column: 2; }
 .chapter-nav .next .nav-kicker { display: block; font-size: 0.74rem; font-weight: 600; }
 .chapter-nav .next .nav-title { font-weight: 700; color: var(--ink-2); }
+.chapter-nav a.prev, .chapter-nav a.next {
+  border: 1.5px solid var(--tray-edge); box-shadow: 0 3px 0 var(--tray-edge); color: var(--ink); text-decoration: none;
+  transition: border-color var(--ui);
+}
+.chapter-nav a.prev { display: flex; align-items: center; gap: 10px; align-self: start; font-weight: 700; }
+.chapter-nav a.next { display: flex; flex-direction: column; }
+.chapter-nav .prev svg { flex: none; display: block; }
+.chapter-nav a.prev:hover, .chapter-nav a.next:hover { border-color: var(--ink-3); }
+.chapter-nav a.prev:hover .tk-hover { transform: translateY(-2px); }
+.chapter-nav a.prev:active, .chapter-nav a.next:active { transform: translateY(1.5px); box-shadow: 0 1px 0 var(--tray-edge); }
+.chapter-nav a.next .nav-kicker { color: var(--ink-3); }
+.chapter-nav a.next .nav-title { color: var(--ink); }
 
 /* ---- the footer, on every page -------------------------------------------------------------------------------- */
 
@@ -748,6 +752,7 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
   .shrink-measure > .shrink-count:first-child { padding-left: 0; }
   .front-along .finding-cards { grid-template-columns: 1fr; }
   .chapter-nav { grid-template-columns: 1fr; }
+  .chapter-nav .next { grid-column: 1; }
 }
 
 @media (max-width: 860px) {

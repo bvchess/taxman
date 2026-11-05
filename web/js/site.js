@@ -1,6 +1,7 @@
 // The map of the site, in one place: the contents rail, the menu on small screens and the front page's figure of the
-// chapters all draw from these lists.  The story's pages follow OUTLINE.md.  An entry without href is not yet
-// written.
+// chapters all draw from these lists, and so do the links at the foot of each page, which lead from each page of the
+// map to the next in this order: INTRO, STORY, AFTER, REFERENCE.  A line is a sentence, with its period.  The story's
+// pages follow OUTLINE.md.  An entry without href is not yet written.
 
 /** The story's first entry: the front page, which introduces it.  It has no number; the chapters keep theirs. */
 export const INTRO = { title: 'Introduction', mark: 'i', href: 'index.html' };
@@ -51,14 +52,14 @@ export const ALONG = [
 
 /** The entry that follows the story in the navigation; one without href is not yet written. */
 export const AFTER = [
-  { title: 'Along the way', line: 'The smaller findings', href: 'along.html' },
+  { title: 'Along the way', line: 'The smaller findings.', href: 'along.html' },
 ];
 
 /** The entries below the navigation's line: the reference pages. */
 export const REFERENCE = [
-  { title: 'Glossary', mark: 'Aa', line: 'The words of the site', href: 'glossary.html' },
-  { title: 'Notation', mark: 'Σ', line: 'The marks, pills and symbols', href: 'notation.html' },
-  { title: 'About', line: 'What this work adds', href: 'about.html' },
+  { title: 'Glossary', mark: 'Aa', line: 'The words of the site.', href: 'glossary.html' },
+  { title: 'Notation', mark: 'Σ', line: 'The marks, pills and symbols.', href: 'notation.html' },
+  { title: 'About', line: 'What this work adds.', href: 'about.html' },
 ];
 
 /** Where a chapter lives, or null if it is not yet written. */

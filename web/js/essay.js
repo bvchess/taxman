@@ -265,9 +265,30 @@ export function mountProvenance(games, { model = true } = {}) {
     model ? ', and from the project\'s model of the game, which every figure runs in the page' : ''}.`;
 }
 
-// The way on at the foot of a chapter: the link to the front page wears the site's icon, as in the contents.
+// The way on at the foot of a page, drawn from site.js: the pages in the order of the contents, each linking to the
+// page before it and the page after.  A page not in the map has no way on.  The link before wears the site's icon when
+// it is the front page, as in the contents; a page not yet written is a dashed span, not a link.
 function mountChapterNav() {
-  for (const a of document.querySelectorAll('.chapter-nav a[href="index.html"]')) a.insertAdjacentHTML('afterbegin', homeMark());
+  const nav = document.querySelector('nav.chapter-nav');
+  if (!nav) return;
+  const pages = [INTRO, ...STORY, ...AFTER, ...REFERENCE];
+  const at = pages.findIndex((p) => p.href === herePage());
+  if (at < 0) return;
+  const name = (p) => (p.n ? `${p.n}. ${p.title}` : p.title);
+  const parts = [];
+  const before = pages[at - 1];
+  if (before) {
+    const label = (before.href === INTRO.href ? homeMark() : '') + name(before);
+    parts.push(hrefOf(before) ? `<a class="prev" href="${before.href}">${label}</a>` : `<span class="prev">${label}</span>`);
+  }
+  const after = pages[at + 1];
+  if (after) {
+    const written = Boolean(hrefOf(after));
+    const body = `<span class="nav-kicker">${written ? 'Next' : 'Next, not yet written:'}</span> `
+      + `<span class="nav-title">${name(after)}.</span>  ${after.line}`;
+    parts.push(written ? `<a class="next" href="${after.href}">${body}</a>` : `<span class="next">${body}</span>`);
+  }
+  nav.innerHTML = parts.join('\n');
 }
 
 export function initEssay() {
