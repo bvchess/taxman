@@ -94,7 +94,7 @@ reach.
 |---|---|---|---|
 | N1 | [the prime lemma](neighbors.md#the-prime-lemma) | every optimal game plays q(n), first, and no other prime | proved |
 | N2 | [the finished-game lemma](neighbors.md#finished-games) | every optimal game opens with q(n) and is over | proved |
-| N3 | [monotonicity](neighbors.md#monotonicity) | a game of n − 1 is a game of n, so opt(n − 1) ≤ opt(n) | proved |
+| N3 | [monotonicity](neighbors.md#monotonicity) | a game of n − 1 is a game of n, and playing n in it at the right moment gains, so opt(n − 1) < opt(n) and every optimal game of n plays n | proved |
 | N4 | [the ceiling lemma](neighbors.md#the-ceiling-lemma) | a game of n without the move n is a game of n − 1, so opt(n) ≤ opt(n − 1) + n | proved |
 | N5 | [the prime formula](neighbors.md#the-prime-formula) | opt(p) = opt(p − 1) + p − q(p − 1) at a prime p, by exchanging the first move | proved |
 | N6 | [the step theorem](neighbors.md#the-step-theorem) | game n is at its ceiling iff some optimal set of n − 1 stays playable with n added, and its optimal sets are then exactly those; at a prime p, the optimal sets are those of p − 1 with q(p − 1) exchanged for p | proved |

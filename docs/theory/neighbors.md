@@ -2,7 +2,7 @@
 
 Part of [the theory](../THEORY.md).
 
-Game n differs from game n − 1 by one number, and much passes between them.  The best score never falls, and never rises
+Game n differs from game n − 1 by one number, and much passes between them.  The best score always rises, but never
 by more than n.  At a prime it rises by an exact amount, and at its ceiling a game's optimal sets are those of the game
 before that stay playable with n added.  The proofs rest on the rules alone and two facts about primes; only one example
 below draws on the rest of the theory, and [arrival.md](arrival.md) follows the arrival of n through the frame model.
@@ -70,12 +70,14 @@ The constructions of the lemmas below take finished games to finished games.
 
 ## Monotonicity
 
-The best score never falls from one game to the next: a game of n − 1 is a game of n.
+The best score rises from each game to the next: a game of n − 1 is a game of n, and playing n in it at the right
+moment always gains.
 
 **Lemma N3 (monotonicity).**  Let n ≥ 2.  A game of n − 1 is a game of n, with the same taxes, and a game of n that does
 not play n is a game of n − 1.  So opt(n − 1) ≤ opt(n), and a set that does not hold n is playable in game n exactly
 when it is playable in game n − 1.  If n is composite and G is a finished game of n − 1, then G, followed by n if n is
-still legal after G, is a finished game of n, which scores ΣG or ΣG + n.
+still legal after G, is a finished game of n, which scores ΣG or ΣG + n.  Every game G of n − 1 gives a game of n that
+scores more than ΣG, so opt(n − 1) < opt(n), and every optimal game of n plays n.
 
 *Proof.*  The number n divides no smaller number, so it takes no part in any move below it.
 
@@ -87,11 +89,29 @@ still legal after G, is a finished game of n, which scores ΣG or ΣG + n.
    number of P has a proper divisor in P, since G is over, and n is not a proper divisor of anything on the board.  So n
    is the only move that can be left.  Playing it takes numbers out of the pot, and what remains is part of P, in which
    no number has a proper divisor.  Either way the game is over.  It opens with q(n − 1), which is q(n), since n is
-   composite.  ∎
+   composite.
+3. *A gain.*  Play G on the board of n, where by step 1 it leaves n in the pot.  If a proper divisor of n is still in
+   the pot at its end, n can follow G, for ΣG + n.  Otherwise let m be the move of G after which no proper divisor of n
+   is left in the pot; one is left before it, since 1 is in the pot until the first move.  Let D be the proper divisors
+   of n in the pot just before m, and T the tax of m in G.  Every member of D leaves the pot at m, so D ⊆ {m} ∪ T.  Let
+   G′ be G with n played just before m, and with m left out if, after n, it is no longer in the pot or has no proper
+   divisor there.  The move n is legal, since D is not empty, and it takes D.  If m is played, it takes T ∖ D, so the
+   pot after it is G's pot after m, less n; if m is left out, the pot is G's pot before m, less n and D, which holds
+   G's pot after m, less n.  Take a later move c of G, with G′'s pot holding G's pot, less n, before it.  The move c is
+   in G's pot and is not n, so it is in G′'s pot; in G it took a proper divisor d, and d ≠ n, so d is in G′'s pot and
+   c is legal.  It takes out of G′'s pot c and its divisors there, which keeps the containment.  So G′ is a game of n.
+   It scores ΣG + n, or ΣG + n − m if it leaves m out, and m ≤ n − 1, so it scores more than ΣG.  Taking G optimal
+   gives opt(n) > opt(n − 1).  An optimal game of n that does not play n is a game of n − 1, by step 1, and scores at
+   most opt(n − 1), so every optimal game of n plays n.  ∎
 
 On the board of 22 the optimal game of 21 above, followed by 22, is a finished game; it scores 166, which is opt(22).
 For a prime n the game G is over on the board of n too, but it does not open with q(n) = n; [the prime formula
 (N5)](#the-prime-formula) handles that case.
+
+On the board of 21, the optimal game 19, 14, 10, 15, 20, 12, 18, 16 of 20 scores 124.  The proper divisors of 21 are
+1, 3 and 7, and the last of them to leave is 3, taken by 15.  So 21 goes just before 15 and takes 3, and 15, with 1, 3
+and 5 gone, is left out.  The game 19, 14, 10, 21, 20, 12, 18, 16 scores 124 + 21 − 15 = 130: more than 124, as step 3
+says, and less than opt(21) = 144.
 
 ## The ceiling lemma
 

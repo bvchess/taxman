@@ -28,18 +28,24 @@
   <div class="para">
     <aside class="note card" aria-label="Monotonicity, proved">
       <div class="note-head"><span class="note-name">Monotonicity<span class="note-label">Lemma N3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#monotonicity">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">The moves of any game of n − 1 are also a legal way to play game n, so the best score never
-      falls.</p>
+      <p class="plain">The moves of any game of n − 1 are also a legal way to play game n, though never an optimal one:
+      the best score always rises.</p>
       <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  The moves of a legal game of n − 1, in their
       order, are a legal game of n, with the same taxes, and the moves of a game of n that does not play n are a legal
-      game of n − 1.  So opt(n − 1) ≤ opt(n), and a set without n is
+      game of n − 1.  Playing n in a game of n − 1, just before the move after which no proper divisor of n is left in
+      the pot, and leaving that move out if it can no longer be played, gives a game of n that scores more.  So
+      opt(n − 1) < opt(n), every optimal game of n plays n, and a set without n is
       <a class="gloss" href="glossary.html#playable">playable</a> in game n exactly when it is playable in game n − 1.</p>
     </aside>
     <p>Game n has the numbers of game n − 1 and one more, n.  The new number divides nothing else on the
     <a class="gloss" href="glossary.html#board">board</a>, so it is never <a class="gloss" href="glossary.html#tax">tax</a>.
     The moves of any game of n − 1 can therefore be played, in the same order, in game n, with every
-    <a class="gloss" href="glossary.html#move">move</a> taking the same tax as before.  So the best score never falls: <a class="gloss" href="glossary.html#opt">opt(n)</a>
-    is at least opt(n − 1).</p>
+    <a class="gloss" href="glossary.html#move">move</a> taking the same tax as before.  So the best score cannot fall:
+    <a class="gloss" href="glossary.html#opt">opt(n)</a> is at least opt(n − 1).</p>
+    <p>In fact it always rises.  In a game of n − 1, play n just before the move that takes the last divisor of n from
+    the pot, or at the end if a divisor is left, and leave that move out if it can no longer be played.  Everything
+    after it stays legal, and the game gains n and loses at most that move, which is smaller than n.  So the moves of a
+    game of n − 1 are never an optimal game of n, and every optimal game of n plays n.</p>
   </div>
 
   <div class="para">
