@@ -69,13 +69,17 @@ export function mountCofactor(host, { games }) {
     const rowH = narrow ? 50 : 36;
     const barH = 20;
     const endW = 46;
-    const top = 4;
+    const headY = 14;
+    const top = 22;
     const height = top + KINDS.length * rowH + 4;
     const svg = freshSVG(box, width, height, `The games from game ${fmt(FROM)} to game ${fmt(games.lastN)} by the cofactor of n, each bar `
       + 'split by how its games were settled. Only the games of other cofactors include searches. The numbers are in '
       + 'the table below.');
     const x0 = labelW;
     const scale = (width - labelW - endW) / most;
+    const axes = el('g', { class: 'axis' }, svg);
+    el('text', { x: narrow ? 0 : labelW - 12, y: headY, 'text-anchor': narrow ? 'start' : 'end' }, axes)
+      .textContent = 'cofactor';
     KINDS.forEach((g, r) => {
       const y = top + r * rowH + (narrow ? 20 : (rowH - barH) / 2);
       const name = el('text', {
