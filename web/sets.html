@@ -170,14 +170,15 @@
   <h2 id="h-loop">The loop</h2>
   <p>When <a class="gloss" href="glossary.html#peel">peel</a> gets stuck, a <a class="gloss" href="glossary.html#loop">loop</a> is to blame.  Take the numbers <span class="n" data-n="10">10</span>,
   <span class="n" data-n="14">14</span>, <span class="n" data-n="15">15</span> and
-  <span class="n" data-n="21">21</span>, with only the primes 2, 3, 5 and 7 left to pay with.  Each of the four has
-  two prime factors, so it can be drawn as an edge between two primes, and the four edges make a square:
-  10 = 2 · 5, 15 = 5 · 3, 21 = 3 · 7 and 14 = 7 · 2.  Every number has two ways to pay, and every prime can pay for
-  two numbers, so peel has no safe step.  Try to play all four.</p>
+  <span class="n" data-n="21">21</span>, with only the primes 2, 3, 5 and 7 left to pay with.  Each of the four has two
+  prime factors, so in the maximal-factor graph it has a line to each of two primes.  Unfold the graph, putting each
+  number between its two primes, and the loop appears: the four make a square, 10 = 2 · 5, 15 = 5 · 3, 21 = 3 · 7 and
+  14 = 7 · 2.  Every number has two ways to pay, and every prime can pay for two numbers, so peel has no safe step.  Try
+  to play all four.</p>
 
   <figure class="fig fig-panel" id="loop" data-fig="loop">
-    <svg role="img" aria-label="The numbers 10, 15, 21 and 14 on the sides of a square whose corners are the primes 2, 5, 3 and 7. Take them one at a time; the primes go to the taxman."></svg>
-    <div class="fig-controls"><button type="button" class="btn" data-act="reset">Start over</button></div>
+    <svg role="img" aria-label="The numbers 10, 14, 15 and 21 in a column, each joined by lines to its two prime factors among 2, 3, 5 and 7 in a column beside it. A button unfolds them into a square with the primes at the corners and the numbers on its sides, 10 between 2 and 5, 15 between 5 and 3, 21 between 3 and 7, 14 between 7 and 2. Take the numbers one at a time; the primes go to the taxman."></svg>
+    <div class="fig-controls"><button type="button" class="btn" data-act="unfold">Unfold into a loop</button> <button type="button" class="btn" data-act="reset">Start over</button></div>
     <figcaption class="loop-status" aria-live="polite"></figcaption>
   </figure>
 

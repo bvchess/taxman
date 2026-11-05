@@ -3,7 +3,18 @@
 // numbers are raised tokens, since the reader takes them.  The claim behind the figure (the four are not playable,
 // any three are) is checked with the model's isPlayable when the figure is made.
 //
-// URL parameter: loop=10,14 opens the figure with those moves played.
+// The figure has two forms of the same graph, and a button that unfolds one into the other.  In layers it is the
+// maximal-factor graph of the game above it: the four products in a column at the left, the four primes in a column at
+// the right, level with them, each product joined by a line to its two primes; the loop is there, but the lines
+// cross.  In the loop each product stands between its two primes, on a side of the dashed square.  The button moves
+// every number still on the table to its place in the other form in two beats, through a midway pose in which no two
+// numbers touch on the way, and the square fades in as the unfolding ends and out as the folding starts.  The reader
+// may play in either form and switch at any time; the trays and Start over do not depend on the form.  The "stuck"
+// label stands by the stuck number in the loop, and in layers in the primes' column, which the game has emptied, level
+// with the stuck numbers.
+//
+// URL parameter: loop=10,14 opens the figure with those moves played, in layers; loop=unfolded:10,14, or just
+// loop=unfolded, opens it as a loop.
 
 import * as M from '../js/model.js';
 import { el, listWords } from '../js/vocab.js';
@@ -14,6 +25,15 @@ const H = 372;
 // The square: primes at the corners, each product on the side between its two primes.
 const CORNER = { 2: [70, 54], 5: [290, 54], 3: [290, 234], 7: [70, 234] };
 const PRODUCTS = [10, 15, 21, 14];
+// Layers: the products ascending down a column at the left, the primes ascending down a column at the right, level.
+const COLUMN = { product: 90, prime: 270 };
+const rowY = (i) => 54 + 60 * i;
+// The pose between the two forms, where the numbers pass one another: the places of a straight glide from layers to
+// the loop, bent so that no two numbers touch on the way, either way.
+const MIDWAY = {
+  2: [162, 41], 3: [261, 152], 5: [323, 160], 7: [158, 253],
+  10: [149, 98], 14: [80, 129], 15: [190, 159], 21: [151, 198],
+};
 const TRAY = { y: 280, h: 86, w: 168, x: { player: 8, taxman: 184 } };
 const SCALE = 1.25;
 
@@ -28,13 +48,28 @@ export function mountLoop(host) {
     if (!M.isPlayable(PRODUCTS.filter((x) => x !== m))) throw new Error('the loop: every three should be playable');
   }
 
+  const byValue = (xs) => [...xs].sort((a, b) => a - b);
+  const mid = (m) => {
+    const [a, b] = M.maximalFactors(m).map((p) => CORNER[p]);
+    return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  };
+  // Every number's place in each pose.
+  const PLACE = {
+    loop: { ...CORNER, ...Object.fromEntries(PRODUCTS.map((m) => [m, mid(m)])) },
+    layers: {
+      ...Object.fromEntries(primes.map((p, i) => [p, [COLUMN.prime, rowY(i)]])),
+      ...Object.fromEntries(byValue(PRODUCTS).map((m, i) => [m, [COLUMN.product, rowY(i)]])),
+    },
+    midway: MIDWAY,
+  };
+
   const s = scene(host.querySelector('svg'), { width: W, height: H, rendering: 'raised' });
   const [x0, y0] = CORNER[2];
   const [x1, y1] = CORNER[3];
   s.custom('square', el('rect', {
     x: x0, y: y0, width: x1 - x0, height: y1 - y0, rx: 6, fill: 'none', 'stroke-width': 2,
     'stroke-dasharray': '3 6', 'stroke-linecap': 'round', style: 'stroke: var(--hair)',
-  }), () => {});
+  }), (node, look) => { node.style.opacity = look.opacity; });
   for (const who of ['player', 'taxman']) {
     const g = el('g', {});
     el('rect', { x: TRAY.x[who], y: TRAY.y, width: TRAY.w, height: TRAY.h, rx: 16, class: `tray tray-${who}`, 'stroke-width': 1.5 }, g);
@@ -49,29 +84,33 @@ export function mountLoop(host) {
     strings.push([m, p]);
   }
   s.text('stuck', (pos, look) => look.words ?? '', { anchor: 'middle' });
-  const mid = (m) => {
-    const [a, b] = M.maximalFactors(m).map((p) => CORNER[p]);
-    return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-  };
   const traySlot = (who, i) => ({ x: TRAY.x[who] + 28 + 37 * i, y: TRAY.y + 56, scale: 0.92 });
 
   const status = host.querySelector('.loop-status');
+  const toggle = host.querySelector('[data-act="unfold"]');
   let state;
+  let form = 'layers'; // 'layers' or 'loop': the form the figure is in, or moving to
+  let motion = 0; // counts the reader's actions, so that a switch the reader has cut short stops after its first beat
 
-  function looks() {
+  // The looks of the numbers on the table and the square, in pose, one of PLACE's.
+  function looks(pose) {
     const legal = new Set(M.legalMoves(state));
     const over = legal.size === 0;
-    const v = { square: {}, 'tray-player': {}, 'tray-taxman': {} };
+    const at = PLACE[pose];
+    // The square fades in as a move into the loop ends and out as a move out of it starts.
+    const into = pose === 'loop';
+    const square = { opacity: into ? 1 : 0, at: into ? [0.45, 1] : [0, 0.55] };
+    const v = { square, 'tray-player': {}, 'tray-taxman': {} };
     for (const p of primes) {
       const i = state.taxman.indexOf(p);
       v[p] = i < 0
-        ? { shape: 0, x: CORNER[p][0], y: CORNER[p][1], scale: SCALE }
+        ? { shape: 0, x: at[p][0], y: at[p][1], scale: SCALE }
         : { shape: 0, taxman: 1, ...traySlot('taxman', i) };
     }
     const stuck = [];
     for (const m of PRODUCTS) {
       const i = state.player.indexOf(m);
-      const [x, y] = mid(m);
+      const [x, y] = at[m];
       if (i >= 0) v[m] = { shape: 1, player: 1, ...traySlot('player', i) };
       else if (over) {
         v[m] = { shape: 1, dashed: 1, depth: 0, faded: 0.5, x, y, scale: SCALE };
@@ -79,11 +118,22 @@ export function mountLoop(host) {
       } else v[m] = { shape: 1, x, y, scale: SCALE, ...(legal.has(m) ? {} : { depth: 0, faded: 0.55 }) };
     }
     stuck.sort((a, b) => a - b);
-    for (const [m, p] of strings) if (state.pot.has(m) && state.pot.has(p)) v[`${m}-${p}`] = {};
-    if (stuck.length === 1) {
-      const [x, y] = mid(stuck[0]);
-      v.stuck = { x, y: y + (y > 150 ? 38 : -32), words: `stuck: ${listWords(M.maximalFactors(stuck[0]).sort((a, b) => a - b))} are gone` };
-    } else if (stuck.length > 1) v.stuck = { x: W / 2, y: 150, words: `${listWords(stuck)} are stuck` };
+    // The lines run straight in every pose, as in the maximal-factor graph above.
+    for (const [m, p] of strings) if (state.pot.has(m) && state.pot.has(p)) v[`${m}-${p}`] = { sag: 0 };
+    if (stuck.length) {
+      let [sx, sy] = [W / 2, 150];
+      if (form === 'layers') {
+        // Every prime is gone by now: the label stands in the primes' column, level with the stuck numbers.
+        const ys = stuck.map((m) => PLACE.layers[m][1]);
+        [sx, sy] = [COLUMN.prime, (Math.min(...ys) + Math.max(...ys)) / 2 + 4];
+      } else if (stuck.length === 1) {
+        const [x, y] = PLACE.loop[stuck[0]];
+        [sx, sy] = [x, y + (y > 150 ? 38 : -32)];
+      }
+      const gone = listWords(M.maximalFactors(stuck[0]).sort((a, b) => a - b));
+      const words = stuck.length === 1 ? `stuck: ${gone} are gone` : `${listWords(stuck)} are stuck`;
+      v.stuck = { x: sx, y: sy, words };
+    }
     return { v, stuck, over };
   }
 
@@ -103,8 +153,10 @@ export function mountLoop(host) {
     }. ${words[state.player.length]} of the four were played. Four numbers need four primes to pay with, and the first move took two of them.`;
   }
 
-  function render(animate) {
-    const { v, stuck, over } = looks();
+  // Show the state in pose (the form's own unless a switch is passing through its midway pose).  staged is a take,
+  // whose move and tax go one after another.
+  function render(animate, { pose = form, staged = false } = {}) {
+    const { v, stuck, over } = looks(pose);
     for (const m of PRODUCTS) {
       const node = s.node(m);
       const canTake = state.pot.has(m) && M.legalMoves(state).includes(m);
@@ -116,7 +168,7 @@ export function mountLoop(host) {
     }
     const last = state.log[state.log.length - 1];
     say(stuck, over, last);
-    if (last) {
+    if (last && staged) {
       v[last.move].at = [0, 0.65];
       last.tax.forEach((t, j) => (v[t].at = [0.25 + 0.12 * j, 0.85 + 0.12 * j]));
     }
@@ -125,14 +177,30 @@ export function mountLoop(host) {
 
   function take(m) {
     if (!state.pot.has(m) || !M.legalMoves(state).includes(m)) return false;
+    motion++;
     state = M.play(state, m);
-    render(true);
+    render(true, { staged: true });
     return true;
   }
 
   function reset() {
+    motion++;
     state = { n: 21, pot: new Set([...primes, ...PRODUCTS]), player: [], taxman: [], log: [] };
     render(false);
+  }
+
+  // Name the form on the button: it says what pressing it does.
+  function label() {
+    toggle.textContent = form === 'layers' ? 'Unfold into a loop' : 'Back to layers';
+  }
+
+  // Move to the other form in two beats, through the midway pose.
+  async function unfold() {
+    const mine = ++motion;
+    form = form === 'layers' ? 'loop' : 'layers';
+    label();
+    await render(true, { pose: 'midway' });
+    if (mine === motion) await render(true);
   }
 
   for (const m of PRODUCTS) {
@@ -145,12 +213,13 @@ export function mountLoop(host) {
       }
     });
   }
+  toggle.addEventListener('click', unfold);
   host.querySelector('[data-act="reset"]').addEventListener('click', reset);
+  const asked = (new URLSearchParams(location.search).get('loop') ?? '').split(/[,:]/);
+  if (asked.includes('unfolded')) form = 'loop';
+  label();
   reset();
-  const asked = new URLSearchParams(location.search).get('loop');
-  if (asked) {
-    for (const m of asked.split(',').map(Number)) if (state.pot.has(m) && M.legalMoves(state).includes(m)) state = M.play(state, m);
-    render(false);
-  }
+  for (const m of asked.map(Number)) if (state.pot.has(m) && M.legalMoves(state).includes(m)) state = M.play(state, m);
+  render(false);
   return { highlight: (n, on) => s.highlight(n, on) };
 }
