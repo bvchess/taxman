@@ -2,7 +2,7 @@
 // into the text on a narrow window; the words that move a figure; and the numbers in the prose that put a halo on
 // their mark in a figure.
 
-import { AFTER, ALONG, INTRO, REFERENCE, STORY, hrefOf } from './site.js';
+import { ALONG, INTRO, REFERENCE, STORY, hrefOf } from './site.js';
 import { iconSVG } from './icon.js';
 import { numberSVG } from './vocab.js';
 
@@ -51,7 +51,7 @@ export function contentsHTML({ here = herePage(), part = 'both' } = {}) {
     return href ? link(badge(c, href === here), c.title, href) : unwritten(badge(c, false), c.title);
   }).join('');
   const entries = (list) => list.map((a) => (a.href ? link(a.mark ? `<span class="glyph">${a.mark}</span>` : ALONG_ICON, a.title, a.href) : unwritten(ALONG_ICON, a.title))).join('');
-  const first = `<p class="toc-group">The story</p><ul class="toc">${story}</ul><ul class="toc">${entries(AFTER)}</ul>`;
+  const first = `<p class="toc-group">The story</p><ul class="toc">${story}</ul>`;
   const reference = `<ul class="toc">${entries(REFERENCE)}</ul>`;
   if (part === 'story') return first;
   if (part === 'reference') return reference;
@@ -261,7 +261,7 @@ function mountAsides() {
 function mountChapterNav() {
   const nav = document.querySelector('nav.chapter-nav');
   if (!nav) return;
-  const pages = [INTRO, ...STORY, ...AFTER, ...REFERENCE];
+  const pages = [INTRO, ...STORY, ...REFERENCE];
   const at = pages.findIndex((p) => p.href === herePage());
   if (at < 0) return;
   const name = (p) => (p.n ? `${p.n}. ${p.title}` : p.title);

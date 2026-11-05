@@ -1,6 +1,6 @@
 // The map of the site, in one place: the contents rail, the menu on small screens and the front page's figure of the
 // chapters all draw from these lists, and so do the links at the foot of each page, which lead from each page of the
-// map to the next in this order: INTRO, STORY, AFTER, REFERENCE.  A line is a sentence, with its period.  The story's
+// map to the next in this order: INTRO, STORY, REFERENCE.  A line is a sentence, with its period.  The story's
 // pages follow OUTLINE.md.  An entry without href is not yet written.
 
 /** The story's first entry: the front page, which introduces it.  It has no number; the chapters keep theirs. */
@@ -33,10 +33,10 @@ export const ALONG = [
       optimal game can claim 30 while 6, 10 and 15 are all still in the pot.`,
   },
   {
-    title: 'One search, six games', where: 'games 1,386 to 1,391', id: 'one-search', at: 2, href: 'chain.html#one-search',
+    title: 'One search, eight games', where: 'games 2,512 to 2,519', id: 'one-search', at: 2, href: 'chain.html#one-search',
     line: `A game often poses exactly the search problem of an earlier game and so needs no search of its own.  Game
-      1,386 poses a new one, and games 1,387 to 1,391 all pose it again, so game 1,386’s search was the only one all six
-      needed.`,
+      2,512 poses a new one, and games 2,513 to 2,519 all pose it again: one search serves eight games, more than any
+      other in the chain.`,
   },
   {
     title: 'Not always one best game', where: 'game 425', id: 'game-425', at: 4, href: 'frames.html#game-425',
@@ -48,11 +48,6 @@ export const ALONG = [
     line: `As n grows, the best game wins the player an almost steady share of the board, which Hensley proved lies
       between 50% and about 73%.  It seems to converge to ~<span data-share>62.9%</span>.`,
   },
-];
-
-/** The entry that follows the story in the navigation; one without href is not yet written. */
-export const AFTER = [
-  { title: 'Along the way', line: 'The smaller findings.', href: 'along.html' },
 ];
 
 /** The entries below the navigation's line: the reference pages. */

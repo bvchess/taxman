@@ -12,7 +12,7 @@ import {
   descendingGreedy, finish, frameModel, frames, isOver, isPlayable, legalMoves, maximalFactors, newGame, omega, peel,
   play, primeFactors, properDivisors, replay, score, sources,
 } from '../js/model.js';
-import { AFTER, INTRO, REFERENCE, STORY } from '../js/site.js';
+import { INTRO, REFERENCE, STORY } from '../js/site.js';
 import { fitsFacts, fitsWords, primeFacts, primeWords } from '../figures/fits.js';
 import { slipFacts, slipOfRecord } from '../figures/slip.js';
 import { linkWords, linksFacts } from '../figures/links.js';
@@ -350,7 +350,7 @@ same('linkWords(10)', linkWords(link10),
 // Every page of the map has exactly one empty nav.chapter-nav, which essay.js fills from the map; no page has a
 // hand-written one, and none has a provenance line.  A page outside the map (style.html) has none.
 const webDir = join(repoRoot, 'web');
-const mapped = new Set([INTRO, ...STORY, ...AFTER, ...REFERENCE].map((p) => p.href).filter(Boolean));
+const mapped = new Set([INTRO, ...STORY, ...REFERENCE].map((p) => p.href).filter(Boolean));
 for (const file of readdirSync(webDir).filter((f) => f.endsWith('.html'))) {
   const html = readFileSync(join(webDir, file), 'utf8');
   const navs = [...html.matchAll(/<nav\b[^>]*\bclass="chapter-nav"[^>]*>(.*?)<\/nav>/gs)];
@@ -375,5 +375,5 @@ console.log(
 console.log(`proofs of ${records.length} games, by group: ${groupLine}; by rule: ${ruleLine}`);
 if (runs) {
   const run = (r) => `games ${r.first} to ${r.last} (${r.count} games, ${r.nodes.toLocaleString('en-US')} nodes)`;
-  console.log(`one search: the example ${run(runs.example)}; the longest ${run(runs.longest)}`);
+  console.log(`one search: the longest ${run(runs.longest)}`);
 }

@@ -25,13 +25,9 @@
 /* Two boards side by side, each with the line that says what changed, and the key to the marks under both. */
 .arrival-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 22px; align-items: start; }
 .arrival-pair > figcaption { grid-column: 1 / -1; }
-/* One board, at the size of one of a pair, with its line beside it. */
-.arrival-one { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 22px; align-items: end; }
 .arrival svg { display: block; width: 100%; height: auto; }
 .arrival-says { font-size: 0.86rem; line-height: 1.5; color: var(--ink-2); margin: 6px 2px 0; }
-.arrival-one .arrival-says { margin: 0 0 6px; }
 .arrival-says strong { color: var(--ink); }
-.arrival-n { font-weight: 700; color: var(--ink); margin-right: 0.35em; }
 
 /* The two panels of game rows: each panel's rows, and under them its words. */
 .slip-fig svg { margin: 0 auto; }
@@ -83,8 +79,7 @@
 #cofactor-fig { margin: 18px 0 16px; }
 
 @container essay (max-width: 540px) {
-  .arrival-pair, .arrival-one { grid-template-columns: minmax(0, 1fr); }
-  .arrival-one .arrival-says { margin: 6px 2px 0; order: 2; }
+  .arrival-pair { grid-template-columns: minmax(0, 1fr); }
   .walker .rule-legend { margin-left: 0; }
 }
 

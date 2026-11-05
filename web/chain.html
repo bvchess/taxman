@@ -146,32 +146,26 @@
       end, n can follow, and opt(n) = opt(n − 1) + n.  For n twice a prime, an optimal game of n − 1 plays only its
       largest prime, which exceeds n/2 by Bertrand's postulate, so game n is always at its ceiling.</p>
     </aside>
-    <p>The same holds at every even n whose half an optimal game of n − 1 leaves alone.  When n is twice a prime, it
-    always does.  An optimal game plays only one prime, the largest on its board, and by Bertrand's postulate a prime
-    always lies between n/2 and n.  So n/2 is not the largest prime below n, and it is still in the pot at the end.</p>
+    <p>The same holds at every even n whose half an optimal game of n − 1 leaves alone.</p>
   </div>
 
-  <details class="aside" id="bertrand">
+  <details class="aside" id="twice-a-prime">
     <summary>
       <span class="aside-pin" aria-hidden="true"></span>
-      <span><span class="where">Along the way: Bertrand's postulate</span><span class="title">A prime between m and
-      2m</span></span>
+      <span><span class="where">Along the way: games 4, 6, 10, 14, 22, …</span><span class="title">When n is twice a
+      prime</span></span>
       <span class="open-mark"><span class="closed-word">Open</span><span class="open-word">Close</span></span>
     </summary>
     <div class="aside-body">
-      <p>For every whole number m from 2 up, some prime lies strictly between m and 2m.  For game 14, 13 lies between 7
-      and 14, so 7 is not the largest prime below 14.  Joseph Bertrand guessed the rule in 1845 and checked it for
-      every m below three million.  Pafnuty Chebyshev proved it a few years later, and in 1931 Paul Erdős, then
-      eighteen, found a much simpler proof, which became his first paper.</p>
-      <p>Erdős's proof looks at the middle number of row 2m of Pascal's triangle,
-      <span class="formula">C(2m, m)</span>.  It is the largest of the 2m + 1 numbers in its row, which add up to
-      4<sup>m</sup>, so it is at least <span class="formula">4<sup>m</sup>/(2m + 1)</span>.  If no prime lay between m
-      and 2m, every prime factor of <span class="formula">C(2m, m)</span> would be at most 2m/3, and a careful count of
-      how often each can divide it shows that <span class="formula">C(2m, m)</span> would be at most
-      <span class="formula">(2m)<sup>√(2m)</sup> · 4<sup>2m/3</sup></span>.  For every m from
-      468 on, the two bounds clash.</p>
-      <p>The m below 468 take a chain of primes, each less than twice the one before: 2, 3, 5, 7, 13, 23, 43, 83,
-      163, 317 and 631.  An m from one of them up to the next has the next one between m and 2m.</p>
+      <p>When n is twice a prime p, n always fits.  An optimal game of n − 1 <a href="#prime">plays only one
+      prime</a>, the largest on its board, and that prime is never p, since some prime always lies between p and 2p.
+      So p is left alone, and since it divides nothing else up to n − 1, it is still in the pot at the end.  Then n can
+      follow, paid for by p.</p>
+      <p>Game 14 is one.  An optimal game of 13 opens with 13 and leaves 7 in the pot, and 14 follows, paid for by 7:
+      game 14 scores <span data-opt="13">52</span> + 14 = <span data-opt="14">66</span>, its ceiling.</p>
+      <p>That a prime always lies between m and 2m, for every m from 2 up, is Bertrand's postulate.  Joseph Bertrand
+      guessed it in 1845 and checked it for every m below three million, and Pafnuty Chebyshev proved it a few years
+      later.  In 1931 Paul Erdős, then eighteen, found a much simpler proof, which became his first paper.</p>
     </div>
   </details>
 
@@ -252,8 +246,9 @@
       without U.</p>
     </aside>
     <p>Most games in which n neither fits nor is prime still need no search.  Before the
-    <a class="gloss" href="glossary.html#frame-solver">frame solver</a> searches a game, rules settle most of it, and what
-    is left is the game's search problem: which few numbers up to n/2 to play as moves as well.  Often n does not change
+    <a class="gloss" href="glossary.html#frame-solver">frame solver</a> (<a href="frames.html">chapter 4</a>) searches
+    a game, rules settle most of it, and what is left is the game's search problem: which few numbers up to n/2 to play
+    as moves as well.  Often n does not change
     that problem at all.  Then game n is a <a class="gloss" href="glossary.html#repeat"><em>repeat</em></a>, and the
     earlier game's answer to the problem is game n's answer too.</p>
   </div>
@@ -269,32 +264,25 @@
       opt(n) = opt(n − 1) + n − x, and exchanging x for n maps the optimal sets of n − 1 onto those of n.  In game 39,
       x = 22.</p>
     </aside>
-    <p>Game <span class="n" data-n="39">39</span> = 3 · 13 is one.  It poses the search problem of game 38, and an
-    optimal game of 39 is an optimal game of 38 with one exchange: 39 takes the place of
-    <span class="n" data-n="22">22</span> = 2 · 11.  Game 39's best score is <span data-opt="38">486</span> + 39 − 22 =
-    <span data-opt="39">503</span>, <span data-gap="39">22</span> below its ceiling.  Here a
-    theorem proves the same exchange with no search at all, and it covers every odd n with two prime factors from game
-    189 on.</p>
+    <p>Game 39 is one.  It poses the search problem of game 38, and an optimal game of 39 is an optimal game of 38
+    with one exchange: 39 takes the place of 22.  Game 39's best score is <span data-opt="38">486</span> + 39 − 22 =
+    <span data-opt="39">503</span>, <span data-gap="39">22</span> below its ceiling.  Here a theorem proves the same
+    exchange with no search at all.  It needs an odd n with two prime factors, as 39 = 3 · 13 is, and from game 189 on
+    it covers every one.</p>
   </div>
 
-  <figure class="fig arrival-one" id="arrival-repeat">
-    <div class="arrival" data-board="39"><svg role="img"></svg></div>
-    <p class="arrival-says"></p>
-  </figure>
   <details class="aside" id="one-search" data-toc="one-search">
     <summary>
       <span class="aside-pin" aria-hidden="true"></span>
-      <span><span class="where">Along the way: games 1,386 to 1,391</span><span class="title"></span></span>
+      <span><span class="where">Along the way: games 2,512 to 2,519</span><span class="title"></span></span>
       <span class="open-mark"><span class="closed-word">Open</span><span class="open-word">Close</span></span>
     </summary>
     <div class="aside-body">
-      <p>Games 1,386 to 1,391 all pose the search problem of game 1,386.  Its search explored
-      <span data-run="nodes">278,935</span> nodes, and the next five games needed no search of their own: each is a
-      <a class="gloss" href="glossary.html#repeat">repeat</a> or is at its
-      <a class="gloss" href="glossary.html#ceiling">ceiling</a>.</p>
-      <p>The longest such run in the chain is <span data-run="longestCount">8</span> games,
-      from game <span data-run="longestFirst">2,512</span> to game <span data-run="longestLast">2,519</span>, all
-      resting on one search of <span data-run="longestNodes">8.7 million</span> nodes.</p>
+      <p>Games <span data-run="longestFirst">2,512</span> to <span data-run="longestLast">2,519</span> pose one and
+      the same search problem.  The search of game <span data-run="longestFirst">2,512</span> explored
+      <span data-run="longestNodes">8.7 million</span> nodes, and the next <span data-run="longestOthers">7</span> games
+      needed no search of their own: each is a <a class="gloss" href="glossary.html#repeat">repeat</a>.  No other
+      search in the chain carries as many games.</p>
     </div>
   </details>
 </section>
@@ -443,7 +431,6 @@ import { headStart, loadGames, loadSmall } from './js/data.js';
 import { fmt } from './js/vocab.js';
 import { pct } from './js/chart.js';
 import { RULES, fillOneSearch } from './js/proof.js';
-import { mountArrival } from './figures/arrival.js';
 import { mountFits, mountPrime } from './figures/fits.js';
 import { mountSlip } from './figures/slip.js';
 import { mountLinks } from './figures/links.js';
@@ -464,14 +451,6 @@ const fill = (attr, values) => {
 fill('opt', (n) => fmt(c.score[Number(n) - 1]));
 fill('ceiling', (n) => fmt(c.score[Number(n) - 2] + Number(n)));
 fill('gap', (n) => fmt(c.score[Number(n) - 2] + Number(n) - c.score[Number(n) - 1]));
-
-// The boards beside the prose, each figure under its own name for the numbers in the text.
-for (const fig of document.querySelectorAll('#arrival-repeat')) {
-  const boards = [...fig.querySelectorAll('.arrival')].map((host) => mountArrival(host, data, Number(host.dataset.board), {
-    says: host.querySelector('.arrival-says') ?? fig.querySelector(':scope > .arrival-says'),
-  }));
-  registerFigure(fig.id, { highlight: (x, on) => boards.forEach((b) => b.highlight(x, on)), goState() {} });
-}
 
 for (const id of ['fits-10', 'fits-12']) registerFigure(id, mountFits(document.getElementById(id), data));
 registerFigure('arrival-prime', mountPrime(document.getElementById('arrival-prime'), data));

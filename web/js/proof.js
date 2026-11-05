@@ -80,7 +80,7 @@ function rootsOf(c) {
   return ROOTS.get(c);
 }
 
-/** The game whose search the record of row i rests on: game 1386 for each of games 1386 to 1391. */
+/** The game whose search the record of row i rests on: game 2512 for each of games 2512 to 2519. */
 export const searchOf = (c, i) => rootsOf(c)[i];
 
 const STORE_WORDS = {
@@ -136,34 +136,33 @@ export function oneSearch(c, n) {
   return { first: n, last: Math.max(...games), count: games.length, nodes: c.nodes[n - 1], games };
 }
 
-// The first game of the run the finding names: games 1386 to 1391.
-const EXAMPLE_FIRST = 1386;
-const EXAMPLE_COUNT = 6;
+// The longest run of games on one search, which the words of chain.html name: games 2512 to 2519.
+const LONGEST_FIRST = 2512;
+const LONGEST_COUNT = 8;
 
-/** The run of games the finding names, 1386 to 1391, and the longest run of the chain. */
+/** The longest run of the chain, which must be the one the words name, games 2512 to 2519. */
 export function oneSearchFacts(games) {
   const c = games.columns;
-  const example = oneSearch(c, EXAMPLE_FIRST);
-  const wanted = Array.from({ length: EXAMPLE_COUNT }, (_, k) => EXAMPLE_FIRST + k);
-  if (JSON.stringify(example.games) !== JSON.stringify(wanted)) {
-    const named = `${wanted[0]} to ${wanted.at(-1)}`;
-    throw new Error(`the one search of game ${EXAMPLE_FIRST} carries games ${example.games.join(', ')}, not ${named}`);
-  }
   let longest = null;
   c.n.forEach((n, i) => {
     if (c.method[i] !== 'search' || c.proof[i] !== 'exhausted') return;
     const run = oneSearch(c, n);
     if (!longest || run.count > longest.count) longest = run;
   });
-  return { example, longest };
+  const last = LONGEST_FIRST + LONGEST_COUNT - 1;
+  if (longest.first !== LONGEST_FIRST || longest.count !== LONGEST_COUNT || longest.last !== last) {
+    const named = `${LONGEST_FIRST} to ${last}`;
+    throw new Error(`the longest run is games ${longest.first} to ${longest.last}, not ${named}`);
+  }
+  return { longest };
 }
 
 /** Fill each span data-run="key" with that fact. */
 export function fillOneSearch(games, root = document) {
-  const { example, longest } = oneSearchFacts(games);
+  const { longest } = oneSearchFacts(games);
   const facts = {
-    nodes: nodesWords(example.nodes), longestFirst: fmt(longest.first), longestLast: fmt(longest.last),
-    longestCount: fmt(longest.count), longestNodes: nodesWords(longest.nodes),
+    longestFirst: fmt(longest.first), longestLast: fmt(longest.last), longestCount: fmt(longest.count),
+    longestNodes: nodesWords(longest.nodes), longestOthers: fmt(longest.count - 1),
   };
   for (const s of root.querySelectorAll('[data-run]')) s.textContent = facts[s.dataset.run];
 }

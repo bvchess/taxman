@@ -6,8 +6,8 @@ and ES modules, and need no build step.  [OUTLINE.md](OUTLINE.md) is the plan of
 
 * `index.html` is the introduction, which explains the game.  The chapters of the story follow: `sets.html` (1),
   `chain.html` (2), `top-half.html` (3), `frames.html` (4), `search.html` (5), `trust.html` (6) and `results.html` (7).
-  `along.html` lists the findings along the way, and `glossary.html`, `notation.html` and `about.html` are the reference
-  pages.  `style.html` shows the site's look; no page links it.
+  `glossary.html`, `notation.html` and `about.html` are the reference pages.  `style.html` shows the site's look;
+  no page links it.
 * `css/site.css` holds the look of every page; a page with styles of its own has `css/<page>.css` beside it.
 * `js/` holds the site's modules: `model.js` is the game, the frame model and playability, with names from the
   [glossary](../docs/GLOSSARY.md); `play.js` is the game the reader plays, apart from its board, which

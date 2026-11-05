@@ -83,7 +83,8 @@ chain's end, and this site explains how.
   fraction of a percent is the whole problem, because only a perfect game is optimal, and only a proof shows it is.
 * **How we did it:** the shrinking problem above, as a figure, each step linked to its chapter.
 * **The chain:** the chart of every game: the player's share, and how each game was settled.
-* **Along the way:** the findings as cards, each linked to the chapter that explains it.
+* **Along the way:** the findings as cards, each linked to the chapter that explains it: three factors of tax (40),
+  one search for eight games (2512 to 2519), more moves and fewer points (833) and two optimal sets (425).
 * **Check it yourself:** the data, the programs and the theory on GitHub.
 * **Right column:** the rules precisely, opt(n) and the Taxman sequence (OEIS A019312); the heuristics' claims and how
   they were measured (`heuristics/README.md`); how to check the chain; what supports the scores (proven outright to
@@ -137,8 +138,8 @@ optimal game over game n's, where n fits (10) and where it does not (12), each a
 **Right column.**  The prime lemma (N1), monotonicity (N3), the ceiling lemma (N4), the prime formula (N5), the step
 theorem (N6), the half lemma (N7), the semiprime formula (J3), the repeat lemma (R6, its last part given U).
 
-**Asides.**  *A prime between m and 2m:* Bertrand's postulate, which the half lemma needs, and Erdős's proof.  *One
-search, six games:* games 1386 to 1391 all rest on one search.
+**Asides.**  *When n is twice a prime:* n always fits, since Bertrand's postulate puts a prime between n/2 and n;
+game 14.  *One search, eight games:* games 2512 to 2519 all rest on one search, the longest such run.
 
 ### 3. The top half
 
@@ -239,11 +240,6 @@ opt(n).
 
 **Right column.**  Hensley (1988), Franklín and Moniot (2023), OEIS A019312, `results/README.md`, the verifiers'
 commands, the open questions (`docs/theory/statements.md#open-questions`).
-
-## Along the way
-
-An index of the findings, each a card linked to the page that explains it: three factors of tax (40), one search for six
-games (1386 to 1391), more moves and fewer points (833), two optimal sets (425), and the player's share.
 
 ## Glossary
 

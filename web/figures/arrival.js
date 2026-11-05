@@ -10,7 +10,6 @@
 // prime takes the place of the largest prime below it.
 
 import * as M from '../js/model.js';
-import { scene } from '../js/scene.js';
 import { fmt, listWords } from '../js/vocab.js';
 import { isPrime, recordWords, ruleOf, searchOf } from '../js/proof.js';
 
@@ -137,18 +136,4 @@ export function arrivalWords(f, { record = false, short = false } = {}) {
     proof = `<span class="walk-record">Proved in the chain ${how}.</span>`;
   }
   return `<strong>${lead}</strong> ${text}${proof ? ` ${proof}` : ''}`;
-}
-
-/** Draw game n's board, static, into host's <svg>, and say what changed in says, by default host's .arrival-says. */
-export function mountArrival(host, data, n, { says = host.querySelector('.arrival-says') } = {}) {
-  const f = arrival(data, n);
-  const rows = Math.ceil(n / COLS);
-  const { width, height } = boardSize(rows);
-  const svg = host.querySelector('svg');
-  const plain = arrivalWords(f, { short: true }).replace(/<[^>]+>/g, '');
-  const sc = scene(svg, { width, height, label: `The board of game ${n}. ${plain}` });
-  for (let x = 1; x <= n; x++) sc.number(x, x);
-  sc.states([boardLooks(f)]).show(0);
-  if (says) says.innerHTML = `<strong>Game ${n}.</strong> ${arrivalWords(f, { short: true })}`;
-  return { facts: f, highlight: (x, on) => sc.highlight(x, on) };
 }
