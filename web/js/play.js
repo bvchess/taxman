@@ -6,8 +6,9 @@
 // took, and at the end compares the score with opt(n).
 //
 // A figure gives the game its board, which draws the state and calls take(x) when the reader takes x: figures/game.js
-// draws the pot and the two trays, figures/graph-game.js the maximal-factor graph.  board(context) makes the board,
-// where context is { you, take, minN, maxN, playing }, and playing() says whether an optimal game is being played.
+// draws the pot of sockets and the two trays, figures/graph-game.js the maximal-factor graph as the pot, over the same
+// two trays (js/trays.js).  board(context) makes the board, where context is { you, take, minN, maxN, playing }, and
+// playing() says whether an optimal game is being played.
 // The board has
 //   html           its markup, which goes between the controls and the caption, with the scores in .player .score and
 //                  .taxman .score

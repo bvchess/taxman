@@ -502,16 +502,11 @@ figure { margin: 30px 0 34px; }
 @keyframes nudge { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 .piece.is-refused svg { animation: nudge 0.28s 2; }
 
-/* The game on the maximal-factor graph (figures/graph-game.js): the board is one tray, and its header holds the two
-   scores, since the graph itself shows who has what.  graph-game.js gives the board the height of game n at the
-   present width. */
+/* The game on the maximal-factor graph (figures/graph-game.js): the pot is the graph, in a tray of its own above the
+   two trays of the main game.  graph-game.js gives the pot the height of game n at the present width.  A number that
+   leaves the pot, and the lines that touch it, are gone from the graph. */
 .graph-board { padding-bottom: 4px; }
-.graph-board header .player, .graph-board header .taxman { display: inline-flex; align-items: baseline; gap: 10px; }
-.graph-board header .score { font-size: 1.1rem; }
-.graph-board .player .who { color: var(--player-ink); }
-.graph-board .player .who::before { background: var(--player); }
-.graph-board .taxman .who { color: var(--taxman-ink); }
-.graph-board .taxman .who::before { background: var(--taxman); border-radius: 2px; }
+.graph-board .is-gone { visibility: hidden; }
 .graph-wrap svg { display: block; }
 .graph-board .tk.is-stuck { cursor: not-allowed; }
 .graph-board .tk.is-takeable.is-pointed .tk-hover { transform: translateY(-4px); }

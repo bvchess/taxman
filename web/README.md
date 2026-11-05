@@ -11,7 +11,7 @@ and ES modules, and need no build step.  [OUTLINE.md](OUTLINE.md) is the plan of
 * `css/site.css` holds the look of every page; a page with styles of its own has `css/<page>.css` beside it.
 * `js/` holds the site's modules: `model.js` is the game, the frame model and playability, with names from the
   [glossary](../docs/GLOSSARY.md); `play.js` is the game the reader plays, apart from its board, which
-  `figures/game.js` and `figures/graph-game.js` draw; `proof.js` is the one place that knows how each game was proven
+  `figures/game.js` and `figures/graph-game.js` draw, over the two trays of `trays.js`; `proof.js` is the one place that knows how each game was proven
   (its rule and its group, from `data/games.json` alone); `site.js` lists the pages, and every navigation draws from it.
 * `figures/` holds one file for each figure, `css/` and `fonts/` the look.
 * `data/` holds `games.json`, a column for every field of every game in the chain, and `small.json`, the moves and

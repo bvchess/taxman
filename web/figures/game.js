@@ -8,15 +8,14 @@
 // URL parameter: game=N or game=N:m1,m2,... opens game N with those moves played.
 
 import { mountPlay, shapeOf } from '../js/play.js';
-import { MOTION, numberSVG, reducedMotion, restyle } from '../js/vocab.js';
-
-const EASE = MOTION.settleCSS; // out, with a little overshoot: a raised token is set down
+import { glide, makePiece, reserveRows, traysHTML } from '../js/trays.js';
+import { reducedMotion, restyle } from '../js/vocab.js';
 
 export function mountGame(host, { small, n = 10, minN = 2, maxN = 30, param = 'game', you = 'You' }) {
   return mountPlay(host, { small, n, minN, maxN, param, you, board: trays });
 }
 
-// The board of the pot and the two trays.
+// The board of the pot and the two trays (js/trays.js).
 function trays({ you, take }) {
   let host;
   let potGrid;
@@ -37,11 +36,7 @@ function trays({ you, take }) {
     for (let x = 1; x <= n; x++) {
       const socket = document.createElement('div');
       socket.className = 'socket';
-      const piece = document.createElement('button');
-      piece.type = 'button';
-      piece.className = 'piece';
-      piece.dataset.n = x;
-      piece.appendChild(numberSVG(x, { rendering: 'raised', looks: [shapeOf(n, x)], size: 50, pad: 3 }));
+      const piece = makePiece(x, shapeOf(n, x));
       piece.addEventListener('click', () => take(x));
       socket.appendChild(piece);
       potGrid.appendChild(socket);
@@ -94,24 +89,8 @@ function trays({ you, take }) {
         restyle(svg, ...looks);
         continue;
       }
-      const a = before.get(x);
-      const b = p.getBoundingClientRect();
       const delay = k === 0 ? 0 : 170 + 120 * (k - 1);
-      p.classList.add('is-moving');
-      const travel = p.animate(
-        [{ transform: `translate(${a.left - b.left}px, ${a.top - b.top}px)` }, { transform: 'none' }],
-        { duration: MOTION.move, delay, easing: EASE, fill: 'backwards' },
-      );
-      travel.onfinish = () => p.classList.remove('is-moving');
-      // Lifted on the way, and a tile taken as a move flips over halfway.
-      const flips = was.split('/')[0] !== shape;
-      svg.animate(
-        flips
-          ? [{ transform: 'scale(1,1)' }, { transform: 'translateY(-10px) scale(0.05,1.08)', offset: 0.45 }, { transform: 'scale(1,1)' }]
-          : [{ transform: 'scale(1)' }, { transform: 'translateY(-8px) scale(1.08)', offset: 0.4 }, { transform: 'scale(1)' }],
-        { duration: MOTION.move, delay, easing: 'ease-in-out', fill: 'backwards' },
-      );
-      setTimeout(() => restyle(svg, ...looks), delay + (flips ? 280 : 200));
+      glide(p, { from: before.get(x), delay, flips: was.split('/')[0] !== shape, looks });
     }
     $('.pot-sum').textContent = state.pot.size ? `${state.pot.size} left` : 'empty';
   }
@@ -123,11 +102,8 @@ function trays({ you, take }) {
     p.classList.add('is-refused');
   }
 
-  // The fullest tray: the taxman may hold every number but one.
   function reserve() {
-    const slot = potGrid.querySelector('.socket').getBoundingClientRect();
-    const perRow = Math.max(1, Math.floor(taxmanSlots.clientWidth / slot.width));
-    host.style.setProperty('--tray-rows', Math.ceil((n - 1) / perRow));
+    reserveRows(host, taxmanSlots, n);
   }
 
   return {
@@ -136,10 +112,7 @@ function trays({ you, take }) {
       <header><span>The pot</span><span class="pot-sum"></span></header>
       <div class="pot-grid" role="group" aria-label="The pot"></div>
     </div>
-    <div class="trays">
-      <div class="tray-box player"><header><span class="who">${you}</span><span class="score">0</span></header><div class="slots" role="group" aria-label="${you === 'You' ? 'Your numbers' : 'The player’s numbers'}"></div></div>
-      <div class="tray-box taxman"><header><span class="who">Taxman</span><span class="score">0</span></header><div class="slots" role="group" aria-label="The taxman’s numbers"></div></div>
-    </div>`,
+    ${traysHTML(you)}`,
     mount(h) {
       host = h;
       potGrid = $('.pot-grid');
