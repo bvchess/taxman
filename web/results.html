@@ -30,8 +30,8 @@
     <p>Choose any game of the <a class="gloss" href="glossary.html#chain">chain</a>.  The explorer shows what the chain
     records for it: what the player and the taxman each collect in its
     <a class="gloss" href="glossary.html#optimal-game">optimal game</a>, how the game was proven, how many
-    <a class="gloss" href="glossary.html#promote">promotions</a> it makes, and what its
-    <a class="gloss" href="glossary.html#search">search</a> cost.  For the games up to 100 it draws the game itself, on
+    <a class="gloss" href="glossary.html#promote">promotions</a> the optimal game makes, and what its
+    <a class="gloss" href="glossary.html#search">search</a> cost.  For the games up to 100 it draws the optimal game itself, on
     its <a class="gloss" href="glossary.html#board">board</a>.</p>
   </div>
 
@@ -42,7 +42,7 @@
       <div class="note-head"><span class="note-name">A game’s record, precisely</span></div>
       <p>The record is the game’s line of the results file.  Its <code>in_the_bag</code> is ΣU*, the score with no
       promotions, and its time is <code>seconds.total</code>, on the machine of its run: a laptop to game 2,175, larger
-      machines past it.  A game of the prime formula or of the bounds store sets up no frames, so it records no ΣU*
+      machines past it.  A game proved by the prime formula or by the bounds store sets up no frames, so it records no ΣU*
       and no <a class="gloss" href="glossary.html#candidate">candidates</a>
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#a-results-line---out-schema-5">the
       frame solver’s reference</a>; <a href="https://github.com/bvchess/taxman/blob/master/results/runs.md">the
