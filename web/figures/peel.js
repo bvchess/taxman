@@ -3,7 +3,9 @@
 // joined by a thin line to each factor it can pay with.  The time slider steps through one run of peel, one pair a
 // step: the pair is drawn with the thick line of a payment, both leave the play and go hollow, and a label names the
 // kind of step, "one way to pay" for a front move (beside the number) or "one taker" for a back move (beside the
-// factor).  At the end every number is paired, in the player's and the taxman's colors, as in the orders figure.
+// factor).  The line grows from the end that acts: from the number to its factor for a front move, from the factor to
+// its number for a back move.  At the end every number is paired, in the player's and the taxman's colors, as in the
+// orders figure.
 //
 // The set and the game come from data/small.json, and the run is js/model.js's peel, choosing its steps: first the
 // four the text walks through, then back moves, then the rest.  The pairs are checked against the payments of the
@@ -109,7 +111,10 @@ export function mountPeel(host, { small }) {
   for (const m of f.set) s.number(m, m);
   for (const x of f.pool) s.number(x, x);
   for (const [m, x] of edges) s.line(`e${m}-${x}`, m, x, 'thin');
-  for (const st of steps) s.line(`p${st.member}`, st.member, st.factor, 'pay');
+  for (const st of steps) {
+    const [from, to] = st.kind === 'front' ? [st.member, st.factor] : [st.factor, st.member];
+    s.line(`p${st.member}`, from, to, 'pay');
+  }
   steps.forEach((st, i) => s.text(`kind${i}`, KIND[st.kind], { anchor: st.kind === 'front' ? 'end' : 'start' }));
   // The heads face each other over the two columns, the factors' in two lines, so that it fits a phone.
   s.text('headSet', 'the set', { kind: 'name', anchor: 'end' });
@@ -143,7 +148,7 @@ export function mountPeel(host, { small }) {
     }
     steps.forEach((st, i) => {
       if (i < k) v[`p${st.member}`] = i === k - 1 && newest ? { at: [0.05, 0.55] } : {};
-      else if (i === k) v[`p${st.member}`] = { draw: 0 }; // drawn from the number to its factor in the next step
+      else if (i === k) v[`p${st.member}`] = { draw: 0 }; // grows from the acting end in the next step
     });
     if (newest) {
       const i = k - 1;
