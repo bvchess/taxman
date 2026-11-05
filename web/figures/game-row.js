@@ -1,4 +1,5 @@
-// A game of n drawn as a row of moves, each over its tax, and at the right of the row what is left in the pot.  The
+// A game of n drawn as a row of moves, each over its tax, and at the right of the row what is left in the pot.  A
+// header line above the row names the moves at the left and, at the right, the numbers left out.  The
 // moves are the player's (blue circles), their tax the taxman's (orange squares), joined by the thick line of a payment
 // (as in figures/game40.js); a move that takes several numbers stacks them.  The numbers left in the pot at the end are
 // out of focus, as in figures/arrival.js: a dashed circle for a number above n/2 and a square for one up to n/2, and a
@@ -17,6 +18,7 @@ export const MOVE_Y = 22;
 export const TAX_Y = 68;
 export const TAX_STEP = 32;
 export const POT_GAP = 0.6; // the gap, in columns, between the moves and the pot
+export const HEADER_H = 26; // the room above a row for its header line
 
 /** A game of n played with the moves, in order: { n, moves, turns: [{ move, tax }], rest, score }, rest being what the
  *  taxman takes at the end.  Throws if a move is illegal. */
@@ -62,21 +64,31 @@ export function potLook(x, n, { given = false } = {}) {
 /** The numbers to register in a scene for a row: its moves, their taxes and what is left. */
 export const numbersOf = (row) => [...row.turns.flatMap((t) => [t.move, ...t.tax]), ...row.rest];
 
-/** Register the marks of row in scene s: its numbers and a payment line from each move to its last tax. */
-export function addRow(s, row, tag = '') {
+/** Register the marks of row in scene s: its numbers and a payment line from each move to its last tax.  header says
+ *  what its header line holds: { name, out }, the label over the moves (none if absent) and whether the label "left
+ *  out" stands over the pot (rowLooks puts them in place). */
+export function addRow(s, row, tag = '', header = {}) {
+  if (header.name) s.text(`${tag}name`, header.name, { kind: 'name' });
+  if (header.out) s.text(`${tag}out`, 'left out', { kind: 'name' });
   for (const x of numbersOf(row)) s.number(idOf(tag, x), x);
   for (const t of row.turns) s.line(payId(tag, t.move), idOf(tag, t.move), idOf(tag, t.tax[t.tax.length - 1]), 'pay');
 }
 
 /** The looks of a row's marks, an object to put into a state.
  *    slots   the move at each column (null for an empty column): a row's moves stand in the columns of their slots
- *    left    the x where column 0 begins;  top, the y of the row's moves;  tag, the prefix of its ids
- *    halo    the numbers that wear a halo
- *    pot     the column at which the pot's first number stands (default: after the last slot) */
+ *    left    the x where column 0 begins;  top, the y where the row begins, under its header line;  tag, the prefix of
+ *            its ids
+ *    halo    the numbers that wear a halo;  given, the numbers of the pot that are moves given up
+ *    pot     the column at which the pot's first number stands (default: after the last slot)
+ *    header  the header line addRow was given: its label stands at the row's left, "left out" over the pot */
 export function rowLooks(row, {
-  slots, left = PAD, top = 0, tag = '', halo = new Set(), pot = slots.length + POT_GAP,
+  slots, left = PAD, top = 0, tag = '', halo = new Set(), given = new Set(), pot = slots.length + POT_GAP,
+  header = {},
 }) {
   const looks = {};
+  const heading = (id, column) => ({ [`${tag}${id}`]: { x: left + COLUMN * column + 3, y: top - HEADER_H / 2 } });
+  if (header.name) Object.assign(looks, heading('name', 0));
+  if (header.out) Object.assign(looks, heading('out', pot));
   const wear = (x) => (halo.has(x) ? { halo: 1 } : {});
   for (const t of row.turns) {
     const c = slots.indexOf(t.move);
@@ -89,7 +101,8 @@ export function rowLooks(row, {
     looks[payId(tag, t.move)] = {};
   }
   row.rest.forEach((x, k) => {
-    looks[idOf(tag, x)] = { ...potLook(x, row.n), x: columnX(pot + k, left), y: top + MOVE_Y, ...wear(x) };
+    const look = potLook(x, row.n, { given: given.has(x) });
+    looks[idOf(tag, x)] = { ...look, x: columnX(pot + k, left), y: top + MOVE_Y, ...wear(x) };
   });
   return looks;
 }

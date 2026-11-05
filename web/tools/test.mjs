@@ -13,7 +13,7 @@ import {
   play, primeFactors, properDivisors, replay, score, sources,
 } from '../js/model.js';
 import { AFTER, INTRO, REFERENCE, STORY } from '../js/site.js';
-import { fitsFacts, fitsWords } from '../figures/fits.js';
+import { fitsFacts, fitsWords, primeFacts, primeWords } from '../figures/fits.js';
 import { slipFacts, slipOfRecord } from '../figures/slip.js';
 import { GROUPS, RULES, oneSearchFacts, settled } from '../js/proof.js';
 import { readResults, repoRoot } from './results.mjs';
@@ -310,6 +310,24 @@ for (const [n, fits, below, words] of [[10, true, [7, 9, 6, 8, 10], '30 + 10 = 4
   same(`fitsWords(${n}) ends with the scores`, fitsWords(f).endsWith(words), true);
 }
 same('fitsFacts(12): the columns of both rows', fitsFacts(smallGames, 12).slots, [11, 9, 6, 10, 8, 12]);
+same('fitsWords(10) says what the game above leaves out', fitsWords(fitsFacts(smallGames, 10)),
+  "<strong>10 fits.</strong> Game 9's optimal game leaves 5 out, and 10 follows it, paid for by 5: 30 + 10 = 40, the ceiling.");
+same('slipFacts(12): its maximal factors', slip12.factors, [4, 6]);
+const prime13 = primeFacts(smallGames, 13);
+same('primeFacts(13): q, the rows, what n takes', [prime13.q, prime13.above.moves, prime13.below.moves, prime13.tax],
+  [11, [11, 9, 10, 8, 12], [13, 9, 10, 8, 12], [1]]);
+same('primeFacts(13): the scores', [prime13.above.score, prime13.below.score], [50, 52]);
+same('primeFacts(13): the columns of each row', prime13.slots, [[11, 9, 10, 8, 12], [13, 9, 10, 8, 12]]);
+same('primeWords(13)', primeWords(prime13),
+  '<strong>13 is a prime.</strong>  Its only maximal factor is 1, so it can only be the first move.  It takes the '
+  + "place of 11, the first move of game 12's optimal game, and every other move stays the same: 50 + 13 − 11 = 52.");
+let notPrime = null;
+try {
+  primeFacts(smallGames, 12);
+} catch (e) {
+  notPrime = e.message;
+}
+same('primeFacts(12) throws: 12 is not a prime', notPrime, 'prime panel of 12: n is not a prime');
 
 // --- The links at the foot of each page (js/site.js, js/essay.js) ---------------------------------------------------
 

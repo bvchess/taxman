@@ -156,8 +156,8 @@
   <figure class="fig arrival-pair game-rows" id="arrival-fits">
     <div class="arrival" data-board="10"><svg role="img"></svg><p class="arrival-says"></p></div>
     <div class="arrival" data-board="12"><svg role="img"></svg><p class="arrival-says"></p></div>
-    <figcaption class="fig-caption">Each row is a game: each move over the tax it takes, and at the right what is left
-    in the pot.  A halo marks what n uses and what changes from game n − 1 to game n.</figcaption>
+    <figcaption class="fig-caption">Each row is a game, each move over the tax it takes.  A halo marks what n uses and
+    what changes from game n − 1 to game n.</figcaption>
   </figure>
 </section>
 
@@ -198,9 +198,8 @@
     = <span data-opt="13">52</span>.</p>
   </div>
 
-  <figure class="fig arrival-one" id="arrival-prime">
-    <div class="arrival" data-board="13"><svg role="img"></svg></div>
-    <p class="arrival-says"></p>
+  <figure class="fig arrival-pair game-rows" id="arrival-prime">
+    <div class="arrival" data-board="13"><svg role="img"></svg><p class="arrival-says"></p></div>
   </figure>
 </section>
 
@@ -410,7 +409,7 @@ import { fmt, listWords } from './js/vocab.js';
 import { pct } from './js/chart.js';
 import { RULES, fillOneSearch } from './js/proof.js';
 import { mountArrival } from './figures/arrival.js';
-import { mountFits } from './figures/fits.js';
+import { mountFits, mountPrime } from './figures/fits.js';
 import { mountSlip } from './figures/slip.js';
 import { mountWalker } from './figures/walker.js';
 import { mountSettled } from './figures/settled.js';
@@ -432,7 +431,7 @@ fill('gap', (n) => fmt(c.score[Number(n) - 2] + Number(n) - c.score[Number(n) - 
 fill('set', (n) => listWords([...small[Number(n) - 1].moves].sort((a, b) => a - b)));
 
 // The boards beside the prose, each figure under its own name for the numbers in the text.
-for (const fig of document.querySelectorAll('#arrival-prime, #arrival-repeat')) {
+for (const fig of document.querySelectorAll('#arrival-repeat')) {
   const boards = [...fig.querySelectorAll('.arrival')].map((host) => mountArrival(host, data, Number(host.dataset.board), {
     says: host.querySelector('.arrival-says') ?? fig.querySelector(':scope > .arrival-says'),
   }));
@@ -440,6 +439,7 @@ for (const fig of document.querySelectorAll('#arrival-prime, #arrival-repeat')) 
 }
 
 registerFigure('arrival-fits', mountFits(document.getElementById('arrival-fits'), data));
+registerFigure('arrival-prime', mountPrime(document.getElementById('arrival-prime'), data));
 registerFigure('slip', mountSlip(document.getElementById('slip'), data));
 
 // The walk through the first hundred games, and its counts.
