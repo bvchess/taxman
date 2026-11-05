@@ -15,6 +15,7 @@ import {
 import { AFTER, INTRO, REFERENCE, STORY } from '../js/site.js';
 import { fitsFacts, fitsWords, primeFacts, primeWords } from '../figures/fits.js';
 import { slipFacts, slipOfRecord } from '../figures/slip.js';
+import { linkWords, linksFacts } from '../figures/links.js';
 import { GROUPS, RULES, oneSearchFacts, settled } from '../js/proof.js';
 import { readResults, repoRoot } from './results.mjs';
 
@@ -328,6 +329,21 @@ try {
   notPrime = e.message;
 }
 same('primeFacts(12) throws: 12 is not a prime', notPrime, 'prime panel of 12: n is not a prime');
+
+// --- The chain of bounds (figures/links.js) -------------------------------------------------------------------------
+
+const links = linksFacts(smallGames);
+const [link12, link10] = [links.find((l) => l.n === 12), links.find((l) => l.n === 10)];
+same('linksFacts: games 2 to 16', links.map((l) => l.n), Array.from({ length: 15 }, (_, i) => i + 2));
+const shape = (l) => [l.from, l.ceiling, l.opt, l.atCeiling];
+same('linksFacts(12): from, ceiling, opt', shape(link12), [44, 56, 50, false]);
+same('linksFacts(10): game 10 is at its ceiling', shape(link10), [30, 40, 40, true]);
+same('linksFacts: every game has from < opt <= ceiling', links.every((l) => l.from < l.opt && l.opt <= l.ceiling),
+  true);
+same('linkWords(12)', linkWords(link12),
+  "Game 12's link runs from opt(11) = 44 up to its ceiling, 44 + 12 = 56, and opt(12) = 50.");
+same('linkWords(10)', linkWords(link10),
+  "Game 10's link runs from opt(9) = 30 up to its ceiling, 30 + 10 = 40, and opt(10) = 40 is at the top.");
 
 // --- The links at the foot of each page (js/site.js, js/essay.js) ---------------------------------------------------
 

@@ -116,8 +116,9 @@ points:* in game 833 every optimal game makes 362 moves, but a game can make 363
 
 **Point.**  Most games are easy if you know an optimal game of the one before.
 
-* Game n − 1's games are games of n, so the score never falls.  Removing n from a game of n leaves a game of n − 1, so
-  it rises by at most n: the ceiling.
+* Game n − 1's games are games of n, and n slips into one, so the score always rises.  Removing n from a game of n
+  leaves a game of n − 1, so it rises by at most n: the ceiling.  The two bounds tie each game to the one before, and
+  the games hang together like the links of a chain.
 * When an optimal set of n − 1 still plays with n added, game n is at its ceiling, and done.
 * At a prime n, swap the old largest prime for n: the prime formula.
 * Often game n poses exactly the search problem of the game before it, and that game's answer carries over: a repeat.
@@ -129,13 +130,15 @@ points:* in game 833 every optimal game makes 362 moves, but a game can make 363
 **Examples.**  Games 9 to 13, small enough to follow by hand: game 12 from game 11 in the opening, 10 fits, 12 does not,
 and 13 is a prime.  The repeat is game 39, which the semiprime formula also settles.
 
-**Figures.**  Adding n to an optimal game of n − 1, animated, with the case where it fits and the case where it does
-not.  The prime swap.  A strip over n of how each game was settled.
+**Figures.**  Game 12 built from game 11's optimal game, animated.  The chain of bounds, games 1 to 16.  Game n − 1's
+optimal game over game n's, where n fits (10) and where it does not (12), each after its paragraph.  The prime swap
+(13), in the same rows.  A strip over n of how each game was settled.
 
 **Right column.**  The prime lemma (N1), monotonicity (N3), the ceiling lemma (N4), the prime formula (N5), the step
 theorem (N6), the half lemma (N7), the semiprime formula (J3), the repeat lemma (R6, its last part given U).
 
-**Asides.**  *One search, six games:* games 1386 to 1391 all rest on one search.
+**Asides.**  *A prime between m and 2m:* Bertrand's postulate, which the half lemma needs, and Erdős's proof.  *One
+search, six games:* games 1386 to 1391 all rest on one search.
 
 ### 3. The top half
 

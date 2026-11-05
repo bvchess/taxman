@@ -41,6 +41,23 @@
 .arrival-pair.game-rows.is-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .game-rows .arrival svg { margin: 0 auto 0 0; }
 
+/* ---- the chain of bounds ---------------------------------------------------------------------------------------- */
+
+.links-fig svg { touch-action: pan-y; }
+.links-fig svg:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 4px; border-radius: 4px; }
+.link-bar { fill: var(--wash); stroke: var(--ink-3); stroke-width: 1.25; }
+.link-bar.is-selected { fill: var(--faint); stroke: var(--ink); stroke-width: 2; }
+.link-wire { stroke: var(--ink-3); stroke-width: 1; }
+.link-dot { fill: var(--ink); }
+.link-dot.is-selected { stroke: var(--paper); stroke-width: 1.5; }
+.link-hit { fill: transparent; cursor: pointer; }
+.link-box { fill: var(--paper); stroke: var(--faint); stroke-width: 1; }
+.chart .link-title { font-weight: 700; }
+.chart .link-label {
+  font-size: 12px; font-weight: 600; fill: var(--ink); pointer-events: none;
+  paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round;
+}
+
 /* ---- the walk ------------------------------------------------------------------------------------------------- */
 
 .walker { position: relative; max-width: var(--measure); }
