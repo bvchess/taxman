@@ -82,9 +82,9 @@
       only 1.  A move is legal exactly when one of its maximal factors is still in the pot.</dd>
       <dt id="maximal-factor-graph">maximal-factor graph</dt>
       <dd>The board drawn as a directed graph, with an edge from each number to each of its maximal factors.  Every
-      edge leads to a smaller number, so the figures draw the edges as lines without arrowheads.  A move is legal
-      exactly when one of its edges leads to a number still in the pot, and its tax is everything still in the pot
-      that it reaches along its edges.</dd>
+      edge leads to a smaller number, so the figures draw the edges as lines without arrowheads.  Each number taken
+      leaves the graph with its edges.  A move is legal exactly when it still has an edge, and its tax is everything
+      it still reaches along its edges.</dd>
       <dt id="pays-for">pays for</dt>
       <dd>A maximal factor of a move, still in the pot when the move is made, <em>pays for</em> it.  Two moves can
       never share a payment.</dd>

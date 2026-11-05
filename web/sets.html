@@ -82,9 +82,12 @@
       <p>The maximal-factor graph of game n is a directed graph, with an edge from each number x to each of its
       maximal factors.  Every edge leads to a smaller number, so the figures draw the edges as lines without
       arrowheads; in the board below, every edge runs one column to the right.  The divisors of x are exactly the
-      numbers that x reaches along its edges, so the tax of a move is what it reaches that is still in the pot.  By the
-      lifting lemma, a move is legal when one of its edges leads to a number still in the pot.  The columns are the
-      numbers' <a class="gloss" href="glossary.html#layer">layers</a>.</p>
+      numbers that x reaches along its edges.  The columns are the numbers'
+      <a class="gloss" href="glossary.html#layer">layers</a>.</p>
+      <p>As the game is played, each number taken leaves the graph with its edges, so the board shows the graph of the
+      numbers still in the pot.  By the lifting lemma, x still reaches each of its divisors left in the pot through
+      numbers left in the pot.  So the tax of a move is everything it reaches on the board, and a move is legal exactly
+      when it still has an edge.</p>
       <p>The graph is the <em>Hasse diagram</em> of divisibility on {1, …, n}.  The Hasse diagram of an order has an
       edge from each element to each element directly below it, and is drawn so that every edge points the same way,
       which is why it needs no arrowheads.  A divisor d of x is directly below x when no third number is a multiple of
