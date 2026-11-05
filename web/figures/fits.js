@@ -1,8 +1,8 @@
 // Does n fit?  Two panels of game rows, one for a game n that fits and one for a game n that does not: each shows the
 // optimal game of game n − 1, above, and a game of n, below, in the same columns, each move over its tax and at the
-// right what is left in the pot (figures/game-row.js).  When n fits, the game below is the one above with n played last,
-// paid for by a number the game above left in the pot.  When it does not, it is game n's optimal game, which gives up a
-// move of the game above so that the move can pay for n.  A halo marks what n uses and what changes.  A flat figure.
+// right what is left in the pot (figures/game-row.js).  When n fits, the game below is the one above with n played
+// last, paid for by a number the game above left in the pot.  When it does not, it is game n's optimal game, which gives
+// up a move of the game above so that the move can pay for n.  A halo marks what n uses and what changes.  A flat figure.
 //
 // The games are data/small.json's, and the panels' words are worked out from them: whether n fits is decided by
 // peel (js/model.js, isPlayable), the maximal factors of n by js/model.js, the taxes and the scores by replaying the
@@ -32,7 +32,9 @@ export function fitsFacts(small, n) {
   };
   if (prev?.n !== n - 1 || cur?.n !== n) fail('small.json has no games n − 1 and n');
   const fits = M.isPlayable([...prev.moves, n]);
-  if (fits !== (cur.score === prev.score + n)) fail(`n ${fits ? 'fits' : 'does not fit'}, but game ${n} scores ${cur.score}`);
+  if (fits !== (cur.score === prev.score + n)) {
+    fail(`n ${fits ? 'fits' : 'does not fit'}, but game ${n} scores ${cur.score}`);
+  }
   const above = gameRow(n - 1, prev.moves);
   if (above.score !== prev.score) fail(`game ${n - 1}'s record scores ${prev.score}`);
   let below;
@@ -65,9 +67,11 @@ export function fitsWords(f) {
     return `<strong>${n} fits.</strong> Game ${n - 1}'s optimal game leaves ${listWords(tax)} in the pot, and ${n} `
       + `follows it, paid for by ${listWords(tax)}: ${fmt(prev.score)} + ${n} = ${fmt(cur.score)}, the ceiling.`;
   }
-  return `<strong>${n} does not fit.</strong> Only ${listWords(uses)}, its maximal factors, can pay for it, and in game `
-    + `${n - 1}'s optimal game ${uses.map((x) => standing(above, x)).join(' and ')}.  Game ${n}'s optimal game gives up `
-    + `${listWords(gaveUp)}, which pays for ${n}: ${fmt(prev.score)} + ${n} − ${gaveUp.join(' − ')} = ${fmt(cur.score)}.`;
+  const how = uses.map((x) => standing(above, x)).join(' and ');
+  const score = `${fmt(prev.score)} + ${n} − ${gaveUp.join(' − ')} = ${fmt(cur.score)}`;
+  return `<strong>${n} does not fit.</strong> Only ${listWords(uses)}, its maximal factors, can pay for it, and in `
+    + `game ${n - 1}'s optimal game ${how}.  Game ${n}'s optimal game gives up ${listWords(gaveUp)}, which pays for `
+    + `${n}: ${score}.`;
 }
 
 const rowName = (row) => `Game ${row.n}`;
@@ -91,9 +95,11 @@ export function mountFits(fig, { small }) {
   const width = rowWidth(columns, pot);
   const scenes = panels.map(({ host, f }) => {
     const words = fitsWords(f);
-    const block = NAME_H + rowHeight([f.above, f.below]) + ROWS_GAP;
+    // Each row is as tall as its own longest tax, so the gap under every row is the same.
+    const heights = [f.above, f.below].map((row) => NAME_H + rowHeight([row]) + ROWS_GAP);
+    const tops = [0, heights[0]];
     const s = scene(host.querySelector('svg'), {
-      width, height: 2 * block - ROWS_GAP, className: 'is-dense',
+      width, height: heights[0] + heights[1] - ROWS_GAP, className: 'is-dense',
       label: `${rowName(f.above)} and game ${f.n}, each move over the tax it takes. ${plain(words)}`,
     });
     const halo = { a: new Set(f.uses), b: new Set([f.n, ...f.tax]) };
@@ -101,8 +107,8 @@ export function mountFits(fig, { small }) {
     [['a', f.above], ['b', f.below]].forEach(([tag, row], i) => {
       addRow(s, row, tag);
       s.text(`${tag}name`, rowName(row), { kind: 'name' });
-      Object.assign(looks, rowLooks(row, { slots: f.slots, top: i * block + NAME_H, tag, halo: halo[tag] }));
-      looks[`${tag}name`] = { x: columnX(0) - COLUMN / 2 + 3, y: i * block + NAME_H / 2 };
+      Object.assign(looks, rowLooks(row, { slots: f.slots, top: tops[i] + NAME_H, tag, halo: halo[tag] }));
+      looks[`${tag}name`] = { x: columnX(0) - COLUMN / 2 + 3, y: tops[i] + NAME_H / 2 };
     });
     s.states([looks]).show(0);
     const says = host.querySelector('.arrival-says');

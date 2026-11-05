@@ -44,7 +44,10 @@ export function unitPx(width) {
 }
 
 /** The height of rows of the given taxes: as tall as the longest of them. */
-export const rowHeight = (rows) => TAX_Y + TAX_STEP * (Math.max(...rows.flatMap((r) => r.turns.map((t) => t.tax.length))) - 1) + 20;
+export const rowHeight = (rows) => {
+  const longest = Math.max(...rows.flatMap((r) => r.turns.map((t) => t.tax.length)));
+  return TAX_Y + TAX_STEP * (longest - 1) + 20;
+};
 
 /** The id of the line that pays for move m in the row tagged tag; numbers are their own ids when there is no tag. */
 export const idOf = (tag, x) => (tag ? `${tag}${x}` : x);
@@ -70,7 +73,9 @@ export function addRow(s, row, tag = '') {
  *    left    the x where column 0 begins;  top, the y of the row's moves;  tag, the prefix of its ids
  *    halo    the numbers that wear a halo
  *    pot     the column at which the pot's first number stands (default: after the last slot) */
-export function rowLooks(row, { slots, left = PAD, top = 0, tag = '', halo = new Set(), pot = slots.length + POT_GAP }) {
+export function rowLooks(row, {
+  slots, left = PAD, top = 0, tag = '', halo = new Set(), pot = slots.length + POT_GAP,
+}) {
   const looks = {};
   const wear = (x) => (halo.has(x) ? { halo: 1 } : {});
   for (const t of row.turns) {

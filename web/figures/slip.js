@@ -1,4 +1,4 @@
-// Along the way: a move slips in.  Game 12 built from game 11's optimal game, which is a game of 12 as it stands: 12
+// A move slips in.  Game 12 built from game 11's optimal game, which is a game of 12 as it stands: 12
 // cannot come last, since every divisor of it is gone, so it goes just before the move that takes the last of them
 // from the pot, takes that tax itself, and the move it robbed is left out.  A row of moves, each over its tax, and at
 // the right what is left in the pot (figures/game-row.js), in four states: the game as it stands, the divisors of 12
@@ -43,7 +43,11 @@ export function slipFacts(n, moves) {
   const dropped = cut >= 0 && !M.legalMoves(played).includes(moves[cut]) ? moves[cut] : null;
   const rest = moves.slice(at).filter((m) => m !== dropped);
   const after = gameRow(n, [...moves.slice(0, at), n, ...rest]);
-  return { n, before: cut < 0 ? null : gameRow(n, moves), after, last, cut: cut < 0 ? null : moves[cut], dropped, gain: n - (dropped ?? 0) };
+  const found = cut >= 0;
+  return {
+    n, before: found ? gameRow(n, moves) : null, after, last, cut: found ? moves[cut] : null, dropped,
+    gain: n - (dropped ?? 0),
+  };
 }
 
 /** The facts of game n's slip from the recorded games, checked: the game of n − 1 scores opt(n − 1) and the new game
