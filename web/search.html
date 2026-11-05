@@ -109,7 +109,7 @@
     sum bounds what a branch can still add.  The solver applies the test to the promotions frame by frame, at every
     node.</p>
     <p>Some sets pass the test and still cannot be played.  The smallest board with one is
-    45's: <a href="trust.html#ladder">12, 18, 20, 30 and 45</a>.  Sets like it are all that the
+    game 45's: <a href="trust.html#ladder">12, 18, 20, 30 and 45</a>.  Sets like it are all that the
     bound misses.</p>
   </div>
 </section>
@@ -119,8 +119,9 @@
   <div class="para">
     <aside class="note tech" aria-label="Conflicts and nogoods">
       <div class="note-head"><span class="note-name">Conflicts and nogoods</span></div>
-      <p>A <em>conflict</em> is a minimal part of the heaviest set that cannot be promoted, a median of two members at
-      n = 760 to 1000 (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/design/search.md#conflicts">conflicts</a>).
+      <p>A <em>conflict</em> is a minimal part of the heaviest set that cannot be promoted, a median of two members in
+      games 760 to 1,000
+      (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/design/search.md#conflicts">conflicts</a>).
       Each is kept as a <em>nogood</em>, a set that cannot be promoted from the root
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/design/search.md#forced-members-and-nogoods">nogoods</a>).</p>
     </aside>
@@ -139,7 +140,7 @@
       promoted or neither, and the heavier is known in advance.</p>
       <p class="precise"><span class="run">Precisely.</span>If exchanging the primes p &lt; q maps the root onto itself,
       and no candidate is divisible by pq, p² or q², every heaviest promotion set has c<sub>p</sub> ≤ c<sub>q</sub>,
-      where c<sub>r</sub> sums x/r over its multiples of r.  At 1300, 41 and 43 are such a pair
+      where c<sub>r</sub> sums x/r over its multiples of r.  At game 1,300, 41 and 43 are such a pair
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/design/gf2-bound.md#prime-exchanges">prime
       exchanges</a>).</p>
     </aside>
@@ -196,15 +197,15 @@
     <aside class="note card" aria-label="How a subtree grows, measured">
       <div class="note-head"><span class="note-name">How a subtree grows</span><a class="standing is-measured" href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-23-game-4949-the-first-chain-game-profiled-whole">measured<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">A subtree grows about 2.6 times for every 100 points of its gap.</p>
-      <p class="precise"><span class="run">Precisely.</span>In the profile of game 4949, a subtree's steps rose 0.42
-      decades per 100 points of its gap, with a rank correlation of 0.88 to 0.96.  Game 4950's nodes sit 200 to 230
+      <p class="precise"><span class="run">Precisely.</span>In the profile of game 4,949, a subtree's steps rose 0.42
+      decades per 100 points of its gap, with a rank correlation of 0.88 to 0.96.  Game 4,950's nodes sit 200 to 230
       points higher, and its subtrees are 5 to 8 times larger
       (<a href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-23-where-the-hard-games-spend-their-steps-q1">the
       hard games</a>).</p>
     </aside>
     <p>What decides the cost is the <a class="gloss" href="glossary.html#gap">gap</a> at each node: how far its
     <a class="gloss" href="glossary.html#bound">bound</a> is above the best game found.  A branch with a large gap
-    cannot be dropped, and it splits again and again before its bound comes down.  In game 4949, near the end of the
+    cannot be dropped, and it splits again and again before its bound comes down.  In game 4,949, near the end of the
     chain, a subtree grew about 2.6 times for every 100 points of its gap.</p>
   </div>
 

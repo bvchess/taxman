@@ -22,9 +22,9 @@ export const STORY = [
 export const ALONG = [
   {
     title: 'More moves isn\'t always better', where: 'game 833', id: 'game-833', at: 1, href: 'sets.html#game-833',
-    line: `The best game is not always the one with the most moves.  Every optimal game of 833 makes
-      <span data-833="moves">362</span> moves, but some games of 833 make <span data-833="longestMoves">363</span>, and
-      they score less.`,
+    line: `The best game is not always the one with the most moves.  In game 833, every optimal game makes
+      <span data-833="moves">362</span> moves, but some games make <span data-833="longestMoves">363</span>, and they
+      score less.`,
   },
   {
     title: 'Three numbers for tax on one move isn\'t impossible', where: 'game 40', id: 'game-40', at: 1, href: 'sets.html#game-40',
@@ -32,7 +32,7 @@ export const ALONG = [
       optimal game can claim 30 while 6, 10 and 15 are all still in the pot.`,
   },
   {
-    title: 'One search, six games', where: 'games 1386 to 1391', id: 'one-search', at: 2, href: 'chain.html#one-search',
+    title: 'One search, six games', where: 'games 1,386 to 1,391', id: 'one-search', at: 2, href: 'chain.html#one-search',
     line: `A game often poses exactly the search problem of an earlier game and so needs no search of its own.  Game
       1,386 poses a new one, and games 1,387 to 1,391 all pose it again, so game 1,386’s search was the only one all six
       needed.`,

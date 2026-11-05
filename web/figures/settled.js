@@ -54,7 +54,7 @@ export function mountSettled(host, { games }) {
     const rows = Math.ceil(total / cols);
     const top = 6;
     const height = top + rows * pitch + 8;
-    const svg = freshSVG(box, width, height, `Every game of the chain from 1 to ${last}, a cell each, ${cols} to a row `
+    const svg = freshSVG(box, width, height, `Every game of the chain from game 1 to game ${fmt(last)}, a cell each, ${cols} to a row `
       + 'from game 1 at the top left, shaded by how it was settled. The counts are in the legend and in the table below.');
     const at = (i) => {
       const r = Math.floor(i / cols);
@@ -114,9 +114,9 @@ export function mountSettled(host, { games }) {
     const part = rules.slice(a - 1, b);
     const noSearch = part.filter((k) => NO_SEARCH.includes(k)).length;
     const each = RULES.map((r) => fmt(part.filter((k) => k === r.key).length));
-    rows.push([`${fmt(a)} to ${fmt(b)}`, ...each, pct(noSearch / part.length, 0)]);
+    rows.push([`games ${fmt(a)} to ${fmt(b)}`, ...each, pct(noSearch / part.length, 0)]);
   }
   rows.push(['all', ...RULES.map((r) => fmt(counts[r.key])), pct(NO_SEARCH.reduce((s, k) => s + counts[k], 0) / total, 0)]);
-  tableView(host, 'The numbers behind the chart', ['games', ...RULES.map((r) => r.name), 'no search'], rows);
+  tableView(host, 'The numbers behind the chart', ['stretch', ...RULES.map((r) => r.name), 'no search'], rows);
   return facts;
 }

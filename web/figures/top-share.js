@@ -39,7 +39,7 @@ export function mountShareChart(host, { games }) {
   const last = games.lastN;
   const box = host.querySelector('.chart-box');
   const tip = tooltip(box);
-  host.querySelector('.chart-sub').textContent = `Each of the ${fmt(facts.count)} games of the chain settled by a search, from n = ${facts.first} to ${fmt(facts.last.n)}: the share of its score that its numbers above n/2 carry. Past game ${facts.past} it stays between ${pct(facts.lowLater)} and ${pct(facts.highLater)}.`;
+  host.querySelector('.chart-sub').textContent = `Each of the ${fmt(facts.count)} games of the chain settled by a search, from game ${fmt(facts.first)} to game ${fmt(facts.last.n)}: the share of its score that its numbers above n/2 carry. Past game ${fmt(facts.past)} it stays between ${pct(facts.lowLater)} and ${pct(facts.highLater)}.`;
 
   responsive(box, (width) => {
     const narrow = width < 520;
@@ -141,8 +141,8 @@ export function mountShareChart(host, { games }) {
     const b = Math.min(last, a + 499);
     const shares = pts.filter((p) => p.n >= a && p.n <= b).map((p) => p.share).sort((p, q) => p - q);
     if (!shares.length) continue;
-    rows.push([`${fmt(a)} to ${fmt(b)}`, fmt(shares.length), pct(shares[0]), pct(shares[Math.floor(shares.length / 2)]), pct(shares[shares.length - 1])]);
+    rows.push([`games ${fmt(a)} to ${fmt(b)}`, fmt(shares.length), pct(shares[0]), pct(shares[Math.floor(shares.length / 2)]), pct(shares[shares.length - 1])]);
   }
-  tableView(host, 'The numbers behind the chart', ['games', 'searched', 'lowest share', 'median', 'highest'], rows);
+  tableView(host, 'The numbers behind the chart', ['stretch', 'searched', 'lowest share', 'median', 'highest'], rows);
   return facts;
 }

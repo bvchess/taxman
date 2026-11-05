@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Taxman · Playing optimal games</title>
-<meta name="description" content="How we play an optimal game of Taxman, the number game, for every n from 1 to past 5,000, and why each is the best possible.">
+<meta name="description" content="How we play an optimal game of Taxman, the number game, in every game up to game 5,000 and beyond, and why each is the best possible.">
 <meta name="author" content="Brian Chess">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <script src="js/tone.js"></script>
@@ -23,8 +23,7 @@
   </hgroup>
   <p class="byline">Brian Chess</p>
   <p class="lede">Taxman is a number game originally created to teach kids about factors.  We play an optimal game, one with the best
-  possible score, for every n from 1 to <span data-last-n>the end of our chain</span>.  This site explains how we did
-  it.</p>
+  possible score, in each of games 1 to <span data-last-n>5,060</span>.  This site explains how we did it.</p>
 </header>
 
 <section class="chapter front-play" id="the-game" data-toc="the-game" aria-labelledby="h-game">
@@ -93,7 +92,7 @@
       <div class="note-head"><span class="note-name">How each game was proven</span></div>
       <p>Each game counts in the first group that fits it.</p>
       <ul>
-        <li><b>Derived from n&nbsp;−&nbsp;1.</b>  n is prime, and the
+        <li><b>Derived from game n&nbsp;−&nbsp;1.</b>  n is prime, and the
         <a class="gloss" href="glossary.html#prime-formula">prime formula</a> gives its score from game
         n&nbsp;−&nbsp;1’s.  Or it reaches its <a class="gloss" href="glossary.html#ceiling">ceiling</a>: its score is
         n&nbsp;+&nbsp;opt(n&nbsp;−&nbsp;1), the most it can be.</li>

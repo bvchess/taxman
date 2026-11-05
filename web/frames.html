@@ -164,9 +164,10 @@
       <p class="plain">The frame model's best score is at most opt(n), and equal to it exactly where statement U
       holds.</p>
       <p class="precise"><span class="run">Precisely.</span>ΣU* + P* ≤ <a class="gloss" href="glossary.html#opt">opt(n)</a>, with equality iff U holds at n.  The
-      <a class="gloss" href="glossary.html#chain">chain</a>'s scores past 2175 are proven within the frame model, so they are opt(n) given U
-      (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what
-      supports the scores</a>).</p>
+      <a class="gloss" href="glossary.html#chain">chain</a>'s scores past game 2,175 are proven within the frame model,
+      so they are opt(n) given U
+      (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports
+      the scores</a>).</p>
     </aside>
     <p>Nothing is lost by looking only at promotions, as long as the game plays all of U*.  The promotion sets are
     exactly what a game that plays U* can add below n/2, so the frame model's best score is the best score of any game
@@ -208,12 +209,12 @@
 
 <section class="chapter" id="along" data-toc="along" aria-label="Along the way">
   <div class="para">
-    <aside class="note card" aria-label="One optimal set to 424, measured">
-      <div class="note-head"><span class="note-name">One optimal set to 424</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-relaxation-proposition">measured<span class="sr-only">, evidence on GitHub</span></a></div>
+    <aside class="note card" aria-label="One optimal set to game 424, measured">
+      <div class="note-head"><span class="note-name">One optimal set to game 424</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-relaxation-proposition">measured<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">Every game up to 424 has one optimal set, and game 425 has two.</p>
       <p class="precise"><span class="run">Precisely.</span>The <a class="gloss" href="glossary.html#prover">prover</a>
-      lists every optimal set of the games it proved.  There is one in every game n ≤ 424; from 425 on a few games
-      have two or three.  In every game listed, the optimal sets share U* and their size, and differ by an exchange of
+      lists every optimal set of the games it proved.  There is one in every game n ≤ 424; from game 425 on a few
+      games have two or three.  In every game listed, the optimal sets share U* and their size, and differ by an exchange of
       equal sum below n/2.  Which one a run records depends on the order of its
       <a class="gloss" href="glossary.html#search">search</a>
       (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#games-with-several-optimal-sets">games
@@ -222,9 +223,10 @@
     <aside class="note card" aria-label="The relaxation proposition, proved">
       <div class="note-head"><span class="note-name">The relaxation proposition<span class="note-label">Proposition Q2</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-relaxation-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">A game with two optimal sets has no greedy shortcut to its best score.</p>
-      <p class="precise"><span class="run">Precisely.</span>In a game with two or more optimal sets, such as 425, every
-      family of subsets of 2..n that is closed under subsets, holds every <a class="gloss" href="glossary.html#playable">playable</a> set, and on which the greedy
-      algorithm finds a heaviest member for every nonnegative weighting has a member that weighs more than <a class="gloss" href="glossary.html#opt">opt(n)</a>.</p>
+      <p class="precise"><span class="run">Precisely.</span>In a game with two or more optimal sets, such as game 425,
+      every family of subsets of 2..n that is closed under subsets, holds every
+      <a class="gloss" href="glossary.html#playable">playable</a> set, and on which the greedy algorithm finds a
+      heaviest member for every nonnegative weighting has a member that weighs more than <a class="gloss" href="glossary.html#opt">opt(n)</a>.</p>
     </aside>
     <details class="aside" id="game-425" data-toc="game-425">
       <summary>

@@ -37,7 +37,7 @@ export function mountSearchCost(host, { games }) {
   const box = host.querySelector('.chart-box');
   const tip = tooltip(box);
   const end = list[list.length - 1];
-  host.querySelector('.chart-sub').textContent = `The ${fmt(list.length)} games of the chain from n = 1 to ${fmt(last)} that needed a search, one dot a game. Each grid line is ten times the one below it.`;
+  host.querySelector('.chart-sub').textContent = `The ${fmt(list.length)} games of the chain from game 1 to game ${fmt(last)} that needed a search, one dot a game. Each grid line is ten times the one below it.`;
   const top = Math.ceil(Math.log10(Math.max(...list.map((g) => g.nodes))));
 
   responsive(box, (width) => {
@@ -132,8 +132,8 @@ export function mountSearchCost(host, { games }) {
     const part = list.filter((g) => g.n >= a && g.n <= b);
     if (!part.length) continue;
     const most = part.reduce((p, q) => (q.nodes > p.nodes ? q : p));
-    rows.push([`${fmt(a)} to ${fmt(b)}`, fmt(part.length), fmt(median(part.map((g) => g.nodes))), `${fmt(most.nodes)} (game ${fmt(most.n)})`]);
+    rows.push([`games ${fmt(a)} to ${fmt(b)}`, fmt(part.length), fmt(median(part.map((g) => g.nodes))), `${fmt(most.nodes)} (game ${fmt(most.n)})`]);
   }
-  tableView(host, 'The numbers behind the chart', ['games', 'searched', 'median nodes', 'most nodes'], rows);
+  tableView(host, 'The numbers behind the chart', ['stretch', 'searched', 'median nodes', 'most nodes'], rows);
   return { count: list.length, end, median };
 }

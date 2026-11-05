@@ -36,7 +36,7 @@ export function mountShareChart(host, { games }) {
   const endShare = shareOf(c, last - 1);
   const box = host.querySelector('.chart-box');
   const tip = tooltip(box);
-  host.querySelector('.chart-sub').textContent = `Every game from n = ${first} to ${fmt(last)}, along a scale of n that grows tenfold from one labeled mark to the next. Where games crowd together, a mark spans their shares.`;
+  host.querySelector('.chart-sub').textContent = `Every game from game ${fmt(first)} to game ${fmt(last)}, along a scale of n that grows tenfold from one labeled mark to the next. Where games crowd together, a mark spans their shares.`;
 
   responsive(box, (width) => {
     const narrow = width < 560;
@@ -94,7 +94,7 @@ export function mountShareChart(host, { games }) {
     el('path', { d: path, class: 'share-band' }, svg);
     el('circle', { cx: x(last), cy: y(endShare), r: 4.5, 'stroke-width': 2, style: 'fill: var(--player); stroke: var(--paper)' }, svg);
     const endLabel = el('text', { x: x(last) - 8, y: y(endShare) - 12, 'text-anchor': 'end', class: 'row-label' }, svg);
-    endLabel.textContent = `${pct(endShare)} at n = ${fmt(last)}`;
+    endLabel.textContent = `${pct(endShare)} at game ${fmt(last)}`;
 
     // The n axis: a labeled mark at each power of ten and at the ends, and small marks between.
     const axisY = m.t + plotH;
@@ -149,8 +149,8 @@ export function mountShareChart(host, { games }) {
   for (let a = 1000; a <= last; a += 1000) stretches.push([a, Math.min(last, a + 999)]);
   const rows = stretches.filter(([a]) => a <= last).map(([a, b]) => {
     const [lo, hi] = shareRange(c, a, Math.min(b, last));
-    return [`${fmt(a)} to ${fmt(Math.min(b, last))}`, pct(lo, 2), pct(hi, 2)];
+    return [`games ${fmt(a)} to ${fmt(Math.min(b, last))}`, pct(lo, 2), pct(hi, 2)];
   });
-  tableView(host, 'The numbers behind the chart', ['games', 'lowest share', 'highest share'], rows);
+  tableView(host, 'The numbers behind the chart', ['stretch', 'lowest share', 'highest share'], rows);
   return { endShare };
 }

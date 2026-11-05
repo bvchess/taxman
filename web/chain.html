@@ -72,10 +72,10 @@
     <p>The quickest way to a good game of n is to take an
     <a class="gloss" href="glossary.html#optimal-set">optimal set</a> of game n − 1 and add n.  If the set can still be
     <a class="gloss" href="glossary.html#playable">played</a>, it scores opt(n − 1) + n, the
-    <a class="gloss" href="glossary.html#ceiling">ceiling</a>, and game n is done.  We say that n <em>fits</em>.</p>
+    <a class="gloss" href="glossary.html#ceiling">ceiling</a>, and game n is done.  We say that game n <em>fits</em>.</p>
     <p>Game 21's optimal set is <span data-set="21">9, 12, 14, 15, 16, 18, 19, 20 and 21</span>, and it scores
-    <span data-opt="21">144</span>.  <span class="n" data-n="22">22</span> fits.  Its half,
-    <span class="n" data-n="11">11</span>, divides nothing else up to 21, so it is never tax, and the game of 21 does not
+    <span data-opt="21">144</span>.  Game <span class="n" data-n="22">22</span> fits.  Its half,
+    <span class="n" data-n="11">11</span>, divides nothing else up to 21, so it is never tax, and game 21 does not
     play it.  So 11 is still in the <a class="gloss" href="glossary.html#pot">pot</a> at the end, and 22 can be played
     last, paid for by 11.  Game 22 scores <span data-opt="21">144</span> + 22 = <span data-opt="22">166</span>, its
     ceiling.</p>
@@ -103,7 +103,7 @@
       exhaustive search (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-step-theorem">the
       step theorem's examples</a>).</p>
     </aside>
-    <p><span class="n" data-n="21">21</span> does not fit.  Game 20 has only one optimal set,
+    <p>Game <span class="n" data-n="21">21</span> does not fit.  Game 20 has only one optimal set,
     <span data-set="20">10, 12, 14, 15, 16, 18, 19 and 20</span>.  With 21 added it holds
     <span class="n" data-n="10">10</span>, <span class="n" data-n="14">14</span>, <span class="n" data-n="15">15</span>
     and 21, the <a class="gloss" href="glossary.html#loop">loop</a> of chapter 1 on the primes 2, 5, 3 and 7, and no game
@@ -131,7 +131,7 @@
       optimal game of n plays q(n), as its first move, and no other prime: a game without it can take q(n) in place of
       its first move, or in front of it, and score more.</p>
     </aside>
-    <p>Past 2, a prime never fits.  Its only divisor is 1, and the first move of every game takes 1 as
+    <p>Past game 2, a prime never fits.  Its only divisor is 1, and the first move of every game takes 1 as
     <a class="gloss" href="glossary.html#tax">tax</a>, so a prime can be played only as the first move.  Every
     <a class="gloss" href="glossary.html#optimal-game">optimal game</a> opens with the largest prime of its board: a
     game that does not can always play that prime in place of its first move, or in front of it, and score more.</p>
@@ -172,7 +172,7 @@
       <p class="precise"><span class="run">Precisely.</span>Let Π_n = Π_m, root problems of games n and m.  Every
       promotion set L makes a game of n worth Σ<a class="gloss" href="glossary.html#u-star">U*</a>(n) + ΣL, and, given
       <a class="gloss" href="glossary.html#statement-u">statement U</a> at n, a promotion set that makes an optimal game
-      of m makes an optimal game of n.  The first part needs no U.  Every game to 2175 is also proven by the prover,
+      of m makes an optimal game of n.  The first part needs no U.  Every game up to 2,175 is also proven by the prover,
       without U.</p>
     </aside>
     <p>Most games that neither fit nor are prime still need no search.  Before the
@@ -185,9 +185,9 @@
   <div class="para">
     <aside class="note card" aria-label="The semiprime formula, proved">
       <div class="note-head"><span class="note-name">The semiprime formula<span class="note-label">Theorem J3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/arrival.md#the-semiprime-formula">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">At an odd n with two prime factors that closes a loop with the moves of game n − 1, as every one from 189
-      on does, n takes the place of one move with two prime factors, and the score rises by the difference: no search,
-      and no statement U.</p>
+      <p class="plain">At an odd n with two prime factors that closes a loop with the moves of game n − 1, as every one from
+      game 189 on does, n takes the place of one move with two prime factors, and the score rises by the difference: no
+      search, and no statement U.</p>
       <p class="precise"><span class="run">Precisely.</span>Let n be odd with two prime factors, closing a cycle with
       U*₂(n − 1), as every such n ≥ 189 does, and x the smallest other member of the cycle.  Then
       opt(n) = opt(n − 1) + n − x, and exchanging x for n maps the optimal sets of n − 1 onto those of n.  In game 39,
@@ -197,8 +197,8 @@
     optimal game is game 38's with one exchange: 39 takes the place of <span class="n" data-n="22">22</span> = 2 · 11.
     It scores <span data-opt="38">486</span> + 39 − 22 = <span data-opt="39">503</span>, <span data-gap="39">22</span> below its
     ceiling.  Here a
-    theorem proves the same exchange with no search at all, and it covers every odd n with two prime factors from 189
-    on.</p>
+    theorem proves the same exchange with no search at all, and it covers every odd n with two prime factors from game
+    189 on.</p>
   </div>
 
   <figure class="fig arrival-one" id="arrival-repeat">
@@ -208,7 +208,7 @@
   <details class="aside" id="one-search" data-toc="one-search">
     <summary>
       <span class="aside-pin" aria-hidden="true"></span>
-      <span><span class="where">Along the way: games 1386 to 1391</span><span class="title"></span></span>
+      <span><span class="where">Along the way: games 1,386 to 1,391</span><span class="title"></span></span>
       <span class="open-mark"><span class="closed-word">Open</span><span class="open-word">Close</span></span>
     </summary>
     <div class="aside-body">
@@ -217,8 +217,8 @@
       <a class="gloss" href="glossary.html#repeat">repeat</a> or reaches its
       <a class="gloss" href="glossary.html#ceiling">ceiling</a>.</p>
       <p>The longest such run in the chain is <span data-run="longestCount">8</span> games,
-      <span data-run="longestFirst">2,512</span> to <span data-run="longestLast">2,519</span>, all resting on one search
-      of <span data-run="longestNodes">8.7 million</span> nodes.</p>
+      from game <span data-run="longestFirst">2,512</span> to game <span data-run="longestLast">2,519</span>, all
+      resting on one search of <span data-run="longestNodes">8.7 million</span> nodes.</p>
     </div>
   </details>
 </section>
@@ -285,13 +285,13 @@
       <div class="note-head"><span class="note-name">What each rule rests on</span></div>
       <p>The ceiling and the prime formula prove a game optimal wherever the game before it is optimal.  A repeat rests
       on <a class="gloss" href="glossary.html#statement-u">statement U</a> at n too, and a search on the
-      <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is exact where U holds.  Every game to
-      2175 is also proven by the <a class="gloss" href="glossary.html#prover">prover</a>, on the whole board, without U
+      <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is exact where U holds.  Every game up to
+      2,175 is also proven by the <a class="gloss" href="glossary.html#prover">prover</a>, on the whole board, without U
       (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports
       the scores</a>).</p>
     </aside>
     <p>That is why the result is a chain.  Each of those games is built from the one before, so the games are found in
-    order, from game 1 up: game 5000 is reached by walking there.</p>
+    order, from game 1 up: game 5,000 is reached by walking there.</p>
   </div>
 </section>
 
@@ -308,9 +308,9 @@
       first case is proved, by the layer-2 corollary (J2); the other two are measured.</p>
     </aside>
     <p>Whether a game needs a <a class="gloss" href="glossary.html#search">search</a> can usually be told from n alone,
-    before any work.  Write n as its largest prime factor times what is left, the <em>cofactor</em> of n: 3002 = 38 · 79
-    has the cofactor 38, and a prime has the cofactor 1.  From game 188 on, no game whose cofactor is 1, a prime, twice
-    a prime or 9 needed a search.</p>
+    before any work.  Write n as its largest prime factor times what is left, the <em>cofactor</em> of n: in
+    game 3,002, n = 38 · 79 has the cofactor 38, and a prime has the cofactor 1.  From game 188 on, no game whose
+    cofactor is 1, a prime, twice a prime or 9 needed a search.</p>
   </div>
 
   <figure class="chart" id="cofactor-fig">
@@ -318,9 +318,9 @@
     <div class="chart-box"></div>
   </figure>
 
-  <p>Those four cofactors take in <span data-cof="named">…</span> of the <span data-cof="total">…</span> games from 188
-  on, and <span data-cof="share">…</span> of the ones settled with no search.  Of the <span data-cof="other">…</span>
-  games with any other cofactor, <span data-cof="otherSearched">…</span> needed a search.</p>
+  <p>Those four cofactors take in <span data-cof="named">…</span> of the <span data-cof="total">…</span> games from game
+  188 on, and <span data-cof="share">…</span> of the ones settled with no search.  Of the
+  <span data-cof="other">…</span> games with any other cofactor, <span data-cof="otherSearched">…</span> needed a search.</p>
 </section>
 
 <section class="chapter" id="head-start" data-toc="head-start" aria-labelledby="h-head-start">
@@ -329,7 +329,7 @@
     <aside class="note tech" aria-label="The two starts of game 5,060">
       <div class="note-head"><span class="note-name">The two starts of game 5,060</span></div>
       <p>As sums of promotions, the part of the score a search chooses: the best is <span data-start="best">…</span>,
-      and the search starts at <span data-start="seeded">…</span> from game 5,059’s game and at
+      and the search starts at <span data-start="seeded">…</span> from game 5,059’s optimal set and at
       <span data-start="own">…</span> on its own.  The frame solver measured both, each search stopped after its first
       thousand nodes
       (<a href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-start-of-game-5060-with-and-without-the-game-before-2026-11/README.md">the

@@ -91,7 +91,7 @@ function words(t, k, score) {
   }
   const node = nodes[k];
   if (!node.parent) {
-    return `The root: nothing is promoted yet, and all ${cands.length} candidates are open. Each number in the tree is what promotions add to the ${fmt(base)} points of U*. Together the candidates add ${node.bound}, so no game of ${t.n} adds more: the root's bound is ${node.bound}.`;
+    return `The root: nothing is promoted yet, and all ${cands.length} candidates are open. Each number in the tree is what promotions add to the ${fmt(base)} points of U*. Together the candidates add ${node.bound}, so no game adds more in game ${t.n}: the root's bound is ${node.bound}.`;
   }
   const { x, promote } = node.edge;
   const parts = [];

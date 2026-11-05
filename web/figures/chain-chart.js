@@ -56,7 +56,7 @@ export function mountChainChart(host, { games }) {
   const tip = tooltip(box);
   const endShare = share[count - 1];
   host.querySelector('.chart-sub').textContent =
-    `For every game from n = 1 to ${fmt(last)}, in stretches of ${STRETCH} games. The player’s share of the board ` +
+    `For games 1 to ${fmt(last)}, in stretches of ${STRETCH} games. The player’s share of the board ` +
     `settles near ${pct(endShare)}; game ${fmt(last)} scores ${fmt(c.score[count - 1])} of ` +
     `${fmt((last * (last + 1)) / 2)}. Under it, how the games of each stretch were proven, and the median time ` +
     'of its searches.';
@@ -80,7 +80,7 @@ export function mountChainChart(host, { games }) {
     const height = axisY + 34;
     const plotW = width - m.l - m.r;
     const svg = freshSVG(box, width, height,
-      `Chart of the chain from n = 1 to ${last}: the player's share of the board; for each stretch of ` +
+      `Chart of the chain from game 1 to game ${fmt(last)}: the player's share of the board; for each stretch of ` +
       `${STRETCH} games, ` +
       'how its games were proven in three groups and the median time of its searches. ' +
       'The numbers are in the table below.');
@@ -147,7 +147,7 @@ export function mountChainChart(host, { games }) {
       cx: x(last), cy: y(endShare), r: 4.5, 'stroke-width': 2, style: 'fill: var(--player); stroke: var(--paper)',
     }, g);
     const endLabel = el('text', { x: x(last) - 8, y: y(endShare) - 12, 'text-anchor': 'end', class: 'row-label' }, g);
-    endLabel.textContent = `${pct(endShare)} at n = ${fmt(last)}`;
+    endLabel.textContent = `${pct(endShare)} at game ${fmt(last)}`;
 
     // How each game was proven: a stacked column a stretch, from the bottom derived from n − 1, repeats, search.
     rowName('how each game was proven', `each ${STRETCH} games, whole = 100%`, provTop + nameH, 24);
@@ -244,11 +244,11 @@ export function mountChainChart(host, { games }) {
 
   // The table view: the numbers behind the chart, by stretches of 100 games.
   const rows = stretches.map((st) => [
-    `${fmt(st.a)} to ${fmt(st.b)}`, ...GROUPS.map((grp) => fmt(st.by[grp.key])), fmt(st.searches), duration(st.median),
+    `games ${fmt(st.a)} to ${fmt(st.b)}`, ...GROUPS.map((grp) => fmt(st.by[grp.key])), fmt(st.searches), duration(st.median),
     `${pct(st.lo)} to ${pct(st.hi)}`,
   ]);
   const allSearch = c.seconds.filter((_, j) => searched[j]);
   rows.push(['all', ...GROUPS.map((grp) => fmt(groupCounts[grp.key])), fmt(searches), duration(median(allSearch)), '']);
-  const head = ['games', ...GROUPS.map((grp) => grp.name), 'searches', 'median search time', 'player’s share'];
+  const head = ['stretch', ...GROUPS.map((grp) => grp.name), 'searches', 'median search time', 'player’s share'];
   tableView(host, 'The numbers behind the chart', head, rows);
 }

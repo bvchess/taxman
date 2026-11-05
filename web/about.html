@@ -38,10 +38,10 @@
   </div>
   <ul class="adds">
     <li><p class="adds-head"><b>The chain</b></p>
-    <p>An <a class="gloss" href="glossary.html#optimal-game">optimal game</a> for every n from 1 to
-    <span data-last-n>the end of the chain</span>, each built from the one before, each with its proof and what that
+    <p>An <a class="gloss" href="glossary.html#optimal-game">optimal game</a> for every game from game 1 to
+    game <span data-last-n>n</span>, each built from the one before, each with its proof and what that
     proof rests on.  The <a class="gloss" href="glossary.html#prover">prover</a>, which shares no proof code with the
-    <a class="gloss" href="glossary.html#frame-solver">frame solver</a>, proves the scores to 2,175 a second time, on
+    <a class="gloss" href="glossary.html#frame-solver">frame solver</a>, proves the scores to game 2,175 a second time, on
     the whole board (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what
     supports the scores</a>).</p></li>
     <li><p class="adds-head"><b>The frame model and its exactness</b><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#the-exactness-theorem">proved<span class="sr-only">, proof on GitHub</span></a></p>
@@ -85,8 +85,8 @@
     which published it in a collection of mathematics games and drills in 1983, as Hensley’s paper records.</p>
     <p><b>The Taxman sequence.</b>  The best scores opt(1), opt(2), opt(3), … are the
     <a class="gloss" href="glossary.html#taxman-sequence">Taxman sequence</a>, A019312 in the OEIS.  The OEIS credits
-    its earlier terms to Dan Hoey, up to n&nbsp;=&nbsp;158; Timothy Loh, up to 227; Bernhard Esslinger, up to 404; and van Nek,
-    up to 519.  Its terms up to 1,000 agree with the chain’s, one for one.</p>
+    its earlier terms to Dan Hoey, up to game 158; Timothy Loh, up to game 227; Bernhard Esslinger, up to game 404; and van Nek,
+    up to game 519.  Its terms up to game 1,000 agree with the chain’s, one for one.</p>
     <p><b>The share.</b>  Douglas Hensley proved in 1988 that the player’s share of the board tends to a constant,
     more than 1/2 and at most 35/48 (<a href="results.html#share">chapter 7</a>).  His strategy splits the board into
     blocks that are played in turn, each without disturbing the blocks after it.</p>
@@ -97,11 +97,11 @@
     bounded opt(n) above by the heaviest matching of that graph, and proved NP-hard a more general game, played on any
     order of things in levels.</p>
     <p><b>Heuristic strategies.</b>  A heuristic strategy plays a good game quickly, with no proof.  Robert Moniot’s
-    program plays seven, and the best of them, OneTax, wins 99.065% of the optimal points over the games 2 to 1,000
+    program plays seven, and the best of them, OneTax, wins 99.065% of the optimal points over games 2 to 1,000
     (<a href="https://github.com/bvchess/taxman/blob/master/moniot/README.md">his strategies</a>).  The repository
     keeps the program as he sent it.  Its source cites three earlier articles on the game: by L. A. Carmony and R. L.
     Holliday, 1993; by J. Trono, 1994; and by R. Moniot, 2007.  The repository’s own strategies win 99.85% of the optimal points up
-    to 1,000, with no search (<a href="https://github.com/bvchess/taxman/blob/master/heuristics/README.md">how they
+    to game 1,000, with no search (<a href="https://github.com/bvchess/taxman/blob/master/heuristics/README.md">how they
     were measured</a>).</p>
   </div>
 </section>

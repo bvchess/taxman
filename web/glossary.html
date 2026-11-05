@@ -33,7 +33,7 @@
     <dl class="glossary">
       <dt id="game">game n</dt>
       <dd>Taxman played on the numbers 1 to n.  Game 21 is Taxman on 1 to 21.  A <em>game</em> also means one play
-      of it, as in "an optimal game of 21".</dd>
+      of it, as in “an optimal game”.</dd>
       <dt id="board">board</dt>
       <dd>The numbers 1 to n of game n.</dd>
       <dt id="proper-divisor">divisor, proper divisor</dt>
@@ -69,8 +69,8 @@
     </aside>
     <dl class="glossary">
       <dt id="playable">playable</dt>
-      <dd>A set of numbers that can all be taken as moves, in some order.  {9, 15} is playable on the board of 21: 9
-      first, then 15.</dd>
+      <dd>A set of numbers that can all be taken as moves, in some order.  {9, 15} is playable on the board of game
+      21: 9 first, then 15.</dd>
       <dt id="optimal-set">optimal set</dt>
       <dd>The set of moves of an optimal game: a playable set with the largest sum.  Most games have one; from game
       425 on, some have two or three.</dd>
@@ -113,10 +113,10 @@
     </aside>
     <dl class="glossary">
       <dt id="chain">chain</dt>
-      <dd>Our optimal games for every n from 1 up, found in order, each built from an optimal game of the one
-      before.</dd>
+      <dd>Our optimal games for game 1 and every game after it, found in order, each built from the one before.</dd>
       <dt id="ceiling">ceiling</dt>
-      <dd>n more than the best score of game n − 1.  No game of n can beat it, so a game that reaches it is optimal.</dd>
+      <dd>n more than the best score of game n − 1.  No score in game n can beat it, so a game that reaches it is
+      optimal.</dd>
       <dt id="prime-formula">prime formula</dt>
       <dd>At a prime n, an optimal game swaps the largest prime below n for n itself, and its score rises by the
       difference.</dd>
@@ -124,7 +124,7 @@
       <dd>A game that poses exactly the search problem of an earlier game, so the earlier game's answer carries
       over.</dd>
       <dt id="fits">fits</dt>
-      <dd>Game n fits when an optimal set of game n − 1 can still be played with n added.  Then game n is at its ceiling: 22 fits, and 21 does not.</dd>
+      <dd>Game n fits when an optimal set of game n − 1 can still be played with n added.  Then game n is at its ceiling: game 22 fits, and game 21 does not.</dd>
       <dt id="search-problem">search problem</dt>
       <dd>What is left to choose in a game once its frames are set: the frames, the candidates and how many of them may be promoted.  Two games with the same search problem have the same promotions.</dd>
       <dt id="cofactor">cofactor</dt>
@@ -145,7 +145,7 @@
     <dl class="glossary">
       <dt id="source">source</dt>
       <dd>A number above n/2.  It divides nothing else on the board, so it is never tax: it is a move or nothing.  On
-      the board of 21 the sources are 11 to 21.</dd>
+      the board of game 21 the sources are 11 to 21.</dd>
       <dt id="factor">factor</dt>
       <dd>A number up to n/2.  It is tax for some larger number, and sometimes a move itself.</dd>
       <dt id="layer">layer</dt>
@@ -163,7 +163,7 @@
       <dt id="top-half">top half</dt>
       <dd>The numbers above n/2, the sources, and the part of the score they make.  In the games that need a search, it is about 93% of the score.</dd>
       <dt id="exchange-property">exchange property</dt>
-      <dd>What makes a greedy choice safe in general: a smaller playable set can always take a member from a larger one and stay playable.  The playable sets of sources lack it in game 2873.</dd>
+      <dd>What makes a greedy choice safe in general: a smaller playable set can always take a member from a larger one and stay playable.  The playable sets of sources lack it in game 2,873.</dd>
     </dl>
   </div>
 </section>
@@ -223,7 +223,7 @@
       <dt id="nogood">nogood</dt>
       <dd>A set of candidates that cannot be promoted together from the start of a search, which the search remembers, so that no branch tries it again.</dd>
       <dt id="odd-core">odd core</dt>
-      <dd>A set that passes the parity test, which every playable set passes, yet cannot be played.  The first is on the board of 45: 12, 18, 20, 30 and 45.  Odd cores are all that the search's bound misses.</dd>
+      <dd>A set that passes the parity test, which every playable set passes, yet cannot be played.  The first is on the board of game 45: 12, 18, 20, 30 and 45.  Odd cores are all that the search's bound misses.</dd>
   </dl>
 </section>
 

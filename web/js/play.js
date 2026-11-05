@@ -109,8 +109,9 @@ export function mountPlay(host, { small, board, n: startN = 10, minN = 2, maxN =
   function verdict(mine) {
     const opt = best.get(n)?.score;
     if (opt === undefined) return `You scored ${mine}.`;
-    if (mine === opt) return `<strong>${mine} is the best score for n = ${n}</strong>: an optimal game.`;
-    return `The best score for n = ${n} is ${opt}, so you were ${opt - mine} short. <strong>Play an optimal game</strong> to see one.`;
+    if (mine === opt) return `<strong>${mine} is the best score in game ${n}</strong>: an optimal game.`;
+    return `The best score in game ${n} is ${opt}, so you were ${opt - mine} short.`
+      + ' <strong>Play an optimal game</strong> to see one.';
   }
 
   // The caption's messages, built in one place so that reserve() can measure the longest of them.

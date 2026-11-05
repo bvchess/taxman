@@ -71,7 +71,7 @@ function settled(r) {
       const how = r.method === 'start'
         ? 'The search’s starting game reached it, so the search took no step.'
         : `The search reached it after ${plural(r.nodes, 'node')}.`;
-      return [lead, `Its score is opt(${fmt(n - 1)}) + ${fmt(n)} = ${fmt(prev)} + ${fmt(n)} = ${fmt(score)}, the most a game of ${fmt(n)} can make. ${how}`];
+      return [lead, `Its score is opt(${fmt(n - 1)}) + ${fmt(n)} = ${fmt(prev)} + ${fmt(n)} = ${fmt(score)}, the most a game can make in game ${fmt(n)}. ${how}`];
     }
     case 'prime_formula': {
       const q = primeBelow(n);
@@ -99,7 +99,7 @@ function settled(r) {
 function restsOn({ n }) {
   if (n === 1) return 'Nothing: game 1 has no move to choose.';
   if (n <= PROVER_LAST) return `The prover proves it too, on the whole board, so it is opt(${fmt(n)}) without the frame model.`;
-  return `It is the frame model’s best score, which is opt(${fmt(n)}) wherever statement U holds, and U is open past ${fmt(PROVER_LAST)}.`;
+  return `It is the frame model’s best score, which is opt(${fmt(n)}) wherever statement U holds, and U is open past game ${fmt(PROVER_LAST)}.`;
 }
 
 // The six numbers under the words: each a label, a value and a line under it.
@@ -166,10 +166,10 @@ export function mountExplorer(host, { games, small }) {
           <label class="ex-n-label"><span>Game</span><input class="ex-n" type="number" min="1" max="${last}" step="1" inputmode="numeric"></label>
           <button type="button" class="btn round" data-act="up" aria-label="The next game">+</button>
         </span>
-        <input class="ex-range" type="range" min="1" max="${last}" step="1" aria-label="Game n, from 1 to ${fmt(last)}">
+        <input class="ex-range" type="range" min="1" max="${last}" step="1" aria-label="Game n, from game 1 to game ${fmt(last)}">
       </div>
       <div class="ex-picks" role="group" aria-label="Jump to a game the story names">
-        <span class="ex-picks-word">Jump to</span>${picks.map((x) => `<button type="button" class="btn ex-chip" data-n="${x}">${fmt(x)}</button>`).join('')}
+        <span class="ex-picks-word">Jump to game</span>${picks.map((x) => `<button type="button" class="btn ex-chip" data-n="${x}">${fmt(x)}</button>`).join('')}
       </div>
     </div>
     <div class="ex-body">

@@ -45,8 +45,8 @@ export function mountRestsOn(host, { games }) {
     <div class="rests-model">
       <p class="rests-title">The frame model of game k gives opt(k)</p>
       <div class="rests-base">
-        <div class="rests-proved"><p><b>k up to ${fmt(PROVER_TO)}</b>${standingBadge('proved')}</p><p>The prover proves opt(k) on the whole board, without the frame model.</p></div>
-        <div class="rests-given"><p><b>k past ${fmt(PROVER_TO)}</b>${standingBadge('given-u')}</p><p>The frame model's best is opt(k) exactly when statement U holds at k.</p></div>
+        <div class="rests-proved"><p><b>k up to game ${fmt(PROVER_TO)}</b>${standingBadge('proved')}</p><p>The prover proves opt(k) on the whole board, without the frame model.</p></div>
+        <div class="rests-given"><p><b>k past game ${fmt(PROVER_TO)}</b>${standingBadge('given-u')}</p><p>The frame model's best is opt(k) exactly when statement U holds at k.</p></div>
       </div>
     </div>`;
   return f;

@@ -20,7 +20,7 @@
 <header class="essay-head para">
   <p class="kicker">Chapter 7</p>
   <h1>The results</h1>
-  <p class="lede">An optimal game for every n from 1 to <span data-last-n>the end of the chain</span>, each with its
+  <p class="lede">An optimal game for each of games 1 to <span data-last-n>the end of the chain</span>, each with its
   proof.  Here is every one of them, what they show together, and what is still open.</p>
 </header>
 
@@ -41,7 +41,7 @@
     <aside class="note tech" aria-label="A game's record, precisely">
       <div class="note-head"><span class="note-name">A game’s record, precisely</span></div>
       <p>The record is the game’s line of the results file.  Its <code>in_the_bag</code> is ΣU*, the score with no
-      promotions, and its time is <code>seconds.total</code>, on the machine of its run: a laptop to 2,175, larger
+      promotions, and its time is <code>seconds.total</code>, on the machine of its run: a laptop to game 2,175, larger
       machines past it.  A game of the prime formula or of the bounds store sets up no frames, so it records no ΣU*
       and no <a class="gloss" href="glossary.html#candidate">candidates</a>
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#a-results-line---out-schema-5">the
@@ -69,16 +69,18 @@
     </aside>
     <aside class="note card" aria-label="Franklín and Moniot's Theorem 5, proved">
       <div class="note-head"><span class="note-name">Every game can be won<span class="note-label">Franklín and Moniot, Theorem 5</span></span><a class="standing is-proved" href="https://arxiv.org/abs/2211.00461">proved<span class="sr-only">, the paper</span></a></div>
-      <p class="plain">The player can beat the taxman in every game but 1 and 3.</p>
-      <p class="precise"><span class="run">Precisely.</span>Their born-free matching wins every game n ∉ {1, 3} but 7
-      and 13, which they win by hand: A. F. Franklín and R. K. Moniot, <i>Discrete Applied Mathematics</i> 339 (2023)
-      166–171 (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#what-the-paper-proves">what
+      <p class="plain">The player can beat the taxman in all but games 1 and 3.</p>
+      <p class="precise"><span class="run">Precisely.</span>Their born-free matching wins every game n ∉ {1, 3} but
+      games 7 and 13, which they win by hand: A. F. Franklín and R. K. Moniot, <i>Discrete Applied Mathematics</i> 339
+      (2023) 166–171
+      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#what-the-paper-proves">what
       the paper proves</a>).</p>
     </aside>
     <p>An <a class="gloss" href="glossary.html#optimal-game">optimal game</a> wins a share of the
     <a class="gloss" href="glossary.html#board">board</a>: its score, <a class="gloss" href="glossary.html#opt">opt(n)</a>,
     divided by 1 + 2 + ⋯ + n, the total of the board.  The player beats the taxman when the share is above one half.
-    In every game of the <a class="gloss" href="glossary.html#chain">chain</a> but <span data-fact="notWon">1 and 3</span>, it is.</p>
+    In every game of the <a class="gloss" href="glossary.html#chain">chain</a> except games <span data-fact="notWon">1
+    and 3</span>, it is.</p>
     <p>In 1988 Douglas Hensley proved that as n grows, the share tends to a constant: more than 1/2, and at most
     35/48, about 73%.  So the player beats the taxman in every game large enough, and in the long run the taxman keeps at
     least 13/48 of the board, more than a quarter.  The theorem does not say what the constant is.</p>
@@ -96,8 +98,8 @@
       <p class="plain">From game 4,000 on, the share stays between <span data-fact="settledLo">62.8%</span> and
       <span data-fact="settledHi">63.0%</span>.</p>
       <p class="precise"><span class="run">Precisely.</span>The share opt(n) / (n(n + 1)/2) stays in that range in every
-      game from 4,000 to <span data-last-n>5060</span>, by the scores of results/optimal.jsonl.gz.  It measures
-      finitely many games, and proves nothing about C.</p>
+      game from game 4,000 to game <span data-last-n>5060</span>, by the scores of results/optimal.jsonl.gz.  It
+      measures finitely many games, and proves nothing about C.</p>
     </aside>
     <p>The chain’s games put the constant near 63%.  The share swings widely in the first games and settles as n
     grows: from game 4,000 on it stays between <span data-fact="settledLo">62.8%</span> and
@@ -110,12 +112,12 @@
 <section class="chapter" id="findings" data-toc="findings" aria-labelledby="h-findings">
   <h2 id="h-findings">What the games show</h2>
   <div class="para">
-    <aside class="note card" aria-label="One optimal set, to 424, measured">
-      <div class="note-head"><span class="note-name">One optimal set, to 424</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-relaxation-proposition">measured<span class="sr-only">, evidence on GitHub</span></a></div>
+    <aside class="note card" aria-label="One optimal set, to game 424, measured">
+      <div class="note-head"><span class="note-name">One optimal set, to game 424</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-relaxation-proposition">measured<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">Every game up to 424 has exactly one optimal set; game 425 has two.</p>
       <p class="precise"><span class="run">Precisely.</span>The <a class="gloss" href="glossary.html#prover">prover</a> lists the
-      optimal sets of the games 2 to 989: one in every game up to 424, and two or three in 30 games from 425 to 779
-      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#observations">the
+      optimal sets of games 2 to 989: one in every game up to 424, and two or three in 30 games from game 425 to game
+      779 (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#observations">the
       evidence</a>).</p>
     </aside>
     <p>Most games have exactly one <a class="gloss" href="glossary.html#optimal-set">optimal set</a>.  Every game up to
@@ -131,10 +133,10 @@
   <div class="para">
     <aside class="note card" aria-label="How far an optimal game falls short, measured">
       <div class="note-head"><span class="note-name">How far an optimal game falls short</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-length-proposition">measured<span class="sr-only">, evidence on GitHub</span></a></div>
-      <p class="plain">Every recorded game up to 4,949 makes the most moves it can, but 833, 834 and 835, which
+      <p class="plain">Every recorded game up to 4,949 makes the most moves it can, but games 833, 834 and 835, which
       make one fewer.</p>
-      <p class="precise"><span class="run">Precisely.</span>The prover settles ℓ(n), the most moves of a game of n, for every
-      n from 2 to 4,949.  Whether the shortfall is bounded is open.</p>
+      <p class="precise"><span class="run">Precisely.</span>The prover settles ℓ(n), the most moves of a game of n, in
+      games 2 to 4,949.  Whether the shortfall is bounded is open.</p>
     </aside>
     <p>Nor does an <a class="gloss" href="glossary.html#optimal-game">optimal game</a> always make as many
     <a class="gloss" href="glossary.html#move">moves</a> as it can.  In game 833, every optimal game makes
@@ -147,8 +149,8 @@
 <section class="chapter" id="open-questions" data-toc="open-questions" aria-labelledby="h-open">
   <h2 id="h-open">What is open</h2>
   <div class="para">
-    <aside class="note card" aria-label="Statement U, open, proved to 2,175">
-      <div class="note-head"><span class="note-name">Statement U<span class="note-label">and corollary X8</span></span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">open, proved to 2,175<span class="sr-only">, evidence on GitHub</span></a></div>
+    <aside class="note card" aria-label="Statement U, open, proved to game 2,175">
+      <div class="note-head"><span class="note-name">Statement U<span class="note-label">and corollary X8</span></span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">open, proved to game 2,175<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">Some optimal game plays every source descending greedy keeps in
       <a class="gloss" href="glossary.html#layer">layers</a> 3 and up.</p>
       <p class="precise"><span class="run">Precisely.</span>Some optimal set of n contains U*<sub>≥3</sub>, and then ΣU* +
@@ -160,15 +162,15 @@
     <a class="gloss" href="glossary.html#statement-u">Statement U</a> says that some
     <a class="gloss" href="glossary.html#optimal-game">optimal game</a> plays every number of
     <a class="gloss" href="glossary.html#u-star">U*</a> with three or more prime factors
-    (<a href="top-half.html#statement-u">chapter 3</a>).  Every score past 2,175 rests on it: each is the best score of
-    the <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is opt(n) wherever U holds.  U holds in
-    every game up to 2,175, because the <a class="gloss" href="glossary.html#prover">prover</a> proves those scores on
-    the whole board.  Past them it is open.</p>
+    (<a href="top-half.html#statement-u">chapter 3</a>).  Every score past game 2,175 rests on it: each is the best
+    score of the <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is opt(n) wherever U holds.  U
+    holds in every game up to 2,175, because the <a class="gloss" href="glossary.html#prover">prover</a> proves those
+    scores on the whole board.  Past them it is open.</p>
   </div>
 
   <div class="para">
-    <aside class="note card" aria-label="The sources conjecture, open, proved to 100,000">
-      <div class="note-head"><span class="note-name">The sources conjecture<span class="note-label">Conjecture S1</span></span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#the-open-statements-about-the-sources">open, proved to 100,000<span class="sr-only">, evidence on GitHub</span></a></div>
+    <aside class="note card" aria-label="The sources conjecture, open, proved to game 100,000">
+      <div class="note-head"><span class="note-name">The sources conjecture<span class="note-label">Conjecture S1</span></span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#the-open-statements-about-the-sources">open, proved to game 100,000<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">No <a class="gloss" href="glossary.html#playable">playable</a> set of sources outweighs U*.</p>
       <p class="precise"><span class="run">Precisely.</span>Every playable set S of sources has ΣS ≤ ΣU*
       (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#the-sources-conjecture">S1</a>).
@@ -240,7 +242,7 @@
   the file cannot change either.</p>
   <p>A replay shows that a game is legal and scores what it says, but not that no game scores more.  That is what the
   proofs are for, and each line names its own.  The <a class="gloss" href="glossary.html#prover">prover</a> proves the
-  scores from 2 to 2,175 again, on the whole board, and
+  scores from game 2 to game 2,175 again, on the whole board, and
   <a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/reproducing.md">its guide</a> gives the
   commands.  The scores alone are also in the format of the OEIS, in
   <a href="https://github.com/bvchess/taxman/blob/master/results/b019312.txt">results/b019312.txt</a>.</p>

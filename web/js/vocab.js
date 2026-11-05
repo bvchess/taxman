@@ -558,7 +558,7 @@ export const STANDING = {
   proved: 'proved',
   computed: 'proved by computation',
   'given-u': 'proved given U',
-  certified: 'open, proved to N',
+  certified: 'open, proved to game N',
   measured: 'measured',
   open: 'open',
 };
