@@ -42,10 +42,16 @@
     The moves of any game of n − 1 can therefore be played, in the same order, in game n, with every
     <a class="gloss" href="glossary.html#move">move</a> taking the same tax as before.  So the best score cannot fall:
     <a class="gloss" href="glossary.html#opt">opt(n)</a> is at least opt(n − 1).</p>
-    <p>In fact it always rises.  In a game of n − 1, play n just before the move that takes the last divisor of n from
-    the pot, or at the end if a divisor is left, and leave that move out if it can no longer be played.  Everything
-    after it stays legal, and the game gains n and loses at most that move, which is smaller than n.  So the moves of a
-    game of n − 1 are never an optimal game of n, and every optimal game of n plays n.</p>
+    <p>Take n = 12.  Game 11's best score is <span data-opt="11">44</span>, from the optimal game 11, 9, 6, 10, 8,
+    whose moves take 1, 3, 2, 5 and 4 as tax.  Played in game 12, the same moves take the same tax, and 12 stays in
+    the pot.</p>
+    <p>In fact the best score always rises.  In a game of n − 1, play n just before the move that takes the last divisor
+    of n from the pot, or at the end if a divisor is left, and leave that move out if it can no longer be played.
+    Everything after it stays legal, and the game gains n and loses at most that move, which is smaller than n.  So the
+    moves of a game of n − 1 are never an optimal game of n, and every optimal game of n plays n.</p>
+    <p>In game 12, the game above cannot simply end with 12, since by then 1, 2, 3, 4 and 6 are all gone.  The last of
+    them to go is 4, taken by the last move, 8.  So 12 is played just before 8, and takes 4 itself.  Then 8 has no
+    divisor left and is left out, and 11, 9, 6, 10, 12 scores <span data-opt="11">44</span> + 12 − 8 = 48.</p>
   </div>
 
   <div class="para">
@@ -57,12 +63,15 @@
       their order, are a legal game of n − 1.  So opt(n) ≤ opt(n − 1) + n, the ceiling of game n, and if S is playable in
       game n, then S without n is playable in game n − 1.</p>
     </aside>
-    <p>Nor can it rise by more than n.  Take an optimal game of n and leave out its move n, if it has one.  Everything
-    n would have taken stays in the <a class="gloss" href="glossary.html#pot">pot</a>, so every other move still has its
-    divisor, and what is left is a game of n − 1.  It scores at least opt(n) − n, and at most opt(n − 1).</p>
+    <p>Nor can it rise by more than n.  Take an optimal game of n and leave out its move n.  Everything n would have
+    taken stays in the <a class="gloss" href="glossary.html#pot">pot</a>, so every other move still has its divisor,
+    and what is left is a game of n − 1.  It scores opt(n) − n, which is at most opt(n − 1).</p>
+    <p>An optimal game of 12 is 11, 9, 10, 8, 12, which scores <span data-opt="12">50</span>.  Without 12, it leaves 6
+    in the pot and is a game of 11, which scores 38, below game 11's best score of <span data-opt="11">44</span>.</p>
     <p>So opt(n − 1) + n is the most that any game of n can score.  It is the
     <a class="gloss" href="glossary.html#ceiling"><em>ceiling</em></a> of game n, and a game that reaches it is
-    optimal, with nothing more to check.</p>
+    optimal, with nothing more to check.  Game 12's ceiling is <span data-opt="11">44</span> + 12 =
+    <span data-ceiling="12">56</span>, and its best score, <span data-opt="12">50</span>, falls short of it.</p>
   </div>
 </section>
 
