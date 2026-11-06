@@ -175,7 +175,7 @@ export function mountSearchTree(host, { small }) {
     if (!node.parent) continue;
     const from = { x: node.parent.x + CHIP.w / 2, y: node.parent.y };
     const to = { x: node.x - CHIP.w / 2, y: node.y };
-    s.line(`e${node.id}`, from, to, 'thin');
+    s.line(`e${node.id}`, from, to, 'branch');
     s.text(`l${node.id}`, node.edge.promote ? String(node.edge.x) : `no ${node.edge.x}`, { anchor: 'end' });
     s.node(`l${node.id}`).dataset.n = String(node.edge.x);
     if (node.kind === 'cut') s.text(`d${node.id}`, 'dropped');

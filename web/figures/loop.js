@@ -6,13 +6,12 @@
 // The figure has two forms of the same graph, and a button that unfolds one into the other.  In layers it is the
 // maximal-factor graph of the game above it: the four products in a column at the left, the four primes in a column at
 // the right, level with them, each product joined by a line to its two primes; the loop is there, but the lines
-// cross.  In the loop each product stands between its two primes, on a side of the dashed square.  The button moves
-// every number still on the table to its place in the other form in one motion, each along a smooth curve that passes
-// through its place in a midway pose, chosen so that no two numbers touch on the way, either way (scene.js, through);
-// and the square fades in as the unfolding ends and out as the folding starts.  The reader
-// may play in either form and switch at any time; the trays and Start over do not depend on the form.  The "stuck"
-// label stands by the stuck number in the loop, and in layers in the primes' column, which the game has emptied, level
-// with the stuck numbers.
+// cross.  In the loop each product stands between its two primes, on a side of the square its lines make.  The button
+// moves every number still on the table to its place in the other form in one motion, each along a smooth curve that
+// passes through its place in a midway pose, chosen so that no two numbers touch on the way, either way (scene.js,
+// through).  The reader may play in either form and switch at any time; the trays and Start over do not depend on the
+// form.  The "stuck" label stands by the stuck number in the loop, and in layers in the primes' column, which the game
+// has emptied, level with the stuck numbers.
 //
 // URL parameter: loop=10,14 opens the figure with those moves played, in layers; loop=unfolded:10,14, or just
 // loop=unfolded, opens it as a loop.
@@ -66,12 +65,6 @@ export function mountLoop(host) {
   };
 
   const s = scene(host.querySelector('svg'), { width: W, height: H, rendering: 'raised' });
-  const [x0, y0] = CORNER[2];
-  const [x1, y1] = CORNER[3];
-  s.custom('square', el('rect', {
-    x: x0, y: y0, width: x1 - x0, height: y1 - y0, rx: 6, fill: 'none', 'stroke-width': 2,
-    'stroke-dasharray': '3 6', 'stroke-linecap': 'round', style: 'stroke: var(--hair)',
-  }), (node, look) => { node.style.opacity = look.opacity; });
   for (const who of ['player', 'taxman']) {
     const g = el('g', {});
     el('rect', { x: TRAY.x[who], y: TRAY.y, width: TRAY.w, height: TRAY.h, rx: 16, class: `tray tray-${who}`, 'stroke-width': 1.5 }, g);
@@ -95,16 +88,13 @@ export function mountLoop(host) {
 
   const pass = (x, crossing) => (crossing ? { through: { x: MIDWAY[x][0], y: MIDWAY[x][1] } } : {});
 
-  // The looks of the numbers on the table and the square, in the form's pose.  crossing is a switch of form, in which
+  // The looks of the numbers on the table, in the form's pose.  crossing is a switch of form, in which
   // the numbers on the table pass through their midway places.
   function looks(crossing) {
     const legal = new Set(M.legalMoves(state));
     const over = legal.size === 0;
     const at = PLACE[form];
-    // The square fades in as a move into the loop ends and out as a move out of it starts.
-    const into = form === 'loop';
-    const square = { opacity: into ? 1 : 0, at: into ? [0.45, 1] : [0, 0.55] };
-    const v = { square, 'tray-player': {}, 'tray-taxman': {} };
+    const v = { 'tray-player': {}, 'tray-taxman': {} };
     for (const p of primes) {
       const i = state.taxman.indexOf(p);
       v[p] = i < 0

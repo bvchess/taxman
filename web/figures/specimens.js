@@ -183,13 +183,15 @@ export function mountMarks(host) {
 }
 
 // A promotion, small: two frames side by side, 9 a candidate among the factors of the frame behind, then a move of
-// the frame in front, paid for by 3.  The same states drawn in either rendering.
+// the frame in front, paid for by 3.  18 is joined to its maximal factors 9 and 6; while 9 is a candidate, a dotted
+// line joins it to the 3 that would pay for it, and it gives way to the hop.  The same states drawn in either
+// rendering.
 function promotionScene(svg, rendering) {
   const s = scene(svg, { width: 260, height: 132, rendering, label: `A promotion, ${rendering}: 9 leaves the factors of one frame and becomes a move of the frame in front, paid for by 3.` });
   s.box('behind').box('front');
-  s.number('ghost', 9).number(9, 9).number(18, 18).number(3, 3).number(15, 15).number(5, 5);
-  s.line('18-9', 18, 9, 'thin').line('15-3', 15, 3, 'thin').line('15-5', 15, 5, 'thin');
-  s.line('rise', 'ghost', 9, 'hop').line('pay', 9, 3, 'pay');
+  s.number('ghost', 9).number(9, 9).number(6, 6).number(18, 18).number(3, 3).number(15, 15).number(5, 5);
+  s.line('18-9', 18, 9, 'thin').line('18-6', 18, 6, 'thin').line('15-3', 15, 3, 'thin').line('15-5', 15, 5, 'thin');
+  s.line('rise', 'ghost', 9, 'hop').line('link', 9, 3, 'link').line('pay', 9, 3, 'pay');
   const base = {
     behind: { x: 8, y: 10, w: 100, h: 112 },
     front: { x: 128, y: 10, w: 124, h: 112 },
@@ -197,7 +199,8 @@ function promotionScene(svg, rendering) {
     3: { x: 220, y: 44, shape: SHAPE.square },
     5: { x: 220, y: 92, shape: SHAPE.square },
     15: { x: 158, y: 92, shape: SHAPE.circle, kept: 1 },
-    '15-3': {}, '15-5': {},
+    6: { x: 82, y: 88, shape: SHAPE.square },
+    '18-6': {}, '15-3': {}, '15-5': {},
   };
   return { s, base };
 }
@@ -205,12 +208,13 @@ function promotionScene(svg, rendering) {
 function promotionStates(base) {
   return [
     { ...base, 9: { x: 82, y: 44, shape: SHAPE.square }, '18-9': {} },
-    { ...base, 9: { x: 82, y: 44, shape: SHAPE.square, ring: 1 }, '18-9': {} },
+    { ...base, 9: { x: 82, y: 44, shape: SHAPE.square, ring: 1 }, '18-9': {}, link: {} },
     {
       ...base, _duration: 1500,
       ghost: { x: 82, y: 44, shape: SHAPE.square, dashed: 1, faded: 1, depth: 0, at: [0.1, 0.5] },
       9: { x: 158, y: 44, shape: SHAPE.circle, kept: 1, ring: 1, at: [0.05, 0.8] },
       rise: { at: [0.45, 0.9] }, pay: { at: [0.6, 1] }, '18-9': { opacity: 0, at: [0, 0.3] },
+      link: { opacity: 0, at: [0, 0.25] },
     },
     {
       ...base,

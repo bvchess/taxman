@@ -7,6 +7,7 @@
 // * a gray fill is kept, a hollow dashed outline rejected, a double outline a candidate;
 // * a thin line joins a number to one of its maximal factors, a thick line is a payment, and a dotted line joins a
 //   candidate to the factor in the frame in front that would pay for it, and a dotted arrow is the path of a promotion;
+//   a light solid line is a branch of a search tree;
 // * a box is a frame, dashed when it is closed;
 // * blue is the player's and orange the taxman's, and nothing else; what the prose names wears a halo of ink.
 //
@@ -130,6 +131,7 @@ const LINK = { width: 1.9, tone: '--mid', dash: '0.1 4.8', cap: 'round' };
  *    link   a candidate and the factor in the frame in front that would pay for it, a dotted line
  *    hop    the path of a promotion, from a factor's old place into the frame in front: the dotted line with an
  *           arrowhead, the only arrow the figures draw
+ *    branch a branch of a search tree, from a node to a node below it
  *    faint  a line out of focus
  *    rule   a rule across a figure, such as the line at n/2 */
 export const LINE = {
@@ -137,6 +139,7 @@ export const LINE = {
   pay: { width: 3.6, tone: '--ink' },
   link: LINK,
   hop: { ...LINK, head: true },
+  branch: { width: 1.6, tone: '--string' },
   faint: { width: 1.2, tone: '--faint' },
   rule: { width: 1.2, tone: '--mid', dash: '5 4' },
 };

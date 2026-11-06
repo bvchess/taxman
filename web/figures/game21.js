@@ -257,8 +257,8 @@ function buildStates(f) {
   S.layered = layered;
 
   // Frames: the board comes apart one frame at a time, the frame in front (layer 1, at the right) first.  A frame's
-  // numbers move together, and its box is drawn as they arrive; the names of the layers, the rule and its words, and
-  // the lines of the factors, which the frames do not draw, fade out early.
+  // numbers move together, and its box and the payment of a closed frame are drawn as they arrive; the names of the
+  // layers, the rule and its words, and the lines of the factors, which the frames do not draw, fade out early.
   const framesView = { _duration: 2400 };
   const frameStart = (layer) => 0.2 * (layer - 1);
   for (const x of numbers) {
@@ -269,7 +269,11 @@ function buildStates(f) {
     const id = `e${a}-${b}`;
     framesView[id] = isSource(a) ? { ...layered[id] } : { ...layered[id], opacity: 0, at: [0, 0.2] };
   }
-  framesView[firstPay] = { ...layered[firstPay] };
+  for (const [move, tax] of closedPayments(f)) {
+    const id = `p${move}-${tax}`;
+    const start = frameStart(f.frameOf.get(move).layer);
+    framesView[id] = id === firstPay ? { ...layered[firstPay] } : { at: [start + 0.2, start + 0.4] };
+  }
   for (const key of ['rule', 'half', 'sourcesName', 'factorsName', ...[0, 1, 2, 3, 4].map((k) => `layer${k}`)]) {
     framesView[key] = { ...layered[key], opacity: 0, at: [0, 0.15] };
   }
@@ -414,10 +418,10 @@ function captions(f) {
     frames:
       `The ${COUNT[f.frames.length] ?? f.frames.length} frames side by side: each source with the factors ` +
       `that can pay for it, greedy's choice in gray, the sources at the left of each frame and its factors ` +
-      `at the right. Each frame stands to the left of the frame in front of it.`,
+      `at the right. Each frame stands to the left of the frame in front of it. ` +
+      `Thick lines mark the payments already settled: ${paysFor(closedPayments(f))}.`,
     freedoms:
-      `The ${COUNT[closed.length]} frames at the ends are closed, with as many factors as moves: ` +
-      `${paysFor(closedPayments(f))}, and they drop out. ` +
+      `The ${COUNT[closed.length]} frames at the ends are closed, with as many factors as moves, and drop out. ` +
       `The other ${COUNT[f.open.length]} have one freedom each: frame ${f.open[0].number} at the right and ` +
       `frame ${f.open[1].number} behind it, numbered from the front. The candidates are ${listWords(f.candidates)}, ` +
       `with a dotted line from each to the factor that would pay for it.`,
