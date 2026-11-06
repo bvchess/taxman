@@ -9,8 +9,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
-  descendingGreedy, finish, frameModel, frames, isOver, isPlayable, legalMoves, maximalFactors, newGame, omega, peel,
-  play, primeFactors, promotedInto, properDivisors, replay, score, sources,
+  collapseFrames, descendingGreedy, finish, frameFacts, frameModel, frames, isOver, isPlayable, legalMoves,
+  maximalFactors, newGame, omega, peel, play, primeFactors, promotedInto, properDivisors, replay, score, sources,
 } from '../js/model.js';
 import { INTRO, STORY } from '../js/site.js';
 import { fitsFacts, fitsWords, primeFacts, primeWords } from '../figures/fits.js';
@@ -162,6 +162,21 @@ for (let n = 2; n <= FRAMES_UP_TO; n++) {
     [[168, 132, 110], [162, 150, 98]].map((set) => set.map((x) => promotedInto(model425, x))), [[2, 1, 0], [2, 1, 0]]);
   same('game 425: ... from frames 3, 2 and 1',
     [168, 132, 110, 162, 150, 98].map((x) => model425.find((f) => f.factors.includes(x)).number), [3, 2, 1, 3, 2, 1]);
+}
+
+// Game 5,060's frames, as the page's scale figure draws them: 19 frames, 3 closed, and the 16 with freedoms collapse
+// into frames 0 to 8, one group each.
+{
+  const model = frameModel(5060);
+  const facts = frameFacts(model);
+  same('game 5,060: 19 frames, 3 closed, 16 with freedoms numbered 0 to 8',
+    [facts.frames, facts.closed, facts.open, facts.lastNumber], [19, 3, 16, 8]);
+  const groups = collapseFrames(model);
+  same('game 5,060: the frames collapse into 9 numbered frames and 3 closed ones',
+    [groups.filter((g) => !g.closed).map((g) => g.number).sort((a, b) => a - b), groups.filter((g) => g.closed).length],
+    [[0, 1, 2, 3, 4, 5, 6, 7, 8], 3]);
+  same('game 5,060: frame 4 is four frames, frames 2, 3, 5 and 7 two each, the others one',
+    [0, 1, 2, 3, 4, 5, 6, 7, 8].map((h) => groups.find((g) => g.number === h).frames.length), [1, 1, 2, 2, 4, 2, 1, 2, 1]);
 }
 
 // Peel that chooses its own steps reaches the same answer, whichever steps it takes (the peel theorem): on game 21's

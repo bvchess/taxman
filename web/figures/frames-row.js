@@ -2,7 +2,8 @@
 // a mark for each of its numbers, the sources at its left (gray if descending greedy keeps them, hollow if not) and
 // its factors at its right; a dashed box is a closed frame.  The frames stand in the wiki's order, the highest layer
 // at the left and the frame in front at the right, and are named by their numbers (js/model.js, frameModel), frame 0
-// being the one in front; a closed frame has no number and is named closed.
+// being the one in front; a closed frame has no number and is named closed.  Frames with freedoms that share a number
+// are one frame: once greedy has decided, they are drawn as a single box around all their numbers (collapseFrames).
 //
 // The frames come from js/model.js at once (frames), and what descending greedy keeps a moment later, from a worker
 // (figures/frames-row-worker.js, frameModel), since descending greedy on a board of thousands takes seconds.  The
@@ -41,10 +42,17 @@ function layout(frames, rows) {
 }
 
 // A frame's name: its number, or closed.  The tooltip's version says Frame h or A closed frame.
-const nameOf = (f, title = false) => {
-  if (f.closed) return title ? 'A closed frame' : 'closed';
-  return title ? `Frame ${f.number}` : String(f.number);
+const nameOf = (u, title = false) => {
+  if (u.closed) return title ? 'A closed frame' : 'closed';
+  return title ? `Frame ${u.number}` : String(u.number);
 };
+
+const sum = (frames, count) => frames.reduce((a, f) => a + count(f), 0);
+// The counts of a frame of the figure: the sums over the frames that make it up.
+const countsOf = (frames) => ({
+  sources: sum(frames, (f) => f.sources.length), kept: sum(frames, (f) => f.kept?.length ?? 0),
+  factors: sum(frames, (f) => f.factors), freedoms: sum(frames, (f) => f.freedoms ?? 0),
+});
 
 const circle = (cx, cy, r) => `M${(cx - r).toFixed(2)} ${cy.toFixed(2)}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
 const square = (cx, cy, h) => `M${(cx - h).toFixed(2)} ${(cy - h).toFixed(2)}h${2 * h}v${2 * h}h${-2 * h}z`;
@@ -60,17 +68,29 @@ function draw(box, tip, data, width) {
   const boxH = (rows + 2 * PAD) * c;
   const height = top + boxH + 30;
   const left = (width - cells * c) / 2;
-  const svg = freshSVG(box, width, height, `The ${data.frames.length} frames of game ${fmt(data.n)}, a mark for each number. The numbers are in the table below.`);
+  const svg = freshSVG(box, width, height, `The frames of game ${fmt(data.n)}, a mark for each number. The numbers are in the table below.`);
   svg.classList.add('frames-row-svg');
+  // The frames as the reader names them: once greedy has decided, the frames of one number are one, a single box from
+  // the first of them to the last; until then every frame stands alone.
+  const boxOf = new Map(boxes.map((b) => [b.f, b]));
+  const units = (data.decided ? M.collapseFrames(frames) : frames.map((f) => ({ closed: false, frames: [f] })))
+    .map((u) => {
+      const own = u.frames.map((f) => boxOf.get(f));
+      const x0 = left + own[0].x * c;
+      const x1 = left + (own[own.length - 1].x + own[own.length - 1].w) * c;
+      return { ...u, x0, x1 };
+    });
+  for (const u of units) {
+    el('rect', {
+      x: u.x0.toFixed(2), y: top, width: (u.x1 - u.x0).toFixed(2), height: boxH.toFixed(2), rx: Math.min(6, 1.4 * c),
+      class: u.closed ? 'row-frame is-closed' : 'row-frame',
+    }, svg);
+  }
   let kept = '';
   let rejected = '';
   let factors = '';
   for (const b of boxes) {
     const x0 = left + b.x * c;
-    el('rect', {
-      x: x0.toFixed(2), y: top, width: (b.w * c).toFixed(2), height: boxH.toFixed(2), rx: Math.min(6, 1.4 * c),
-      class: b.f.closed ? 'row-frame is-closed' : 'row-frame',
-    }, svg);
     const keptSet = new Set(b.f.kept ?? []);
     // The sources from the largest down, column by column; then the factors.
     [...b.f.sources].reverse().forEach((s, i) => {
@@ -88,45 +108,41 @@ function draw(box, tip, data, width) {
   el('path', { d: factors, class: 'row-factor' }, svg);
   el('path', { d: kept, class: 'row-kept' }, svg);
   el('path', { d: rejected, class: 'row-rejected' }, svg);
-  // The name under each group of frames of one layer that share a name: a frame's number, or closed.  Until greedy has
-  // decided, no frame has one.
+  // The name under each frame: its number, or closed.  Until greedy has decided, no frame has one.  A name stands
+  // where it fits: as wide as its box and half the space to each neighbor.  A number always shows, and a closed
+  // frame, which is dashed, goes without a name that would run into its neighbors.
   const labelY = top + boxH + 18;
-  const groups = new Map();
-  for (const b of data.decided ? boxes : []) {
-    const key = `${b.f.layer}:${b.f.number}`;
-    groups.set(key, [...(groups.get(key) ?? []), b]);
-  }
-  for (const list of groups.values()) {
-    const a = left + list[0].x * c;
-    const z = left + (list[list.length - 1].x + list[list.length - 1].w) * c;
-    const t = el('text', { x: ((a + z) / 2).toFixed(1), y: labelY, 'text-anchor': 'middle', class: 'tick' }, svg);
-    t.textContent = nameOf(list[0].f);
+  const space = (u, i) => {
+    const before = i > 0 ? u.x0 - units[i - 1].x1 : LAYER_GAP * c;
+    const after = i < units.length - 1 ? units[i + 1].x0 - u.x1 : LAYER_GAP * c;
+    return u.x1 - u.x0 + (before + after) / 2;
+  };
+  if (data.decided) {
+    units.forEach((u, i) => {
+      const x = ((u.x0 + u.x1) / 2).toFixed(1);
+      const t = el('text', { x, y: labelY, 'text-anchor': 'middle', class: 'tick' }, svg);
+      t.textContent = nameOf(u);
+      if (u.closed && t.getBBox().width > space(u, i)) t.remove();
+    });
   }
   // The hover layer: a frame's counts.
-  for (const b of boxes) {
-    const x0 = left + b.x * c;
-    const hit = el('rect', { x: (x0 - 1).toFixed(2), y: 0, width: (b.w * c + 2).toFixed(2), height: top + boxH + 4, fill: 'transparent', class: 'hit' }, svg);
+  for (const u of units) {
+    const hit = el('rect', {
+      x: (u.x0 - 1).toFixed(2), y: 0, width: (u.x1 - u.x0 + 2).toFixed(2), height: top + boxH + 4, fill: 'transparent',
+      class: 'hit',
+    }, svg);
     hit.addEventListener('pointerenter', () => {
-      const rows = [data.decided ? nameOf(b.f, true) : 'A frame', ['sources', fmt(b.f.sources.length)]];
-      if (data.decided) rows.push(['kept by greedy', fmt(b.f.kept.length)]);
-      rows.push(['factors', fmt(b.f.factors)]);
-      if (data.decided) rows.push(['freedoms', b.f.closed ? 'none: closed' : fmt(b.f.freedoms)]);
-      tip.show(rows, x0 + (b.w * c) / 2, top + 20);
+      const counts = countsOf(u.frames);
+      const rows = [data.decided ? nameOf(u, true) : 'A frame'];
+      if (u.frames.length > 1) rows.push(['frames collapsed into it', fmt(u.frames.length)]);
+      rows.push(['sources', fmt(counts.sources)]);
+      if (data.decided) rows.push(['kept by greedy', fmt(counts.kept)]);
+      rows.push(['factors', fmt(counts.factors)]);
+      if (data.decided) rows.push(['freedoms', u.closed ? 'none: closed' : fmt(counts.freedoms)]);
+      tip.show(rows, (u.x0 + u.x1) / 2, top + 20);
     });
     hit.addEventListener('pointerleave', () => tip.hide());
   }
-}
-
-/** The figure's facts once descending greedy has decided: the counts its caption says. */
-export function rowFacts(frames) {
-  const closed = frames.filter((f) => f.closed);
-  return {
-    frames: frames.length,
-    closed: closed.length,
-    open: frames.length - closed.length,
-    lastNumber: Math.max(...frames.map((f) => f.number ?? 0)),
-    freedoms: frames.reduce((a, f) => a + f.freedoms, 0),
-  };
 }
 
 /** Mount the figure in host, which holds .row-box and .fig-caption.  Resolves with its facts once greedy has decided. */
@@ -150,11 +166,18 @@ export function mountFramesRow(host, { games, n = games.lastN }) {
     }
   }).observe(box);
   const numbers = data.frames.reduce((a, f) => a + f.sources.length + f.factors, 0);
-  const describe = (rest) => `The ${data.frames.length} frames of game ${fmt(n)}, a mark for each of its ${fmt(numbers)} numbers: in each frame its sources at the left, gray where descending greedy keeps them and hollow where it does not, and its factors at the right. ${rest}`;
+  const describe = (rest) => `The frames of game ${fmt(n)}, a mark for each of its ${fmt(numbers)} numbers: in each frame its sources at the left, gray where descending greedy keeps them and hollow where it does not, and its factors at the right. ${rest}`;
   caption.textContent = describe('Descending greedy is still working out which sources it keeps…');
-  // The table, its last columns filled in once greedy has decided.
-  const pendingRows = drawOrder(data.frames).map((f) => ['…', fmt(f.sources.length), '…', fmt(f.factors), '…']);
-  tableView(host, 'The numbers behind the figure', ['frame', 'sources', 'kept', 'factors', 'freedoms'], pendingRows);
+  // The table: a row for each frame, its last columns filled in once greedy has decided.
+  const table = (rows) => {
+    const old = host.querySelector('.chart-table');
+    tableView(host, 'The numbers behind the figure', ['frame', 'sources', 'kept', 'factors', 'freedoms'], rows);
+    if (old) {
+      host.querySelector('.chart-table:last-of-type').open = old.open;
+      old.remove();
+    }
+  };
+  table(drawOrder(data.frames).map((f) => ['…', fmt(f.sources.length), '…', fmt(f.factors), '…']));
   return new Promise((resolve, reject) => {
     worker.onerror = (e) => {
       caption.textContent = `The frames of game ${fmt(n)}: descending greedy could not be run in this browser.`;
@@ -170,18 +193,16 @@ export function mountFramesRow(host, { games, n = games.lastN }) {
       data.frames = answer.frames;
       data.decided = true;
       if (width > 0) redraw();
-      const facts = rowFacts(data.frames);
+      const facts = M.frameFacts(data.frames);
       caption.textContent = describe(
-        `${facts.closed} of them are closed, and the other ${facts.open} make up frames 0 to ${facts.lastNumber}, ` +
-        `with ${fmt(facts.freedoms)} freedoms in all and ${fmt(candidates)} candidates.`
+        `Its ${facts.open} frames with freedoms collapse into frames 0 to ${facts.lastNumber}, and ${facts.closed} ` +
+        `more are closed, dashed.  In all they have ${fmt(facts.freedoms)} freedoms and ${fmt(candidates)} candidates.`
       );
-      const cells = [...host.querySelectorAll('.chart-table tbody tr')];
-      drawOrder(data.frames).forEach((f, j) => {
-        const td = cells[j].children;
-        td[0].textContent = f.closed ? 'closed' : String(f.number);
-        td[2].textContent = fmt(f.kept.length);
-        td[4].textContent = f.closed ? 'closed' : fmt(f.freedoms);
-      });
+      table(M.collapseFrames(drawOrder(data.frames)).map((u) => {
+        const counts = countsOf(u.frames);
+        return [u.closed ? 'closed' : String(u.number), fmt(counts.sources), fmt(counts.kept), fmt(counts.factors),
+          u.closed ? 'closed' : fmt(counts.freedoms)];
+      }));
       resolve(facts);
     };
   });

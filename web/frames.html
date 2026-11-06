@@ -99,8 +99,9 @@
     with the factors 1 and 8, have as many factors as moves.  They are <em>closed</em>: every <a class="gloss"
     href="glossary.html#factor">factor</a> <a class="gloss" href="glossary.html#pays-for">pays for</a> a move, and
     nothing in them is left to choose.  The other two have four factors and three moves, one freedom each.  The frames
-    with freedoms are numbered from the front:  <em>frame 0</em> at the right, with the sources 14, 15 and 21, and frame
-    1 behind it, with 12, 18 and 20.</p>
+    with freedoms are numbered from the front: <em>frame 0</em> at the right, with the sources 14, 15 and 21, and frame
+    1 behind it, with 12, 18 and 20.  In a larger game, several frames with freedoms can stand at the same distance from
+    the front; they are collapsed into a single frame, with one number.</p>
   </div>
 </section>
 
@@ -189,13 +190,14 @@
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/design/frame-model.md#setup-in-the-code">the
       design</a>; <a href="https://github.com/bvchess/taxman/tree/master/solver/frame/src/frames">solver/frame/src/frames</a>).</p>
     </aside>
-  <p>Game 21 has two <a class="gloss" href="glossary.html#candidate">candidates</a>.  Game
-  <span data-scale="n">5,060</span> has <span data-scale="frames">19</span>
-  <a class="gloss" href="glossary.html#frame">frames</a> and <span data-scale="candidates">1,380</span> candidates.  Its
-  <a class="gloss" href="glossary.html#optimal-game">optimal game</a> <a class="gloss" href="glossary.html#promote">promotes</a>
-  <span data-scale="promotions">268</span> of them, and they carry <span data-scale="promoted">570,330</span> of its
-  <span data-scale="score">8,053,621</span> points: about <span data-scale="rest">7%</span> of the score.  The other
-  <span data-scale="top">93%</span> is <a class="gloss" href="glossary.html#u-star">U*</a>, which one greedy pass chose.</p>
+  <p>Game 21 has two <a class="gloss" href="glossary.html#candidate">candidates</a>.  Game <span
+  data-scale="n">5,060</span> has <span data-scale="candidates">1,380</span>, in <a class="gloss"
+  href="glossary.html#frame">frames</a> 0 to <span data-row="last">8</span>, into which its <span
+  data-row="open">16</span> frames with freedoms collapse.  Its <a class="gloss"
+  href="glossary.html#optimal-game">optimal game</a> <a class="gloss" href="glossary.html#promote">promotes</a> <span
+  data-scale="promotions">268</span> of them, and they carry <span data-scale="promoted">570,330</span> of its <span
+  data-scale="score">8,053,621</span> points: about <span data-scale="rest">7%</span> of the score.  The other <span
+  data-scale="top">93%</span> is <a class="gloss" href="glossary.html#u-star">U*</a>, which one greedy pass chose.</p>
   </div>
 
   <figure class="fig wide chart frames-row" id="frames-row">
@@ -292,7 +294,10 @@ const scale = {
   sets: fmt(Math.round(c.candidates[i] * Math.log10(2))),
 };
 for (const s of document.querySelectorAll('[data-scale]')) s.textContent = scale[s.dataset.scale];
-mountFramesRow(document.getElementById('frames-row'), { games });
+mountFramesRow(document.getElementById('frames-row'), { games }).then((facts) => {
+  const row = { open: facts.open, last: facts.lastNumber };
+  for (const s of document.querySelectorAll('[data-row]')) s.textContent = fmt(row[s.dataset.row]);
+});
 
 mountTwoSets(document.getElementById('two-sets'), { games });
 fill425(games);

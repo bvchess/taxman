@@ -325,6 +325,37 @@ export function frameModel(n) {
   return decided.map((f) => ({ ...f, number: f.closed ? null : f.layer - lowest }));
 }
 
+/** The model's frames with the frames of one number collapsed into one: a list of {number, closed, frames} in the
+ *  order the frames come, a numbered group holding every frame of its number, at the place of the first, and a closed
+ *  frame a group of its own.  model is frameModel(n), or its frames in any order. */
+export function collapseFrames(model) {
+  const groups = [];
+  const byNumber = new Map();
+  for (const f of model) {
+    if (!f.closed && byNumber.has(f.number)) {
+      byNumber.get(f.number).frames.push(f);
+      continue;
+    }
+    const group = { number: f.number, closed: f.closed, frames: [f] };
+    groups.push(group);
+    if (!f.closed) byNumber.set(f.number, group);
+  }
+  return groups;
+}
+
+/** The counts of a decided model: its frames, closed frames, frames with freedoms, the highest number and the
+ *  freedoms in all. */
+export function frameFacts(model) {
+  const open = model.filter((f) => !f.closed);
+  return {
+    frames: model.length,
+    closed: model.length - open.length,
+    open: open.length,
+    lastNumber: Math.max(...open.map((f) => f.number)),
+    freedoms: model.reduce((a, f) => a + f.freedoms, 0),
+  };
+}
+
 /** The number of the frame that a promotion of factor x goes into: x is a factor of a frame numbered h, and as a move
  *  it belongs to frame h - 1.  model is frameModel(n).  Throws if x is a factor of no frame with freedoms. */
 export function promotedInto(model, x) {
