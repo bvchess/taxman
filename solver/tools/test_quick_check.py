@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Unit tests of quick_check.py's judgment of a run (the summary that run_tests.py writes) and of its wait for a quiet
-machine (the CPU ticks, the share they say is busy, and the decision to wait, go on or give up) and of its lock, which
-makes two checks take turns.
+machine (the CPU ticks, the tasks at SCHED_IDLE whose ticks count as idle, the share the ticks say is busy, and the
+decision to wait, go on or give up) and of its lock, which makes two checks take turns.
 
 usage: python3 -I test_quick_check.py      (or python3 -I -m unittest test_quick_check, from this directory)
 """
@@ -90,6 +90,101 @@ class Ticks(unittest.TestCase):
         second = quick_check.read_ticks()
         self.assertGreaterEqual((second.total - first.total) % quick_check.WRAP, 0)
         self.assertLess((second.total - first.total) % quick_check.WRAP, 1 << 20, "a counter that jumped")
+
+
+def proc_stat(user=0, nice=0, system=0, idle=0) -> str:
+    """The cpu line of /proc/stat: user nice system idle iowait irq softirq steal guest guest_nice."""
+    return f"cpu  {user} {nice} {system} {idle} 0 0 0 0 0 0\n"
+
+
+def task_stat(tid: int, name: str = "exact", ticks=(0, 0), nice: int = 0, policy: int = 0) -> str:
+    """A task's stat file as Linux writes it, 52 fields: the task id, the name in parentheses, and numbers, of which
+    only the state (field 3), utime and stime (14 and 15), nice (19) and policy (41) are set."""
+    fields = {3: "R", 14: ticks[0], 15: ticks[1], 19: nice, 41: policy}
+    return " ".join([str(tid), f"({name})"] + [str(fields.get(number, 0)) for number in range(3, 53)])
+
+
+# A thread of the prover on batmobile, which runs at SCHED_IDLE (policy 5) and nice 0.
+PROVER_THREAD = (
+    "1496520 (exact) R 1383891 1496517 1383889 34817 1383889 4194368 532575 0 7 0 179267 117 0 0 20 0 89 0 135949331 "
+    "29550268416 689966 18446744073709551615 94796093706608 94796094249440 140729367706224 0 0 0 0 3149824 17474 0 0 0 "
+    "-1 12 0 5 0 0 0 94796094282520 94796094285168 94796304818176 140729367711203 140729367723043 140729367723043 "
+    "140729367723957 0\n"
+)
+
+
+class SchedIdleTasks(unittest.TestCase):
+    """Linux counts the time of a task at SCHED_IDLE and nice 0 as busy; the check counts it as idle."""
+
+    def test_a_stat_file_is_read_by_field_number_from_the_last_parenthesis(self):
+        self.assertEqual(quick_check.task_in_stat(PROVER_THREAD),
+                         quick_check.Task(tid=1496520, ticks=179267 + 117, nice=0, policy=quick_check.SCHED_IDLE))
+
+    def test_a_name_with_spaces_and_parentheses_does_not_shift_the_fields(self):
+        text = task_stat(77, name="a b) (c (d) e", ticks=(300, 40), nice=-5, policy=3)
+        self.assertEqual(quick_check.task_in_stat(text), quick_check.Task(tid=77, ticks=340, nice=-5, policy=3))
+
+    def test_only_tasks_at_sched_idle_and_nice_0_or_below_are_taken_by_task_id(self):
+        stats = [task_stat(1, ticks=(10, 1), policy=quick_check.SCHED_IDLE),
+                 task_stat(2, ticks=(20, 2), nice=-5, policy=quick_check.SCHED_IDLE),
+                 task_stat(3, ticks=(30, 3), nice=10, policy=quick_check.SCHED_IDLE),  # in the `nice` ticks already
+                 task_stat(4, ticks=(40, 4), policy=0),
+                 task_stat(5, ticks=(50, 5), nice=10, policy=0),
+                 task_stat(6, ticks=(60, 6), policy=3)]  # SCHED_BATCH
+        self.assertEqual(quick_check.sched_idle_ticks(stats), {1: 11, 2: 22})
+
+    def test_a_machine_busy_with_sched_idle_tasks_at_nice_0_only_is_quiet(self):
+        idle = quick_check.SCHED_IDLE
+        before = quick_check.ticks_in_proc_stat(
+            proc_stat(user=500, system=400, idle=1000),
+            [task_stat(1, ticks=(100, 10), policy=idle), task_stat(2, ticks=(50, 5), policy=idle)])
+        after = quick_check.ticks_in_proc_stat(
+            proc_stat(user=730, system=415, idle=1000),
+            [task_stat(1, ticks=(250, 20), policy=idle), task_stat(2, ticks=(130, 10), policy=idle)])
+        self.assertEqual(quick_check.busy_share(before, after), 0.0)
+
+    def test_the_machine_is_busy_with_what_other_tasks_use_beside_the_sched_idle_ones(self):
+        idle = quick_check.SCHED_IDLE
+        before = quick_check.ticks_in_proc_stat(
+            proc_stat(user=1000), [task_stat(1, ticks=(100, 0), policy=idle), task_stat(2, ticks=(100, 0))])
+        after = quick_check.ticks_in_proc_stat(
+            proc_stat(user=1400), [task_stat(1, ticks=(400, 0), policy=idle), task_stat(2, ticks=(200, 0))])
+        self.assertEqual(quick_check.busy_share(before, after), 0.25)
+
+    def test_a_niced_sched_idle_task_is_idle_once_through_the_nice_ticks_and_not_counted_again(self):
+        idle = quick_check.SCHED_IDLE
+        before = quick_check.ticks_in_proc_stat(
+            proc_stat(user=1000, nice=0),
+            [task_stat(1, ticks=(100, 0), nice=10, policy=idle), task_stat(2, ticks=(100, 0))])
+        after = quick_check.ticks_in_proc_stat(
+            proc_stat(user=1200, nice=200),  # 200 ticks of the niced task, 200 of the other
+            [task_stat(1, ticks=(300, 0), nice=10, policy=idle), task_stat(2, ticks=(300, 0))])
+        self.assertEqual(quick_check.busy_share(before, after), 0.5)
+
+    def test_a_task_in_only_one_reading_is_left_out(self):
+        idle = quick_check.SCHED_IDLE
+        before = quick_check.ticks_in_proc_stat(
+            proc_stat(user=1000),
+            [task_stat(1, ticks=(100, 0), policy=idle), task_stat(2, ticks=(900, 0), policy=idle)])  # 2 ends
+        after = quick_check.ticks_in_proc_stat(
+            proc_stat(user=2000),
+            [task_stat(1, ticks=(200, 0), policy=idle), task_stat(3, ticks=(5000, 0), policy=idle)])  # 3 begins
+        self.assertEqual(quick_check.sched_idle_growth(before, after), 100)
+        self.assertEqual(quick_check.busy_share(before, after), 0.9)
+
+    def test_readings_without_tasks_say_what_the_cpu_ticks_say(self):
+        before = quick_check.ticks_in_proc_stat(proc_stat(user=100, idle=100))
+        after = quick_check.ticks_in_proc_stat(proc_stat(user=200, idle=100))
+        self.assertEqual(before.sched_idle, {})
+        self.assertEqual(quick_check.busy_share(before, after), 1.0)
+
+    def test_every_task_this_system_lists_is_read(self):
+        if not sys.platform.startswith("linux"):
+            self.skipTest("only Linux has /proc/PID/task/TID/stat")
+        stats = quick_check.read_task_stats()
+        self.assertTrue(stats)
+        for task in map(quick_check.task_in_stat, stats):
+            self.assertGreaterEqual(task.ticks, 0)
 
 
 PS = """\

@@ -20,9 +20,12 @@ exits with status 1 if
   * the tests take more than TOTAL_LIMIT seconds (their time, not the build's), or
   * a test uses more than TEST_LIMIT seconds of CPU.
 
-Work run niced (at a priority below the normal) counts as idle, not as busy: it yields its CPUs to the tests, so a
-machine that is busy only with such work is quiet enough.  The tests still share a core's hyperthread and the caches
-with it, which the CPU-second limits feel; testing.md says what to do if they fail for that.
+Work run at a low priority counts as idle, not as busy: it yields its CPUs to the tests, so a machine that is busy only
+with such work is quiet enough.  That is work niced (at a nice value above 0), which the system counts in its `nice`
+ticks, and on Linux also work at the SCHED_IDLE policy (`chrt -i 0`) at a nice value of 0 or below, which the system
+counts as busy: the check adds the CPU time that such a task used during the sample, from the task's own stat file, to
+the idle ticks.  The tests still share a core's hyperthread and the caches with it, which the CPU-second limits feel;
+testing.md says what to do if they fail for that.
 
 A test is held to its CPU seconds, not to the seconds it takes: with every CPU busy a test takes several times as long
 as it does alone, and its CPU seconds do not change.  The limits are here and nowhere else; raising either needs
@@ -31,6 +34,7 @@ with it.
 """
 import ctypes
 import fcntl
+import glob
 import json
 import os
 import subprocess
@@ -38,7 +42,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Callable, Dict, List, NamedTuple, Optional
+from typing import Callable, Dict, Iterable, List, Mapping, NamedTuple, Optional
 
 TOTAL_TARGET = 10.0  # seconds the tests should take, on a laptop of ten cores
 TOTAL_LIMIT = 15.0  # seconds of the tests after which the check fails
@@ -67,26 +71,61 @@ POINTER = "A test that takes more than about a second is long: see solver/docs/d
 
 # --- how busy the machine is ------------------------------------------------------------------------------------------
 class Ticks(NamedTuple):
-    """What the machine's CPUs have spent so far, all together, in ticks of the system's clock."""
+    """What the machine's CPUs have spent so far, all together, in ticks of the system's clock.  `sched_idle` is, on
+    Linux, what each task at the SCHED_IDLE policy (and nice 0 or below) has used so far, by task id, which `idle` does
+    not hold (see NICED_IS_IDLE); on macOS it is empty."""
     idle: int
     total: int
+    sched_idle: Mapping[int, int] = {}
 
 
-# Niced work does not make the machine busy.  Work at a low priority (a long search at nice 10 or SCHED_IDLE) gives its
-# CPUs up to a test the moment the test wants one, so the test runs as it would on a machine with nothing else to do,
-# except for what it shares with that work (a core's other hyperthread, the caches).  Both systems' `nice` ticks are
-# counted as idle, here, in the one place where the ticks are read.
+class Task(NamedTuple):
+    """The fields of a Linux task's stat file that matter here."""
+    tid: int
+    ticks: int  # the CPU time the task has used so far, user and system, in ticks of the system's clock
+    nice: int
+    policy: int
+
+
+# Work at a low priority does not make the machine busy.  Work niced (a long search at nice 10) or at the SCHED_IDLE
+# policy gives its CPUs up to a test the moment the test wants one, so the test runs as it would on a machine with
+# nothing else to do, except for what it shares with that work (a core's other hyperthread, the caches).  Both systems'
+# `nice` ticks are counted as idle, here, in the one place where the ticks are read.  Linux puts a task's time in its
+# `nice` ticks only when the task's nice value is above 0, so work at SCHED_IDLE and nice 0 (`chrt -i 0`) is in the user
+# and system ticks, as busy as any: what such tasks used over a sample is counted as idle too (`busy_share`).  A task at
+# SCHED_IDLE and nice above 0 is already in the `nice` ticks, and is not counted a second time.
 NICED_IS_IDLE = True
+
+SCHED_IDLE = 5  # the number of Linux's SCHED_IDLE policy, field 41 of a task's stat file
 
 WRAP = 1 << 32  # macOS counts ticks in 32 bits, and a laptop that stays up wraps them within weeks
 
 
-def ticks_in_proc_stat(text: str) -> Ticks:
+def task_in_stat(text: str) -> Task:
+    """Linux: a task's stat file (/proc/PID/task/TID/stat) is `tid (name) state ppid ...`.  The name can hold spaces and
+    parentheses, so the fields are counted from the last `)`: the state is field 3, the user and system ticks (utime and
+    stime) are fields 14 and 15, nice is field 19, and the policy is field 41 (proc(5))."""
+    fields = text[text.rindex(")") + 1:].split()
+
+    def field(number: int) -> int:
+        return int(fields[number - 3])
+
+    return Task(int(text.split(None, 1)[0]), field(14) + field(15), field(19), field(41))
+
+
+def sched_idle_ticks(task_stats: Iterable[str]) -> Dict[int, int]:
+    """Linux: the ticks so far of the tasks at the SCHED_IDLE policy and nice 0 or below, by task id, from the text of
+    the tasks' stat files.  A task above nice 0 is in the `nice` ticks of /proc/stat already (see NICED_IS_IDLE)."""
+    tasks = map(task_in_stat, task_stats)
+    return {task.tid: task.ticks for task in tasks if task.policy == SCHED_IDLE and task.nice <= 0}
+
+
+def ticks_in_proc_stat(text: str, task_stats: Iterable[str] = ()) -> Ticks:
     """Linux: the first line of /proc/stat is `cpu user nice system idle iowait irq softirq steal ...`, the ticks of all
     the CPUs together; a CPU that waits for input or output is idle, and so is one that runs niced work (see
-    NICED_IS_IDLE)."""
+    NICED_IS_IDLE).  The `task_stats` are the texts of the tasks' stat files, for the tasks at SCHED_IDLE."""
     fields = [int(field) for field in text.splitlines()[0].split()[1:9]]
-    return Ticks(fields[3] + fields[4] + fields[1], sum(fields))
+    return Ticks(fields[3] + fields[4] + fields[1], sum(fields), sched_idle_ticks(task_stats))
 
 
 def ticks_of_mach() -> Ticks:
@@ -104,20 +143,44 @@ def ticks_of_mach() -> Ticks:
     return Ticks((info[idle] + info[nice]) % WRAP, (info[user] + info[system] + info[idle] + info[nice]) % WRAP)
 
 
+def read_task_stats() -> List[str]:
+    """Linux: the text of the stat file of every task (every thread of every process) now.  A task that ends while the
+    files are read, or a file that cannot be read, is left out.  A task's name can be any bytes, so they are decoded
+    leniently."""
+    texts = []
+    for path in glob.glob("/proc/[0-9]*/task/[0-9]*/stat"):
+        try:
+            texts.append(Path(path).read_text(errors="replace"))
+        except OSError:
+            continue
+    return texts
+
+
 def read_ticks() -> Optional[Ticks]:
     """The ticks of the machine's CPUs so far, or None where this system does not say."""
     try:
-        return ticks_of_mach() if sys.platform == "darwin" else ticks_in_proc_stat(Path("/proc/stat").read_text())
+        if sys.platform == "darwin":
+            return ticks_of_mach()
+        return ticks_in_proc_stat(Path("/proc/stat").read_text(), read_task_stats())
     except (OSError, ValueError, IndexError, AttributeError):
         return None
 
 
+def sched_idle_growth(before: Ticks, after: Ticks) -> int:
+    """The ticks the tasks at SCHED_IDLE used between two readings: those of the tasks in both, since a task that began
+    or ended between them has no ticks to compare."""
+    both = before.sched_idle.keys() & after.sched_idle.keys()
+    return sum(after.sched_idle[tid] - before.sched_idle[tid] for tid in both)
+
+
 def busy_share(before: Ticks, after: Ticks) -> Optional[float]:
-    """The share of the CPUs' time between two readings that was not idle (0 to 1), or None if no ticks went by."""
+    """The share of the CPUs' time between two readings that was not idle (0 to 1), or None if no ticks went by.  The
+    ticks that tasks at SCHED_IDLE used count as idle (see NICED_IS_IDLE)."""
     total = (after.total - before.total) % WRAP
     if total == 0:
         return None
-    return min(1.0, max(0.0, 1.0 - ((after.idle - before.idle) % WRAP) / total))
+    idle = (after.idle - before.idle) % WRAP + sched_idle_growth(before, after)
+    return min(1.0, max(0.0, 1.0 - idle / total))
 
 
 def sample_busy_share() -> Optional[float]:
