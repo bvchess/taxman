@@ -6,7 +6,7 @@
 // * a circle is a move or a source, a square a factor; a promotion turns a square into a circle;
 // * a gray fill is kept, a hollow dashed outline rejected, a double outline a candidate;
 // * a thin line joins a number to one of its maximal factors, a thick line is a payment, and a dotted line joins a
-//   factor to its maximal factor in the frame in front, and a dotted arrow is the path of a promotion;
+//   candidate to the factor in the frame in front that would pay for it, and a dotted arrow is the path of a promotion;
 // * a box is a frame, dashed when it is closed;
 // * blue is the player's and orange the taxman's, and nothing else; what the prose names wears a halo of ink.
 //
@@ -127,7 +127,7 @@ const LINK = { width: 1.9, tone: '--mid', dash: '0.1 4.8', cap: 'round' };
 /** The kinds of line.  Each differs by weight, tone and dash, never by color alone.
  *    thin   a number and one of its maximal factors
  *    pay    a payment: the factor that pays for a move
- *    link   a factor and its maximal factor in the frame in front, a dotted line
+ *    link   a candidate and the factor in the frame in front that would pay for it, a dotted line
  *    hop    the path of a promotion, from a factor's old place into the frame in front: the dotted line with an
  *           arrowhead, the only arrow the figures draw
  *    faint  a line out of focus

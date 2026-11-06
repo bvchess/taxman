@@ -53,7 +53,8 @@ const STEP = 34;
 const SPLIT = 22; // once cut, how far the factors stand above the line and the sources below it
 
 // The frames, side by side.  Rows are 48 apart, and each factor stands level with the factor it divides (8 with 4,
-// 4 with 2, 9 with 3, 7 with 1), so that the dotted links run straight across, between the sources they pass.
+// 4 with 2, 9 with 3, 7 with 1), so that a candidate's dotted link and its hop run straight across, between the
+// sources they pass.
 const row = (r) => 58 + 48 * r;
 const FRAME_AT = {
   16: [33, row(1)], 8: [97, row(1)],
@@ -73,8 +74,6 @@ const BOX_AT = {
 // After the promotion the moves of frame 0 make room for 9, level with 3, which pays for it: a short hop
 // rightward from the factors of frame 1.
 const PROMOTED_AT = { 14: [317, row(1.2)], 21: [317, row(2.1)], 9: [317, row(3)], 15: [317, row(3.9)] };
-// The links to the frame in front that the figure draws: those that pass clear of other numbers.
-const LINKS_DRAWN = [[8, 4], [4, 2], [9, 3], [10, 2], [7, 1]];
 const NAME_Y = 302; // the names of the layers and the frames, under them (a frame's name from the freedoms state on)
 // The lines of a frame's arithmetic, under its name: three, as two run into the next frame at a width of 390 px.
 const ARITH_LINES = 3;
@@ -151,6 +150,16 @@ const numbers = Array.from({ length: N }, (_, i) => i + 1);
 const isSource = (x) => x > HALF;
 const shapeOf = (x) => (isSource(x) ? SHAPE.circle : SHAPE.square);
 const allEdges = numbers.flatMap((x) => M.maximalFactors(x).map((f) => [x, f]));
+// The dotted links: from each candidate to each of its maximal factors, which all lie in the frame in front.
+const candidateLinks = (f) => allEdges.filter(([a]) => f.candidates.includes(a));
+// The factor that pays for each move.
+const payers = (f) => new Map(f.turns.map((t) => [t.move, t.tax[0]]));
+// The payments of the closed frames, [move, tax], in the order the frames stand, left to right.
+const closedPayments = (f) => {
+  const payOf = payers(f);
+  return f.frames.filter((fr) => fr.closed).sort((a, b) => BOX_AT[a.layer].x - BOX_AT[b.layer].x)
+    .flatMap((fr) => fr.kept.map((m) => [m, payOf.get(m)]));
+};
 
 // Each layer's column, ascending from the top; once split at n/2, the factors stand above the line, the largest
 // nearest it, and the sources below it, the smallest nearest it.
@@ -194,8 +203,7 @@ function buildStates(f) {
   };
   const frame1 = f.frames.find((fr) => fr.layer === 1);
   const firstKept = Math.max(...frame1.kept);
-  const linkDrawn = new Set(LINKS_DRAWN.map(([a, b]) => `${a}-${b}`));
-  const payOf = new Map(f.turns.map((t) => [t.move, t.tax[0]]));
+  const payOf = payers(f);
   const firstPay = `p${firstKept}-${payOf.get(firstKept)}`;
   const decided = (x) => (isSource(x) ? { kept: f.kept.has(x) ? 1 : 0, dashed: f.kept.has(x) ? 0 : 1 } : {});
   const S = {};
@@ -260,7 +268,6 @@ function buildStates(f) {
   for (const [a, b] of allEdges) {
     const id = `e${a}-${b}`;
     framesView[id] = isSource(a) ? { ...layered[id] } : { ...layered[id], opacity: 0, at: [0, 0.2] };
-    if (!isSource(a) && linkDrawn.has(`${a}-${b}`)) framesView[`l${a}-${b}`] = { at: [0.8, 1] };
   }
   framesView[firstPay] = { ...layered[firstPay] };
   for (const key of ['rule', 'half', 'sourcesName', 'factorsName', ...[0, 1, 2, 3, 4].map((k) => `layer${k}`)]) {
@@ -285,12 +292,9 @@ function buildStates(f) {
   for (const [a, b] of allEdges) {
     const id = `e${a}-${b}`;
     if (isSource(a)) freedoms[id] = { faded: closed.has(a) || !f.kept.has(a) ? 1 : 0, opacity: closed.has(a) ? 0.6 : 1 };
-    const lid = `l${a}-${b}`;
-    if (!isSource(a) && linkDrawn.has(`${a}-${b}`)) {
-      freedoms[lid] = f.candidates.includes(a) ? { halo: 1 } : { faded: 1, opacity: 0.5 };
-    }
   }
-  freedoms[firstPay] = { faded: 1, opacity: 0.6 };
+  for (const [a, b] of candidateLinks(f)) freedoms[`l${a}-${b}`] = { halo: 1 };
+  for (const [move, tax] of closedPayments(f)) freedoms[`p${move}-${tax}`] = { faded: 1, opacity: 0.6 };
   for (const fr of f.frames) {
     freedoms[`box${fr.layer}`] = { ...BOX_AT[fr.layer], dashed: fr.closed ? 1 : 0, faded: fr.closed ? 1 : 0 };
     freedoms[`name${fr.layer}`] = { x: boxMiddle(fr.layer), y: NAME_Y, opacity: fr.closed ? 0.6 : 1 };
@@ -322,12 +326,11 @@ function buildStates(f) {
   for (const [a, b] of allEdges) {
     const id = `e${a}-${b}`;
     if (isSource(a)) promote[id] = promotedSet.has(b) ? { opacity: 0, at: [0, 0.3] } : { ...freedoms[id] };
-    const lid = `l${a}-${b}`;
-    if (freedoms[lid] && f.candidates.includes(a)) {
-      promote[lid] = promotedSet.has(a) ? { opacity: 0, at: [0, 0.25] } : { faded: 1, opacity: 0.4 };
-    } else if (freedoms[lid]) promote[lid] = { ...freedoms[lid] };
   }
-  promote[firstPay] = { ...freedoms[firstPay] };
+  for (const [a, b] of candidateLinks(f)) {
+    promote[`l${a}-${b}`] = promotedSet.has(a) ? { opacity: 0, at: [0, 0.25] } : { faded: 1, opacity: 0.4 };
+  }
+  for (const [move, tax] of closedPayments(f)) promote[`p${move}-${tax}`] = { ...freedoms[`p${move}-${tax}`] };
   for (const fr of f.frames) {
     promote[`box${fr.layer}`] = { ...freedoms[`box${fr.layer}`] };
     promote[`name${fr.layer}`] = { ...freedoms[`name${fr.layer}`] };
@@ -391,6 +394,10 @@ function buildStates(f) {
 // The words under the figure
 // ---------------------------------------------------------------------------------------------------------------
 
+/** The payments in words: "8 pays for 16 and 1 for 19". */
+const paysFor = (payments) =>
+  payments.map(([move, tax], i) => `${tax} ${i === 0 ? 'pays ' : ''}for ${move}`).join(' and ');
+
 function captions(f) {
   const half = Math.floor(HALF);
   const fp = f.frameOf.get(f.promoted[0]);
@@ -407,11 +414,13 @@ function captions(f) {
     frames:
       `The ${COUNT[f.frames.length] ?? f.frames.length} frames side by side: each source with the factors ` +
       `that can pay for it, greedy's choice in gray, the sources at the left of each frame and its factors ` +
-      `at the right. A dotted line joins a factor to its maximal factor in the frame in front.`,
+      `at the right. Each frame stands to the left of the frame in front of it.`,
     freedoms:
-      `The ${COUNT[closed.length]} frames at the ends are closed, with as many factors as moves, and drop out. ` +
+      `The ${COUNT[closed.length]} frames at the ends are closed, with as many factors as moves: ` +
+      `${paysFor(closedPayments(f))}, and they drop out. ` +
       `The other ${COUNT[f.open.length]} have one freedom each: frame ${f.open[0].number} at the right and ` +
-      `frame ${f.open[1].number} behind it, numbered from the front. The candidates are ${listWords(f.candidates)}.`,
+      `frame ${f.open[1].number} behind it, numbered from the front. The candidates are ${listWords(f.candidates)}, ` +
+      `with a dotted line from each to the factor that would pay for it.`,
     promote:
       `${f.promoted[0]} hops rightward: it leaves the factors of frame ${fp.number} and becomes a move of ` +
       `frame ${M.promotedInto(f.frames, f.promoted[0])}, paid for by ${payer}. Only one candidate fits, and ` +
@@ -455,8 +464,8 @@ export function mountGame21(host, { small, states = STOPS, param = 'fig21', labe
   }
   for (const [a, b] of allEdges) {
     s.line(`e${a}-${b}`, a, b, 'thin');
-    if (!isSource(a)) s.line(`l${a}-${b}`, a, b, 'link');
   }
+  for (const [a, b] of candidateLinks(f)) s.line(`l${a}-${b}`, a, b, 'link');
   f.turns.forEach((t, i) => {
     s.line(`p${t.move}-${t.tax[0]}`, t.move, t.tax[0], 'pay');
     s.tag(`tag${i + 1}`, i + 1);
