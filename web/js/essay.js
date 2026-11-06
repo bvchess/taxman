@@ -255,13 +255,13 @@ function mountAsides() {
   openTarget();
 }
 
-// The way on at the foot of a page, drawn from site.js: the pages in the order of the contents, each linking to the
-// page before it and the page after.  A page not in the map has no way on.  The link before wears the site's icon when
+// The way on at the foot of a page, drawn from site.js: the introduction and the story in order, each page linking to
+// the page before it and the page after.  A reference page or any page not in the sequence has no way on.  The link before wears the site's icon when
 // it is the front page, as in the contents; a page not yet written is a dashed span, not a link.
 function mountChapterNav() {
   const nav = document.querySelector('nav.chapter-nav');
   if (!nav) return;
-  const pages = [INTRO, ...STORY, ...REFERENCE];
+  const pages = [INTRO, ...STORY];
   const at = pages.findIndex((p) => p.href === herePage());
   if (at < 0) return;
   const name = (p) => (p.n ? `${p.n}. ${p.title}` : p.title);
@@ -278,10 +278,37 @@ function mountChapterNav() {
   if (after) {
     const written = Boolean(hrefOf(after));
     const body = `<span class="nav-kicker">${written ? 'Next' : 'Next, not yet written:'}</span> `
-      + `<span class="nav-title">${name(after)}.</span>  ${after.line}`;
+      + `<span class="nav-title">${name(after)}</span>  ${after.line}`;
     parts.push(written ? `<a class="next" href="${after.href}">${body}</a>` : `<span class="next">${body}</span>`);
   }
   nav.innerHTML = parts.join('\n');
+}
+
+// A button at the corner of each command that copies the command's text.  It says so for two seconds, or says that the
+// clipboard refused.
+function mountCopyButtons() {
+  for (const dd of document.querySelectorAll('dl.commands dd')) {
+    const code = dd.querySelector('code');
+    if (!code) continue;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn copy';
+    button.textContent = 'Copy';
+    button.setAttribute('aria-label', `Copy the command: ${dd.previousElementSibling?.textContent.trim() ?? 'command'}`);
+    let timer;
+    button.addEventListener('click', async () => {
+      let said = 'Copied';
+      try {
+        await navigator.clipboard.writeText(code.textContent);
+      } catch {
+        said = 'Copy failed';
+      }
+      button.textContent = said;
+      clearTimeout(timer);
+      timer = setTimeout(() => { button.textContent = 'Copy'; }, said === 'Copied' ? 2000 : 1500);
+    });
+    dd.append(button);
+  }
 }
 
 export function initEssay() {
@@ -290,4 +317,5 @@ export function initEssay() {
   mountAsides();
   mountFigureLinks();
   mountChapterNav();
+  mountCopyButtons();
 }

@@ -241,6 +241,18 @@ opt(n).
 **Right column.**  Hensley (1988), Franklín and Moniot (2023), OEIS A019312, `results/README.md`, the verifiers'
 commands, the open questions (`docs/theory/statements.md#open-questions`).
 
+### 8. In Summary
+
+**Point.**  The optimal games in brief, for a reader who wants them now; the chapters before it never need it.  The
+introduction offers it at its top: "In a hurry? Go straight to the summary."
+
+* The optimal games: how far they reach and what the proofs rest on, the Taxman sequence (OEIS A019312), the file
+  results/optimal.jsonl.gz, and commands that download it and take out the moves.
+* Game 21, step by step: the bounds from game 20, then the eight steps of the game 21 figure, each linked to the
+  chapter that explains it, ending at 144.
+
+**Figures.**  Game 21, all eight steps.
+
 ## Glossary
 
 The site's words, each with its meaning and an example, grouped in the order of the story, with their precise forms

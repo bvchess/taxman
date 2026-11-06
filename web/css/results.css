@@ -1,5 +1,5 @@
-/* The pages of the results: chapter 7, with the explorer, the chart of the player's share and the commands that check
-   the data; Along the way; and About.  The look is site.css's; this file only places the pieces. */
+/* The pages of the results: chapter 7, with the explorer and the chart of the player's share; Along the way; and About.
+   The look is site.css's; this file only places the pieces. */
 
 /* ---- the explorer ----------------------------------------------------------------------------------------------- */
 
@@ -79,16 +79,6 @@
 #share-chart .share-bound { stroke: var(--mid); stroke-width: 1.2; stroke-dasharray: 5 4; }
 #share-chart .share-dot { fill: var(--player); }
 #share-chart .share-band { fill: none; stroke: var(--player); stroke-width: 2; stroke-linecap: round; }
-
-/* ---- the commands that check the data ---------------------------------------------------------------------------- */
-
-dl.commands { margin: 8px 0 22px; }
-dl.commands dt { font-size: 0.86rem; font-weight: 700; margin: 12px 0 4px; }
-dl.commands dd { margin: 0; }
-dl.commands code {
-  display: block; padding: 8px 12px; border-radius: 8px; font-size: 0.84rem; line-height: 1.5; white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
 
 /* ---- the About page: what this work adds, and the citation -------------------------------------------------------- */
 

@@ -245,6 +245,27 @@ table, .nums, output { font-variant-numeric: tabular-nums lining-nums; }
 .go:hover::after { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .go:active::after { transform: translateY(1px); box-shadow: 0 0.5px 0 var(--rim); }
 
+/* ---- the commands that check the data ---------------------------------------------------------------------------- */
+
+dl.commands { margin: 8px 0 22px; }
+dl.commands dt { font-size: 0.86rem; font-weight: 700; margin: 12px 0 4px; }
+dl.commands dd { margin: 0; position: relative; }
+dl.commands code {
+  display: block; padding: 8px 12px; border-radius: 8px; font-size: 0.84rem; line-height: 1.5; white-space: pre-wrap;
+  overflow-wrap: anywhere; padding-right: 5.2em;
+}
+dl.commands .btn.copy { position: absolute; top: 6px; right: 6px; padding: 5px 9px; font-size: 0.72rem; }
+
+/* The steps of the summary: a numbered list in the text column. */
+ol.steps { margin: 0 0 1.05em; padding-left: 1.6em; }
+ol.steps li { margin: 0 0 0.7em; }
+ol.steps li::marker { color: var(--ink-3); font-weight: 700; }
+/* Each step opens with the pill of its state alone, named as on the figure's slider; its name is for screen readers. */
+ol.steps .go::after { margin: 0 4px 0 0; }
+
+/* The front page's pointer to the summary, under the lede. */
+p.hurry { font-size: 0.92rem; color: var(--ink-3); margin: -0.4em 0 0; }
+
 /* ---- the technical layer: notes in the right column --------------------------------------------------------- */
 
 .para { position: relative; }

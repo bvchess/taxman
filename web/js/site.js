@@ -1,7 +1,8 @@
 // The map of the site, in one place: the contents rail, the menu on small screens and the front page's figure of the
 // chapters all draw from these lists, and so do the links at the foot of each page, which lead from each page of the
-// map to the next in this order: INTRO, STORY, REFERENCE.  A line is a sentence, with its period.  The story's
-// pages follow OUTLINE.md.  An entry without href is not yet written.
+// map to the next in this sequence: INTRO, then STORY.  The reference pages stand on their own: the rail lists them,
+// and no link leads to or from them.  A line is a sentence, with its period.  The story's pages
+// follow OUTLINE.md.  An entry without href is not yet written.
 
 /** The story's first entry: the front page, which introduces it.  It has no number; the chapters keep theirs. */
 export const INTRO = { title: 'Introduction', mark: 'i', href: 'index.html' };
@@ -14,6 +15,7 @@ export const STORY = [
   { n: 5, title: 'The search', line: 'A search tries promotion sets, and a bound proves when nothing better is left.', href: 'search.html' },
   { n: 6, title: 'Trust', line: 'Every score is checked, and every score says what it rests on.', href: 'trust.html' },
   { n: 7, title: 'The results', line: 'The games, how each was proven, and what they show.', href: 'results.html' },
+  { n: 8, title: 'In Summary', line: 'The optimal games in brief, and the whole method on game 21.', href: 'summary.html' },
 ];
 
 /** The findings along the way, the story chapter each belongs beside, and, once written, where it is.  The navigation
