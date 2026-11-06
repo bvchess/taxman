@@ -204,16 +204,16 @@
 
   <p>The <a class="gloss" href="glossary.html#freedom">freedoms</a> also limit how many candidates can be promoted
   together.  Each promotion spends a freedom of the frame it leaves and one of the frame it joins, so game
-  <span data-limit="n">100</span>’s <span data-limit="freedoms">12</span> freedoms might seem to allow
-  <span data-limit="half">six</span>.  Where the freedoms stand matters too.  Frame 0 has a single freedom, and only a
+  <span data-limit="n">100</span>’s <span data-limit="freedoms">twelve</span> freedoms might seem to allow
+  <span data-limit="half">six</span>, but where the freedoms appear matters too.  Frame 0 has a single freedom, and only a
   promotion out of frame 1 can spend it, so at most one candidate of frame 1 is promoted.  Frame 2 has
   <span data-limit="second">three</span>, and every promotion out of frame 2 or out of frame 3 spends one of them, so
   at most <span data-limit="second">three</span> come from those two frames.  That makes
   <span data-limit="limit">four</span>.  Game <span data-limit="n">100</span>’s largest promotion sets have exactly
-  <span data-limit="limit">four</span> members, and its optimal game promotes <span data-limit="limit">four</span>:
-  <span data-limit="promoted">49 from frame 1, and 44, 45 and 50 from frame 2</span>.</p>
+  <span data-limit="limit">four</span> members, and its optimal game promotes <span data-limit="limit">four</span>.</p>
 
-  <p>Each of game <span data-scale="n">100</span>’s candidates is promoted or not, so the <span data-scale="candidates">17</span> allow
+  <p>Each of game <span data-scale="n">100</span>’s candidates is promoted or not, so the
+  <span data-scale="candidates">17</span> candidates allow
   2<sup data-scale="exponent">17</sup> = <span data-scale="sets">131,072</span> sets, but only
   <span data-scale="promotionSets">1,042</span> of them are legal promotion sets; every other set breaks some frame.  Which
   promotion set is the heaviest is the one question left, and a search answers it.
@@ -307,27 +307,19 @@ const scale = {
 };
 for (const s of document.querySelectorAll('[data-scale]')) s.textContent = scale[s.dataset.scale];
 
-// The promotion limit of that game, and the promotions it makes, grouped by the frame each leaves.  The paragraph's
+// The promotion limit of that game.  The paragraph's
 // fixed words (one freedom in frame 0, frames numbered 0 to 3, the limit as frame 0's freedoms plus frame 2's, the game
 // promoting as many as the limit) must hold for the game.
 const model = M.frameModel(rowFacts.n);
 const { limit, freedoms } = M.promotionLimit(model);
 const total = freedoms.reduce((a, b) => a + b, 0);
-const promotions = [...small[rowFacts.n - 1].promotions].sort((x, y) => x - y);
 if (freedoms[0] !== 1 || freedoms.length !== 4 || limit !== freedoms[0] + freedoms[2] ||
     c.promotions[c.n.indexOf(rowFacts.n)] !== limit) {
   throw new Error(`the paragraph on the promotion limit does not describe game ${rowFacts.n}`);
 }
-const leaving = new Map();
-for (const x of promotions) {
-  const h = model.find((g) => !g.closed && g.factors.includes(x)).number;
-  leaving.set(h, [...(leaving.get(h) ?? []), x]);
-}
-const groups = [...leaving].sort((a, b) => a[0] - b[0]).map(([h, xs]) => `${listWords(xs)} from frame ${h}`);
 const limitWords = {
-  n: fmt(rowFacts.n), freedoms: fmt(total), half: numberWord(Math.floor(total / 2)), second: numberWord(freedoms[2]),
-  limit: numberWord(limit),
-  promoted: groups.length < 3 ? groups.join(', and ') : `${groups.slice(0, -1).join(', ')}, and ${groups.at(-1)}`,
+  n: fmt(rowFacts.n), freedoms: numberWord(total), half: numberWord(Math.floor(total / 2)),
+  second: numberWord(freedoms[2]), limit: numberWord(limit),
 };
 for (const s of document.querySelectorAll('[data-limit]')) s.textContent = limitWords[s.dataset.limit];
 
