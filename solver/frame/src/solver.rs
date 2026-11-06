@@ -107,6 +107,7 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
+use std::iter;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
@@ -930,14 +931,14 @@ trait Job: Send + Sync {
     fn search(&self, go: Go, opts: &SolveOptions) -> Result<Outcome, String>;
     /// The unsound mode's search ([`unsound`]) on `threads` threads, with no ceiling: the start that a search makes
     /// ([`search::start_incumbent`]), from the promotions of `seed`, the moves for `n − 1`, if the search takes a seed,
-    /// then at most `rounds` rounds of LNS on many threads with the options `lns` ([`finder::Lns::rounds`]), which end
-    /// once `enough` says so of the incumbent's promotion sum.  `clock` is the game's seconds so far.
+    /// then the rounds of LNS on many threads that `plan` asks for ([`finder::Lns::rounds`]), which end once `enough`
+    /// says so of the game's promotion sum.  With `plan.survivors` and a seed, the rounds follow a second trajectory,
+    /// from what survives of the seed.  `clock` is the game's seconds so far.
     fn improve(
         &self,
         seed: Option<&[u32]>,
-        rounds: u64,
+        plan: &unsound::Plan,
         threads: usize,
-        lns: finder::Options,
         clock: &dyn Fn() -> f64,
         enough: &dyn Fn(u64) -> bool,
     ) -> unsound::Improved;
@@ -1070,9 +1071,8 @@ impl<const W: usize> Job for SearchJob<W> {
     fn improve(
         &self,
         seed: Option<&[u32]>,
-        rounds: u64,
+        plan: &unsound::Plan,
         threads: usize,
-        lns: finder::Options,
         clock: &dyn Fn() -> f64,
         enough: &dyn Fn(u64) -> bool,
     ) -> unsound::Improved {
@@ -1082,12 +1082,18 @@ impl<const W: usize> Job for SearchJob<W> {
         // The job's control has no ceiling, and only takes the start's offers.
         let start = search::start_incumbent(prepared, &graph, &self.control, threads, seed.as_ref());
         let start_seconds = clock();
+        // The second trajectory, if there is one, begins from what survives of the seed, as the finder's seed rounds
+        // do.  The start is at least as heavy, since it began from those survivors, so the game's set begins as the
+        // start.
+        let survivors = seed.as_ref().filter(|_| plan.survivors).map(|seed| search::seed_survivors(prepared, seed));
+        let starts: Vec<Bits<W>> = iter::once(start).chain(survivors).collect();
         let space = SearchSpace::new(prepared);
-        let lns = finder::Lns { p: prepared, space: &space, options: lns };
-        let ran = lns.rounds(&start, rounds, threads, clock, enough);
+        let lns = finder::Lns { p: prepared, space: &space, options: plan.lns() };
+        let ran = lns.rounds(&starts, plan.rounds(), threads, clock, enough);
         unsound::Improved {
             start: start.sum(),
             start_seconds,
+            trajectories: starts.len(),
             promotions: ran.set.to_vec(),
             moves: solution_for_promotions::<W>(&self.board.tables, ran.set),
             rounds: ran.rounds,

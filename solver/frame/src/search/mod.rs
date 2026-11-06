@@ -79,9 +79,9 @@
 //! * `profile`: [`SearchProfile`], the profile of a search (`taxman solve --profile`): its tree of tagged nodes, the
 //!   searchers' counts, its file.
 //! * here: [`search`], which starts or resumes the engine on a prepared game; [`start_incumbent`], the incumbent
-//!   [`search`] starts from; [`offer_seed`], [`best_so_far`] and [`seed_survivors_sum`], for a caller that steers
-//!   searches through their [`Control`] (`EngineConfig::control`), and [`search_steered`], whose branching settings the
-//!   gate trial may change as it runs.
+//!   [`search`] starts from; [`offer_seed`], [`best_so_far`], [`seed_survivors`] and [`seed_survivors_sum`], for a
+//!   caller that steers searches through their [`Control`] (`EngineConfig::control`), and [`search_steered`], whose
+//!   branching settings the gate trial may change as it runs.
 
 mod branching;
 pub mod finder;
@@ -667,11 +667,17 @@ fn offer_found<const W: usize>(
     Ok(offer_set(control, set))
 }
 
-/// The promotion sum of what survives of `seed` in `prepared`, the game searched: of the candidates of `seed` that can
-/// still be promoted, from the largest down, the set that [`search`] and [`offer_seed`] make of a seed.  A search
-/// seeded with `seed` starts from that set or a better one, so a ceiling that this sum reaches settles it at once.
+/// What survives of `seed` in `prepared`, the game searched: of the candidates of `seed`, those that can still be
+/// promoted, from the largest down, the set that [`search`] and [`offer_seed`] make of a seed, and the finder's seed
+/// rounds and the unsound mode's second trajectory begin from.
+pub fn seed_survivors<const W: usize>(prepared: &Prepared<W>, seed: &Bits<W>) -> Bits<W> {
+    surviving(prepared, seed)
+}
+
+/// The promotion sum of [`seed_survivors`].  A search seeded with `seed` starts from that set or a better one, so a
+/// ceiling that this sum reaches settles it at once.
 pub fn seed_survivors_sum<const W: usize>(prepared: &Prepared<W>, seed: &Bits<W>) -> u64 {
-    surviving(prepared, seed).sum()
+    seed_survivors(prepared, seed).sum()
 }
 
 /// `set` as the payload of an incumbent, which is how the searchers encode one ([`put_bits`]): a caller that starts the

@@ -31,9 +31,11 @@ of the repository.
 | `--gate GAP` | the gate each game's search starts with, in place of the default, 300 ([design/search.md, "Conflict branching"](design/search.md#conflict-branching)): the gap, a whole number from 0 to 4,000, from which conflict branching chooses its conflict; a gate trial, if asked for, compares its gates with it.  It is refused where conflict branching is off (`--tactic conflict_branching=off`), since a gate does nothing there.  It changes only where the search branches, so no answer; it is no tactic and no part of a checkpoint, which resumes with any gate, and a line records it in `options` |
 | `--gate-trial GATES`, `--gate-trial-plan SPEC` | off by default, so a search keeps its gate ([design/gate-trial.md](design/gate-trial.md)).  With `--gate-trial`, each game's search with conflict branching on tries the gates GATES (comma-separated, each from 0 to 4,000) and its own on a sample of its units, once it has taken 50 million steps, and branches from then on with the gate that took the least CPU, if it took 3% less than its own.  `--gate-trial none` says there is no trial.  SPEC, `NAME=VALUE` separated by commas, changes the trial's numbers: `after` (steps, default 50000000), `units` (24), `steps` (the most of each solve, 150000), `threads` (4) and `least_gap` (300); without `--gate-trial` it asks for a trial of the gates 1000, 800 and 600, and it is refused with `none`.  A trial runs only with a checkpoint directory.  It changes only the gate, so no answer; it is no tactic and no part of a checkpoint, and a line records it in `engine` and `options` |
 | `--show` | print each game's promotions and moves |
-| `--unsound` | play each game as well as `--effort` finds, with no proof, and append its [unsound line](#an-unsound-line) to `--out`, which it needs.  It takes `--threads`, `--tactic`, `--show` and the four flags below, and refuses the flags of the proof search: `--window`, the finder's, `--profile`, `--profile-depth`, `--carried-dir`, `--gate`, the gate trial's, the checkpoints', `--progress`, the limits, `--mem-cap`, `--background` and `--force-search` |
+| `--unsound` | play each game as well as `--effort` finds, with no proof, and append its [unsound line](#an-unsound-line) to `--out`, which it needs.  It takes `--threads`, `--tactic`, `--show` and the six flags below, and refuses the flags of the proof search: `--window`, the finder's, `--profile`, `--profile-depth`, `--carried-dir`, `--gate`, the gate trial's, the checkpoints', `--progress`, the limits, `--mem-cap`, `--background` and `--force-search` |
 | `--effort E` | with `--unsound`: the level of effort, from 0 (the search's start alone) to 32; level E ≥ 1 is 2^(E−1) rounds of the large neighborhood search of the [finder](../../docs/GLOSSARY.md#the-search), and does the rounds of every lower level first |
 | `--seed S` | with `--unsound`: the seed of the rounds' random choices (default 1) |
+| `--fix LO,HI` | with `--unsound`: the share of the incumbent's promotions that each neighborhood keeps fixed, drawn at random from LO to HI (default 0.7,0.9); a smaller share leaves a neighborhood more to search.  Refused unless 0 ≤ LO ≤ HI ≤ 1 |
+| `--survivors` | with `--unsound`: a game keeps a second incumbent, the [trajectory](#an-unsound-line) that begins from what survives of the moves for n − 1, beside the start's, and each of them gets half of a round's neighborhoods; a game with no moves for n − 1 to start from keeps one |
 | `--stop-at-known`, `--from-known` | with `--unsound`, to measure it on the games whose opt(n) the built-in table has, and refused for any other: end a game's rounds as soon as its score is the table's, and start every game from the table's moves for n − 1 |
 
 ## 2. The other commands
@@ -197,9 +199,18 @@ ceiling: a score above n + score(n − 1) is a finding, which `prev.short_by` re
 A line is the same on any number of threads and any machine, but for its times and threads.  A round is a fixed number
 of neighborhoods (64, `NEIGHBORHOODS` in `search::finder`), each a unit of at most 1,024 steps from the incumbent as the
 round starts, and neighborhood k of round r draws its choices from a generator of the seed, n, r and k alone; the best
-set of the round, the lowest k's among equals, is the next incumbent.  A stop signal ends the run between rounds, and the
-game in play is not recorded.  The summary line on stdout gives n, the score, the method, the rounds, how many raised
-the score and the seconds, then `unsound`, what `--stop-at-known` recorded, and a `short_by` above 0.
+set of the round, the lowest k's among equals, is the next incumbent.  A neighborhood keeps a share of the incumbent's
+promotions fixed, drawn from the range `--fix` gives, and searches the rest.  A stop signal ends the run between rounds,
+and the game in play is not recorded.  The summary line on stdout gives n, the score, the method, the rounds, how many
+raised the score and the seconds, then `unsound`, what `--stop-at-known` recorded, and a `short_by` above 0.
+
+A game follows a *trajectory* of incumbents, the one that begins from the start.  With `--survivors` it follows a second
+as well, which begins from what survives of the moves for n − 1: their promotions that can still be promoted here, from
+the largest down, as the proven finder's seed rounds begin.  Neighborhood k of a round works from the incumbent of
+trajectory k mod 2 as the round starts, so each has 32 of the 64 neighborhoods, and a trajectory's next incumbent is
+the best set of its own, the lowest k's among equals, if that is heavier than before.  The game's set is the heavier of
+the two incumbents, the start's on a tie, and a round that makes it heavier is an improvement, which names the
+trajectory that made it.  A game that is not seeded follows one trajectory, whatever the switch, and its line says so.
 
 Here is the line of game 595 from a run of 590-612 at effort 4 on four threads, with `--from-known` and
 `--stop-at-known`, with the moves and the promotions cut short, the fields regrouped and comments added:
@@ -210,10 +221,11 @@ Here is the line of game 595 from a run of 590-612 at effort 4 on four threads, 
  "prev":{"n":594,"score":110282,"source":"table","moves_digest":"623c70271b00b128","short_by":0},
  "repeats":null,                          # a repeat names the line whose promotions it plays here
  "setup":{"frames":6,"candidates":141,"max_total":33,"greedy_sum":8396,"digest":"c6fe37bd55f2b043"},
- "effort":4, "seed":1, "start":110839,    # the start fell 21 short of the table's score
- "rounds":2, "neighborhoods":128, "steps":441,
- "improvements":[{"round":1,"neighborhoods":64,"seconds":0.0974,"score":110847},
-                 {"round":2,"neighborhoods":128,"seconds":0.1612,"score":110860}],
+ "effort":4, "seed":1, "fix":[0.7,0.9], "survivors":false,
+ "start":110839,                          # the start fell 21 short of the table's score
+ "trajectories":1, "rounds":2, "neighborhoods":128, "steps":441,
+ "improvements":[{"round":1,"trajectory":0,"neighborhoods":64,"seconds":0.0974,"score":110847},
+                 {"round":2,"trajectory":0,"neighborhoods":128,"seconds":0.1612,"score":110860}],
  "seconds":0.1633, "start_seconds":0.0268, "threads":4,
  "from_known":true, "stop_at_known":{"known":110860,"round":2},   # so effort 2 would have reached it
  "tactics":"default", "build":{"commit":"d3258ec220e5...","dirty":true}}
@@ -229,9 +241,11 @@ Here is the line of game 595 from a run of 590-612 at effort 4 on four threads, 
 | `repeats` | for a repeat, the n of the line whose promotions it plays; null otherwise |
 | `setup` | as in a results line, without `cap`; null on a `trivial` or `prime` line |
 | `effort`, `seed` | the level of effort and the seed of the rounds' random choices |
+| `fix`, `survivors` | the range of `--fix` (the lowest and the highest share of the incumbent's promotions a neighborhood keeps fixed), and whether `--survivors` was given |
 | `start` | the score of a searched game's start; null on any other line |
+| `trajectories` | for a searched game, the incumbents its rounds kept: 2 with `--survivors` where the game was seeded, else 1; null on any other line |
 | `rounds`, `neighborhoods`, `steps` | the rounds done, their neighborhoods and the engine's steps in them |
-| `improvements` | for each round that raised the score: `round`, the `neighborhoods` and the `seconds` until it ended, and the new `score` |
+| `improvements` | for each round that raised the score: `round`, the `trajectory` (0: the start's, 1: the survivors') that made it, the `neighborhoods` and the `seconds` until it ended, and the new `score` |
 | `seconds`, `start_seconds` | the game's wall time, from the start of its setup to its line, and the part of it before the rounds |
 | `threads` | the threads it ran on |
 | `from_known` | true if `--from-known` started the game from the built-in table's moves for n − 1 |

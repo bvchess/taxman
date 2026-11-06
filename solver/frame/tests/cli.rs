@@ -35,6 +35,8 @@ fn help_lists_the_commands_and_every_tactic() {
             "--unsound",
             "--effort E",
             "--seed S",
+            "--fix LO,HI",
+            "--survivors",
             "--stop-at-known",
             "--from-known",
             "tables N K...",
@@ -457,8 +459,42 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         let message = format!("{} is a flag of the proof search, which --unsound does not run", flag[0]);
         assert_usage_error(&[&base[..], flag].concat(), &message);
     }
-    for flag in [&["--effort", "1"][..], &["--seed", "2"], &["--stop-at-known"], &["--from-known"]] {
+    let unsound_only: [&[&str]; 6] = [
+        &["--effort", "1"],
+        &["--seed", "2"],
+        &["--fix", "0.5,0.7"],
+        &["--survivors"],
+        &["--stop-at-known"],
+        &["--from-known"],
+    ];
+    for flag in unsound_only {
         let message = format!("{} is a flag of the unsound mode: give --unsound with it", flag[0]);
         assert_usage_error(&[&["solve", "12"][..], flag].concat(), &message);
     }
+}
+
+/// `--fix LO,HI` takes two numbers with 0 <= LO <= HI <= 1, and the line records the range and the switch
+/// `--survivors`.
+#[test]
+fn the_share_fixed_is_a_range_and_the_line_records_it_with_the_survivors_switch() {
+    let dir = TempDir::new("unsound-fix");
+    let file = dir.join("fix.jsonl");
+    let base = ["solve", "12", "--unsound", "--effort", "1", "--threads", "1", "--out", path(&file)];
+    for fix in ["0.9,0.7", "-0.1,0.5", "0.5,1.1", "0.5", "0.5,", "a,b", "0.5,0.7,0.9", "nan,0.5", "0.5,inf", ""] {
+        let message = format!("--fix takes LO,HI, two numbers with 0 <= LO <= HI <= 1, such as 0.7,0.9: got {fix:?}");
+        assert_usage_error(&[&base[..], &["--fix", fix]].concat(), &message);
+    }
+    assert!(!file.exists(), "a refused run plays no game");
+    let run = taxman(&[&base[..], &["--fix", "0.4,0.6", "--survivors"]].concat());
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let line = Json::parse(fs::read_to_string(&file).unwrap().lines().next().unwrap()).unwrap();
+    assert_eq!(line.get("fix"), Some(&Json::array([0.4, 0.6])));
+    assert_eq!(line.get("survivors"), Some(&Json::Bool(true)));
+    // Without the options, the line records the defaults.
+    let other = dir.join("default.jsonl");
+    let run = taxman(&["solve", "12", "--unsound", "--effort", "1", "--threads", "1", "--out", path(&other)]);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let line = Json::parse(fs::read_to_string(&other).unwrap().lines().next().unwrap()).unwrap();
+    assert_eq!(line.get("fix"), Some(&Json::array([0.7, 0.9])));
+    assert_eq!(line.get("survivors"), Some(&Json::Bool(false)));
 }

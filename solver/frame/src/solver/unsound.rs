@@ -31,6 +31,22 @@
 //! do not depend on the level: a run at E + 1 does the rounds of E first, and then more.  So the `improvements` of a
 //! line at one level show what every lower level would have scored.
 //!
+//! # The shape of the rounds
+//!
+//! Two options of the plan change what the rounds search, and so the line; neither changes the default.  Every value of
+//! them keeps what the rounds guarantee: a line depends on the game, its start, the level, the seed and the options
+//! only, never on the threads, and a run at E + 1 does the rounds of E first.
+//!
+//! * **`fix`** is the range from which each neighborhood draws the share of the incumbent's promotions it keeps fixed
+//!   ([`Options::fix`](crate::search::finder::Options::fix)).  A smaller share frees more of the game to a
+//!   neighborhood, which then takes more of its steps.
+//! * **`survivors`** gives a game that has a seed a second trajectory of incumbents, from what survives of the seed
+//!   ([`seed_survivors`](crate::search::seed_survivors)), as the finder beside a proof search starts its seed rounds,
+//!   beside the first, the start's.  Neighborhood k of a round works from the incumbent of trajectory k mod 2, each
+//!   trajectory has 32 of the 64 neighborhoods, and the game's set is the heavier of the two incumbents, the start's
+//!   on a tie ([`Lns::rounds`](crate::search::finder::Lns::rounds)).  A game with no seed follows one trajectory, and
+//!   its line says so (`trajectories`).
+//!
 //! # A range
 //!
 //! [`solve_range`] plays the games lo..=hi in order, one at a time, on all the threads given.  The moves for n − 1 that
@@ -66,16 +82,30 @@ use std::time::Instant;
 /// The most effort a run may ask for: 2^31 rounds, far more than a game needs.
 pub const MAX_EFFORT: u32 = 32;
 
-/// How the unsound mode plays: the level of effort, the seed of the rounds' random choices, and the measuring options.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// How the unsound mode plays: the level of effort, the seed of the rounds' random choices, the shape of the
+/// neighborhoods and of the rounds, and the measuring options.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Plan {
     /// From 0 to [`MAX_EFFORT`].
     pub effort: u32,
     pub seed: u64,
+    /// `--fix LO,HI`: the share of the incumbent's promotions that each neighborhood keeps fixed is drawn from this
+    /// range, 0 ≤ LO ≤ HI ≤ 1 ([`check_fix`]).
+    pub fix: (f64, f64),
+    /// `--survivors`: a game with a seed follows a second trajectory, from what survives of the seed.
+    pub survivors: bool,
     /// `--stop-at-known`: a game's rounds end once its score is the built-in table's.
     pub stop_at_known: bool,
     /// `--from-known`: every game starts from the built-in table's moves for n − 1.
     pub from_known: bool,
+}
+
+/// Effort 0, the finder's seed and share fixed, one trajectory, and no measuring option.
+impl Default for Plan {
+    fn default() -> Plan {
+        let finder::Options { fix, seed, .. } = finder::Options::default();
+        Plan { effort: 0, seed, fix, survivors: false, stop_at_known: false, from_known: false }
+    }
 }
 
 impl Plan {
@@ -83,6 +113,44 @@ impl Plan {
     pub fn rounds(&self) -> u64 {
         self.effort.checked_sub(1).map_or(0, |e| 1u64 << e)
     }
+
+    /// How the rounds search: the finder's defaults, with this plan's seed and share fixed.
+    pub fn lns(&self) -> finder::Options {
+        finder::Options { seed: self.seed, fix: self.fix, ..finder::Options::default() }
+    }
+}
+
+/// Whether `fix` is a range of shares: 0 ≤ LO ≤ HI ≤ 1 (which no NaN is).
+fn is_range((lo, hi): (f64, f64)) -> bool {
+    (0.0..=1.0).contains(&lo) && (lo..=1.0).contains(&hi)
+}
+
+/// Reads the value of `--fix`, `LO,HI`: two numbers, 0 ≤ LO ≤ HI ≤ 1.
+///
+/// # Errors
+///
+/// What `text` should have been.
+pub fn parse_fix(text: &str) -> Result<(f64, f64), String> {
+    let numbers = text.split_once(',').and_then(|(lo, hi)| Some((lo.parse().ok()?, hi.parse().ok()?)));
+    numbers.filter(|&fix| is_range(fix)).ok_or_else(|| fix_error(text))
+}
+
+/// Checks that `fix` is a range of shares: 0 ≤ LO ≤ HI ≤ 1.
+///
+/// # Errors
+///
+/// What `fix` should have been.
+pub fn check_fix(fix: (f64, f64)) -> Result<(), String> {
+    if is_range(fix) {
+        Ok(())
+    } else {
+        Err(fix_error(&format!("{},{}", fix.0, fix.1)))
+    }
+}
+
+/// The message of a `--fix` that is not `LO,HI` with 0 ≤ LO ≤ HI ≤ 1, quoting what it was given.
+fn fix_error(got: &str) -> String {
+    format!("--fix takes LO,HI, two numbers with 0 <= LO <= HI <= 1, such as 0.7,0.9: got {got:?}")
 }
 
 /// Where the moves for n − 1 that a game started from came from.
@@ -136,11 +204,12 @@ pub struct Known {
     pub round: Option<u64>,
 }
 
-/// A round whose better set raised the game's score: the round, the time on the game's clock when it ended, and the new
-/// score.
+/// A round whose better set raised the game's score: the round, the trajectory that made it (0 is the start's), the
+/// time on the game's clock when it ended, and the new score.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Raised {
     pub round: u64,
+    pub trajectory: usize,
     pub seconds: f64,
     pub score: u64,
 }
@@ -166,6 +235,8 @@ pub struct Line {
     pub plan: Plan,
     /// The score of a searched game's start.
     pub start: Option<u64>,
+    /// The trajectories a searched game's rounds followed: 2 with `--survivors` and a seed, else 1.
+    pub trajectories: Option<usize>,
     /// The rounds done, and the engine's steps in them.
     pub rounds: u64,
     pub steps: u64,
@@ -204,6 +275,7 @@ impl Line {
         let improvements = self.improvements.iter().map(|raised| {
             Json::object([
                 ("round", Json::from(raised.round)),
+                ("trajectory", Json::from(raised.trajectory)),
                 ("neighborhoods", Json::from(raised.round * NEIGHBORHOODS)),
                 ("seconds", Json::Num(raised.seconds)),
                 ("score", Json::from(raised.score)),
@@ -225,7 +297,10 @@ impl Line {
             ("setup", setup),
             ("effort", Json::from(self.plan.effort)),
             ("seed", Json::from(self.plan.seed)),
+            ("fix", Json::array([self.plan.fix.0, self.plan.fix.1])),
+            ("survivors", Json::Bool(self.plan.survivors)),
             ("start", self.start.map_or(Json::Null, Json::from)),
+            ("trajectories", self.trajectories.map_or(Json::Null, Json::from)),
             ("rounds", Json::from(self.rounds)),
             ("neighborhoods", Json::from(self.rounds * NEIGHBORHOODS)),
             ("steps", Json::from(self.steps)),
@@ -266,10 +341,11 @@ impl Line {
 }
 
 /// What the unsound mode's search of a game came to ([`Job::improve`](super::Job::improve)): the start's promotion sum,
-/// when it was known on the game's clock, and the rounds after it.
+/// when it was known on the game's clock, and the rounds after it, of one trajectory or more.
 pub(super) struct Improved {
     pub(super) start: u64,
     pub(super) start_seconds: f64,
+    pub(super) trajectories: usize,
     /// The best promotions found, ascending, and the moves they make.
     pub(super) promotions: Vec<u32>,
     pub(super) moves: Vec<u32>,
@@ -407,9 +483,10 @@ fn read_line(json: &Json, optimal: &Optimal) -> Result<(u32, Stored), String> {
 ///
 /// # Errors
 ///
-/// A range that is empty or starts below 1; `--stop-at-known` or `--from-known` for a game the built-in table lacks; a
-/// file that cannot be opened or written, or holds a line it may not ([`UnsoundFile::open`]); and a game whose moves
-/// fail a check (the module documentation, "One game").
+/// A range that is empty or starts below 1; an effort above [`MAX_EFFORT`] or a `fix` that [`check_fix`] refuses;
+/// `--stop-at-known` or `--from-known` for a game the built-in table lacks; a file that cannot be opened or written, or
+/// holds a line it may not ([`UnsoundFile::open`]); and a game whose moves fail a check (the module documentation, "One
+/// game").
 pub fn solve_range(
     lo: u32,
     hi: u32,
@@ -424,6 +501,7 @@ pub fn solve_range(
     if plan.effort > MAX_EFFORT {
         return Err(format!("the effort {} is more than the most, {MAX_EFFORT}", plan.effort));
     }
+    check_fix(plan.fix)?;
     let optimal = Optimal::built_in();
     if plan.stop_at_known || plan.from_known {
         if let Some(n) = (lo..=hi).find(|&n| optimal.score(n).is_none()) {
@@ -532,6 +610,7 @@ fn play(
         setup: None,
         plan: *plan,
         start: None,
+        trajectories: None,
         rounds: 0,
         steps: 0,
         improvements: Vec::new(),
@@ -564,19 +643,24 @@ fn play(
             } else {
                 let bag = set.in_the_bag;
                 let enough = |sum: u64| known.is_some_and(|known| bag + sum >= known);
-                let lns = finder::Options { seed: plan.seed, ..finder::Options::default() };
                 let seed = before.map(|before| before.moves.as_slice());
-                let improved = set.job.improve(seed, plan.rounds(), opts.threads, lns, &clock, &enough);
+                let improved = set.job.improve(seed, plan, opts.threads, &clock, &enough);
                 if improved.interrupted {
                     return Ok(None);
                 }
                 line.start = Some(bag + improved.start);
                 line.start_seconds = improved.start_seconds;
+                line.trajectories = Some(improved.trajectories);
                 (line.rounds, line.steps) = (improved.rounds, improved.nodes);
                 line.improvements = improved
                     .improvements
                     .iter()
-                    .map(|i| Raised { round: i.round, seconds: i.seconds, score: bag + i.sum })
+                    .map(|i| Raised {
+                        round: i.round,
+                        trajectory: i.trajectory,
+                        seconds: i.seconds,
+                        score: bag + i.sum,
+                    })
                     .collect();
                 (line.moves, line.promotions) = (improved.moves, improved.promotions);
             }
@@ -629,9 +713,47 @@ mod tests {
 
     #[test]
     fn the_rounds_of_a_level_double_with_each_level() {
-        let plan = |effort| Plan { effort, seed: 1, stop_at_known: false, from_known: false };
+        let plan = |effort| Plan { effort, ..Plan::default() };
         let rounds: Vec<u64> = (0..=4).map(|effort| plan(effort).rounds()).collect();
         assert_eq!(rounds, [0, 1, 2, 4, 8]);
         assert_eq!(plan(MAX_EFFORT).rounds(), 1 << 31);
+    }
+
+    #[test]
+    fn the_default_plan_searches_as_the_first_form_did() {
+        let plan = Plan::default();
+        assert_eq!((plan.effort, plan.seed, plan.fix, plan.survivors), (0, 1, (0.7, 0.9), false));
+        assert!(!plan.stop_at_known && !plan.from_known);
+        let lns = plan.lns();
+        let default = finder::Options::default();
+        assert_eq!((lns.fix, lns.unit_nodes, lns.seed), (default.fix, default.unit_nodes, default.seed));
+    }
+
+    #[test]
+    fn a_share_fixed_is_a_range_inside_0_to_1() {
+        for (text, fix) in
+            [("0.7,0.9", (0.7, 0.9)), ("0,1", (0.0, 1.0)), ("0.5,0.5", (0.5, 0.5)), ("1e-1,.2", (0.1, 0.2))]
+        {
+            assert_eq!(parse_fix(text), Ok(fix), "{text}");
+        }
+        for text in [
+            "",
+            "0.5",
+            "0.5,",
+            ",0.5",
+            "0.5,0.7,0.9",
+            "a,b",
+            "0.7;0.9",
+            "0.9,0.7",
+            "-0.1,0.5",
+            "0.5,1.1",
+            "nan,0.5",
+            "0.5,inf",
+        ] {
+            let err = parse_fix(text).unwrap_err();
+            assert!(err.starts_with("--fix takes LO,HI") && err.contains("0 <= LO <= HI <= 1"), "{text:?}: {err}");
+        }
+        assert_eq!(check_fix((0.3, 0.5)), Ok(()));
+        assert!(check_fix((f64::NAN, 0.5)).is_err() && check_fix((0.5, f64::NAN)).is_err());
     }
 }

@@ -503,7 +503,7 @@ fn an_incomplete_line_is_checked_as_far_as_it_goes_by_both_verifiers() {
 fn an_unsound_line_is_refused_by_both_verifiers() {
     let games = solver::solve_range(1, 12, &common::options(1), None).unwrap();
     let lines: Vec<Json> = games.iter().map(GameResult::to_json).collect();
-    let plan = unsound::Plan { effort: 0, seed: 1, stop_at_known: false, from_known: false };
+    let plan = unsound::Plan::default();
     let mut unsound_lines = Vec::new();
     unsound::solve_range(13, 13, &common::options(1), &plan, None, |line| unsound_lines.push(line.to_json())).unwrap();
     let unsound_line = &unsound_lines[0];

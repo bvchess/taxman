@@ -43,6 +43,13 @@
 //! are done, the best set they found becomes the incumbent, the lowest k's on a tie ([`Lns::round`]).  So the incumbent
 //! after r rounds depends on the start, n, the seed and r alone, and a run of more rounds does those of a run of fewer
 //! first.  These rounds are not those of the finder beside a search, which are timed.
+//!
+//! The rounds may keep more than one incumbent, a *trajectory* each: the unsound mode keeps the start's, and with
+//! `--survivors` a second that begins from what survives of the seed ([`surviving`]), as the finder beside a search
+//! starts its seed rounds.  With T trajectories, neighborhood k of a round works from the incumbent of trajectory
+//! k mod T as the round starts, each trajectory's next incumbent is the best set of its own neighborhoods, the lowest
+//! k's on a tie, if that is heavier, and the game's set is the heaviest incumbent, the first trajectory's on a tie
+//! ([`Lns::rounds`]).  The draws of neighborhood k do not depend on T, and the guarantees above hold for any T.
 
 use super::incumbent::surviving;
 use super::{best_so_far, offer_found, payload_of, set_of_payload, Prepared, SearchSpace, TaxSearcher, TaxUnit};
@@ -135,22 +142,23 @@ pub struct Outcome<const W: usize> {
 pub const NEIGHBORHOODS: u64 = 64;
 
 /// What a round of the rounds on many threads came to ([`Lns::round`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Round<const W: usize> {
-    /// The heaviest set its neighborhoods found, the one of the lowest k among equals: the incumbent it started from,
-    /// or better.
-    pub set: Bits<W>,
+    /// For each trajectory, the heaviest set its neighborhoods found, the one of the lowest k among equals: the
+    /// incumbent it started from, or better.
+    pub sets: Vec<Bits<W>>,
     /// The engine's steps, over its neighborhoods.
     pub nodes: u64,
     /// Its neighborhoods searched to the end within the step limit.
     pub finished: u64,
 }
 
-/// A better set that a round of [`Lns::rounds`] found: the round (from 1), the incumbent's new promotion sum, and the
-/// time on the caller's clock when the round ended.
+/// A better set that a round of [`Lns::rounds`] found: the round (from 1), the trajectory that made it (0 is the first
+/// start's), the game's new promotion sum, and the time on the caller's clock when the round ended.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Improvement {
     pub round: u64,
+    pub trajectory: usize,
     pub sum: u64,
     pub seconds: f64,
 }
@@ -158,7 +166,7 @@ pub struct Improvement {
 /// What [`Lns::rounds`] came to.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Rounds<const W: usize> {
-    /// The incumbent after the last round: the start, or better.
+    /// The game's set after the last round: the heaviest incumbent of the trajectories, the first's on a tie.
     pub set: Bits<W>,
     /// The rounds done, and their engine's steps.
     pub rounds: u64,
@@ -234,40 +242,46 @@ impl<const W: usize> Lns<'_, W> {
     }
 
     /// Round `round` (counted from 1) of the rounds on many threads (see the module documentation, "On many threads,
-    /// alone"), from the incumbent `best`, on `threads` threads: the [`NEIGHBORHOODS`] neighborhoods of `best`, the kth
-    /// drawn from [`Options::rng_of`] and searched as a unit ([`unit`](Self::unit)) with a control of its own, since a
-    /// control passes the incumbent of one run on to the next.  The answer is the same on any number of threads.
-    pub fn round(&self, best: &Bits<W>, round: u64, threads: usize) -> Round<W> {
+    /// alone"), from the incumbents `bases`, at least one, on `threads` threads: the [`NEIGHBORHOODS`] neighborhoods,
+    /// the kth of the incumbent `bases[k % bases.len()]`, drawn from [`Options::rng_of`] and searched as a unit
+    /// ([`unit`](Self::unit)) with a control of its own, since a control passes the incumbent of one run on to the
+    /// next.  The answer is the same on any number of threads.
+    pub fn round(&self, bases: &[Bits<W>], round: u64, threads: usize) -> Round<W> {
         let n = self.p.n;
         let ran = in_parallel(NEIGHBORHOODS as usize, threads, |k| {
-            self.unit(best, &mut self.options.rng_of(n, round, k as u64), &Control::new())
+            self.unit(&bases[k % bases.len()], &mut self.options.rng_of(n, round, k as u64), &Control::new())
         });
-        // The heaviest, the first of equals: a later set replaces it only if it is strictly heavier.
-        let mut out = Round { set: *best, nodes: 0, finished: 0 };
-        for ran in ran {
+        let mut out = Round { sets: bases.to_vec(), nodes: 0, finished: 0 };
+        for (k, ran) in ran.into_iter().enumerate() {
             (out.nodes, out.finished) = (out.nodes + ran.nodes, out.finished + u64::from(ran.completed));
-            if ran.set.sum() > out.set.sum() {
-                out.set = ran.set;
+            // The heaviest of a trajectory's, the first of equals: a later set replaces it only if it is strictly
+            // heavier.
+            let set = &mut out.sets[k % bases.len()];
+            if ran.set.sum() > set.sum() {
+                *set = ran.set;
             }
         }
         out
     }
 
-    /// Rounds 1, 2, ... of the rounds on many threads ([`round`](Self::round)), from the incumbent `start`, on
-    /// `threads` threads: at most `most` of them, and none once `enough` says that the incumbent's promotion sum is
-    /// enough (asked of the start, and after each round).  The set a round finds becomes the incumbent if it is
-    /// heavier, as an [`Improvement`], whose time is the caller's `clock`.  A stop signal ([`engine::stop_signal`])
-    /// ends the rounds before the next, or in the middle of one, whose units it stops: then the rounds are
-    /// `interrupted`, and the round it stopped is not counted.
+    /// Rounds 1, 2, ... of the rounds on many threads ([`round`](Self::round)), from the incumbents `starts`, at least
+    /// one, a trajectory each, on `threads` threads: at most `most` of them, and none once `enough` says that the
+    /// game's promotion sum is enough (asked of the starts, and after each round).  A trajectory's incumbent becomes
+    /// the best set of its own neighborhoods if that is heavier.  The game's set is the heaviest incumbent, the
+    /// first's on a tie, and a round that makes it heavier is an [`Improvement`], whose time is the caller's `clock`.
+    /// A stop signal ([`engine::stop_signal`]) ends the rounds before the next, or in the middle of one, whose units
+    /// it stops: then the rounds are `interrupted`, and the round it stopped is not counted.
     pub fn rounds(
         &self,
-        start: &Bits<W>,
+        starts: &[Bits<W>],
         most: u64,
         threads: usize,
         clock: &dyn Fn() -> f64,
         enough: &dyn Fn(u64) -> bool,
     ) -> Rounds<W> {
-        let mut out = Rounds { set: *start, rounds: 0, nodes: 0, improvements: Vec::new(), interrupted: false };
+        let mut incumbents = starts.to_vec();
+        let set = heaviest(&incumbents).1;
+        let mut out = Rounds { set, rounds: 0, nodes: 0, improvements: Vec::new(), interrupted: false };
         let signaled = || engine::stop_signal().is_some();
         while out.rounds < most && !enough(out.set.sum()) {
             if signaled() {
@@ -275,20 +289,33 @@ impl<const W: usize> Lns<'_, W> {
                 break;
             }
             let round = out.rounds + 1;
-            let ran = self.round(&out.set, round, threads);
+            let ran = self.round(&incumbents, round, threads);
             // A signal in the middle of the round stopped some of its units.
             if signaled() {
                 out.interrupted = true;
                 break;
             }
             (out.rounds, out.nodes) = (round, out.nodes + ran.nodes);
-            if ran.set.sum() > out.set.sum() {
-                out.set = ran.set;
-                out.improvements.push(Improvement { round, sum: ran.set.sum(), seconds: clock() });
+            incumbents = ran.sets;
+            let (trajectory, set) = heaviest(&incumbents);
+            if set.sum() > out.set.sum() {
+                out.improvements.push(Improvement { round, trajectory, sum: set.sum(), seconds: clock() });
             }
+            out.set = set;
         }
         out
     }
+}
+
+/// The heaviest of `sets`, at least one, and its index: the first of equals.
+fn heaviest<const W: usize>(sets: &[Bits<W>]) -> (usize, Bits<W>) {
+    let mut best = (0, sets[0]);
+    for (i, set) in sets.iter().enumerate() {
+        if set.sum() > best.1.sum() {
+            best = (i, *set);
+        }
+    }
+    best
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -555,12 +582,17 @@ mod tests {
         assert_ne!(lns.options.rng(800).next(), lns.options.rng(801).next());
     }
 
-    /// The rounds on many threads on the prepared game `p` from its greedy set: at most `most`, on `threads` threads,
-    /// ending once the incumbent reaches `target` if there is one.
-    fn rounds_of(p: &Prepared<W>, most: u64, threads: usize, target: Option<u64>) -> Rounds<W> {
+    /// The rounds on many threads on the prepared game `p` from the sets `starts`, a trajectory each: at most `most`,
+    /// on `threads` threads, ending once the game's set reaches `target` if there is one.
+    fn rounds_from(p: &Prepared<W>, starts: &[Bits<W>], most: u64, threads: usize, target: Option<u64>) -> Rounds<W> {
         let space = SearchSpace::new(p);
         let lns = Lns { p, space: &space, options: Options::default() };
-        lns.rounds(&p.greedy, most, threads, &|| 0.0, &|sum| target.is_some_and(|target| sum >= target))
+        lns.rounds(starts, most, threads, &|| 0.0, &|sum| target.is_some_and(|target| sum >= target))
+    }
+
+    /// [`rounds_from`] the greedy set of `p`, one trajectory.
+    fn rounds_of(p: &Prepared<W>, most: u64, threads: usize, target: Option<u64>) -> Rounds<W> {
+        rounds_from(p, &[p.greedy], most, threads, target)
     }
 
     /// The game of the tests of the rounds on many threads, whose greedy set its rounds 1 and 2 improve.
@@ -598,6 +630,62 @@ mod tests {
         for none in [rounds_of(&p, 2, 4, Some(0)), rounds_of(&p, 0, 4, None)] {
             assert_eq!((none.set, none.rounds, none.nodes, none.improvements.len()), (p.greedy, 0, 0, 0));
         }
+    }
+
+    #[test]
+    fn the_heaviest_set_is_the_first_of_equals() {
+        let set = |numbers: &[u32]| numbers.iter().copied().collect::<Bits<W>>();
+        let (small, same, large) = (set(&[1, 5]), set(&[2, 4]), set(&[7]));
+        assert_eq!((small.sum(), same.sum(), large.sum()), (6, 6, 7));
+        assert_eq!(heaviest(&[small, same]), (0, small));
+        assert_eq!(heaviest(&[same, small]), (0, same));
+        assert_eq!(heaviest(&[small, large, same, large]), (1, large));
+    }
+
+    #[test]
+    fn neighborhood_k_of_a_round_works_from_the_incumbent_of_trajectory_k_mod_t() {
+        let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
+        let space = SearchSpace::new(&p);
+        let lns = Lns { p: &p, space: &space, options: Options::default() };
+        let poorer = p.greedy.without(p.greedy.max().unwrap());
+        for bases in [vec![p.greedy], vec![p.greedy, poorer], vec![poorer, p.greedy, poorer]] {
+            let ran = lns.round(&bases, 3, 4);
+            // Each trajectory's best set, the lowest k's among equals, from the neighborhoods that k mod T names.
+            let mut expected = bases.clone();
+            for k in 0..NEIGHBORHOODS {
+                let t = k as usize % bases.len();
+                let unit = lns.unit(&bases[t], &mut lns.options.rng_of(p.n, 3, k), &Control::new());
+                if unit.set.sum() > expected[t].sum() {
+                    expected[t] = unit.set;
+                }
+            }
+            assert_eq!(ran.sets, expected, "{} trajectories", bases.len());
+        }
+    }
+
+    #[test]
+    fn trajectories_are_the_same_on_any_number_of_threads_and_the_game_follows_the_heaviest() {
+        let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
+        let space = SearchSpace::new(&p);
+        let lns = Lns { p: &p, space: &space, options: Options::default() };
+        // The greedy set with half its promotions, the other trajectory's start, in either order.
+        let half = p.greedy.to_vec();
+        let poor: Bits<W> = half[..half.len() / 2].iter().copied().collect();
+        assert!(p.can_promote(&poor) && poor.sum() < p.greedy.sum());
+        for starts in [[p.greedy, poor], [poor, p.greedy]] {
+            let one = rounds_from(&p, &starts, 2, 1, None);
+            assert!(p.can_promote(&one.set) && one.set.sum() == one.improvements.last().unwrap().sum);
+            assert_eq!(rounds_from(&p, &starts, 2, 4, None), one, "4 threads");
+            let short = rounds_from(&p, &starts, 1, 4, None);
+            assert!(one.improvements.starts_with(&short.improvements), "{:?}", one.improvements);
+            // The improvement names the trajectory of the heaviest incumbent after the round.
+            let (trajectory, set) = heaviest(&lns.round(&starts, 1, 1).sets);
+            let expected = Improvement { round: 1, trajectory, sum: set.sum(), seconds: 0.0 };
+            assert_eq!(short.improvements, [expected], "starts {starts:?}");
+        }
+        // Two equal starts tie, and the first trajectory's set is the game's.
+        let tied = rounds_from(&p, &[p.greedy, p.greedy], 0, 1, None);
+        assert_eq!((tied.set, tied.rounds), (p.greedy, 0));
     }
 
     #[test]

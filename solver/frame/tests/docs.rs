@@ -1050,7 +1050,7 @@ fn the_reference_documents_exactly_the_keys_of_a_result_line() {
 
 /// The keys of the unsound line the code writes for game `n`, with `--stop-at-known`.
 fn unsound_keys(n: u32) -> BTreeSet<String> {
-    let plan = unsound::Plan { effort: 1, seed: 1, stop_at_known: true, from_known: false };
+    let plan = unsound::Plan { effort: 1, stop_at_known: true, ..unsound::Plan::default() };
     let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
     let mut keys = BTreeSet::new();
     unsound::solve_range(n, n, &opts, &plan, None, |line| {
