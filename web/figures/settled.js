@@ -4,8 +4,8 @@
 //
 //   the ceiling        a game whose score is n + opt(n − 1), found with no search
 //   the prime formula  a prime n
-//   a repeat           a game that repeats an earlier game's search, in the chain or in the bounds store
-//   a search           every other game: a search of its own, in the chain or in the bounds store, or nothing to promote
+//   a repeat           a game that repeats an earlier game's search
+//   a search           every other game: a search of its own, or nothing to promote
 //
 // A game that the ceiling or the prime formula settles is counted there whatever its record says, since both prove it
 // from the game before; the record is in its tooltip.  The four rules take a gray ramp, light to dark in the order the

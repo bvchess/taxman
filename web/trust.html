@@ -216,14 +216,9 @@
     <a class="gloss" href="glossary.html#ceiling">ceiling</a> or by the
     <a class="gloss" href="glossary.html#prime-formula">prime formula</a> rests on the game before it, and a
     <a class="gloss" href="glossary.html#repeat">repeat</a> on the game it repeats.  A
-    <a class="gloss" href="glossary.html#search">search</a> rests on the frame model of its own game.  The
-    <span data-rests="known">382</span> games from game <span data-rests="knownFrom">3,984</span> to
-    game <span data-rests="knownTo">4,783</span> meet an upper bound that an earlier run of the solver proved, so they
-    rest on the frame model of the games that bound came from.</p>
-    <p>Each game's line in the file says this itself: it names how the score was proven and lists what that assumes.  A
-    line that assumes nothing is proved within the frame model, given that the solver is right.  The lines of those
-    <span data-rests="known">382</span> games list statement U at each game their bound came from, their own game or
-    others.</p>
+    <a class="gloss" href="glossary.html#search">search</a> rests on the frame model of its own game.</p>
+    <p>Each game's line in the file says this itself: it names how the score was proven and lists what that assumes.
+    Every line assumes nothing, so each is proved within the frame model, given that the solver is right.</p>
   </div>
 
   <div class="para">
@@ -274,7 +269,7 @@ const fill = (attr, facts) => {
 
 registerFigure('ladder', mountLadder(document.getElementById('ladder')));
 const rests = mountRestsOn(document.getElementById('rests-on'), { games });
-fill('rests', { past: fmt(rests.past), known: fmt(rests.count.known), knownFrom: fmt(rests.knownFrom), knownTo: fmt(rests.knownTo) });
+fill('rests', { past: fmt(rests.past) });
 const e78 = mountExact78(document.getElementById('exact-78'), { small });
 registerFigure('exact-78', e78);
 const f = e78.facts;

@@ -84,8 +84,6 @@ function settled(r) {
     }
     case 'same_search':
       return [lead, `Game ${fmt(n)} poses exactly the search problem of an earlier game, whose promotions carry over with no search.`];
-    case 'known':
-      return [lead, `The store holds an upper bound on opt(${fmt(n)}) that this game meets, so it was taken with no search.`];
     case 'trivial':
       return [lead, n === 1
         ? 'Game 1 has no move: the taxman takes the 1.'
@@ -104,7 +102,7 @@ function restsOn({ n }) {
 
 // The six numbers under the words: each a label, a value and a line under it.
 function stats(r) {
-  const noFrames = r.proof === 'prime_formula' ? 'the prime formula sets up no frames' : 'the store’s game sets up no frames';
+  const noFrames = 'the prime formula sets up no frames';
   const bag = r.inTheBag;
   return [
     ['moves', fmt(r.moves), r.n - r.moves === 1 ? '1 number goes to the taxman' : `${fmt(r.n - r.moves)} numbers go to the taxman`],
@@ -112,7 +110,7 @@ function stats(r) {
     ['the top half, ΣU*', bag === null ? '—' : fmt(bag), bag === null ? noFrames : r.score > 0 ? `${percent(bag / r.score)} of the score` : ''],
     ['candidates', r.candidates === null ? (r.proof === 'trivial' ? 'none' : '—') : fmt(r.candidates), r.candidates === null && r.proof !== 'trivial' ? noFrames : ''],
     ['nodes', fmt(r.nodes), r.nodes === 0 ? 'no step of search' : ''],
-    ['time', duration(r.seconds), 'on the machine of its run'],
+    ['time', duration(r.seconds), 'with at least one thread at work'],
   ];
 }
 

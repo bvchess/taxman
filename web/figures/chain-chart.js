@@ -6,7 +6,7 @@
 // shows as a band that narrows.  The proof row stacks the stretch's games by the three groups of js/proof.js (search,
 // repeats an earlier search, derived from n − 1) on a 0 to 100% scale.  The time row rises on a log scale to the
 // median of the stretch's searches.  A search is a game whose method is search (the chain's own searches, those that
-// ended at the ceiling included); its time is the game's seconds over every run of the search (tools/export.mjs).
+// ended at the ceiling included); its time is the time the game had at least one worker (tools/export.mjs).
 
 import { duration, el, fmt } from '../js/vocab.js';
 import { GROUPS, ruleWords, settled } from '../js/proof.js';

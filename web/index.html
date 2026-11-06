@@ -101,9 +101,8 @@
         game’s answer is its answer too.</li>
         <li><b>Search.</b>  Every other game.  A search proved its score.</li>
       </ul>
-      <p>Some games were proven by the <a class="gloss" href="glossary.html#bounds-store">bounds store</a>, in runs
-      apart from the chain; each counts by how it was proven there.  The <span data-proof="searchNothing">…</span>
-      small games with nothing left to choose count as searches of one node.</p>
+      <p>The <span data-proof="searchNothing">…</span> small games with nothing left to choose count as searches of
+      one node.</p>
     </aside>
     <aside class="note tech" aria-label="The time of a search">
       <div class="note-head"><span class="note-name">The time of a search</span></div>
@@ -112,13 +111,9 @@
       <ul>
         <li>It counts every search the chain ran, <span data-proof="chainSearches">…</span> in all, even the few that
         ended at the ceiling.</li>
-        <li>A search’s time is its wall-clock time.  A search that was stopped and resumed counts the time of every
-        run.</li>
-        <li>The machines grew, from 8 threads up to game 2,175 to 88 at the end.  From game 2,176 on, a run searched
-        several games at once, usually four and for a while sixteen, so times from different runs compare only
-        roughly.</li>
-        <li>The <span data-proof="storeSearch">…</span> searches of the bounds store ran apart from the chain, and have
-        no time here.</li>
+        <li>A search’s time is the time it had at least one thread at work.</li>
+        <li>One run on one machine of 88 threads made the whole chain.  It worked on up to four games at once, and a
+        search’s time counts the time it shared the threads with the others.</li>
       </ul>
     </aside>
     <aside class="note tech" aria-label="The player's share">
@@ -196,7 +191,7 @@ document.querySelector('[data-orders-exp]').textContent = fmt(counts.game.expone
 mountChainChart(document.getElementById('chain-chart'), { games });
 const proofs = settled(games);
 const proofFacts = {
-  storeSearch: proofs.store.search, searchNothing: proofs.searchNothing,
+  searchNothing: proofs.searchNothing,
   chainSearches: games.columns.method.filter((m) => m === 'search').length,
 };
 for (const s of document.querySelectorAll('[data-proof]')) s.textContent = fmt(proofFacts[s.dataset.proof]);

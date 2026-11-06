@@ -15,16 +15,14 @@ export const PROVER_TO = 2175;
 const GROUPS = [
   { title: 'From the game before', kinds: ['cap', 'prime_formula'], rests: 'rests on game n − 1, which rests on its own proof' },
   { title: 'By a search of the frame model', kinds: ['exhausted', 'same_search', 'trivial'], rests: 'rests on the frame model of game n, and a repeat on the game it repeats' },
-  { title: 'By a bound from an earlier run', kinds: ['known'], rests: 'rests on the frame model of the games the bound came from' },
 ];
-const NAMES = { ...Object.fromEntries(PROOFS.map((p) => [p.key, p.name])), known: 'meets an upper bound an earlier run proved', trivial: 'nothing to choose' };
+const NAMES = { ...Object.fromEntries(PROOFS.map((p) => [p.key, p.name])), trivial: 'nothing to choose' };
 
-/** The counts the figure and its prose show: games by proof, and the range of the games proven by a bound. */
+/** The counts the figure and its prose show: games by proof. */
 export function restsFacts(games) {
   const c = games.columns;
   const count = Object.fromEntries(PROOFS.map((p) => [p.key, c.proof.filter((x) => x === p.key).length]));
-  const known = c.n.filter((_, i) => c.proof[i] === 'known');
-  return { count, total: c.n.length, last: games.lastN, knownFrom: known[0], knownTo: known[known.length - 1], past: games.lastN - PROVER_TO };
+  return { count, total: c.n.length, last: games.lastN, past: games.lastN - PROVER_TO };
 }
 
 export function mountRestsOn(host, { games }) {
@@ -36,7 +34,6 @@ export function mountRestsOn(host, { games }) {
   const group = (g) => `<div class="rests-group">
       <p class="rests-title">${g.title}</p>
       <ul>${g.kinds.map((k) => `<li><span>${NAMES[k]}</span><b>${fmt(f.count[k])}</b></li>`).join('')}</ul>
-      ${g.kinds.includes('known') ? `<p class="rests-range">games ${fmt(f.knownFrom)} to ${fmt(f.knownTo)}</p>` : ''}
       <p class="rests-on"><span class="rests-arrow" aria-hidden="true"></span>${g.rests}</p>
     </div>`;
   box.innerHTML = `

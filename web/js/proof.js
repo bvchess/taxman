@@ -1,15 +1,14 @@
 // How each game of the chain was proven: the one place that knows.  Every figure that sorts the games by their proof
 // takes the sorting from here, from data/games.json alone.
 //
-// The record of a game has a proof kind (PROOFS), and a game proven by the bounds store (kind known) also has the rule
-// of the upper bound it cites, the column storeRule.  The story's classification is coarser and goes by the rule that
-// the chapter "Walking up the chain" meets, the first that applies (ruleOf):
+// The record of a game has a proof kind (PROOFS).  The story's classification is coarser and goes by the rule that the
+// chapter "Walking up the chain" meets, the first that applies (ruleOf):
 //
 //   prime    n is prime (the prime formula, from game n − 1)
 //   ceiling  n > 1 and opt(n) = n + opt(n − 1), the game's score is its ceiling (the ceiling lemma, from game n − 1)
-//   repeat   the record's proof is same_search, or known with the store rule repeat
-//   search   every other game: proof exhausted (its own search), known with the store rule exhausted (a search in a
-//            run of the bounds store), and trivial (a game with nothing to promote, whose tree is a single node)
+//   repeat   the record's proof is same_search
+//   search   every other game: proof exhausted (its own search) and trivial (a game with nothing to promote, whose
+//            tree is a single node)
 //
 // and the front page shows three groups of them (GROUPS): search, repeats an earlier search, and derived from n − 1
 // (the rules prime and ceiling).
@@ -23,7 +22,6 @@ export const PROOFS = [
   { key: 'same_search', name: 'repeats an earlier search', short: 'a repeat of an earlier game’s search' },
   { key: 'cap', name: 'reaches the ceiling', short: 'the ceiling' },
   { key: 'prime_formula', name: 'prime formula', short: 'the prime formula' },
-  { key: 'known', name: 'proven in the bounds store', short: 'a game the bounds store proved' },
   { key: 'trivial', name: 'trivial: nothing to promote', short: 'trivial' },
 ];
 
@@ -56,12 +54,11 @@ export const isPrime = (n) => n >= 2 && primeFactors(n)[0] === n;
 export function ruleOf(c, i) {
   const n = c.n[i];
   const proof = c.proof[i];
-  const stored = proof === 'known' ? c.storeRule[i] : null;
   if (isPrime(n)) return 'prime';
   if (n > 1 && c.score[i] === c.score[i - 1] + n) return 'ceiling';
-  if (proof === 'same_search' || stored === 'repeat') return 'repeat';
-  if (proof === 'exhausted' || proof === 'trivial' || stored === 'exhausted') return 'search';
-  throw new Error(`game ${n}: proof ${proof}${stored ? ` by the store rule ${stored}` : ''} fits no rule`);
+  if (proof === 'same_search') return 'repeat';
+  if (proof === 'exhausted' || proof === 'trivial') return 'search';
+  throw new Error(`game ${n}: proof ${proof} fits no rule`);
 }
 
 /** The game whose search a repeat n repeats: the game before it, or the one before that when n − 1 is prime, since a
@@ -83,13 +80,6 @@ function rootsOf(c) {
 /** The game whose search the record of row i rests on: game 2512 for each of games 2512 to 2519. */
 export const searchOf = (c, i) => rootsOf(c)[i];
 
-const STORE_WORDS = {
-  exhausted: 'a search in the bounds store',
-  repeat: 'a repeat in the bounds store',
-  ceiling: 'the ceiling, by the bounds store',
-  prime: 'the prime formula, by the bounds store',
-};
-
 /** How the chain's record proves the game in row i, in words: "a repeat of game 21's search". */
 export function recordWords(c, i) {
   const n = c.n[i];
@@ -99,7 +89,6 @@ export function recordWords(c, i) {
     case 'same_search': return `a repeat of game ${fmt(searchOf(c, i))}’s search`;
     case 'exhausted': return `a search of ${fmt(c.nodes[i])} node${c.nodes[i] === 1 ? '' : 's'}`;
     case 'trivial': return 'nothing to choose';
-    case 'known': return STORE_WORDS[c.storeRule[i]] ?? 'the bounds store';
     default: return c.proof[i];
   }
 }
@@ -113,13 +102,11 @@ export function nodesWords(k) {
 
 /** How the game in row i was proven by its rule, as one phrase that reads after "proven by" in a tooltip. */
 export function ruleWords(c, i, rule = ruleOf(c, i)) {
-  const stored = c.proof[i] === 'known';
   switch (rule) {
     case 'prime': return 'the prime formula';
     case 'ceiling': return 'the ceiling';
-    case 'repeat': return stored ? 'a repeat, in the bounds store' : recordWords(c, i);
+    case 'repeat': return recordWords(c, i);
     default:
-      if (stored) return 'a search, in the bounds store';
       if (c.proof[i] === 'trivial') return 'a search of one node';
       return `a search of ${nodesWords(c.nodes[i])} node${c.nodes[i] === 1 ? '' : 's'}`;
   }
@@ -176,11 +163,9 @@ export function settled(games) {
   for (const r of rules) counts[r]++;
   const groupCounts = Object.fromEntries(GROUPS.map((g) => [g.key, g.rules.reduce((s, r) => s + counts[r], 0)]));
   const noSearch = NO_SEARCH.reduce((s, k) => s + counts[k], 0);
-  // The games of the bounds store under each group, and two kinds of game the record and the rules sort differently.
+  // Two kinds of game the record and the rules sort differently.
   const count = (test) => rules.filter((_, i) => test(i)).length;
-  const known = (i) => c.proof[i] === 'known';
-  const store = Object.fromEntries(GROUPS.map((g) => [g.key, count((i) => groups[i] === g.key && known(i))]));
   const recordRepeatAtCeiling = count((i) => rules[i] === 'ceiling' && c.proof[i] === 'same_search');
   const searchNothing = count((i) => rules[i] === 'search' && c.proof[i] === 'trivial');
-  return { rules, groups, counts, groupCounts, noSearch, total: rules.length, store, recordRepeatAtCeiling, searchNothing };
+  return { rules, groups, counts, groupCounts, noSearch, total: rules.length, recordRepeatAtCeiling, searchNothing };
 }

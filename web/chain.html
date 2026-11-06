@@ -296,10 +296,8 @@
       <div class="note-head"><span class="note-name">How the chart counts</span></div>
       <p>A game counts under the first rule that applies, in the order prime, ceiling, repeat, search.  So the ceiling
       holds <span data-settled="recordRepeatAtCeiling">…</span> games the chain records as repeats, since the ceiling
-      proves them from game n − 1 alone.  A game of the bounds store, which proves bounds apart from the chain,
-      counts by the bound it cites: <span data-settled="storeBefore">…</span> by the ceiling or the prime formula,
-      <span data-settled="storeRepeat">…</span> as repeats and <span data-settled="storeSearch">…</span> by searches.
-      The searches include <span data-settled="searchNothing">…</span> small games with nothing to choose.</p>
+      proves them from game n − 1 alone.  The searches include <span data-settled="searchNothing">…</span> small
+      games with nothing to choose.</p>
     </aside>
     <p>The same rules carry the <a class="gloss" href="glossary.html#chain">chain</a> to its end.  Of its
     <span data-settled="total">…</span> games, <span data-settled="share">…</span> were proven with no search of their
@@ -407,7 +405,6 @@ const settledFacts = {
   total: fmt(chain.total), share: pct(chain.noSearch / chain.total, 1),
   ceilingShare: pct(chain.counts.ceiling / chain.total, 1), primeShare: pct(chain.counts.prime / chain.total, 1),
   repeatShare: pct(chain.counts.repeat / chain.total, 1), searchShare: pct(chain.counts.search / chain.total, 1),
-  storeRepeat: fmt(chain.store.repeat), storeSearch: fmt(chain.store.search), storeBefore: fmt(chain.store.before),
   recordRepeatAtCeiling: fmt(chain.recordRepeatAtCeiling), searchNothing: fmt(chain.searchNothing),
 };
 fill('settled', (key) => settledFacts[key]);
