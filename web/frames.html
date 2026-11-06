@@ -36,19 +36,20 @@
       components.  For n ≥ 2, each frame's sources lie in one layer k and its factors in layer k − 1, and a frame in
       front of it lies in layer k − 1.</p>
     </aside>
-    <p data-follows="fig21" data-state="1">Chapter 3 left game 21 with its
+    <p data-follows="fig21" data-state="1 2">Chapter 3 left game 21
+  <a class="go" href="?fig21=1#fig21" data-fig="fig21" data-state="1">in its layers</a>, with its
   <a class="gloss" href="glossary.html#source">sources</a> chosen: <a class="gloss" href="glossary.html#u-star">U*</a>
   in gray, and <span class="n" data-n="11">11</span>, <span class="n" data-n="13">13</span> and
-  <span class="n" data-n="17">17</span> rejected.  Now join each source to the
+  <span class="n" data-n="17">17</span> rejected.  Now gather each source with the
   <a class="gloss" href="glossary.html#factor">factors</a> that can pay for it, and
-  <a class="go" href="?fig21=1#fig21" data-fig="fig21" data-state="1">the board falls apart</a> into four groups.
+  <a class="go" href="?fig21=2#fig21" data-fig="fig21" data-state="2">the board falls apart</a> into four groups.
   Each is a <a class="gloss" href="glossary.html#frame"><em>frame</em></a>: some sources with every factor that can pay
   for one of them.</p>
   </div>
 
   <figure class="fig fig21" id="fig21">
-    <div class="fig-state"><span class="fig-state-name">Frames</span><span class="fig-state-n">1 of 4</span></div>
-    <svg role="img" aria-label="Game 21, from its frames to the game played. The current state is described under the figure."></svg>
+    <div class="fig-state"><span class="fig-state-name">Layers</span><span class="fig-state-n">1 of 5</span></div>
+    <svg role="img" aria-label="Game 21, from its layers to the game played. The current state is described under the figure."></svg>
     <div class="fig-timeline"></div>
     <figcaption class="fig-caption"></figcaption>
   </figure>
@@ -92,10 +93,10 @@
       (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#the-exactness-theorem">the
       closed-frames lemma</a>).</p>
     </aside>
-    <p data-follows="fig21" data-state="2">In each frame, the <a class="gloss" href="glossary.html#source">sources</a>
+    <p data-follows="fig21" data-state="3">In each frame, the <a class="gloss" href="glossary.html#source">sources</a>
     that greedy kept are its moves, and each needs a factor of its own to pay for it.  A frame's <a class="gloss"
     href="glossary.html#freedom"><em>freedoms</em></a> are its factors less its moves: how many factors it can spare.
-    <a class="go" href="?fig21=2#fig21" data-fig="fig21" data-state="2">Count them</a>.  The two frames at the ends,
+    <a class="go" href="?fig21=3#fig21" data-fig="fig21" data-state="3">Count them</a>.  The two frames at the ends,
     with the factors 1 and 8, have as many factors as moves.  They are <em>closed</em>: every <a class="gloss"
     href="glossary.html#factor">factor</a> <a class="gloss" href="glossary.html#pays-for">pays for</a> a move, and
     nothing in them is left to choose.  The other two have four factors and three moves, one freedom each.  The frames
@@ -115,10 +116,10 @@
   the frame in front can take on.  In game 21 the candidates are <span class="n" data-n="4">4</span> and
   <span class="n" data-n="9">9</span>, drawn with a second outline.</p>
 
-  <p>Why not <span class="n" data-n="10">10</span>, or <span class="n" data-n="6">6</span>? 10 = 2 · 5 would join 14 = 2
-  · 7, 21 = 3 · 7 and 15 = 3 · 5 in frame 0, and those four are <a href="sets.html#loop-section">chapter 1's loop</a>:
-  they cannot all be played. 6 = 2 · 3 would close a smaller <a class="gloss" href="glossary.html#loop">loop</a> with 14
-  and 21.  But 9 = 3 · 3 has the single maximal factor 3, closes no loop, and fits, and so does 4 = 2 · 2.</p>
+  <p>Why not <span class="n" data-n="10">10</span>, or <span class="n" data-n="6">6</span>?  Either would close a
+  <a class="gloss" href="glossary.html#loop">loop</a> in frame 0, and the numbers of a loop cannot all be played: 10
+  would make <a href="sets.html#loop-section">chapter 1's loop</a> with 14, 21 and 15, and 6 a smaller one with 14 and
+  21.  But 9 has a single maximal factor, 3, so it closes no loop, and it fits.  So does 4.</p>
 
   <div class="para">
     <aside class="note card" aria-label="The promotion-limit lemma, proved">
@@ -130,15 +131,15 @@
       c<sub>1</sub> + ⋯ + c<sub>t</sub> with 0 ≤ c<sub>h</sub> ≤ κ<sub>h</sub> and
       c<sub>h</sub> + c<sub>h+1</sub> ≤ ρ<sub>h</sub>.  In game 21 it is 1.</p>
     </aside>
-    <p data-follows="fig21" data-state="3">Only one of the two can go, since each frame here has one <a class="gloss"
-    href="glossary.html#freedom">freedom</a> and a promotion spends one in each.  <a class="go" href="?fig21=3#fig21"
-    data-fig="fig21" data-state="3">Promote 9</a>, the larger.  It hops to the right, from frame 1 into frame 0, where 3
+    <p data-follows="fig21" data-state="4">Only one of the two can go, since each frame here has one <a class="gloss"
+    href="glossary.html#freedom">freedom</a> and a promotion spends one in each.  <a class="go" href="?fig21=4#fig21"
+    data-fig="fig21" data-state="4">Promote 9</a>, the larger.  It hops to the right, from frame 1 into frame 0, where 3
     <a class="gloss" href="glossary.html#pays-for">pays for</a> it, and the score is <span
     data-g21="inTheBag">135</span> + 9 = <span data-g21="score">144</span>.</p>
   </div>
 
-  <p data-follows="fig21" data-state="4">The frames also give the order of play: the frames in front first, from the
-  right.  <a class="go" href="?fig21=4#fig21" data-fig="fig21" data-state="4">Play the game</a>: the moves are
+  <p data-follows="fig21" data-state="5">The frames also give the order of play: the frames in front first, from the
+  right.  <a class="go" href="?fig21=5#fig21" data-fig="fig21" data-state="5">Play the game</a>: the moves are
   <span data-g21="moves">19, 9, 15, 21, 14, 18, 12, 20 and 16</span>, each taking the one <a class="gloss" href="glossary.html#tax">tax</a> its thick line marks.
   Then no move is left, and the taxman takes <span data-g21="rest">11, 13 and 17</span>.  The game ends
   <span data-g21="score">144</span> to <span data-g21="taxman">87</span>, and 144 is
@@ -147,11 +148,9 @@
 
 <section class="chapter" id="frame-model-section" data-toc="frame-model-section" aria-labelledby="h-model">
   <h2 id="h-model">The frame model</h2>
-  <p>So once <a class="gloss" href="glossary.html#u-star">U*</a> is chosen, a game is settled by one choice: which
+  <p>So once <a class="gloss" href="glossary.html#u-star">U*</a> is chosen, a game is settled by choosing the
     <a class="gloss" href="glossary.html#candidate">candidates</a> to <a class="gloss" href="glossary.html#promote">promote</a> together.  A set of
-    candidates that can all be promoted together is a <em>promotion set</em>, and the
-    <a class="gloss" href="glossary.html#frame-model"><em>frame model</em></a> asks for the heaviest one.  Everything
-  else follows from it: the frames, the order of play and the game.</p>
+    candidates that can all be promoted together is a <em>promotion set</em>, and an optimal game requires the heaviest one.</p>
 
   <div class="para">
     <aside class="note card" aria-label="The exactness theorem, proved">
@@ -162,21 +161,22 @@
       <a class="gloss" href="glossary.html#playable">playable</a> iff L is a promotion set.  So ΣU* + P*, with P* the
       weight of the heaviest promotion set, is the largest weight of a playable set that contains U*.</p>
     </aside>
-    <aside class="note card" aria-label="The corollary of U, proved">
-      <div class="note-head"><span class="note-name">The corollary of U<span class="note-label">Corollary X8</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">proved<span class="sr-only">, proof on GitHub</span></a></div>
+    <aside class="note card" aria-label="The corollary of statement U, proved">
+      <div class="note-head"><span class="note-name">The corollary of statement U<span class="note-label">Corollary X8</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">The frame model's best score is at most opt(n), and equal to it exactly where statement U
       holds.</p>
-      <p class="precise"><span class="run">Precisely.</span>ΣU* + P* ≤ <a class="gloss" href="glossary.html#opt">opt(n)</a>, with equality iff U holds at n.  The
-      <a class="gloss" href="glossary.html#chain">chain</a>'s scores past game 2,175 are proven within the frame model,
-      so they are opt(n) given U
+      <p class="precise"><span class="run">Precisely.</span>ΣU* + P* ≤ <a class="gloss" href="glossary.html#opt">opt(n)</a>, with equality iff statement U holds at
+      n.  The <a class="gloss" href="glossary.html#chain">chain</a>'s scores past game 2,175 are proven within the frame
+      model, so they are opt(n) given statement U
       (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports
       the scores</a>).</p>
     </aside>
-    <p>Nothing is lost by looking only at promotions, as long as the game plays all of U*.  The promotion sets are
-    exactly what a game that plays U* can add below n/2, so the frame model's best score is the best score of any game
-    that plays U*.  That is the best score of the game itself exactly where
-    <a class="gloss" href="glossary.html#statement-u">statement U</a> holds, which
-    <a href="top-half.html#statement-u">chapter 3</a> states.</p>
+    <p>The <a class="gloss" href="glossary.html#frame-model"><em>frame model</em></a> fixes the sources to U* and
+    leaves only the promotions to choose.  That loses nothing for a game that plays all of U*: below n/2, such a game
+    can add any promotion set, and nothing else.  So the frame model's best score is the best score of any game that
+    plays all of U*.  <a class="gloss" href="glossary.html#statement-u">Statement U</a>, from
+    <a href="top-half.html#statement-u">chapter 3</a>, says that some optimal game does.  Wherever it holds, the frame
+    model's best score is <a class="gloss" href="glossary.html#opt">opt(n)</a>, the best score of the game itself.</p>
   </div>
 </section>
 
@@ -273,8 +273,8 @@ initEssay();
 const [small, games] = await Promise.all([loadSmall(), loadGames()]);
 
 const fig21 = mountGame21(document.getElementById('fig21'), {
-  small, states: ['frames', 'freedoms', 'promote', 'play'],
-  label: 'Game 21, from its frames to the game played. The current state is described under the figure.',
+  small, states: ['layered', 'frames', 'freedoms', 'promote', 'play'],
+  label: 'Game 21, from its layers to the game played. The current state is described under the figure.',
 });
 registerFigure('fig21', fig21);
 const f = fig21.facts;

@@ -125,7 +125,9 @@ import { mountGame21 } from './figures/game21.js';
 initEssay();
 const [small, games] = await Promise.all([loadSmall(), loadGames()]);
 
-registerFigure('fig21', mountGame21(document.getElementById('fig21'), { small }));
+registerFigure('fig21', mountGame21(document.getElementById('fig21'), {
+  small, states: ['pot', 'layers', 'sources', 'greedy', 'frames', 'freedoms', 'promote', 'play'],
+}));
 for (const s of document.querySelectorAll('[data-last-n]')) s.textContent = fmt(games.lastN);
 </script>
 </body>
