@@ -16,10 +16,10 @@
 // * the tokens grow with the width, from their plain size on a phone, where game 30 still fits at 390 px, to a
 //   quarter larger.
 //
-// The marks are the site's: a number the reader may take is a raised token standing up, a coin for a number above
-// n/2 and a tile for the rest; one that cannot be taken lies flat.  A take plays as in the main game: the move
-// travels down from its place in the graph into the player's tray and its tax into the taxman's, one after another,
-// and a tile taken as a move turns over as a coin.  A number that leaves the pot is gone from the graph, and so is
+// The marks are the site's: every number is plain, between a tile and a coin, in the pot and in the trays; a number
+// the reader may take is a raised token standing up, and one that cannot be taken lies flat.  A take plays as in the
+// main game: the move travels down from its place in the graph into the player's tray and its tax into the taxman's,
+// one after another.  A number that leaves the pot is gone from the graph, and so is
 // every line that touches it; since a number leaves the pot only after the divisors it taxes, a line that goes leads
 // only to numbers already gone, and a number left with no line is one that cannot be taken.  Taking back, or
 // starting over, brings the numbers back to their places with their lines.  Pointing at or focusing a number that can
@@ -29,10 +29,10 @@
 // URL parameter: graph=N or graph=N:m1,m2,... opens game N with those moves played.
 
 import * as M from '../js/model.js';
-import { mountPlay, shapeOf } from '../js/play.js';
+import { mountPlay } from '../js/play.js';
 import { scene } from '../js/scene.js';
 import { boxAround, glide, makePiece, reserveRows, returnDelays, startOf, traysHTML } from '../js/trays.js';
-import { MOTION, NS, SIZE, listWords, look, reducedMotion, restyle } from '../js/vocab.js';
+import { MOTION, NS, SHAPE, SIZE, listWords, look, reducedMotion, restyle } from '../js/vocab.js';
 
 export function mountGraphGame(host, { small, n = 21 }) {
   let view;
@@ -40,7 +40,7 @@ export function mountGraphGame(host, { small, n = 21 }) {
   return { ...game, highlight: (x, on) => view.highlight(x, on) };
 }
 
-const ROW = 38; // the distance between rows, in the units of a token, which is 30 across as a coin
+const ROW = 38; // the distance between rows, in the units of a token, which is 30 across as a circle
 const POINT_MS = 150; // the halo answering the pointer, as --ui does
 
 // Where every number of game n stands on a board width pixels wide.  deepest is the largest layer of the largest game,
@@ -100,7 +100,7 @@ function graphBoard({ you, take, maxN, playing }) {
     const halo = lit();
     const v = {};
     for (let x = 1; x <= n; x++) {
-      const base = { ...lay.at.get(x), scale: lay.scale, shape: shapeOf(n, x) === 'move' ? 1 : 0 };
+      const base = { ...lay.at.get(x), scale: lay.scale, shape: SHAPE.plain };
       if (state.pot.has(x)) {
         v[x] = { ...base, ...(legal.has(x) ? {} : look('lying')), halo: halo.has(x) && x !== pointed ? 1 : 0 };
       } else v[x] = base; // gone from the graph: the board hides it, so it stays where it stands
@@ -248,7 +248,7 @@ function graphBoard({ you, take, maxN, playing }) {
     return { x: r.left + lay.at.get(x).x, y: r.top + lay.at.get(x).y };
   }
 
-  const lookNames = (x, tray) => (tray === 'player' ? ['move', 'player'] : [shapeOf(n, x), 'taxman']);
+  const lookNames = (tray) => (tray === 'player' ? ['plain', 'player'] : ['plain', 'taxman']);
 
   // Put the pieces of the trays where the state says.  A piece of a number taken in this step (order) travels from its
   // token, and one that the state no longer holds travels back to it.  Returns when each number leaves the graph or
@@ -270,9 +270,9 @@ function graphBoard({ you, take, maxN, playing }) {
         continue;
       }
       const c = centerOf(x);
-      const near = legal.has(x) ? [shapeOf(n, x)] : [shapeOf(n, x), 'lying'];
+      const near = legal.has(x) ? ['plain'] : ['plain', 'lying'];
       const box = boxAround(p, c.x, c.y, lay.scale);
-      glide(p, { to: box, delay, flips: shapeOf(n, x) !== 'move' && p._tray === 'player', looks: near });
+      glide(p, { to: box, delay, looks: near });
       later(() => p.remove(), delay + MOTION.move);
     }
     // The pieces of the state, in the order of its lists, so that the trays fill left to right.
@@ -281,8 +281,8 @@ function graphBoard({ you, take, maxN, playing }) {
       let p = held.get(x);
       if (!p) {
         const coming = animate && order.includes(x);
-        const near = wasLegal.has(x) ? [shapeOf(n, x)] : [shapeOf(n, x), 'lying'];
-        p = makePiece(x, ...(coming ? near : lookNames(x, tray)));
+        const near = wasLegal.has(x) ? ['plain'] : ['plain', 'lying'];
+        p = makePiece(x, ...(coming ? near : lookNames(tray)));
         p.disabled = true;
         p._tray = tray;
         p._batch = batch;
@@ -290,7 +290,7 @@ function graphBoard({ you, take, maxN, playing }) {
         held.set(x, p);
         if (coming) fresh.push(x);
       }
-      p._final = lookNames(x, tray);
+      p._final = lookNames(tray);
       p.setAttribute('aria-label', label(x));
     }
     for (const tray of ['player', 'taxman']) {
@@ -307,7 +307,7 @@ function graphBoard({ you, take, maxN, playing }) {
       const delay = startOf(p._k);
       at.set(x, delay);
       const from = boxAround(p, c.x, c.y, lay.scale);
-      glide(p, { from, delay, flips: shapeOf(n, x) !== 'move' && p._tray === 'player', looks: p._final });
+      glide(p, { from, delay, looks: p._final });
     }
     return at;
   }

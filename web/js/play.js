@@ -31,9 +31,6 @@
 import * as M from './model.js';
 import { listWords, reducedMotion } from './vocab.js';
 
-/** The look of x's token in game n: a coin ('move') for a number above n/2, a tile ('factor') for the rest. */
-export const shapeOf = (n, x) => (x > n / 2 ? 'move' : 'factor');
-
 const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 const range = (a, b) => Array.from({ length: Math.max(0, b - a + 1) }, (_, i) => a + i);
 
