@@ -12,7 +12,8 @@ entries are meant to be moved, merged and cut.
   its proof, technical notes, and links to the code, the data and the literature.  A reader who never looks right misses
   nothing of the story.  So no page needs to be set apart: the search is a chapter like the others, and its depth
   sits on the right.
-* **Standings.**  Every claim says where it stands: proved, proved given U, proved by computation, measured, or open.
+* **Standings.**  Every claim says where it stands: proved, proved given statement U, proved by computation, measured,
+  or open.
   The words are the theory's ([statements.md](../docs/theory/statements.md#the-statements)).
 * **Numbers come from the data.**  Counts, scores and shares are read from `results/optimal.jsonl.gz` when the page is
   built or loaded, never typed.
@@ -88,8 +89,8 @@ chain's end, and this site explains how.
 * **Check it yourself:** the data, the programs and the theory on GitHub.
 * **Right column:** the rules precisely, opt(n) and the Taxman sequence (OEIS A019312); the heuristics' claims and how
   they were measured (`heuristics/README.md`); how to check the chain; what supports the scores (proven outright to
-  2175, given U past it), beside "Check it yourself" and not at the top, until chapter 6 gives it its home; how to cite
-  the site.
+  2175, given statement U past it), beside "Check it yourself" and not at the top, until chapter 6 gives it its home;
+  how to cite the site.
 
 ## The story
 
@@ -136,7 +137,7 @@ optimal game over game n's, where n fits (10) and where it does not (12), each a
 (13), in the same rows.  The whole chain, a cell for each game, shaded by how it was proven.
 
 **Right column.**  The prime lemma (N1), monotonicity (N3), the ceiling lemma (N4), the prime formula (N5), the step
-theorem (N6), the half lemma (N7), the semiprime formula (J3), the repeat lemma (R6, its last part given U).
+theorem (N6), the half lemma (N7), the semiprime formula (J3), the repeat lemma (R6, its last part given statement U).
 
 **Asides.**  *When n is twice a prime:* n always fits, since Bertrand's postulate puts a prime between n/2 and n;
 game 14.  *One search, eight games:* games 2512 to 2519 all rest on one search, the longest such run.
@@ -172,15 +173,15 @@ certificates ((★), (♦)), where exchange breaks (game 2873), statement U, the
 * A frame with as many factors as moves is closed; the others have freedoms.
 * To promote a factor is to play it as a move, one frame forward.  Game 21's promotion of 9.
 * The frame model searches only promotion sets.  Its best score is the best score of a game that plays U\*, which is
-  opt(n) exactly when U holds.
+  opt(n) exactly when statement U holds.
 * How much is left: in game 5060, 268 promotions from 1,380 candidates, worth about 7% of the score.
 
 **Figures.**  The game-21 figure, from the frames to the finished game.  A row of a large game's frames, drawn small,
 to show the scale.
 
 **Right column.**  The frame lemma (F1), the layer theorem (F3), the winnability lemma (F5), the promotion-limit lemma
-(F9), the exactness theorem (X7), the corollary of U (X8); the solver's design (`solver/docs/design/frame-model.md`)
-and code.
+(F9), the exactness theorem (X7), the corollary of statement U (X8); the solver's design
+(`solver/docs/design/frame-model.md`) and code.
 
 **Asides.**  *Two optimal sets:* every game to 424 has one optimal set; game 425 has two.
 
@@ -216,7 +217,7 @@ register); the design (`solver/docs/DESIGN.md`, `search.md`, `gf2-bound.md`, `ta
 * Its bound: a set that can be played is independent over GF(2), and that bound's gap is about a tenth of the best
   published bound's.
 * The parity bound equals opt(n) for every n up to 77 and misses first at 78, where an odd core weighs in (measured).
-* Past 2175 the scores are exact given U, and here is what supports U.
+* Past 2175 the scores are exact given statement U, and here is what supports it.
 * What each game's record says: how it was proven and what it assumes.
 
 **Figures.**  What rests on what: the proof kinds and their assumptions.  The ladder of three conditions, at least one,

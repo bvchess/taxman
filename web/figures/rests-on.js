@@ -1,7 +1,7 @@
 // What rests on what: the kinds of proof in the chain's records, grouped by what each rests on, and under them what
 // makes the frame model's best score opt(n): the prover's proof up to 2175, statement U at n past it.  A flat
 // figure in HTML, each count read from data/games.json.  The two foundations wear the standing pills they have, and
-// the box of the one given U has the pill's double outline.
+// the box of the one given statement U has the pill's double outline.
 //
 // The kinds and their meaning are those of solver/docs/REFERENCE.md, "Proof kinds"; the prover's reach is
 // results/README.md's, "What supports the scores", item 6.

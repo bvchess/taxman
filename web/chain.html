@@ -236,15 +236,15 @@
 <section class="chapter" id="repeat" data-toc="repeat" aria-labelledby="h-repeat">
   <h2 id="h-repeat">A repeat</h2>
   <div class="para">
-    <aside class="note card" aria-label="The repeat lemma, proved given U">
-      <div class="note-head"><span class="note-name">The repeat lemma<span class="note-label">Lemma R6</span></span><a class="standing is-given-u" href="https://github.com/bvchess/taxman/blob/master/docs/theory/search-rules.md#the-repeat-lemma">proved given U<span class="sr-only">, proof on GitHub</span></a></div>
+    <aside class="note card" aria-label="The repeat lemma, proved given statement U">
+      <div class="note-head"><span class="note-name">The repeat lemma<span class="note-label">Lemma R6</span></span><a class="standing is-given-u" href="https://github.com/bvchess/taxman/blob/master/docs/theory/search-rules.md#the-repeat-lemma">proved given statement U<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">If game n poses the search problem of an earlier game, the earlier game's answer gives an optimal
       game of n.</p>
       <p class="precise"><span class="run">Precisely.</span>Let Π_n = Π_m, root problems of games n and m.  Every
       promotion set L makes a game of n worth Σ<a class="gloss" href="glossary.html#u-star">U*</a>(n) + ΣL, and, given
       <a class="gloss" href="glossary.html#statement-u">statement U</a> at n, a promotion set that makes an optimal game
-      of m makes an optimal game of n.  The first part needs no U.  Every game up to 2,175 is also proven by the prover,
-      without U.</p>
+      of m makes an optimal game of n.  The first part does not need statement U.  Every game up to 2,175 is also
+      proven by the prover, without statement U.</p>
     </aside>
     <p>Most games in which n neither fits nor is prime still need no search.  Before the
     <a class="gloss" href="glossary.html#frame-solver">frame solver</a> (<a href="frames.html">chapter 4</a>) searches
@@ -320,8 +320,10 @@
       <p>The ceiling and the prime formula prove the chain's game of n optimal wherever its game of n − 1 is.  A repeat
       rests
       on <a class="gloss" href="glossary.html#statement-u">statement U</a> at n too, and a search on the
-      <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is exact where U holds.  Every game up to
-      2,175 is also proven by the <a class="gloss" href="glossary.html#prover">prover</a>, on the whole board, without U
+      <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is exact where statement U holds.
+      Every game up to 2,175 is also proven by the <a class="gloss" href="glossary.html#prover">prover</a>, on the whole
+      board,
+      without statement U
       (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports
       the scores</a>).</p>
     </aside>

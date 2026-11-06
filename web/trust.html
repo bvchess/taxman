@@ -174,11 +174,12 @@
 <section class="chapter" id="what-supports-the-scores" data-toc="what-supports-the-scores" aria-labelledby="h-supports">
   <h2 id="h-supports">What supports the scores</h2>
   <div class="para">
-    <aside class="note card" aria-label="The corollary of U, proved">
-      <div class="note-head"><span class="note-name">The corollary of U<span class="note-label">Corollary X8</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">The frame model's best score is never above opt(n), and equals it exactly when U holds.</p>
-      <p class="precise"><span class="run">Precisely.</span>ΣU* + P*(Π<sub>n</sub>) ≤ opt(n), with equality iff U holds
-      at n.</p>
+    <aside class="note card" aria-label="The corollary of statement U, proved">
+      <div class="note-head"><span class="note-name">The corollary of statement U<span class="note-label">Corollary X8</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">The frame model's best score is never above opt(n), and equals it exactly when statement U
+      holds.</p>
+      <p class="precise"><span class="run">Precisely.</span>ΣU* + P*(Π<sub>n</sub>) ≤ opt(n), with equality iff
+      statement U holds at n.</p>
     </aside>
     <aside class="note card" aria-label="Statement U, open, proved to game 2,175">
       <div class="note-head"><span class="note-name">Statement U</span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">open, proved to game 2,175<span class="sr-only">, evidence on GitHub</span></a></div>
@@ -193,8 +194,8 @@
     <span data-rests="past">2,885</span> of them.  Each is the best score of the
     <a class="gloss" href="glossary.html#frame-model">frame model</a>, and that is opt(n) exactly when
     <a class="gloss" href="glossary.html#statement-u">statement U</a> holds at n: when some optimal game plays every
-    number of <a class="gloss" href="glossary.html#u-star">U*</a> with three or more prime factors.  U is open in
-    general, so each of those scores is opt(n) given U.</p>
+    number of <a class="gloss" href="glossary.html#u-star">U*</a> with three or more prime factors.  Statement U is
+    open in general, so each of those scores is opt(n) given statement U.</p>
   </div>
 
   <figure class="fig rests-fig" id="rests-on" aria-label="What each kind of proof in the chain's records rests on, with the number of games of each kind, and what makes the frame model's best score opt(n).">
@@ -226,8 +227,8 @@
   </div>
 
   <div class="para">
-    <aside class="note tech" aria-label="The evidence for U">
-      <div class="note-head"><span class="note-name">The evidence for U</span></div>
+    <aside class="note tech" aria-label="The evidence for statement U">
+      <div class="note-head"><span class="note-name">The evidence for statement U</span></div>
       <p>The lower layers: every optimal set holds U*<sub>1</sub> and U*<sub>2</sub>, by
       <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-bottom-layers-theorem">the
       bottom-layers theorem (F4)</a>.  The sources: <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#the-sources-conjecture">the
@@ -238,15 +239,15 @@
       <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#where-a-proof-stops">where a
       proof stops</a>.</p>
     </aside>
-    <p>What supports U past game 2,175:</p>
+    <p>What supports statement U past game 2,175:</p>
     <ul class="rules">
       <li>It holds at every game the prover reaches, up to game 2,175.</li>
-      <li>It is proved for the numbers with one or two prime factors: every optimal set holds those of U*.  U asks
-      the same of the numbers with three or more.</li>
+      <li>It is proved for the numbers with one or two prime factors: every optimal set holds those of U*.
+      Statement U asks the same of the numbers with three or more.</li>
       <li>Among the <a class="gloss" href="glossary.html#source">sources</a> alone, U* is the heaviest set that can be
       played, in every game up to 100,000.</li>
       <li>The prover's barred bounds show, number by number, that any game beating the recorded score would have to
-      play most of the numbers U asks about: about 85% of them in games 2,176 to 3,314, though never all of a
+      play most of the numbers statement U asks about: about 85% of them in games 2,176 to 3,314, though never all of a
       game's.</li>
     </ul>
   </div>

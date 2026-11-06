@@ -191,24 +191,24 @@
       design</a>; <a href="https://github.com/bvchess/taxman/tree/master/solver/frame/src/frames">solver/frame/src/frames</a>).</p>
     </aside>
   <p>Game 21 has two <a class="gloss" href="glossary.html#candidate">candidates</a>.  Game <span
-  data-scale="n">5,060</span> has <span data-scale="candidates">1,380</span>, in <a class="gloss"
-  href="glossary.html#frame">frames</a> 0 to <span data-row="last">8</span>, into which its <span
-  data-row="open">16</span> frames with freedoms collapse.  Its <a class="gloss"
-  href="glossary.html#optimal-game">optimal game</a> <a class="gloss" href="glossary.html#promote">promotes</a> <span
-  data-scale="promotions">268</span> of them, and they carry <span data-scale="promoted">570,330</span> of its <span
-  data-scale="score">8,053,621</span> points: about <span data-scale="rest">7%</span> of the score.  The other <span
-  data-scale="top">93%</span> is <a class="gloss" href="glossary.html#u-star">U*</a>, which one greedy pass chose.</p>
+  data-row="n">100</span> has <span data-row="candidates">17</span>, in <a class="gloss"
+  href="glossary.html#frame">frames</a> 0 to <span data-row="last">3</span>, into which its <span
+  data-row="open">7</span> frames with freedoms collapse.</p>
   </div>
 
-  <figure class="fig wide chart frames-row" id="frames-row">
-    <p class="chart-title">The frames of game <span data-scale="n">5,060</span></p>
+  <figure class="fig chart frames-row" id="frames-row">
+    <p class="chart-title">The frames of game <span data-row="n">100</span></p>
     <div class="row-box"></div>
     <figcaption class="fig-caption"></figcaption>
   </figure>
 
-  <p>Each candidate is promoted or not, so <span data-scale="candidates">1,380</span> candidates allow about
-  10<sup data-scale="sets">415</sup> sets, and most of them break some frame.  Which set is the heaviest is the one
-  choice left, and a search makes it.</p>
+  <p>Game <span data-scale="n">5,060</span> has <span data-scale="candidates">1,380</span> candidates.  Its <a class="gloss"
+  href="glossary.html#optimal-game">optimal game</a> <a class="gloss" href="glossary.html#promote">promotes</a> <span
+  data-scale="promotions">268</span> of them, and they carry <span data-scale="promoted">570,330</span> of its <span
+  data-scale="score">8,053,621</span> points: about <span data-scale="rest">7%</span> of the score.  The other <span
+  data-scale="top">93%</span> is <a class="gloss" href="glossary.html#u-star">U*</a>, which one greedy pass chose.
+  Each candidate is promoted or not, so they allow about 10<sup data-scale="sets">415</sup> sets, and most of them
+  break some frame.  Which set is the heaviest is the one choice left, and a search makes it.</p>
 </section>
 
 <section class="chapter" id="along" data-toc="along" aria-label="Along the way">
@@ -294,10 +294,10 @@ const scale = {
   sets: fmt(Math.round(c.candidates[i] * Math.log10(2))),
 };
 for (const s of document.querySelectorAll('[data-scale]')) s.textContent = scale[s.dataset.scale];
-mountFramesRow(document.getElementById('frames-row'), { games }).then((facts) => {
-  const row = { open: facts.open, last: facts.lastNumber };
-  for (const s of document.querySelectorAll('[data-row]')) s.textContent = fmt(row[s.dataset.row]);
-});
+// The frames drawn: a game small enough to draw, whose frames the prose before the figure counts.
+const rowFacts = mountFramesRow(document.getElementById('frames-row'), { games, n: 100 });
+const row = { n: rowFacts.n, candidates: rowFacts.candidates, open: rowFacts.open, last: rowFacts.lastNumber };
+for (const s of document.querySelectorAll('[data-row]')) s.textContent = fmt(row[s.dataset.row]);
 
 mountTwoSets(document.getElementById('two-sets'), { games });
 fill425(games);
