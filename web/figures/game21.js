@@ -424,7 +424,7 @@ function captions(f) {
       `The ${COUNT[closed.length]} frames at the ends are closed, with as many factors as moves, and drop out. ` +
       `The other ${COUNT[f.open.length]} have one freedom each: frame ${f.open[0].number} at the right and ` +
       `frame ${f.open[1].number} behind it, numbered from the front. The candidates are ${listWords(f.candidates)}, ` +
-      `with a dotted line from each to the factor that would pay for it.`,
+      `with a dotted line from each to its maximal factor in the frame in front.`,
     promote:
       `${f.promoted[0]} hops rightward: it leaves the factors of frame ${fp.number} and becomes a move of ` +
       `frame ${M.promotedInto(f.frames, f.promoted[0])}, paid for by ${payer}. Only one candidate fits, and ` +

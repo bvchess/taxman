@@ -102,8 +102,7 @@
     <span class="n" data-n="1">1</span> for <span class="n" data-n="19">19</span>, and nothing in them is left to
     choose.  The other two have four factors and three moves, one freedom each.  The frames
     with freedoms are numbered from the front: <em>frame 0</em> at the right, with the sources 14, 15 and 21, and frame
-    1 behind it, with 12, 18 and 20.  In a larger game, several frames with freedoms can stand at the same distance from
-    the front; they are collapsed into a single frame, with one number.</p>
+    1 behind it, with 12, 18 and 20.</p>
   </div>
 </section>
 
@@ -115,8 +114,8 @@
   <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a> pays for it.  A
   <a class="gloss" href="glossary.html#candidate"><em>candidate</em></a> is a factor that its frame can spare and that
   the frame in front can take on.  In game 21 the candidates are <span class="n" data-n="4">4</span> and
-  <span class="n" data-n="9">9</span>, drawn with a second outline, and a dotted line runs from each to the factor
-  that would pay for it.</p>
+  <span class="n" data-n="9">9</span>, drawn with a second outline, and a dotted line runs from each to its maximal
+  factor in the frame in front.</p>
 
   <p>Why not <span class="n" data-n="10">10</span>, or <span class="n" data-n="6">6</span>?  Either would close a
   <a class="gloss" href="glossary.html#loop">loop</a> in frame 0, and the numbers of a loop cannot all be played: 10
@@ -194,8 +193,7 @@
     </aside>
   <p>Game 21 has two <a class="gloss" href="glossary.html#candidate">candidates</a>.  Game <span
   data-row="n">100</span> has <span data-row="candidates">17</span>, in <a class="gloss"
-  href="glossary.html#frame">frames</a> 0 to <span data-row="last">3</span>, into which its <span
-  data-row="open">7</span> frames with freedoms collapse.</p>
+  href="glossary.html#frame">frames</a> 1 to <span data-row="last">3</span>.</p>
   </div>
 
   <figure class="fig chart frames-row" id="frames-row">
@@ -204,13 +202,15 @@
     <figcaption class="fig-caption"></figcaption>
   </figure>
 
-  <p>Game <span data-scale="n">5,060</span> has <span data-scale="candidates">1,380</span> candidates.  Its <a class="gloss"
-  href="glossary.html#optimal-game">optimal game</a> <a class="gloss" href="glossary.html#promote">promotes</a> <span
-  data-scale="promotions">268</span> of them, and they carry <span data-scale="promoted">570,330</span> of its <span
-  data-scale="score">8,053,621</span> points: about <span data-scale="rest">7%</span> of the score.  The other <span
-  data-scale="top">93%</span> is <a class="gloss" href="glossary.html#u-star">U*</a>, which one greedy pass chose.
-  Each candidate is promoted or not, so they allow about 10<sup data-scale="sets">415</sup> sets, and most of them
-  break some frame.  Which set is the heaviest is the one choice left, and a search makes it.</p>
+  <p>Game <span data-scale="n">100</span>’s <a class="gloss" href="glossary.html#optimal-game">optimal game</a>
+  <a class="gloss" href="glossary.html#promote">promotes</a> <span data-scale="promotions">4</span> of its candidates,
+  <span data-scale="promoted">44, 45, 49 and 50</span>, and they carry <span data-scale="gain">188</span> of its
+  <span data-scale="score">3,164</span> points: about <span data-scale="rest">6%</span> of the score.  The other
+  <span data-scale="top">94%</span> is <a class="gloss" href="glossary.html#u-star">U*</a>, which one greedy pass
+  chose.  Each candidate is promoted or not, so the <span data-scale="candidates">17</span> allow
+  2<sup data-scale="exponent">17</sup> = <span data-scale="sets">131,072</span> sets, and only
+  <span data-scale="promotionSets">1,042</span> of them are promotion sets: every other set breaks some frame.  Which
+  promotion set is the heaviest is the one choice left, and a search makes it.</p>
 </section>
 
 <section class="chapter" id="along" data-toc="along" aria-label="Along the way">
@@ -263,10 +263,9 @@
 
 <script type="module">
 import { initEssay, registerFigure } from './js/essay.js';
-import { loadGames, loadSmall } from './js/data.js';
+import { PROMOTION_SETS, loadGames, loadSmall } from './js/data.js';
 import { fmt, listWords } from './js/vocab.js';
 import { pct } from './js/chart.js';
-import * as M from './js/model.js';
 import { mountGame21 } from './figures/game21.js';
 import { mountFramesRow } from './figures/frames-row.js';
 import { fill425, mountTwoSets } from './figures/two-sets-425.js';
@@ -285,21 +284,26 @@ const words21 = {
 };
 for (const s of document.querySelectorAll('[data-g21]')) s.textContent = words21[s.dataset.g21];
 
-// The scale of the last game of the chain.
-const c = games.columns;
-const n = games.lastN;
-const i = c.n.indexOf(n);
-const promoted = c.score[i] - c.inTheBag[i];
-const scale = {
-  n: fmt(n), candidates: fmt(c.candidates[i]), frames: fmt(M.frames(n).length), promotions: fmt(c.promotions[i]),
-  promoted: fmt(promoted), score: fmt(c.score[i]), rest: pct(promoted / c.score[i], 0), top: pct(c.inTheBag[i] / c.score[i], 0),
-  sets: fmt(Math.round(c.candidates[i] * Math.log10(2))),
-};
-for (const s of document.querySelectorAll('[data-scale]')) s.textContent = scale[s.dataset.scale];
 // The frames drawn: a game small enough to draw, whose frames the prose before the figure counts.
 const rowFacts = mountFramesRow(document.getElementById('frames-row'), { games, n: 100 });
-const row = { n: rowFacts.n, candidates: rowFacts.candidates, open: rowFacts.open, last: rowFacts.lastNumber };
+const row = { n: rowFacts.n, candidates: rowFacts.candidates, last: rowFacts.lastNumber };
 for (const s of document.querySelectorAll('[data-row]')) s.textContent = fmt(row[s.dataset.row]);
+
+// The facts of that game: its promotions, the share of its score they add, and its sets of candidates.
+if (PROMOTION_SETS.n !== rowFacts.n) {
+  throw new Error(`the promotion sets were counted for game ${PROMOTION_SETS.n}, not for game ${rowFacts.n}`);
+}
+const c = games.columns;
+const i = c.n.indexOf(rowFacts.n);
+const gain = c.score[i] - c.inTheBag[i];
+const scale = {
+  n: fmt(rowFacts.n), promotions: fmt(c.promotions[i]),
+  promoted: listWords([...small[rowFacts.n - 1].promotions].sort((x, y) => x - y)), gain: fmt(gain),
+  score: fmt(c.score[i]), rest: pct(gain / c.score[i], 0), top: pct(c.inTheBag[i] / c.score[i], 0),
+  candidates: fmt(rowFacts.candidates), exponent: fmt(rowFacts.candidates), sets: fmt(2 ** rowFacts.candidates),
+  promotionSets: fmt(PROMOTION_SETS.count),
+};
+for (const s of document.querySelectorAll('[data-scale]')) s.textContent = scale[s.dataset.scale];
 
 mountTwoSets(document.getElementById('two-sets'), { games });
 fill425(games);

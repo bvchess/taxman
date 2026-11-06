@@ -184,8 +184,8 @@ export function mountMarks(host) {
 
 // A promotion, small: two frames side by side, 9 a candidate among the factors of the frame behind, then a move of
 // the frame in front, paid for by 3.  18 is joined to its maximal factors 9 and 6; while 9 is a candidate, a dotted
-// line joins it to the 3 that would pay for it, and it gives way to the hop.  The same states drawn in either
-// rendering.
+// line joins 9 to its maximal factor 3 in the frame in front, and it gives way to the hop.  The same states drawn in
+// either rendering.
 function promotionScene(svg, rendering) {
   const s = scene(svg, { width: 260, height: 132, rendering, label: `A promotion, ${rendering}: 9 leaves the factors of one frame and becomes a move of the frame in front, paid for by 3.` });
   s.box('behind').box('front');

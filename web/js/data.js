@@ -1,5 +1,5 @@
-// The data, loaded once a page: the chain's columns (games.json), the first games' moves (small.json), and one
-// measurement that is in neither (START_5060).
+// The data, loaded once a page: the chain's columns (games.json), the first games' moves (small.json), and two
+// counts that are in neither (START_5060, PROMOTION_SETS).
 
 const base = new URL('../data/', import.meta.url);
 const cache = new Map();
@@ -24,6 +24,10 @@ export const loadSmall = () => load('small.json');
 /** The start of game 5060's search, as a promotion sum: from the game of 5059 (seeded) and with no seed (own), measured
  *  by the frame solver (taxman-notebook, search/the-start-of-game-5060-with-and-without-the-game-before-2026-11). */
 const START_5060 = { n: 5060, seeded: 570285, own: 569735 };
+
+/** The sets of game n's candidates that U* can add, the promotion sets, counted by brute force over all subsets of the
+ *  candidates; web/tools/test.mjs counts them again. */
+export const PROMOTION_SETS = { n: 100, count: 1042 };
 
 /** Where the last game's search starts, against its best, the game's score less its in_the_bag: the two starts and
  *  how far each lies below the best.  Throws if the last game is not the one measured. */

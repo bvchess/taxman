@@ -13,6 +13,7 @@ import {
   maximalFactors, newGame, omega, peel, play, primeFactors, promotedInto, properDivisors, replay, score, sources,
 } from '../js/model.js';
 import { INTRO, STORY } from '../js/site.js';
+import { PROMOTION_SETS } from '../js/data.js';
 import { fitsFacts, fitsWords, primeFacts, primeWords } from '../figures/fits.js';
 import { slipFacts, slipOfRecord } from '../figures/slip.js';
 import { linkWords, linksFacts } from '../figures/links.js';
@@ -269,6 +270,30 @@ for (let n = 1; n <= FRAME_MODEL_UP_TO; n++) {
   if (inTheBag == null) continue;
   const kept = frameModel(n).flatMap((frame) => frame.kept);
   same(`the kept sources of frameModel(${n}) sum to in_the_bag`, sum(kept), inTheBag);
+}
+
+// The promotion sets of game PROMOTION_SETS.n: the subsets of its candidates that U* can add, counted over all of them.
+// The heaviest is the game's promotions, and its sum is the score less in_the_bag.
+{
+  const { n } = PROMOTION_SETS;
+  const model = frameModel(n);
+  const uStar = model.flatMap((f) => f.kept);
+  const candidates = model.filter((f) => !f.closed).flatMap((f) => f.factors).filter((x) => isPlayable([...uStar, x]));
+  let count = 0;
+  let heaviest = { sum: -1, set: [] };
+  for (let mask = 0; mask < 2 ** candidates.length; mask++) {
+    const set = candidates.filter((_, b) => mask & (1 << b));
+    if (!isPlayable([...uStar, ...set])) continue;
+    count++;
+    if (sum(set) > heaviest.sum) heaviest = { sum: sum(set), set };
+  }
+  same(`game ${n}: the promotion sets`, count, PROMOTION_SETS.count);
+  const record = records[n - 1];
+  same(`game ${n}: the heaviest promotion set sums to score less in_the_bag`, heaviest.sum,
+    record.score - record.in_the_bag);
+  const ascending = (list) => [...list].sort((x, y) => x - y);
+  same(`game ${n}: the heaviest promotion set is the recorded promotions`, ascending(heaviest.set),
+    ascending(record.promotions));
 }
 
 // --- How each game was proven (js/proof.js) ---------------------------------------------------------------------

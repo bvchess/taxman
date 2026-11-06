@@ -2,9 +2,12 @@
 // box, a mark for each of its numbers, the sources at its left (gray if descending greedy keeps them, hollow if not)
 // and its factors at its right; a dashed box is a closed frame.  The boxes stand in the wiki's order, the highest layer
 // at the left and the frame in front at the right, and are named by their numbers (js/model.js, frameModel), frame 0
-// being the one in front; a closed frame has no number and is named closed.  Frames with freedoms that share a number
-// are one frame (collapseFrames): one box, with all their sources at its left, largest first, and all their factors at
-// its right.
+// being the one in front; a closed frame has no number and is named closed.  Under a box with freedoms stand its
+// number and its freedoms, the sum over the frames that make it up, in one of two forms: on a line below the number
+// ("2 freedoms"), or stacked, the count and then the word, when that lets the marks be larger.  Under a closed box
+// stands only closed.  The labels are measured in the page, and a box is at least as wide as its widest line.
+// Frames with freedoms that share a number are one frame (collapseFrames): one box, with all their sources at its
+// left, largest first, and all their factors at its right.
 //
 // Descending greedy on a game this size takes milliseconds, so the figure computes the frames when it is mounted, and
 // checks the sum of U* against the recorded in_the_bag of data/games.json.  It sits in the text column: the columns of
@@ -21,13 +24,23 @@ const MAX_ROWS = 60;
 const PAD = 0.6; // a box's margin around its numbers, in cells
 const GAP = 1; // between two boxes, in cells
 const MIN_GAP = 8; // and in pixels
-const LABEL_WIDTH = { closed: 46, number: 14 }; // a box is at least as wide as its name, in pixels
+const LABEL_PAD = 4; // a box is wider than its widest label line by this much, in pixels
+const LABEL_LINE = 15; // between the lines of a box's labels, in pixels
 
 // A frame's name: its number, or closed.  The tooltip's version says Frame h or A closed frame.
 const nameOf = (u, title = false) => {
   if (u.closed) return title ? 'A closed frame' : 'closed';
   return title ? `Frame ${u.number}` : String(u.number);
 };
+
+// The lines under a box in each form: a frame with freedoms has its number and its freedoms, on one line or stacked;
+// a closed frame has only closed.
+function labelsOf(u, freedoms) {
+  if (u.closed) return { line: ['closed'], stacked: ['closed'] };
+  const word = freedoms === 1 ? 'freedom' : 'freedoms';
+  const number = String(u.number);
+  return { line: [number, `${fmt(freedoms)} ${word}`], stacked: [number, fmt(freedoms), word] };
+}
 
 const sum = (frames, count) => frames.reduce((a, f) => a + count(f), 0);
 // The counts of a box: the sums over the frames that make it up.
@@ -48,15 +61,18 @@ function boxesOf(model) {
   });
 }
 
-// Where each box stands for columns of rows cells and cells of c pixels, and the row's width in pixels.  A box
-// is as wide as its columns, or as its name if that is wider.
-function layout(boxes, rows, c) {
+// Where each box stands for columns of rows cells and cells of c pixels, and the row's width in pixels, with the
+// labels in form.  A box is as wide as its columns, or as its widest label line if that is wider.
+function layout(boxes, rows, c, form) {
   let x = 0;
   const placed = boxes.map((u) => {
     const sourceCols = Math.ceil(u.sources.length / rows);
     const factorCols = Math.max(1, Math.ceil(u.factors / rows));
-    const w = Math.max((2 * PAD + sourceCols + 1 + factorCols) * c, u.closed ? LABEL_WIDTH.closed : LABEL_WIDTH.number);
-    const p = { u, x, w, sourceCols, factorCols, rows: Math.min(rows, Math.max(u.sources.length, u.factors)) };
+    const w = Math.max((2 * PAD + sourceCols + 1 + factorCols) * c, u.need[form]);
+    const p = {
+      u, x, w, labels: u.labels[form], sourceCols, factorCols,
+      rows: Math.min(rows, Math.max(u.sources.length, u.factors)),
+    };
     x += w + Math.max(MIN_GAP, GAP * c);
     return p;
   });
@@ -64,12 +80,12 @@ function layout(boxes, rows, c) {
 }
 
 // The column height with the largest cell that lets the row fit width; of the heights that allow it, the lowest.
-function fit(boxes, width) {
+function fit(boxes, width, form) {
   let best = null;
   for (let rows = MIN_ROWS; rows <= MAX_ROWS; rows++) {
     let c = MAX_CELL;
-    while (c > 1 && layout(boxes, rows, c).width > width) c -= 0.1;
-    if (!best || c > best.c + 1e-9) best = { rows, c };
+    while (c > 1 && layout(boxes, rows, c, form).width > width) c -= 0.1;
+    if (!best || c > best.c + 1e-9) best = { rows, c, form };
   }
   return best;
 }
@@ -78,16 +94,38 @@ const circle = (cx, cy, r) =>
   `M${(cx - r).toFixed(2)} ${cy.toFixed(2)}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
 const square = (cx, cy, h) => `M${(cx - h).toFixed(2)} ${(cy - h).toFixed(2)}h${2 * h}v${2 * h}h${-2 * h}z`;
 
+// The boxes with their labels in both forms and the width each form needs, measured in svg.
+function withLabels(boxes, svg) {
+  const probe = el('text', { class: 'tick' }, svg);
+  const measure = (text) => {
+    probe.textContent = text;
+    return probe.getComputedTextLength();
+  };
+  const labelled = boxes.map((u) => {
+    const labels = labelsOf(u, countsOf(u.frames).freedoms);
+    const need = (form) => Math.max(...labels[form].map(measure)) + LABEL_PAD;
+    return { ...u, labels, need: { line: need('line'), stacked: need('stacked') } };
+  });
+  probe.remove();
+  return labelled;
+}
+
 function draw(box, tip, data, width) {
-  const { rows, c } = fit(data.boxes, width);
-  const { placed, width: total } = layout(data.boxes, rows, c);
-  const top = 6;
-  const boxH = (Math.max(...placed.map((p) => p.rows)) + 2 * PAD) * c;
-  const height = top + boxH + 30;
-  const left = (width - total) / 2;
-  const svg = freshSVG(box, width, height,
+  const svg = freshSVG(box, width, 0,
     `The frames of game ${fmt(data.n)}, a mark for each number. The numbers are in the table below.`);
   svg.classList.add('frames-row-svg');
+  const boxes = withLabels(data.boxes, svg);
+  // The form with the larger cell, the one-line form on a tie.
+  const oneLine = fit(boxes, width, 'line');
+  const stacked = fit(boxes, width, 'stacked');
+  const { rows, c, form } = stacked.c > oneLine.c + 1e-9 ? stacked : oneLine;
+  const { placed, width: total } = layout(boxes, rows, c, form);
+  const top = 6;
+  const boxH = (Math.max(...placed.map((p) => p.rows)) + 2 * PAD) * c;
+  const height = top + boxH + 6 + (Math.max(...placed.map((p) => p.labels.length)) * LABEL_LINE) + 6;
+  const left = (width - total) / 2;
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.setAttribute('height', height);
   let kept = '';
   let rejected = '';
   let factors = '';
@@ -109,10 +147,13 @@ function draw(box, tip, data, width) {
       const cy = top + (PAD + (i % p.rows) + 0.5) * c;
       factors += square(cx, cy, 0.3 * c);
     }
-    const t = el('text', {
-      x: (x0 + p.w / 2).toFixed(1), y: top + boxH + 18, 'text-anchor': 'middle', class: 'tick',
-    }, svg);
-    t.textContent = nameOf(p.u);
+    p.labels.forEach((label, k) => {
+      const t = el('text', {
+        x: (x0 + p.w / 2).toFixed(1), y: top + boxH + 3 + (k + 1) * LABEL_LINE, 'text-anchor': 'middle',
+        class: 'tick',
+      }, svg);
+      t.textContent = label;
+    });
   }
   el('path', { d: factors, class: 'row-factor' }, svg);
   el('path', { d: kept, class: 'row-kept' }, svg);
@@ -127,7 +168,6 @@ function draw(box, tip, data, width) {
     hit.addEventListener('pointerenter', () => {
       const counts = countsOf(p.u.frames);
       const lines = [nameOf(p.u, true)];
-      if (p.u.frames.length > 1) lines.push(['frames collapsed into it', fmt(p.u.frames.length)]);
       lines.push(['sources', fmt(counts.sources)], ['kept by greedy', fmt(counts.kept)],
         ['factors', fmt(counts.factors)], ['freedoms', p.u.closed ? 'none: closed' : fmt(counts.freedoms)]);
       tip.show(lines, x0 + p.w / 2, top + 20);
@@ -153,9 +193,8 @@ export function mountFramesRow(host, { games, n }) {
   const numbers = sum(model, (f) => f.sources.length + f.factors.length);
   caption.textContent = `The frames of game ${fmt(n)}, a mark for each of its ${fmt(numbers)} numbers: in each frame ` +
     'its sources at the left, gray where descending greedy keeps them and hollow where it does not, and its factors ' +
-    `at the right. Its ${facts.open} frames with freedoms collapse into frames 0 to ${facts.lastNumber}, and ` +
-    `${facts.closed} more are closed, dashed. In all they have ${fmt(facts.freedoms)} freedoms and ` +
-    `${fmt(facts.candidates)} candidates.`;
+    `at the right. Under each frame with freedoms are its number and its freedoms, and the ${facts.closed} closed ` +
+    'frames are dashed.';
   const columns = ['frame', 'sources', 'kept', 'factors', 'freedoms'];
   tableView(host, 'The numbers behind the figure', columns, data.boxes.map((u) => {
     const counts = countsOf(u.frames);
