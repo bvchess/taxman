@@ -193,8 +193,7 @@ export function mountFramesRow(host, { games, n }) {
   const numbers = sum(model, (f) => f.sources.length + f.factors.length);
   caption.textContent = `The frames of game ${fmt(n)}, a mark for each of its ${fmt(numbers)} numbers: in each frame ` +
     'its sources at the left, gray where descending greedy keeps them and hollow where it does not, and its factors ' +
-    `at the right. Under each frame with freedoms are its number and its freedoms, and the ${facts.closed} closed ` +
-    'frames are dashed.';
+    'at the right.';
   const columns = ['frame', 'sources', 'kept', 'factors', 'freedoms'];
   tableView(host, 'The numbers behind the figure', columns, data.boxes.map((u) => {
     const counts = countsOf(u.frames);

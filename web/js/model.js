@@ -363,3 +363,36 @@ export function promotedInto(model, x) {
   if (!from) throw new Error(`${x} is a factor of no frame with freedoms, so it cannot be promoted`);
   return from.number - 1;
 }
+
+/** The candidates of a decided model: the factors of its frames with freedoms that U* can add one at a time (U* with
+ *  the factor is playable), ascending.  model is frameModel(n). */
+export function candidates(model) {
+  const uStar = model.flatMap((f) => f.kept);
+  return model
+    .filter((f) => !f.closed)
+    .flatMap((f) => f.factors)
+    .filter((x) => isPlayable([...uStar, x]))
+    .sort(ascending);
+}
+
+/** The promotion limit of a decided model (docs/theory/frame-model.md, the promotion-limit lemma F9): no promotion set
+ *  has more members than the largest c_1 + ... + c_t with 0 <= c_h <= kappa_h and c_h + c_(h+1) <= rho_h, where c_h
+ *  counts the promotions out of frame h.  The lemma's part 1 gives it from the front, c_h = min(rho_h, kappa_h,
+ *  rho_(h-1) - c_(h-1)), with c_0 = 0.  Returns { limit, freedoms, candidates }, the last two as arrays indexed by
+ *  frame number (rho_h and kappa_h, summed over the frames that share a number).  model is frameModel(n). */
+export function promotionLimit(model) {
+  const inCandidates = new Set(candidates(model));
+  const freedoms = [];
+  const kappa = [];
+  for (const f of model.filter((g) => !g.closed)) {
+    freedoms[f.number] = (freedoms[f.number] ?? 0) + f.freedoms;
+    kappa[f.number] = (kappa[f.number] ?? 0) + f.factors.filter((x) => inCandidates.has(x)).length;
+  }
+  let limit = 0;
+  let previous = 0;
+  for (let h = 1; h < freedoms.length; h++) {
+    previous = Math.min(freedoms[h], kappa[h], freedoms[h - 1] - previous);
+    limit += previous;
+  }
+  return { limit, freedoms, candidates: kappa };
+}

@@ -9,8 +9,9 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
-  collapseFrames, descendingGreedy, finish, frameFacts, frameModel, frames, isOver, isPlayable, legalMoves,
-  maximalFactors, newGame, omega, peel, play, primeFactors, promotedInto, properDivisors, replay, score, sources,
+  candidates as candidatesOf, collapseFrames, descendingGreedy, finish, frameFacts, frameModel, frames, isOver,
+  isPlayable, legalMoves, maximalFactors, newGame, omega, peel, play, primeFactors, promotedInto, promotionLimit,
+  properDivisors, replay, score, sources,
 } from '../js/model.js';
 import { INTRO, STORY } from '../js/site.js';
 import { PROMOTION_SETS } from '../js/data.js';
@@ -278,13 +279,15 @@ for (let n = 1; n <= FRAME_MODEL_UP_TO; n++) {
   const { n } = PROMOTION_SETS;
   const model = frameModel(n);
   const uStar = model.flatMap((f) => f.kept);
-  const candidates = model.filter((f) => !f.closed).flatMap((f) => f.factors).filter((x) => isPlayable([...uStar, x]));
+  const candidates = candidatesOf(model);
   let count = 0;
   let heaviest = { sum: -1, set: [] };
+  let largest = 0;
   for (let mask = 0; mask < 2 ** candidates.length; mask++) {
     const set = candidates.filter((_, b) => mask & (1 << b));
     if (!isPlayable([...uStar, ...set])) continue;
     count++;
+    largest = Math.max(largest, set.length);
     if (sum(set) > heaviest.sum) heaviest = { sum: sum(set), set };
   }
   same(`game ${n}: the promotion sets`, count, PROMOTION_SETS.count);
@@ -294,6 +297,9 @@ for (let n = 1; n <= FRAME_MODEL_UP_TO; n++) {
   const ascending = (list) => [...list].sort((x, y) => x - y);
   same(`game ${n}: the heaviest promotion set is the recorded promotions`, ascending(heaviest.set),
     ascending(record.promotions));
+  const { limit } = promotionLimit(model);
+  same(`game ${n}: the largest promotion set has the promotion limit's members`, largest, limit);
+  same(`game ${n}: the recorded promotions number the promotion limit`, record.promotions.length, limit);
 }
 
 // --- How each game was proven (js/proof.js) ---------------------------------------------------------------------

@@ -15,7 +15,7 @@
 // game, its last state k plays it through, and k.3 opens it after its third move.
 
 import * as M from '../js/model.js';
-import { SHAPE, listWords } from '../js/vocab.js';
+import { SHAPE, listWords, numberWord } from '../js/vocab.js';
 import { scene, timeline } from '../js/scene.js';
 import { holdHeight } from './hold-height.js';
 
@@ -81,7 +81,6 @@ const arithY = (i) => NAME_Y + 20 + 18 * i;
 const SCORE_Y = 352;
 const SCORE_LOW = arithY(ARITH_LINES - 1) + 34; // the score where a frame's arithmetic stands above it
 const boxMiddle = (layer) => BOX_AT[layer].x + BOX_AT[layer].w / 2;
-const COUNT = { 2: 'two', 3: 'three', 4: 'four', 5: 'five' };
 
 // ---------------------------------------------------------------------------------------------------------------
 // The facts, from the model
@@ -95,8 +94,7 @@ export function facts21(small) {
   const uStar = M.descendingGreedy(N);
   const kept = new Set(uStar);
   const open = frames.filter((f) => !f.closed);
-  // A candidate here is a factor of an open frame that can be promoted alone: U* with it is playable.
-  const candidates = open.flatMap((f) => f.factors).filter((x) => M.isPlayable([...uStar, x])).sort((a, b) => a - b);
+  const candidates = M.candidates(frames);
   const played = M.replay(N, game.moves);
   const turns = played.log.filter((entry) => 'move' in entry);
   const rest = played.log.find((entry) => 'rest' in entry).rest;
@@ -416,13 +414,13 @@ function captions(f) {
     layered: 'Game 21 as descending greedy left it, in its layers cut at n/2: the sources it kept in gray, those it ' +
       'rejected dashed. The lines of each source run to factors one layer down, in the column to its right.',
     frames:
-      `The ${COUNT[f.frames.length] ?? f.frames.length} frames side by side: each source with the factors ` +
+      `The ${numberWord(f.frames.length)} frames side by side: each source with the factors ` +
       `that can pay for it, greedy's choice in gray, the sources at the left of each frame and its factors ` +
       `at the right. Each frame stands to the left of the frame in front of it. ` +
       `Thick lines mark the payments already settled: ${paysFor(closedPayments(f))}.`,
     freedoms:
-      `The ${COUNT[closed.length]} frames at the ends are closed, with as many factors as moves, and drop out. ` +
-      `The other ${COUNT[f.open.length]} have one freedom each: frame ${f.open[0].number} at the right and ` +
+      `The ${numberWord(closed.length)} frames at the ends are closed, with as many factors as moves, and drop out. ` +
+      `The other ${numberWord(f.open.length)} have one freedom each: frame ${f.open[0].number} at the right and ` +
       `frame ${f.open[1].number} behind it, numbered from the front. The candidates are ${listWords(f.candidates)}, ` +
       `with a dotted line from each to its maximal factor in the frame in front.`,
     promote:

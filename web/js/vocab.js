@@ -602,6 +602,15 @@ export function fmt(n) {
   return Number(n).toLocaleString('en-US');
 }
 
+const NUMBER_WORDS = [
+  'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
+];
+
+/** A count in words from one to twelve, and written for reading (fmt) beyond: 3 as "three", 13 as "13". */
+export function numberWord(k) {
+  return NUMBER_WORDS[k - 1] ?? fmt(k);
+}
+
 /** A time in seconds, to two significant figures in the unit that suits: 0.0011 s as 1.1 ms, 16,094 s as 4.5 h, and
  *  from two days on in days. */
 export function duration(s) {
