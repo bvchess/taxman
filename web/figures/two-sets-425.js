@@ -1,8 +1,8 @@
 // Along the way: game 425 has two optimal sets.  They play the same numbers above n/2, U*, and differ by an exchange
-// of three promotions of equal sum, one in each of layers 5, 4 and 3.  The moves are drawn flat, as the player's, in
-// the wiki's order of layers, the highest at the left.  The exchange is the theory's (docs/theory/
+// of three promotions of equal sum, one into each of frames 2, 1 and 0.  The moves are drawn flat, as the player's, in
+// the wiki's order of frames, the highest at the left.  The exchange is the theory's (docs/theory/
 // uniqueness-and-longest-games.md, "Optimal sets on the whole board"), written out here and checked: the two sides
-// have equal sums and pair off layer by layer; the score, U* and the count of promotions come from data/games.json.
+// have equal sums and pair off frame by frame; the score, U* and the count of promotions come from data/games.json.
 
 import * as M from '../js/model.js';
 import { fmt, numberSVG } from '../js/vocab.js';
@@ -16,13 +16,15 @@ const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 /** The numbers the page says of game 425, checked against the exchange. */
 export function facts425(games) {
   const i = games.columns.n.indexOf(N);
-  const layers = ONE.map(M.omega);
-  if (sum(ONE) !== sum(OTHER) || OTHER.some((x, j) => M.omega(x) !== layers[j]) || [...ONE, ...OTHER].some((x) => x > N / 2)) {
-    throw new Error(`game ${N}: the exchange is not three numbers up to n/2 of equal sum, layer for layer`);
+  const model = M.frameModel(N);
+  const frames = ONE.map((x) => M.promotedInto(model, x));
+  const sameFrames = OTHER.every((x, j) => M.promotedInto(model, x) === frames[j]);
+  if (sum(ONE) !== sum(OTHER) || !sameFrames || [...ONE, ...OTHER].some((x) => x > N / 2)) {
+    throw new Error(`game ${N}: the exchange is not three numbers up to n/2 of equal sum, frame for frame`);
   }
   return {
     score: games.columns.score[i], inTheBag: games.columns.inTheBag[i], promotions: games.columns.promotions[i],
-    shared: games.columns.promotions[i] - ONE.length, swap: sum(ONE), layers,
+    shared: games.columns.promotions[i] - ONE.length, swap: sum(ONE), frames,
   };
 }
 
@@ -39,7 +41,8 @@ export function mountTwoSets(host, { games }) {
   const head = document.createElement('div');
   head.className = 'exchange-row two-sets-head';
   head.setAttribute('aria-hidden', 'true');
-  head.innerHTML = `<span></span><div class="exchange-marks">${facts.layers.map((k) => `<span>layer ${k}</span>`).join('')}</div><span>sum</span>`;
+  const headMarks = facts.frames.map((h) => `<span>${h}</span>`).join('');
+  head.innerHTML = `<span>promoted into frame</span><div class="exchange-marks">${headMarks}</div><span>sum</span>`;
   host.appendChild(head);
   const row = (xs, label) => {
     const div = document.createElement('div');
@@ -54,6 +57,10 @@ export function mountTwoSets(host, { games }) {
   };
   host.append(row(ONE, 'One optimal set'), row(OTHER, 'The other'));
   host.setAttribute('role', 'img');
-  host.setAttribute('aria-label', `Game ${N}: one optimal set plays ${ONE.join(', ')}, the other ${OTHER.join(', ')}, one in each of layers ${facts.layers.join(', ')}; each three sum to ${fmt(sum(ONE))}, and both sets score ${fmt(facts.score)}.`);
+  host.setAttribute(
+    'aria-label',
+    `Game ${N}: one optimal set plays ${ONE.join(', ')}, the other ${OTHER.join(', ')}, one into each of frames ` +
+      `${facts.frames.join(', ')}; each three sum to ${fmt(sum(ONE))}, and both sets score ${fmt(facts.score)}.`
+  );
   return facts;
 }

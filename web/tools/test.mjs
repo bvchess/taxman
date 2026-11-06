@@ -10,7 +10,7 @@ import { join } from 'node:path';
 
 import {
   descendingGreedy, finish, frameModel, frames, isOver, isPlayable, legalMoves, maximalFactors, newGame, omega, peel,
-  play, primeFactors, properDivisors, replay, score, sources,
+  play, primeFactors, promotedInto, properDivisors, replay, score, sources,
 } from '../js/model.js';
 import { INTRO, STORY } from '../js/site.js';
 import { fitsFacts, fitsWords, primeFacts, primeWords } from '../figures/fits.js';
@@ -152,6 +152,16 @@ for (let n = 2; n <= FRAMES_UP_TO; n++) {
     [3, [12, 18, 20], [], 1, false],
     [4, [16], [], 0, true],
   ]);
+  const numberOf = (n, x) => frameModel(n).find((f) => f.sources.includes(x) || f.factors.includes(x)).number;
+  same('frameModel(21) numbers: 14, 15 and 21 in frame 0, 12, 18 and 20 in frame 1, 1 and 8 closed',
+    [14, 15, 21, 12, 18, 20, 1, 8].map((x) => numberOf(21, x)), [0, 0, 0, 1, 1, 1, null, null]);
+  const model425 = frameModel(425);
+  same('game 425: the lowest layer with freedoms is 3',
+    Math.min(...model425.filter((f) => !f.closed).map((f) => f.layer)), 3);
+  same('game 425: the promotions of both optimal sets go into frames 2, 1 and 0',
+    [[168, 132, 110], [162, 150, 98]].map((set) => set.map((x) => promotedInto(model425, x))), [[2, 1, 0], [2, 1, 0]]);
+  same('game 425: ... from frames 3, 2 and 1',
+    [168, 132, 110, 162, 150, 98].map((x) => model425.find((f) => f.factors.includes(x)).number), [3, 2, 1, 3, 2, 1]);
 }
 
 // Peel that chooses its own steps reaches the same answer, whichever steps it takes (the peel theorem): on game 21's

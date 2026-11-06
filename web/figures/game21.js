@@ -65,12 +65,12 @@ const BOX_AT = {
   2: { x: 290, y: 30, w: 118, h: 248 },
   1: { x: 432, y: 30, w: 118, h: 248 },
 };
-// After the promotion the moves of the layer-2 frame make room for 9, level with 3, which pays for it: a short hop
-// rightward from the factors of the layer-3 frame.
+// After the promotion the moves of frame 0 make room for 9, level with 3, which pays for it: a short hop
+// rightward from the factors of frame 1.
 const PROMOTED_AT = { 14: [317, row(1.2)], 21: [317, row(2.1)], 9: [317, row(3)], 15: [317, row(3.9)] };
 // The links to the frame in front that the figure draws: those that pass clear of other numbers.
 const LINKS_DRAWN = [[8, 4], [4, 2], [9, 3], [10, 2], [7, 1]];
-const NAME_Y = 302; // the names of the layers and the frames, under them
+const NAME_Y = 302; // the names of the layers and the frames, under them (a frame's name from the freedoms state on)
 const NOTE_Y = 322; // the notes under the frames
 const SCORE_Y = 352;
 const boxMiddle = (layer) => BOX_AT[layer].x + BOX_AT[layer].w / 2;
@@ -104,6 +104,10 @@ export function facts21(small) {
   for (const f of frames) {
     if (!BOX_AT[f.layer]) throw new Error(`game 21 has a frame in layer ${f.layer} that the figure has no box for`);
     for (const x of [...f.sources, ...f.factors]) if (!FRAME_AT[x]) throw new Error(`game 21: no place for ${x}`);
+  }
+  const ends = [frames[0], frames[frames.length - 1]];
+  if (open.length !== 2 || !ends.every((fr) => fr.closed) || open.some((fr) => fr.freedoms !== 1)) {
+    throw new Error('game 21: the freedoms caption expects a closed frame at each end and two frames with one freedom');
   }
   for (const x of game.promotions) if (!PROMOTED_AT[x]) throw new Error(`game 21: no place for the promotion of ${x}`);
   for (const t of turns) if (t.tax.length !== 1) throw new Error(`game 21: move ${t.move} takes ${t.tax.length} numbers`);
@@ -219,10 +223,7 @@ function buildStates(f) {
     if (!isSource(a) && linkDrawn.has(`${a}-${b}`)) framesView[`l${a}-${b}`] = { at: [0.6, 1] };
   }
   framesView[firstPay] = { at: [0.5, 1] };
-  for (const fr of f.frames) {
-    framesView[`box${fr.layer}`] = { ...BOX_AT[fr.layer], at: [0.45, 1] };
-    framesView[`layer${fr.layer}`] = { x: boxMiddle(fr.layer), y: NAME_Y };
-  }
+  for (const fr of f.frames) framesView[`box${fr.layer}`] = { ...BOX_AT[fr.layer], at: [0.45, 1] };
   framesView.scoreU = { x: CENTER_X, y: SCORE_Y };
   S.frames = framesView;
 
@@ -246,14 +247,14 @@ function buildStates(f) {
   freedoms[firstPay] = { faded: 1, opacity: 0.6 };
   for (const fr of f.frames) {
     freedoms[`box${fr.layer}`] = { ...BOX_AT[fr.layer], dashed: fr.closed ? 1 : 0, faded: fr.closed ? 1 : 0 };
-    freedoms[`layer${fr.layer}`] = { x: boxMiddle(fr.layer), y: NAME_Y, opacity: fr.closed ? 0.6 : 1 };
-    freedoms[`free${fr.layer}`] = { x: boxMiddle(fr.layer), y: NOTE_Y, opacity: fr.closed ? 0.6 : 1 };
+    freedoms[`name${fr.layer}`] = { x: boxMiddle(fr.layer), y: NAME_Y, opacity: fr.closed ? 0.6 : 1 };
+    if (!fr.closed) freedoms[`free${fr.layer}`] = { x: boxMiddle(fr.layer), y: NOTE_Y };
   }
   freedoms.scoreU = { x: CENTER_X, y: SCORE_Y };
   S.freedoms = freedoms;
 
-  // The promotion: 9 rounds into a circle as it hops rightward, from the factors of the layer-3 frame into the
-  // moves of the layer-2 frame, where 3 pays for it.  Its old place keeps a dashed ghost.
+  // The promotion: 9 rounds into a circle as it hops rightward, from the factors of frame 1 into the
+  // moves of frame 0, where 3 pays for it.  Its old place keeps a dashed ghost.
   const promote = { _duration: 1600 };
   for (const x of numbers) {
     promote[x] = {
@@ -281,9 +282,8 @@ function buildStates(f) {
   promote[firstPay] = { ...freedoms[firstPay] };
   for (const fr of f.frames) {
     promote[`box${fr.layer}`] = { ...freedoms[`box${fr.layer}`] };
-    promote[`layer${fr.layer}`] = { ...freedoms[`layer${fr.layer}`] };
-    if (fr.closed) promote[`free${fr.layer}`] = { ...freedoms[`free${fr.layer}`] };
-    else {
+    promote[`name${fr.layer}`] = { ...freedoms[`name${fr.layer}`] };
+    if (!fr.closed) {
       // The count of freedoms goes out before the words that replace it come in, so the two never overlap.
       promote[`free${fr.layer}`] = { x: boxMiddle(fr.layer), y: NOTE_Y, opacity: 0, at: [0, 0.3] };
       promote[`left${fr.layer}`] = { x: boxMiddle(fr.layer), y: NOTE_Y, at: [0.4, 0.8] };
@@ -304,7 +304,7 @@ function buildStates(f) {
   for (const t of f.turns) start[`p${t.move}-${t.tax[0]}`] = {};
   for (const fr of f.frames) {
     start[`box${fr.layer}`] = { ...BOX_AT[fr.layer], dashed: fr.closed ? 1 : 0 };
-    start[`layer${fr.layer}`] = { x: boxMiddle(fr.layer), y: NAME_Y };
+    start[`name${fr.layer}`] = { x: boxMiddle(fr.layer), y: NAME_Y };
   }
   // The tally, each side with the mark of its color, so that the color is never alone.
   start.keyPlayer = { x: CENTER_X - 112, y: SCORE_Y, shape: SHAPE.circle, scale: 0.42, player: 1 };
@@ -343,7 +343,7 @@ function buildStates(f) {
 function captions(f) {
   const half = Math.floor(HALF);
   const fp = f.frameOf.get(f.promoted[0]);
-  const into = f.frames.find((fr) => fr.layer === M.omega(f.promoted[0]));
+  const closed = f.frames.filter((fr) => fr.closed);
   const payer = f.turns.find((t) => t.move === f.promoted[0]).tax[0];
   const f1 = f.frames.find((fr) => fr.layer === 1);
   return {
@@ -351,9 +351,18 @@ function captions(f) {
     layers: 'Each number stands in the column of its layer, its count of prime factors, with layer 1 at the right. A line runs rightward from each number to each of its maximal factors: 12 to 6 and 4.',
     sources: `Each column cut at n/2. Below the line are the sources, ${M.sources(N)[0]} to ${N}: they divide no other number on the board, so each is a move or nothing. Above it are the factors, 1 to ${half}.`,
     greedy: `From ${N} down, descending greedy keeps ${listWords(f.keptDown)}, each still playable with those kept before it. It rejects ${listWords(f.rejectedDown)}: their one maximal factor, 1, already pays for ${f1.kept[0]}. U* scores ${f.inTheBag}.`,
-    frames: `The ${COUNT[f.frames.length] ?? f.frames.length} frames side by side: each source with the factors that can pay for it, greedy's choice in gray. A frame's sources, at its left, share a layer, and its factors, at its right, lie one layer below. A dotted line joins a factor to its maximal factor in the frame in front.`,
-    freedoms: `The frames of layers ${listWords(f.frames.filter((fr) => fr.closed).map((fr) => fr.layer))} are closed, with as many factors as moves, and drop out. The frames of layers ${listWords(f.open.map((fr) => fr.layer))} have one freedom each. The candidates are ${listWords(f.candidates)}.`,
-    promote: `${f.promoted[0]} hops rightward: it leaves the factors of the layer-${fp.layer} frame and becomes a move of the layer-${into.layer} frame, paid for by ${payer}. Only one candidate fits, and ${f.promoted[0]} is the larger. The score: ${f.inTheBag} + ${f.promoted.join(' + ')} = ${f.score}.`,
+    frames:
+      `The ${COUNT[f.frames.length] ?? f.frames.length} frames side by side: each source with the factors ` +
+      `that can pay for it, greedy's choice in gray, the sources at the left of each frame and its factors ` +
+      `at the right. A dotted line joins a factor to its maximal factor in the frame in front.`,
+    freedoms:
+      `The ${COUNT[closed.length]} frames at the ends are closed, with as many factors as moves, and drop out. ` +
+      `The other ${COUNT[f.open.length]} have one freedom each: frame ${f.open[0].number} at the right and ` +
+      `frame ${f.open[1].number} behind it, numbered from the front. The candidates are ${listWords(f.candidates)}.`,
+    promote:
+      `${f.promoted[0]} hops rightward: it leaves the factors of frame ${fp.number} and becomes a move of ` +
+      `frame ${M.promotedInto(f.frames, f.promoted[0])}, paid for by ${payer}. Only one candidate fits, and ` +
+      `${f.promoted[0]} is the larger. The score: ${f.inTheBag} + ${f.promoted.join(' + ')} = ${f.score}.`,
   };
 }
 
@@ -401,6 +410,9 @@ export function mountGame21(host, { small, states = STOPS, param = 'fig21', labe
   for (const fr of f.frames) s.box(`box${fr.layer}`);
   s.text('potName', `the pot: the numbers 1 to ${N}`, { kind: 'name', anchor: 'middle' });
   for (let layer = 0; layer <= 4; layer++) s.text(`layer${layer}`, `layer ${layer}`, { kind: 'name', anchor: 'middle' });
+  for (const fr of f.frames) {
+    s.text(`name${fr.layer}`, fr.closed ? 'closed' : `frame ${fr.number}`, { kind: 'name', anchor: 'middle' });
+  }
   s.line('rule', { x: 12, y: MID_Y }, { x: W - 12, y: MID_Y }, 'rule');
   s.text('half', 'n/2');
   s.text('sourcesName', 'sources', { anchor: 'middle' });
@@ -408,8 +420,9 @@ export function mountGame21(host, { small, states = STOPS, param = 'fig21', labe
   s.text('scoreU', `U* scores ${f.inTheBag}`, { kind: 'score', anchor: 'middle' });
   s.text('scoreP', `${f.inTheBag} + ${f.promoted.join(' + ')} = ${f.score}`, { kind: 'score', anchor: 'middle' });
   for (const fr of f.frames) {
-    s.text(`free${fr.layer}`, fr.closed ? 'closed' : `${fr.freedoms} freedom${fr.freedoms === 1 ? '' : 's'}`, { anchor: 'middle' });
-    if (!fr.closed) s.text(`left${fr.layer}`, 'no freedom left', { anchor: 'middle' });
+    if (fr.closed) continue;
+    s.text(`free${fr.layer}`, `${fr.freedoms} freedom${fr.freedoms === 1 ? '' : 's'}`, { anchor: 'middle' });
+    s.text(`left${fr.layer}`, 'no freedom left', { anchor: 'middle' });
   }
 
   const all = buildStates(f);

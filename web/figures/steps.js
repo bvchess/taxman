@@ -19,9 +19,9 @@ const DRAW = {
     look.same = { x: 134, y: 53 };
     return look;
   },
-  // Game 21's frame of layer 2, as the wiki lays a frame out.
+  // Game 21's frame 0, as the wiki lays a frame out.
   frame(s) {
-    const f = M.frames(21).find((x) => x.layer === 2);
+    const f = M.frameModel(21).find((x) => x.number === 0);
     const look = { box: { x: 30, y: 4, w: 140, h: 108 } };
     s.box('box');
     // Each column centered on the frame's middle, the sources a little further apart than the factors.
@@ -59,7 +59,7 @@ const DRAW = {
 
 const LABELS = {
   orders: 'The moves 19, 9 and 15, and the same three in another order: the same set.',
-  frame: 'Game 21’s frame of layer 2: the sources 14, 15 and 21 at the left, the factors 2, 3, 5 and 7 at the right.',
+  frame: 'Game 21’s frame 0: the sources 14, 15 and 21 at the left, the factors 2, 3, 5 and 7 at the right.',
   promote: 'A promotion: the factor 9 leaves its frame, becomes a move of the frame in front, and 3 pays for it.',
 };
 

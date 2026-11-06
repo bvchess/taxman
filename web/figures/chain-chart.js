@@ -179,7 +179,7 @@ export function mountChainChart(host, { games }) {
     });
 
     // The time of a search: a column a stretch, rising to the median of its searches on a log scale.
-    rowName('time of a search', 'median per 100 games, log scale', timePlot, timeH);
+    rowName('time required to search', 'median per 100 games, log scale', timePlot, timeH);
     gridRow(TIME_TICKS, yTime);
     for (const st of stretches) {
       if (st.median === null) continue;

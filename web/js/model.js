@@ -309,13 +309,26 @@ export function descendingGreedy(n) {
  *    kept      its sources in U*, the moves the model fixes;
  *    rejected  its other sources, which descending greedy drops;
  *    freedoms  its factors minus its kept sources, the factors it can spare for promotions;
- *    closed    true when freedoms is 0, and the frame takes no part in the search. */
+ *    closed    true when freedoms is 0, and the frame takes no part in the search;
+ *    number    the frame's number, null when it is closed: if L is the lowest layer of a frame with freedoms, every
+ *              frame with freedoms in layer L + h is frame h, so frame 0 is at the front and frames of one layer
+ *              share a number (docs/theory/frame-model.md, "Numbering"). */
 export function frameModel(n) {
   const inUStar = new Set(descendingGreedy(n));
-  return frames(n).map((frame) => {
+  const decided = frames(n).map((frame) => {
     const kept = frame.sources.filter((s) => inUStar.has(s));
     const rejected = frame.sources.filter((s) => !inUStar.has(s));
     const freedoms = frame.factors.length - kept.length;
     return { ...frame, kept, rejected, freedoms, closed: freedoms === 0 };
   });
+  const lowest = Math.min(...decided.filter((f) => !f.closed).map((f) => f.layer));
+  return decided.map((f) => ({ ...f, number: f.closed ? null : f.layer - lowest }));
+}
+
+/** The number of the frame that a promotion of factor x goes into: x is a factor of a frame numbered h, and as a move
+ *  it belongs to frame h - 1.  model is frameModel(n).  Throws if x is a factor of no frame with freedoms. */
+export function promotedInto(model, x) {
+  const from = model.find((f) => !f.closed && f.factors.includes(x));
+  if (!from) throw new Error(`${x} is a factor of no frame with freedoms, so it cannot be promoted`);
+  return from.number - 1;
 }

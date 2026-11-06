@@ -54,8 +54,7 @@
   </figure>
 
   <p>Every number lies in exactly one frame.  A frame's sources share a
-    <a class="gloss" href="glossary.html#layer">layer</a>, and its factors lie in the layer just below.  Game 21 has
-    one frame in each of layers 1 to 4.  One frame is <a class="gloss" href="glossary.html#in-front">in front of</a>
+    <a class="gloss" href="glossary.html#layer">layer</a>, and its factors lie in the layer just below.  One frame is <a class="gloss" href="glossary.html#in-front">in front of</a>
     another when a number of the other has a maximal factor in it, as <span class="n" data-n="9">9</span> has
     <span class="n" data-n="3">3</span>.  The frame in front stands to the right, and a dotted line runs to it.</p>
 
@@ -93,12 +92,15 @@
       (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#the-exactness-theorem">the
       closed-frames lemma</a>).</p>
     </aside>
-    <p data-follows="fig21" data-state="2">In each frame, the <a class="gloss" href="glossary.html#source">sources</a> that greedy kept are its moves, and each needs a
-    factor of its own to pay for it.  A frame's <a class="gloss" href="glossary.html#freedom"><em>freedoms</em></a> are
-    its factors less its moves: how many factors it can spare.  <a class="go" href="?fig21=2#fig21" data-fig="fig21"
-    data-state="2">Count them</a>.  The frames of layers 1 and 4 have as many factors as moves.  They are
-    <em>closed</em>: every <a class="gloss" href="glossary.html#factor">factor</a> <a class="gloss" href="glossary.html#pays-for">pays for</a> a move, and nothing in them is left to choose.  The frames of layers 2 and 3
-    have four factors and three moves, one freedom each.</p>
+    <p data-follows="fig21" data-state="2">In each frame, the <a class="gloss" href="glossary.html#source">sources</a>
+    that greedy kept are its moves, and each needs a factor of its own to pay for it.  A frame's <a class="gloss"
+    href="glossary.html#freedom"><em>freedoms</em></a> are its factors less its moves: how many factors it can spare.
+    <a class="go" href="?fig21=2#fig21" data-fig="fig21" data-state="2">Count them</a>.  The two frames at the ends,
+    with the factors 1 and 8, have as many factors as moves.  They are <em>closed</em>: every <a class="gloss"
+    href="glossary.html#factor">factor</a> <a class="gloss" href="glossary.html#pays-for">pays for</a> a move, and
+    nothing in them is left to choose.  The other two have four factors and three moves, one freedom each.  The frames
+    with freedoms are numbered from the front:  <em>frame 0</em> at the right, with the sources 14, 15 and 21, and frame
+    1 behind it, with 12, 18 and 20.</p>
   </div>
 </section>
 
@@ -112,11 +114,10 @@
   the frame in front can take on.  In game 21 the candidates are <span class="n" data-n="4">4</span> and
   <span class="n" data-n="9">9</span>, drawn with a second outline.</p>
 
-  <p>Why not <span class="n" data-n="10">10</span>, or <span class="n" data-n="6">6</span>?  10 = 2 · 5 would join
-  14 = 2 · 7, 21 = 3 · 7 and 15 = 3 · 5 in the frame of layer 2, and those four are
-  <a href="sets.html#loop-section">chapter 1's loop</a>: they cannot all be played.  6 = 2 · 3 would close a smaller
-  <a class="gloss" href="glossary.html#loop">loop</a> with 14 and 21.  But 9 = 3 · 3 has the single maximal factor 3,
-  closes no loop, and fits, and so does 4 = 2 · 2.</p>
+  <p>Why not <span class="n" data-n="10">10</span>, or <span class="n" data-n="6">6</span>? 10 = 2 · 5 would join 14 = 2
+  · 7, 21 = 3 · 7 and 15 = 3 · 5 in frame 0, and those four are <a href="sets.html#loop-section">chapter 1's loop</a>:
+  they cannot all be played. 6 = 2 · 3 would close a smaller <a class="gloss" href="glossary.html#loop">loop</a> with 14
+  and 21.  But 9 = 3 · 3 has the single maximal factor 3, closes no loop, and fits, and so does 4 = 2 · 2.</p>
 
   <div class="para">
     <aside class="note card" aria-label="The promotion-limit lemma, proved">
@@ -128,10 +129,11 @@
       c<sub>1</sub> + ⋯ + c<sub>t</sub> with 0 ≤ c<sub>h</sub> ≤ κ<sub>h</sub> and
       c<sub>h</sub> + c<sub>h+1</sub> ≤ ρ<sub>h</sub>.  In game 21 it is 1.</p>
     </aside>
-    <p data-follows="fig21" data-state="3">Only one of the two can go, since each frame here has one
-    <a class="gloss" href="glossary.html#freedom">freedom</a> and a promotion spends one in each.  <a class="go" href="?fig21=3#fig21" data-fig="fig21" data-state="3">Promote 9</a>,
-    the larger.  It hops to the right, into the frame of <a class="gloss" href="glossary.html#layer">layer</a> 2, where 3 <a class="gloss" href="glossary.html#pays-for">pays for</a> it, and the score is
-    <span data-g21="inTheBag">135</span> + 9 = <span data-g21="score">144</span>.</p>
+    <p data-follows="fig21" data-state="3">Only one of the two can go, since each frame here has one <a class="gloss"
+    href="glossary.html#freedom">freedom</a> and a promotion spends one in each.  <a class="go" href="?fig21=3#fig21"
+    data-fig="fig21" data-state="3">Promote 9</a>, the larger.  It hops to the right, from frame 1 into frame 0, where 3
+    <a class="gloss" href="glossary.html#pays-for">pays for</a> it, and the score is <span
+    data-g21="inTheBag">135</span> + 9 = <span data-g21="score">144</span>.</p>
   </div>
 
   <p data-follows="fig21" data-state="4">The frames also give the order of play: the frames in front first, from the
@@ -188,8 +190,8 @@
       design</a>; <a href="https://github.com/bvchess/taxman/tree/master/solver/frame/src/frames">solver/frame/src/frames</a>).</p>
     </aside>
   <p>Game 21 has two <a class="gloss" href="glossary.html#candidate">candidates</a>.  Game
-  <span data-scale="n">5,060</span> has <span data-scale="candidates">1,380</span>, in
-  <span data-scale="frames">19</span> <a class="gloss" href="glossary.html#frame">frames</a>.  Its
+  <span data-scale="n">5,060</span> has <span data-scale="frames">19</span>
+  <a class="gloss" href="glossary.html#frame">frames</a> and <span data-scale="candidates">1,380</span> candidates.  Its
   <a class="gloss" href="glossary.html#optimal-game">optimal game</a> <a class="gloss" href="glossary.html#promote">promotes</a>
   <span data-scale="promotions">268</span> of them, and they carry <span data-scale="promoted">570,330</span> of its
   <span data-scale="score">8,053,621</span> points: about <span data-scale="rest">7%</span> of the score.  The other
@@ -197,7 +199,7 @@
   </div>
 
   <figure class="fig wide chart frames-row" id="frames-row">
-    <p class="chart-title">The frames of game <span data-scale="n">5,060</span>, by layer</p>
+    <p class="chart-title">The frames of game <span data-scale="n">5,060</span></p>
     <div class="row-box"></div>
     <figcaption class="fig-caption"></figcaption>
   </figure>
@@ -241,10 +243,10 @@
         <span data-425="shared">20</span> promotions, and differ in three more: one plays 168, 132 and 110, the other
         162, 150 and 98.</p>
         <div id="two-sets"></div>
-        <p>Both threes sum to <span data-425="swap">410</span>, so a game that plays either set scores
-        <span data-425="score">57,010</span>, the best possible, and they trade one number in each of layers 5, 4 and
-        3.  A tie like this rules out a shortcut like chapter 3's for the whole game.  On a family of sets where a
-        greedy pass always finds the heaviest, distinct numbers give only one heaviest set, and game 425 has two.</p>
+        <p>Both threes sum to <span data-425="swap">410</span>, so a game that plays either set scores <span
+        data-425="score">57,010</span>, the best possible, and they trade one promotion into each of frames 2, 1 and 0.
+        A tie like this rules out a shortcut like chapter 3's for the whole game.  On a family of sets where a greedy
+        pass always finds the heaviest, distinct numbers give only one heaviest set, and game 425 has two.</p>
       </div>
     </details>
   </div>
