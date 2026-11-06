@@ -44,7 +44,7 @@ const DRAW = {
   promote(s) {
     s.box('from').box('into');
     s.number('ghost', 9).number('nine', 9).number('three', 3);
-    s.line('rise', 'ghost', 'nine', 'link').line('pay', 'nine', 'three', 'pay');
+    s.line('rise', 'ghost', 'nine', 'hop').line('pay', 'nine', 'three', 'pay');
     return {
       from: { x: 14, y: 22, w: 46, h: 76 },
       into: { x: 78, y: 22, w: 108, h: 76 },

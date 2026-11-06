@@ -351,7 +351,7 @@ function captions(f) {
     layers: 'Each number stands in the column of its layer, its count of prime factors, with layer 1 at the right. A line runs rightward from each number to each of its maximal factors: 12 to 6 and 4.',
     sources: `Each column cut at n/2. Below the line are the sources, ${M.sources(N)[0]} to ${N}: they divide no other number on the board, so each is a move or nothing. Above it are the factors, 1 to ${half}.`,
     greedy: `From ${N} down, descending greedy keeps ${listWords(f.keptDown)}, each still playable with those kept before it. It rejects ${listWords(f.rejectedDown)}: their one maximal factor, 1, already pays for ${f1.kept[0]}. U* scores ${f.inTheBag}.`,
-    frames: `The ${COUNT[f.frames.length] ?? f.frames.length} frames side by side: each source with the factors that can pay for it, greedy's choice in gray. A frame's sources, at its left, share a layer, and its factors, at its right, lie one layer below. A dotted arrow runs from a factor to its maximal factor in the frame in front.`,
+    frames: `The ${COUNT[f.frames.length] ?? f.frames.length} frames side by side: each source with the factors that can pay for it, greedy's choice in gray. A frame's sources, at its left, share a layer, and its factors, at its right, lie one layer below. A dotted line joins a factor to its maximal factor in the frame in front.`,
     freedoms: `The frames of layers ${listWords(f.frames.filter((fr) => fr.closed).map((fr) => fr.layer))} are closed, with as many factors as moves, and drop out. The frames of layers ${listWords(f.open.map((fr) => fr.layer))} have one freedom each. The candidates are ${listWords(f.candidates)}.`,
     promote: `${f.promoted[0]} hops rightward: it leaves the factors of the layer-${fp.layer} frame and becomes a move of the layer-${into.layer} frame, paid for by ${payer}. Only one candidate fits, and ${f.promoted[0]} is the larger. The score: ${f.inTheBag} + ${f.promoted.join(' + ')} = ${f.score}.`,
   };
@@ -388,7 +388,7 @@ export function mountGame21(host, { small, states = STOPS, param = 'fig21', labe
   for (const x of numbers) s.number(x, x);
   for (const x of f.promoted) {
     s.number(`ghost${x}`, x);
-    s.line(`from${x}`, `ghost${x}`, x, 'link');
+    s.line(`from${x}`, `ghost${x}`, x, 'hop');
   }
   for (const [a, b] of allEdges) {
     s.line(`e${a}-${b}`, a, b, 'thin');

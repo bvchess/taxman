@@ -5,8 +5,8 @@
 // The grammar is the theory's (docs/theory/img/draw.py):
 // * a circle is a move or a source, a square a factor; a promotion turns a square into a circle;
 // * a gray fill is kept, a hollow dashed outline rejected, a double outline a candidate;
-// * a thin line joins a number to one of its maximal factors, a thick line is a payment, and a dotted arrow runs from
-//   a factor to its maximal factor in the frame in front;
+// * a thin line joins a number to one of its maximal factors, a thick line is a payment, and a dotted line joins a
+//   factor to its maximal factor in the frame in front, and a dotted arrow is the path of a promotion;
 // * a box is a frame, dashed when it is closed;
 // * blue is the player's and orange the taxman's, and nothing else; what the prose names wears a halo of ink.
 //
@@ -122,16 +122,21 @@ export function look(...parts) {
  *  curving between, so that a line between two columns of numbers never crosses a number of either column. */
 export const LINE_LOOK = { opacity: 1, draw: 1, halo: 0, faded: 0, sag: 0, bend: 0 };
 
+const LINK = { width: 1.9, tone: '--mid', dash: '0.1 4.8', cap: 'round' };
+
 /** The kinds of line.  Each differs by weight, tone and dash, never by color alone.
  *    thin   a number and one of its maximal factors
  *    pay    a payment: the factor that pays for a move
- *    link   a factor and its maximal factor in the frame in front, a dotted arrow
+ *    link   a factor and its maximal factor in the frame in front, a dotted line
+ *    hop    the path of a promotion, from a factor's old place into the frame in front: the dotted line with an
+ *           arrowhead, the only arrow the figures draw
  *    faint  a line out of focus
  *    rule   a rule across a figure, such as the line at n/2 */
 export const LINE = {
   thin: { width: 1.3, tone: '--mid', raisedTone: '--string' },
   pay: { width: 3.6, tone: '--ink' },
-  link: { width: 1.9, tone: '--mid', dash: '0.1 4.8', cap: 'round', head: true },
+  link: LINK,
+  hop: { ...LINK, head: true },
   faint: { width: 1.2, tone: '--faint' },
   rule: { width: 1.2, tone: '--mid', dash: '5 4' },
 };

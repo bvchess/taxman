@@ -63,7 +63,7 @@ export const TOKENS = [
     ['--ink', 'Text, the outline of a flat mark, a payment, the reader’s place.'],
     ['--ink-2', 'Secondary text: ledes, captions, notes.'],
     ['--ink-3', 'Quiet text: labels, kickers, the names of a slider’s stops.'],
-    ['--mid', 'A thin line in a flat figure; a dotted arrow.'],
+    ['--mid', 'A thin line in a flat figure; a dotted line or arrow.'],
     ['--faint', 'A faded mark or line, out of focus.'],
     ['--hair', 'Hairlines: rules, the margin’s line, grids.'],
     ['--wash', 'The faintest ground: a folded note, a chapter not yet written, a hover.'],
@@ -189,7 +189,7 @@ function promotionScene(svg, rendering) {
   s.box('behind').box('front');
   s.number('ghost', 9).number(9, 9).number(18, 18).number(3, 3).number(15, 15).number(5, 5);
   s.line('18-9', 18, 9, 'thin').line('15-3', 15, 3, 'thin').line('15-5', 15, 5, 'thin');
-  s.line('rise', 'ghost', 9, 'link').line('pay', 9, 3, 'pay');
+  s.line('rise', 'ghost', 9, 'hop').line('pay', 9, 3, 'pay');
   const base = {
     behind: { x: 8, y: 10, w: 100, h: 112 },
     front: { x: 128, y: 10, w: 124, h: 112 },
