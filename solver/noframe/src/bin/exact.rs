@@ -1,6 +1,6 @@
 //! The prover's proofs of optimal scores: for every game in a range, an upper bound on opt(n) proven without the
 //! frame model, compared with the recorded optimum V(n) (the committed chain and the `--results` files; see
-//! solver/noframe/docs/reproducing.md, "The recorded games").  One line per game, resumable:
+//! solver/noframe/docs/reproducing.md, "The recorded moves").  One line per game, resumable:
 //!
 //!     exact --from A --to B [--list ...] [--threads T] [--seconds S] [--share S] [--budget NODES] [--all 1]
 //!           [--parity 0] [--segments 1] [--lagrangian 0|1] [--fix-low 0 | --fix-upper 1] [--checkpoints DIR]

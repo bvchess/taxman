@@ -275,9 +275,9 @@ ls -l ~/taxman-work/ckpt                         # a checkpoint per unfinished s
   termination deletes: use `S3_DEST`, or `rsync` the work directory home from time to time.
 * **An error stop** (`prover.sh` exits with status 1): `exact` stopped with an error, the final check failed, or
   `MAX_FAILS` passes in a row crashed without a new line.  Nothing is retried; read the end of `prover.log` and
-  `prover.err`.  The message "a playable set worth X beats the recorded Y" is a counterexample: a better game than the
+  `prover.err`.  The message "a playable set worth X beats the recorded Y" is a counterexample: better moves than the
   committed chain's for that n, the finding a run exists to look for.  The set is in the message; keep `~/taxman-work`
-  as it is, and report it.  The message "the recorded game does not replay to its score" means that the results file
+  as it is, and report it.  The message "the recorded moves do not replay to their score" means that the results file
   or the build is wrong.
 
 ## Bring the data home, verify, commit

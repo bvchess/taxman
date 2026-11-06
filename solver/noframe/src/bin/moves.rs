@@ -1,6 +1,6 @@
 //! The longest move sequences against the optimal ones: for every game of a range, M(n), the most moves that can be
 //! played on 1..=n, decided by the prover ([`taxman_prover::moves`]), against the recorded optimal moves (the
-//! committed chain and the `--results` files; see solver/noframe/docs/reproducing.md, "The recorded games").  One line
+//! committed chain and the `--results` files; see solver/noframe/docs/reproducing.md, "The recorded moves").  One line
 //! per game, resumable:
 //!
 //!     moves --from A --to B [--list ...] [--budget NODES] [--heaviest 0] [--seconds S] [--optimal FILE]
@@ -87,7 +87,7 @@ fn main() {
         let started = Instant::now();
         let board = Board::new(n as u32, &spf);
         let (score, moves) = &recorded[&n];
-        assert_eq!(board.replay(moves), Ok(*score), "n={n}: the recorded moves do not replay to its score");
+        assert_eq!(board.replay(moves), Ok(*score), "n={n}: the recorded moves do not replay to their score");
         let k = moves.len() as u64;
         let upper_part: Vec<u32> = moves.iter().copied().filter(|&c| 2 * u64::from(c) > n).collect();
         let prev = known.get(&(n - 1));

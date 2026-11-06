@@ -1,7 +1,7 @@
 //! The upper part of the optimal sets, game by game: for every game in a range, which members of U\*_{≥3} (the
 //! sources of three or more prime factors that descending greedy keeps) the parity bound certifies to be in every
 //! set beating the recorded score, and which it leaves open.  The recorded moves are those of the committed chain and
-//! the `--results` files (solver/noframe/docs/reproducing.md, "The recorded games").  One line per game, resumable:
+//! the `--results` files (solver/noframe/docs/reproducing.md, "The recorded moves").  One line per game, resumable:
 //!
 //!     upper --from A --to B [--list ...] [--threads K] [--seconds S] [--optimal FILE] [--results FILE]...
 //!           --out FILE

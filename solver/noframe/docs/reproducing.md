@@ -56,7 +56,7 @@ where large (`gunzip -k` to resume into it).  The commands marked study E6 measu
 3 or more free costs the prover's search anything, the theory track's measurement E6 ([its
 entry](https://github.com/bvchess/taxman-notebook/blob/main/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md#the-plan-of-e6)).
 
-## The recorded games
+## The recorded moves
 
 `exact`, `upper`, `optsets`, `moves` and the examples `parityroot` and `paritycheck` check games against the recorded
 moves of the committed chain, the file `results/optimal.jsonl.gz` ([what it holds](../../../results/README.md)).  They

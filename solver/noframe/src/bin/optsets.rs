@@ -1,6 +1,6 @@
 //! Every optimal set, on the whole board: for every game in a range, all playable sets of picks worth the recorded
 //! optimum V(n) (the committed chain and the `--results` files; see solver/noframe/docs/reproducing.md, "The recorded
-//! games").  One line per game, resumable:
+//! moves").  One line per game, resumable:
 //!
 //!     optsets --from A --to B [--list ...] [--threads T] [--seconds S] [--budget NODES] [--limit SETS]
 //!             [--upper all|fixed|other] [--derive 0] [--searched-only 1] [--segments 1] [--optimal FILE]

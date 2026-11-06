@@ -452,7 +452,7 @@ fn the_command_exits_with_status_2_on_a_planted_wrong_score_and_writes_the_count
 /// A game is refused, with an error that says why, instead of certified or beaten: when the barred bounds are those of
 /// another board, when they were found against a score above the recorded one (nothing beats the recorded score, but
 /// they certify the open members against a higher one, so nothing is proven), when the results have no moves for the
-/// board, when the recorded moves do not replay to its score, and when it does not play the sources above n/2 that
+/// board, when the recorded moves do not replay to their score, and when it does not play the sources above n/2 that
 /// setup keeps.
 #[test]
 fn a_game_that_a_certificate_cannot_be_made_for_is_refused() {

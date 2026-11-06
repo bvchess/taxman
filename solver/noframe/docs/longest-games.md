@@ -47,7 +47,7 @@ in Python replays the recorded moves and computes ν(n) from scratch by Hopcroft
 
 Each game reads its predecessor's line in the output file, so a run that continues an earlier one starts from a copy of
 its output.  The recorded moves are the committed chain's, and `--results` adds a file of them ([the recorded
-moves](reproducing.md#the-recorded-games)).
+moves](reproducing.md#the-recorded-moves)).
 
 ## Results
 
