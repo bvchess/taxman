@@ -1,24 +1,21 @@
 /* Chapter 4, frames: the styles of its figures, after css/site.css. */
 
-/* The frames of the last game, drawn small: a box a frame, a mark a number.  The space is held while a worker works
-   the frames out, so that the page does not move when they arrive. */
+/* The frames of game 100, drawn small: a box a frame, a mark a number. */
 .frames-row { margin: 24px 0 30px; }
 .frames-row .chart-title { margin-bottom: 8px; }
 .frames-row .row-box { position: relative; }
-.frames-row .fig-caption { min-height: 4.6em; }
 .frames-row-svg .row-frame { fill: none; stroke: var(--ink); stroke-width: 1.2; }
 .frames-row-svg .row-frame.is-closed { stroke-dasharray: 5 3.5; }
 .frames-row-svg .row-kept { fill: var(--mid); }
 .frames-row-svg .row-rejected { fill: var(--paper); stroke: var(--ink-3); stroke-width: 0.8; }
 .frames-row-svg .row-factor { fill: none; stroke: var(--ink-2); stroke-width: 0.8; }
+/* A closed frame is out of focus, as in the figure of game 21: its box in the faint tone, its marks in the string tone,
+   lighter than an open frame's but still visible at this size, and its label, already in the ink-3 tone, as it is. */
+.frames-row-svg .row-closed .row-frame { stroke: var(--faint); }
+.frames-row-svg .row-closed .row-kept { fill: var(--string); }
+.frames-row-svg .row-closed .row-rejected { stroke: var(--string); }
+.frames-row-svg .row-closed .row-factor { stroke: var(--string); }
 .frames-row-svg .hit { cursor: default; }
-
-@container essay (max-width: 987px) {
-  .frames-row .fig-caption { min-height: 7.6em; }
-}
-@container essay (max-width: 540px) {
-  .frames-row .fig-caption { min-height: 12em; }
-}
 
 /* The two optimal sets of game 425: a column a frame, named over the marks. */
 .two-sets-head { font-size: 0.7rem; color: var(--ink-3); margin-bottom: -4px; }

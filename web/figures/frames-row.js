@@ -1,11 +1,13 @@
 // A row of a mid-sized game's frames, drawn small, to show their number: every frame of the game the page names as a
-// box, a mark for each of its numbers, the sources at its left (gray if descending greedy keeps them, hollow if not)
-// and its factors at its right; a dashed box is a closed frame.  The boxes stand in the wiki's order, the highest layer
-// at the left and the frame in front at the right, and are named by their numbers (js/model.js, frameModel), frame 0
-// being the one in front; a closed frame has no number and is named closed.  Under a box with freedoms stand its
-// number and its freedoms, the sum over the frames that make it up, in one of two forms: on a line below the number
-// ("2 freedoms"), or stacked, the count and then the word, when that lets the marks be larger.  Under a closed box
-// stands only closed.  The labels are measured in the page, and a box is at least as wide as its widest line.
+// box, a mark for each of its numbers, the sources at its left (gray if descending greedy keeps them, hollow with a
+// dashed outline if not, as in the figure of game 21) and its factors at its right; a closed frame is drawn dashed and
+// faded, its box, marks and label alike, as game 21 draws its closed frames.  The boxes stand in the wiki's order, the
+// highest layer at the left and the frame in front at the right, and are named by their numbers (js/model.js,
+// frameModel), frame 0 being the one in front; a closed frame has no number and is named closed.  Under a box with
+// freedoms stand its number and its freedoms, the sum over the frames that make it up, in one of two forms: on a line
+// below the number ("2 freedoms"), or stacked, the count and then the word, when that lets the marks be larger.  Under
+// a closed box stands only closed.  The labels are measured in the page, and a box is at least as wide as its widest
+// line.
 // Frames with freedoms that share a number are one frame (collapseFrames): one box, with all their sources at its
 // left, largest first, and all their factors at its right.
 //
@@ -21,6 +23,7 @@ import { freshSVG, tableView, tooltip } from '../js/chart.js';
 const MAX_CELL = 12; // the largest mark's cell, in pixels
 const MIN_ROWS = 3;
 const MAX_ROWS = 60;
+const DASHES = 8; // dashes round the outline of a rejected source
 const PAD = 0.6; // a box's margin around its numbers, in cells
 const GAP = 1; // between two boxes, in cells
 const MIN_GAP = 8; // and in pixels
@@ -126,38 +129,44 @@ function draw(box, tip, data, width) {
   const left = (width - total) / 2;
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   svg.setAttribute('height', height);
-  let kept = '';
-  let rejected = '';
-  let factors = '';
+  // The marks of the open boxes share three paths; a closed box has a group of its own, with the same three.
+  const open = { kept: '', rejected: '', factors: '' };
+  const dash = (2 * Math.PI * 0.4 * c) / (2 * DASHES);
+  const addPaths = (parent, d) => {
+    el('path', { d: d.factors, class: 'row-factor' }, parent);
+    el('path', { d: d.kept, class: 'row-kept' }, parent);
+    el('path', { d: d.rejected, class: 'row-rejected', 'stroke-dasharray': `${dash.toFixed(2)} ${dash.toFixed(2)}` },
+      parent);
+  };
   for (const p of placed) {
     const x0 = left + p.x;
+    const marks = p.u.closed ? { kept: '', rejected: '', factors: '' } : open;
+    const parent = p.u.closed ? el('g', { class: 'row-closed' }, svg) : svg;
     el('rect', {
       x: x0.toFixed(2), y: top, width: p.w.toFixed(2), height: boxH.toFixed(2), rx: Math.min(6, 1.4 * c),
       class: p.u.closed ? 'row-frame is-closed' : 'row-frame',
-    }, svg);
+    }, parent);
     p.u.sources.forEach((s, i) => {
       const cx = x0 + (PAD + Math.floor(i / p.rows) + 0.5) * c;
       const cy = top + (PAD + (i % p.rows) + 0.5) * c;
-      if (p.u.kept.has(s)) kept += circle(cx, cy, 0.4 * c);
-      else rejected += circle(cx, cy, 0.32 * c);
+      marks[p.u.kept.has(s) ? 'kept' : 'rejected'] += circle(cx, cy, 0.4 * c);
     });
     const factorsX = x0 + p.w - (PAD + p.factorCols) * c;
     for (let i = 0; i < p.u.factors; i++) {
       const cx = factorsX + (Math.floor(i / p.rows) + 0.5) * c;
       const cy = top + (PAD + (i % p.rows) + 0.5) * c;
-      factors += square(cx, cy, 0.3 * c);
+      marks.factors += square(cx, cy, 0.3 * c);
     }
     p.labels.forEach((label, k) => {
       const t = el('text', {
         x: (x0 + p.w / 2).toFixed(1), y: top + boxH + 3 + (k + 1) * LABEL_LINE, 'text-anchor': 'middle',
         class: 'tick',
-      }, svg);
+      }, parent);
       t.textContent = label;
     });
+    if (p.u.closed) addPaths(parent, marks);
   }
-  el('path', { d: factors, class: 'row-factor' }, svg);
-  el('path', { d: kept, class: 'row-kept' }, svg);
-  el('path', { d: rejected, class: 'row-rejected' }, svg);
+  addPaths(svg, open);
   // The hover layer: a box's counts.
   for (const p of placed) {
     const x0 = left + p.x;
@@ -192,8 +201,8 @@ export function mountFramesRow(host, { games, n }) {
   const facts = { ...M.frameFacts(model), n, candidates: games.columns.candidates[i] };
   const numbers = sum(model, (f) => f.sources.length + f.factors.length);
   caption.textContent = `The frames of game ${fmt(n)}, a mark for each of its ${fmt(numbers)} numbers: in each frame ` +
-    'its sources at the left, gray where descending greedy keeps them and hollow where it does not, and its factors ' +
-    'at the right.';
+    'its sources at the left, gray where descending greedy keeps them and hollow and dashed where it does not, and ' +
+    'its factors at the right.';
   const columns = ['frame', 'sources', 'kept', 'factors', 'freedoms'];
   tableView(host, 'The numbers behind the figure', columns, data.boxes.map((u) => {
     const counts = countsOf(u.frames);
