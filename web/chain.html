@@ -247,11 +247,12 @@
       proven by the prover, without statement U.</p>
     </aside>
     <p>Most games in which n neither fits nor is prime still need no search.  Before the
-    <a class="gloss" href="glossary.html#frame-solver">frame solver</a> (<a href="frames.html">chapter 4</a>) searches
-    a game, rules settle most of it, and what is left is the game's search problem: which few numbers up to n/2 to play
-    as moves as well.  Often n does not change
-    that problem at all.  Then game n is a <a class="gloss" href="glossary.html#repeat"><em>repeat</em></a>, and the
-    earlier game's answer to the problem is game n's answer too.</p>
+    <a class="gloss" href="glossary.html#frame-solver">frame solver</a> searches a game, rules settle most of it
+    (<a href="top-half.html">chapter 3</a> and <a href="frames.html">chapter 4</a>), and what is left is the game's
+    search problem: which few numbers up to n/2 to play as moves as well.  Often n does not change that problem at all.
+    Then game n is a <a class="gloss" href="glossary.html#repeat"><em>repeat</em></a>, and the earlier game's answer to
+    the problem is game n's answer too.  The solver looks for one as soon as the problem is set up, before it searches
+    (<a href="search.html#repeat-check">chapter 5</a>).</p>
   </div>
 
   <div class="para">
@@ -360,37 +361,8 @@
   <p>Those four cofactors take in <span data-cof="named">…</span> of the <span data-cof="total">…</span> games from game
   188 on, and <span data-cof="share">…</span> of the ones settled with no search.  Of the
   <span data-cof="other">…</span> games with any other cofactor, <span data-cof="otherSearched">…</span> needed a search.</p>
-</section>
-
-<section class="chapter" id="head-start" data-toc="head-start" aria-labelledby="h-head-start">
-  <h2 id="h-head-start">A head start</h2>
-  <div class="para">
-    <aside class="note tech" aria-label="The two starts of game 5,060">
-      <div class="note-head"><span class="note-name">The two starts of game 5,060</span></div>
-      <p>As sums of promotions, the part of the score a search chooses: the best is <span data-start="best">…</span>,
-      and the search starts at <span data-start="seeded">…</span> from game 5,059’s optimal set and at
-      <span data-start="own">…</span> on its own.  The frame solver measured both, each search stopped after its first
-      thousand nodes
-      (<a href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-start-of-game-5060-with-and-without-the-game-before-2026-11/README.md">the
-      start of game 5,060</a>).  What a start below the best costs a search was measured at game 3,020
-      (<a href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-dear-games-the-problem-or-the-chains-path-2026-10/README.md#4-what-a-start-below-optn-costs">a
-      start below opt(n)</a>).</p>
-    </aside>
-    <p>A game that needs a <a class="gloss" href="glossary.html#search">search</a> still gets a start from the game
-    before.  The search of game n starts from the optimal set of game n − 1, carried over to game n, and that start is
-    usually optimal or close to it.  Game 5,060’s search starts <span data-start="seededGap">…</span> points below the best score
-    this way; from a start of its own, it would begin <span data-start="ownGap">…</span> below.  A search keeps only
-    the branches that might beat the best game it has found, so the nearer it starts to the best, the less it has to
-    search.  A start far below the best can make a search many times longer.</p>
-  </div>
-  <div class="para">
-    <p>Game n − 1 helps in two more ways.  The <a class="gloss" href="glossary.html#ceiling">ceiling</a> it gives game n
-    ends a search as soon as the search finds a game that reaches it: <span data-start="cap">…</span> searches of the
-    chain ended there,
-    <span data-start="capStart">…</span> of them at their start, before a single step.  And where game n poses part of
-    the problem game n − 1 posed, the search can drop that part, by the near-repeat lemma
-    (<a href="search.html#proof">chapter 5</a>).</p>
-  </div>
+  <p>A game that needs a search still gets help from game n − 1: its search starts near the best, and stops as soon as
+  it reaches the ceiling (<a href="search.html#head-start">chapter 5</a>).</p>
 </section>
 
 <nav class="chapter-nav" aria-label="Pages"></nav>
@@ -400,7 +372,7 @@
 
 <script type="module">
 import { initEssay, registerFigure } from './js/essay.js';
-import { headStart, loadGames, loadSmall } from './js/data.js';
+import { loadGames, loadSmall } from './js/data.js';
 import { fmt } from './js/vocab.js';
 import { pct } from './js/chart.js';
 import { fillOneSearch } from './js/proof.js';
@@ -439,13 +411,6 @@ const settledFacts = {
   recordRepeatAtCeiling: fmt(chain.recordRepeatAtCeiling), searchNothing: fmt(chain.searchNothing),
 };
 fill('settled', (key) => settledFacts[key]);
-
-// The head start: game 5060's two starts, measured (js/data.js), and the searches the ceiling ended.
-const startFacts = {
-  ...headStart(games),
-  cap: c.proof.filter((p) => p === 'cap').length, capStart: c.method.filter((m) => m === 'start').length,
-};
-fill('start', (key) => (key in startFacts ? fmt(startFacts[key]) : undefined));
 
 // The cofactor rule.
 const cof = mountCofactor(document.getElementById('cofactor-fig'), { games });

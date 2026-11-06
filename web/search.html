@@ -24,14 +24,24 @@
   left.</p>
 </header>
 
-<section class="chapter" id="branch-and-bound" data-toc="branch-and-bound" aria-label="Branch and bound">
+<section class="chapter" id="repeat-check" data-toc="repeat-check" aria-label="A repeat">
   <p>Once the <a class="gloss" href="glossary.html#frame">frames</a> are set, all that is left to choose is which
   <a class="gloss" href="glossary.html#candidate">candidates</a> to <a class="gloss" href="glossary.html#promote">promote</a>.
-  Game 45 has <span data-tree="candidates">8</span> candidates, so
-  <span data-tree="sets">256</span> sets of them, and only some can be promoted together.  Game
-  <span data-last-n>5,060</span> has <span data-last="candidates">1,380</span> candidates, and far too many sets to
-  try one by one.</p>
+  Before the <a class="gloss" href="glossary.html#frame-solver">frame solver</a> searches, it asks whether an earlier
+  game has chosen them already.  When game n poses the <a class="gloss" href="glossary.html#search-problem">search
+  problem</a> of one of the games just before it, game n is a <a class="gloss" href="glossary.html#repeat">repeat</a>
+  (<a href="chain.html#repeat">chapter 2</a>), and that game's promotions are game n's.  Game 39 is one.  The new
+  number lands in a <a class="gloss" href="glossary.html#closed">closed</a> frame, where descending greedy keeps 39
+  and drops 22, and the frames with freedoms and their candidates stay as they were in game 38.</p>
+  <p>Game 45 is not.  The maximal factors of 45 are 15, in frame 1, and 9, which with 27 made a closed frame of its
+  own in game 44.  45 joins the two frames into one, so frame 1 changes, and game 45 poses a problem of its own.  It
+  has <span data-tree="candidates">8</span> candidates, so <span data-tree="sets">256</span> sets of them, and only
+  some can be promoted together.  Game <span data-last-n>5,060</span> has
+  <span data-last="candidates">1,380</span> candidates, and far too many sets to try one by one.</p>
+</section>
 
+<section class="chapter" id="branch-and-bound" data-toc="branch-and-bound" aria-labelledby="h-branch">
+  <h2 id="h-branch">Branch and bound</h2>
   <div class="para">
     <aside class="note card" aria-label="The state lemma, proved">
       <div class="note-head"><span class="note-name">The state lemma<span class="note-label">Lemma R1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/search-rules.md#the-state-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
@@ -39,7 +49,7 @@
       <p class="precise"><span class="run">Precisely.</span>P ∪ X is a promotion set exactly when each member of X is a
       factor of its home in state(P), and every frame of state(P) stays winnable with X applied.</p>
     </aside>
-    <p>A <a class="gloss" href="glossary.html#search">search</a> tries them a candidate at a time.  At each step it
+    <p>A <a class="gloss" href="glossary.html#search">search</a> tries the sets a candidate at a time.  At each step it
     takes one candidate and splits in two: one branch promotes it, the other goes on without it.  Each point where it
     splits is a <a class="gloss" href="glossary.html#node">node</a>.  All the while the search keeps the best game it
     has found, and at each node a <a class="gloss" href="glossary.html#bound">bound</a>: a limit on what the promotions
@@ -149,6 +159,41 @@
   </div>
 </section>
 
+<section class="chapter" id="head-start" data-toc="head-start" aria-labelledby="h-head-start">
+  <h2 id="h-head-start">A head start</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="The two starts of game 5,060">
+      <div class="note-head"><span class="note-name">The two starts of game 5,060</span></div>
+      <p>As sums of promotions, the part of the score a search chooses: the best is <span data-start="best">…</span>,
+      and the search starts at <span data-start="seeded">…</span> from game 5,059’s optimal set and at
+      <span data-start="own">…</span> on its own.  The frame solver measured both, each search stopped after its first
+      thousand nodes
+      (<a href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-start-of-game-5060-with-and-without-the-game-before-2026-11/README.md">the
+      start of game 5,060</a>).  What a start below the best costs a search was measured at game 3,020
+      (<a href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-dear-games-the-problem-or-the-chains-path-2026-10/README.md#4-what-a-start-below-optn-costs">a
+      start below opt(n)</a>).</p>
+    </aside>
+    <p>A search does not start from nothing.  The search of game n starts from the optimal set of game n − 1, carried
+    over to game n (<a href="chain.html#ceiling">chapter 2</a>), and that start is usually optimal or close to it.  Game
+    5,060’s search starts <span data-start="seededGap">…</span> points below the best score this way; from a start of
+    its own, it would begin <span data-start="ownGap">…</span> below.  A branch is dropped only when its bound cannot
+    beat the best game found, so the nearer the search starts to the best, the more branches it can drop.  A start far
+    below the best can make a search many times longer.</p>
+  </div>
+  <div class="para">
+    <aside class="note card" aria-label="The near-repeat lemma, proved">
+      <div class="note-head"><span class="note-name">The near-repeat lemma<span class="note-label">Lemma R7</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/search-rules.md#the-near-repeat-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">A branch that poses part of an earlier game's problem adds no more than that game's best, so
+      the search may drop it.</p>
+      <p class="precise"><span class="run">Precisely.</span>Under three conditions against a game m, every completion
+      of a node is a promotion set of m's root problem, worth at most a bound Z of its best.</p>
+    </aside>
+    <p>Game n − 1 helps once more.  Where a branch of game n poses only part of the problem that game n − 1 posed, the
+    search can drop it, by the near-repeat lemma.  It is a <a class="gloss" href="glossary.html#repeat">repeat</a> in
+    part: game n − 1’s search has already shown how much that part can add.</p>
+  </div>
+</section>
+
 <section class="chapter" id="proof" data-toc="proof" aria-labelledby="h-proof">
   <h2 id="h-proof">What proves a game</h2>
   <div class="para">
@@ -160,13 +205,6 @@
       search</a>, every promotion set heavier than the best found, and true to every mirror, lies in an open branch.
       So a search with no branch left proves P*, the heaviest promotion set's sum, equal to its best.</p>
     </aside>
-    <aside class="note card" aria-label="The near-repeat lemma, proved">
-      <div class="note-head"><span class="note-name">The near-repeat lemma<span class="note-label">Lemma R7</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/search-rules.md#the-near-repeat-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">A branch that poses part of an earlier game's problem adds no more than that game's best, so
-      the search may drop it.</p>
-      <p class="precise"><span class="run">Precisely.</span>Under three conditions against a game m, every completion
-      of a node is a promotion set of m's root problem, worth at most a bound Z of its best.</p>
-    </aside>
     <p>When no branch is left, the <a class="gloss" href="glossary.html#search">search</a> has proved that no set of
     promotions beats its best one: every set was either tried or dropped by a bound that showed it could not do
     better.  So its best game is the best of the <a class="gloss" href="glossary.html#frame-model">frame model</a>,
@@ -175,8 +213,10 @@
     <span data-proof="exhausted">1,612</span> games of the <a class="gloss" href="glossary.html#chain">chain</a> were
     proven.</p>
     <p>A search can also stop early.  No game of n scores more than the best score of game n − 1 plus n, the
-    <a class="gloss" href="glossary.html#ceiling">ceiling</a>.  A search whose best game reaches the ceiling has
-    nothing left to find, and it stops there.</p>
+    <a class="gloss" href="glossary.html#ceiling">ceiling</a> (<a href="chain.html#ceiling">chapter 2</a>).  A search
+    whose best game reaches the ceiling has nothing left to find, and it stops there.  That is how
+    <span data-start="cap">…</span> searches of the chain ended, <span data-start="capStart">…</span> of them at their
+    start, before a single step.</p>
   </div>
 </section>
 
@@ -237,7 +277,7 @@
 
 <script type="module">
 import { initEssay, registerFigure } from './js/essay.js';
-import { loadGames, loadSmall } from './js/data.js';
+import { headStart, loadGames, loadSmall } from './js/data.js';
 import { fmt } from './js/vocab.js';
 import { mountSearchTree } from './figures/search-tree.js';
 import { mountSearchCost, nodesWords } from './figures/search-cost.js';
@@ -255,6 +295,10 @@ fill('tree', Object.fromEntries(Object.entries(tree.facts).map(([k, v]) => [k, t
 for (const s of document.querySelectorAll('[data-last-n]')) s.textContent = fmt(games.lastN);
 fill('last', { candidates: fmt(c.candidates[c.n.indexOf(games.lastN)]) });
 fill('proof', { exhausted: fmt(c.proof.filter((p) => p === 'exhausted').length) });
+// The head start: game 5060's two starts, measured (js/data.js), and the searches the ceiling ended.
+const start = { ...headStart(games), cap: c.proof.filter((p) => p === 'cap').length,
+  capStart: c.method.filter((m) => m === 'start').length };
+fill('start', Object.fromEntries(Object.entries(start).map(([k, v]) => [k, fmt(v)])));
 
 const cost = mountSearchCost(document.getElementById('cost-chart'), { games });
 const LATE = 4500;

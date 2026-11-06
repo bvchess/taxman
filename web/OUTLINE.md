@@ -124,10 +124,11 @@ points:* in game 833 every optimal game makes 362 moves, but a game can make 363
 * When an optimal set of n − 1 still plays with n added, game n is at its ceiling, and done.
 * At a prime n, swap the old largest prime for n: the prime formula.
 * Often game n poses exactly the search problem of the game before it, and that game's answer carries over: a repeat.
+  The solver looks for one once the problem is set up, before it searches (chapter 5).
 * Together these settle about 65% of the games with no search.  That is why the result is a chain: game 5000 is reached
   by walking there.
 * Which games need a search can usually be told from n alone, from its cofactor: n over its largest prime factor
-  (measured).
+  (measured).  Those still get a start and a ceiling from game n − 1 (chapter 5).
 
 **Examples.**  Games 9 to 13, small enough to follow by hand: game 12 from game 11 in the opening, 10 fits, 12 does not,
 and 13 is a prime.  The repeat is game 39, which the semiprime formula also settles.
@@ -147,6 +148,7 @@ game 14.  *One search, eight games:* games 2512 to 2519 all rest on one search, 
 **Point.**  In the games that need a search, the numbers above n/2 carry about 93% of the score (measured), and one
 greedy pass chooses them.
 
+* Where n fits or is a prime, game n − 1 has settled game n (chapter 2); game 21 is neither, so it starts here.
 * A number above n/2 divides nothing else on the board, so it is never tax: a move or nothing.  These are the sources.
 * Layers: a number's count of prime factors.  A number's maximal factors sit one layer down.
 * Descending greedy: from n down, keep each source that can still be played with those kept.  What it keeps is U\*.
@@ -189,13 +191,17 @@ to show the scale.
 
 **Point.**  A search tries promotion sets, and an upper bound proves when nothing better is left.
 
+* A repeat first: once the frames are set, a game whose search problem an earlier game posed takes that game's
+  promotions (game 39, whose new number lands in a closed frame); game 45 changes frame 1 and needs a search.
 * Branch and bound: promote a candidate or not; a bound says how much a branch could still gain; a branch that cannot
   beat the best game found is dropped.
 * The bound: a quick test that every playable set of promotions passes, though some unplayable sets pass it too.  The
   heaviest set that passes bounds what a branch can gain.
 * Learning from dead ends: a set of promotions that fails is remembered, so no branch tries it again, and promotions
   that differ only by exchanging two primes are tried once.
-* A game is proven when the whole tree is explored, or when the best game reaches the ceiling.
+* A head start: the search starts from game n − 1's optimal set, near the best (game 5060, measured), and the
+  near-repeat cut drops a branch that poses part of game n − 1's problem.
+* A game is proven when the whole tree is explored, or when the best game reaches the ceiling, some at their start.
 * What it costs: the search grows steeply with the gap between the bound and the best game, and that is why the chain
   stops where it does.
 

@@ -29,8 +29,9 @@ const GAME_ROW = { title: 'The game', href: '#the-game' };
 /** The chapters with a row, in the order of the rows. */
 const STEPS = [1, 3, 4, 2, 5];
 
-/** The links of chapters whose row goes somewhere other than the chapter's page. */
-const HREF = { 2: 'chain.html#head-start' };
+/** The links of chapters whose row goes somewhere other than the chapter's page: chapter 2's row, the start that game
+ *  n − 1 gives a search, goes to the section of chapter 5 that explains it. */
+const HREF = { 2: 'search.html#head-start' };
 
 const LOG2 = Math.log10(2);
 
