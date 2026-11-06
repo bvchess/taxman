@@ -17,7 +17,7 @@ export const STORY = [
   {
     n: 7, title: 'The results', line: 'The best scores, how each was proven, and what they show.', href: 'results.html',
   },
-  { n: 8, title: 'In Summary', line: 'The optimal games in brief, and the whole method on game 21.', href: 'summary.html' },
+  { n: 8, title: 'Summary', line: 'The optimal games in brief, and the whole method on game 21.', href: 'summary.html' },
 ];
 
 /** The findings along the way, the story chapter each belongs beside, and, once written, where it is.  The navigation

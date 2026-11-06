@@ -30,6 +30,7 @@
 
   /* The face of the site: one family for text, figures and tables, then the reader's system fonts. */
   --font: "Radio Canada", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; /* commands to type */
 
   /* Ink and paper */
   --paper: #ffffff;
@@ -251,7 +252,8 @@ dl.commands { margin: 8px 0 22px; }
 dl.commands dt { font-size: 0.86rem; font-weight: 700; margin: 12px 0 4px; }
 dl.commands dd { margin: 0; position: relative; }
 dl.commands code {
-  display: block; padding: 8px 12px; border-radius: 8px; font-size: 0.84rem; line-height: 1.5; white-space: pre-wrap;
+  display: block; padding: 8px 12px; border-radius: 8px; font-family: var(--mono); font-weight: 400; font-size: 0.8rem;
+  line-height: 1.55; white-space: pre-wrap;
   overflow-wrap: anywhere; padding-right: 5.2em;
 }
 dl.commands .btn.copy { position: absolute; top: 6px; right: 6px; padding: 5px 9px; font-size: 0.72rem; }
