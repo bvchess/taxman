@@ -64,9 +64,8 @@ Before the prover, this was the state of the evidence.
   establish U at every n ≤ 2175.  Beyond, the committed lines past 2175 that rest on U, by an exhausted search or a
   repeat, have it uncertified.  The barred parity bounds certify about 85% of those sources per game on 2176–3314 and
   80% on 3315–3440, but close no game alone ([proofs.md](proofs.md#the-upper-part-game-by-game)).  The rest needs a
-  search that leaves the open sources optional: the certificates of U
-  ([solver/docs/design/certificates.md](../../docs/design/certificates.md)), which superseded the measurement E6 of
-  [reproducing.md](reproducing.md).
+  search that leaves the open sources optional ([the certificate theorem
+  (E2)](../../../docs/theory/extended-problem.md#the-certificate-theorem)).
 * **Whether every optimal game's upper part is U\*.**  [The uniqueness theorem
   (Q1)](../../../docs/theory/uniqueness-and-longest-games.md#the-uniqueness-theorem) settles the sources' instance
   alone.  For the whole game, a frontier argument, as in [S3](../../../docs/theory/sources.md#the-frontier-theorem),

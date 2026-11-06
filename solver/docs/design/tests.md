@@ -31,11 +31,6 @@ every second line of the Java fixtures), and the comment on each says what the w
     `model` (`src/playable.rs`, the peel, itself checked against the rules on every subset of the games to 20).  It
     checks both directions of X7 on every set of every game to 100 (to 120 ignored) and on random sets of games
     to 1300 (to 8191 ignored), and the near miss that only the candidate filter keeps out (n = 98).
-  * `tests/model_extended.rs` checks [E1](../../../docs/theory/extended-problem.md#the-extended-exactness-theorem) (the
-    extended problem, with the sources of three or more prime factors
-    optional) both ways, in both formulations (with and without the claims of `unzip`, [E4](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)): on every set of
-    every game to 80 (to 60 with every such source open) and on random sets to 1300 (to 4095 ignored).  It checks that
-    with none open the promotion sets are the frame model's, and catches a mutant that skips the check of E4.
   * `tests/bottom_layers.rs` checks F4 on every game of the committed chain and another run of
     its lines for 2176–2276 (`testdata/c8g.chain-2176.jsonl`), every optimal set the prover enumerated, and every
     optimal set of the games to 48.
@@ -128,48 +123,12 @@ every second line of the Java fixtures), and the comment on each says what the w
   table `NEAR_REPEATS` counts the trees of the games 768, 1083 and 1101, solved as the solver solves them from the
   committed moves for n − 1, with the near-repeat cut and without it, and checks that the line of each counts the nodes
   the cut cut (`stats.near_repeat_cut`) if it was armed, and has no such key if it was not.  The rows `symmetry=off`
-  are the default's trees before the rule of symmetric pairs.  The table `EXTENDED` does the same for the extended
-  problem with nothing open, Π⁺(∅), without the claims of `unzip`, whose search must also be the default engine's on
-  the same problem, node for node; with the claims, Π⁺(∅) must pose the default problem itself and reproduce every row
-  of the default table, node for node.
+  are the default's trees before the rule of symmetric pairs.
 
   **A change that alters the tree on purpose fails them.**  Run `cargo test --release --test tripwires -- --nocapture`
   (the quick tests check only the rows of trees of 250 nodes or fewer): it prints the rows as observed, in the layout of
   the table at the top of the file.  Check that the promotion sums (the answers) have not moved, paste the rows in, and
   update any node counts quoted in the docs.
-* **Extended mode** ([Extended mode: one-sided candidates](extended-mode.md)):
-  * the model with one-sided candidates against the extended problem's reference predicate on every game 2..=300, for
-    nothing open, every source of three or more prime factors open (to 120) and five random sets of them
-    (`tests/model_extended.rs`: sets promoted at once and one by one in random orders, their conflicts and nogoods, the
-    narrowing and the count);
-  * its search against the whole-board oracle on every game to 80 (to 60 with every such source open, 69 ignored);
-  * the GF(2) bound's free blocks: the intersection against brute force with one-sided elements, every promotion set of
-    the games to 120 independent and under the bound, and random paths to 1300 matching the levels built afresh at every
-    node;
-  * the soundness harness in extended mode on every game 2..=300 under six configurations (the default tactics of
-    extended mode, on one thread and two, forgetting every step, without forced members, without nogoods, and with
-    conflict branching at every check), and a game resumed every 1,000 nodes;
-  * the header's digest of the one-sided candidates, and the refusals of what extended mode cannot take (tactics, block
-    words, another problem's checkpoint).
-* **Certificates** (`tests/certify.rs`):
-  * `taxman certify`: every game of 600..=1300 that needs a certificate certified (ignored; a sample by default), and
-    some past 1300; a planted wrong score beaten by a game the referee accepts, with the status 2 and the
-    counterexample file, and said again by a rerun; a certificate's search stopped every 1,000 nodes and resumed to the
-    same verdict; the games a certificate cannot be made for refused; the file of certificates and the bounds' files
-    read as they should be; `--list` certifying the games of a file in its order;
-  * `taxman verify-certificates`: a file that `certify` wrote over 1312..=1317 (three games that rest on the game before
-    them) passes, on one thread and on two, with the summary's counts and the committed prover files' proven end of the
-    chain.  Each doctored line (another digest, score, open members or width; a `same_problem` with nothing to rest on,
-    or with its numbers changed; a certified line with a counterexample; a `build` without a commit; a score the
-    results do not have) is refused, naming the line.  A beaten line is verified with its counterexample, and cannot
-    stand beside a certified one.  The end of the chain is checked on synthetic data (a gap stops what rests on it) and
-    on the committed chain;
-  * the two formulations: a line records its formulation, and an old line reads as without the claims.  The rule
-    settles the same pairs in each formulation and across them (a certificate of one settles a later game in the
-    other, with the digest of the problem in the run's formulation, and as a search of the game does).  The claims
-    change the problems of 231 of the 377 games of 600..=1300 that need a certificate, and none of their sizes, and make
-    the rule settle 101 games where it settled 81 (609 and 611, say, pose different problems without the claims and one
-    with them).  A file that mixes the formulations passes, and a line whose formulation is changed is refused.
 * **Engine** (`tests/engine.rs`, `tests/robustness.rs`, `tests/stop_signal.rs`):
   * a toy problem with a known answer (knapsack, against dynamic programming), run with 1 and many threads, with a tiny
     `queue_mem_cap` to force spilling, and killed and resumed from checkpoints, gives the same answer.  Ignored tests do
@@ -321,7 +280,7 @@ the computations behind the statements that are not proved are in [evidence.md](
 | F1, F3, F6 | The census of every board 2..8191 (above): its check A, that each frame lies in one layer and the frames in front of it one layer down, and its check C, clean numbering; the unit tests of `frames` (above). |
 | F4 | `tests/bottom_layers.rs` (above). |
 | X1 to X7 | `tests/model_exact.rs` (above), and the census's checks D to G: no candidate has a back claim's factor among its maximal factors (X5), none is a factor of a frame numbered 0 and every one has a home (X3, X6), and the sources played are the U\* of `src/root_problem.rs` (X1); check I and `tests/canonical_root.rs` (above), that setup builds Π_n. |
-| E1 to E6 | `tests/model_extended.rs`, extended mode and the certificates (above), and the census's check H: Π⁺(∅) with the claims is Π_n (E5). |
+| E5 | The census's check H (above): Π⁺(∅) with the claims is Π_n. |
 | B1, B4 | The study of the multi-field bound ([its entry](https://github.com/bvchess/taxman-notebook/blob/main/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md); its programs build at commit 8753189): every promotion set of the boards with at most 22 candidates, and sampled ones of the boards 137..400, independent under the plain signing and five random signings over GF(3) of every frame, 6.4 million pairs, and 14,472 of every 25th board of 400..2175 in 4,320 signed frames; the decomposition bound never below P\* under random multipliers at 309 roots of 2..400 and at 400..2175. |
-| B2, B3 | The GF(2) bound under bound soundness, and its free blocks under extended mode (above).  At every root of 2..1300 that is not prime the bound is at least P\*, and every promotion set of the 90 roots with at most 22 candidates is independent in every frame ([matroid intersection bounds](https://github.com/bvchess/taxman-notebook/blob/main/search/matroid-intersection-bounds-2026-10/README.md)). |
+| B2 | The GF(2) bound under bound soundness (above).  At every root of 2..1300 that is not prime the bound is at least P\*, and every promotion set of the 90 roots with at most 22 candidates is independent in every frame ([matroid intersection bounds](https://github.com/bvchess/taxman-notebook/blob/main/search/matroid-intersection-bounds-2026-10/README.md)). |
 | R2, R3, R5, R7 | The prime exchanges and the near-repeat cut under bound soundness, the soundness harness, the floor, and the tripwires (above). |

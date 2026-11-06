@@ -164,25 +164,6 @@ impl SearchTactics {
         }
     }
 
-    /// The tactics of *extended mode*, a search of a problem with one-sided candidates (the extended problem's,
-    /// `crate::frames::build_extended`): the default without the rule of symmetric pairs, which such a search refuses
-    /// ([`refusal_with_one_sided`](Self::refusal_with_one_sided)).
-    pub fn extended() -> Self {
-        SearchTactics { symmetry: false, ..SearchTactics::default() }
-    }
-
-    /// Why these tactics cannot search a problem with one-sided candidates, if they cannot: such a search refuses the
-    /// rule of symmetric pairs (`symmetry`: the prime-exchange theorem (R2, docs/theory/search-rules.md) is proven for
-    /// the frame model, and for the extended problem would need each prime exchange to map the one-sided candidates of
-    /// each frame onto themselves, which nothing checks yet).
-    pub fn refusal_with_one_sided(&self) -> Option<String> {
-        self.symmetry.then(|| {
-            "a search with one-sided candidates (extended mode) cannot run with symmetry=on (the prime-exchange \
-             theorem, R2, is not proven for them)"
-                .to_owned()
-        })
-    }
-
     /// The tactics as the header of a checkpoint records them: one bit for each switch that is on, `fix_forced` (bit
     /// 0), `nogoods` (1), `forget_nogoods` (2), `symmetry` (3), `conflict_branching` (4), `conflict_look` (5),
     /// `near_repeat` (6), `price_reuse` (7), `carried_nogoods` (8) and `warm_start` (9); the defaults are `0x2FF`.

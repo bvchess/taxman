@@ -34,8 +34,7 @@
 //! Why each is needed: a set holding a number that is no candidate of Π_M is no promotion set of it, though Π_M's model
 //! may promote it (22 at n = 98); a promoted number with another home in Π_M would change frames that the check did not
 //! compare; and provisional moves for M bound nothing.  The cut drops only nodes none of whose completions beats the
-//! incumbent, as a bound does, so the search stays exact; it learns nothing.  It does not treat the one-sided
-//! candidates of the extended problem, and is never set up for a problem that has them.
+//! incumbent, as a bound does, so the search stays exact; it learns nothing.
 
 use super::setup::Prepared;
 use crate::bits::Bits;
@@ -65,20 +64,12 @@ pub struct NearRepeat<const W: usize> {
 impl<const W: usize> NearRepeat<W> {
     /// The cut of a search of `n` by the game of `m`, both set up as [`prepare`](super::prepare) sets a game up, with
     /// `bound`, a proven bound of the best promotion sum of `m`'s problem.
-    ///
-    /// # Errors
-    ///
-    /// If either problem has one-sided candidates, which the cut does not treat.
-    pub fn new(n: &Prepared<W>, m: &Prepared<W>, bound: u64) -> Result<Self, String> {
+    pub fn new(n: &Prepared<W>, m: &Prepared<W>, bound: u64) -> Self {
         Self::of(&n.model, &n.candidates, Arc::clone(&m.model), m.root, &m.candidates, bound)
     }
 
     /// [`new`](Self::new) from the parts of the two problems: Π_N's model and candidates, Π_M's model, root and
     /// candidates, and `bound`, a proven bound of P\*(Π_M).
-    ///
-    /// # Errors
-    ///
-    /// As [`new`](Self::new)'s.
     pub fn of(
         n_model: &FrameGraph,
         n_candidates: &Bits<W>,
@@ -86,17 +77,14 @@ impl<const W: usize> NearRepeat<W> {
         m_root: FrameSet<W>,
         m_candidates: &Bits<W>,
         bound: u64,
-    ) -> Result<Self, String> {
-        if n_model.has_one_sided() || m_model.has_one_sided() {
-            return Err("the near-repeat cut does not treat the one-sided candidates of the extended problem".into());
-        }
+    ) -> Self {
         let marked = *n_candidates & *m_candidates;
         let same_home: Bits<W> = marked.iter().filter(|&x| n_model.home(x) == m_model.home(x)).collect();
         let mut by_home = [Bits::EMPTY; MAX_FRAMES];
         for x in same_home.iter() {
             by_home[n_model.home(x)].insert(x);
         }
-        Ok(NearRepeat { model: m_model, root: m_root, marked, same_home, by_home, bound, cut: AtomicU64::new(0) })
+        NearRepeat { model: m_model, root: m_root, marked, same_home, by_home, bound, cut: AtomicU64::new(0) }
     }
 
     /// The same cut, with a count of its own of the nodes it cut (none yet): for searches beside the search that has

@@ -72,12 +72,5 @@ What the programs' answers rest on:
   (X7)](theory/exactness.md#the-exactness-theorem) makes the answer the best score of a game that plays U\*.  The
   corollary of U (X8), which uses [the bottom-layers theorem (F4)](theory/frame-model.md#the-bottom-layers-theorem) for
   layers 1 and 2, makes it opt(n) exactly when U holds at n.  A repeat, and every upper bound it carries between games,
-  needs U at the games it passes through.
-* **The certificates of U** apply [the certificate theorem (E2)](theory/extended-problem.md#the-certificate-theorem):
-  [the barred bound (W2)](theory/parity-bound.md#the-barred-bound) certifies most members of U\*_{≥3}, and a search of
-  the extended problem, by [the state lemma (R1)](theory/search-rules.md#the-state-lemma), the dual-bound and floor
-  lemmas (R4, R5) and [the frame bound for the extended problem
-  (B3)](theory/frame-bounds.md#the-frame-bound-for-the-extended-problem), finds nothing above the score.  A search
-  stopped at the ceiling (E3) rests also on the recorded score of game n − 1.  A game that the prover or a certificate
-  has proven does not rest on U; [results/README.md](../results/README.md#what-supports-the-scores) says which games
-  those are.
+  needs U at the games it passes through.  A game that the prover has proven does not rest on U;
+  [results/README.md](../results/README.md#what-supports-the-scores) says which games those are.

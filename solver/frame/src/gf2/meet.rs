@@ -3981,70 +3981,16 @@ mod tests {
         Owned { block, vector, weight }
     }
 
-    /// A random problem like [`random`], some of whose elements are one-sided as the extended problem's candidates are:
-    /// in one matroid such an element has a random vector in a random block, and in the other it has a coordinate of
-    /// its own, independent of everything there: its own unit vector in one of one or two *free blocks* appended after
-    /// that matroid's random blocks, where no other element has that coordinate.  There are between one and `n` of
-    /// them; they are the heaviest elements if `last` (as the search orders them) and otherwise at random places of
-    /// the weight order, which the solver must not care about.  Returns the problem and which elements are one-sided.
-    fn random_one_sided(rng: &mut Rng, n: usize, dim: u64, last: bool) -> (Owned<1>, Vec<bool>) {
-        let blocks = [1 + rng.below(3) as usize, 1 + rng.below(3) as usize];
-        let free = [1 + rng.below(2) as usize, 1 + rng.below(2) as usize];
-        let dims: [Vec<u64>; 2] = blocks.map(|b| (0..b).map(|_| 1 + rng.below(dim)).collect());
-        let count = 1 + rng.below(n as u64) as usize;
-        let mut places: Vec<usize> = (0..n).collect();
-        if !last {
-            for i in (1..n).rev() {
-                places.swap(i, rng.below(i as u64 + 1) as usize);
-            }
-        }
-        let mut one_sided = vec![false; n];
-        for &e in &places[n - count..] {
-            one_sided[e] = true;
-        }
-        let mut block = [Vec::new(), Vec::new()];
-        let mut vector = [Vec::new(), Vec::new()];
-        let mut coloops = [[0u32; 2]; 2];
-        for &is_one_sided in &one_sided {
-            // The side of the element's own frame, the other being the one where it has a coordinate of its own.
-            let own = rng.below(2) as usize;
-            for m in 0..2 {
-                if is_one_sided && m != own {
-                    let at = rng.below(free[m] as u64) as usize;
-                    block[m].push((blocks[m] + at) as u8);
-                    vector[m].push([1 << coloops[m][at]]);
-                    coloops[m][at] += 1;
-                } else {
-                    let b = rng.below(blocks[m] as u64) as usize;
-                    block[m].push(b as u8);
-                    vector[m].push([rng.below(1 << dims[m][b])]);
-                }
-            }
-        }
-        let mut weight: Vec<i64> = (0..n).map(|_| 1 + rng.below(30) as i64).collect();
-        weight.sort_unstable();
-        (Owned { block, vector, weight }, one_sided)
-    }
-
     /// What the checks of a problem count, so that the tests can see that they met what they were meant to.
     #[derive(Default)]
     struct Counts {
-        /// Warm starts, those whose start holds a one-sided element or whose deleted element is one, weight splits, and
-        /// the loss of the smaller sets that was exactly the brute-force loss.
+        /// Warm starts, weight splits, and the loss of the smaller sets that was exactly the brute-force loss.
         warm: usize,
-        warm_with_one_sided: usize,
         splits: usize,
         exact_losses: usize,
-        /// Heaviest sets of all sizes, and those that hold a one-sided element (one with a coordinate of its own in one
-        /// matroid).
-        heaviest: usize,
-        heaviest_with_one_sided: usize,
-        /// Members of the heaviest set that the bound without a member was asked for, and those it certified; of
-        /// each, the ones that were one-sided.
+        /// Members of the heaviest set that the bound without a member was asked for, and those it certified.
         asked: usize,
         certified: usize,
-        asked_one_sided: usize,
-        certified_one_sided: usize,
         /// Heaviest sets without a member of every size ([`Meet::without_any_size`]), with some elements banned, and of
         /// another size than the heaviest set's: smaller and larger.
         any_size: usize,
@@ -4083,21 +4029,13 @@ mod tests {
 
     /// The checks of the intersection on one problem, against brute force: the heaviest set under every size limit,
     /// from the empty start and from every set a solve reported (dominant), with a member deleted; and the split's
-    /// bound without each member.  `one_sided` says which elements are one-sided (none, for [`random`]'s problems); it
-    /// only decides what `counts` counts, the checks being the same for all.
-    fn check_warm_starts_and_split(
-        rng: &mut Rng,
-        owned: &Owned<1>,
-        one_sided: &[bool],
-        trial: usize,
-        counts: &mut Counts,
-    ) {
+    /// bound without each member.
+    fn check_warm_starts_and_split(rng: &mut Rng, owned: &Owned<1>, trial: usize, counts: &mut Counts) {
         let n = owned.weight.len();
         let p = owned.problem();
         let ([ba, bb], [va, vb]) = (&owned.block, &owned.vector);
         let mut meet = Meet::<1>::new(n, owned.blocks());
         let live: Vec<u32> = (0..n as u32).collect();
-        let holds_one_sided = |set: &[u32]| set.iter().any(|&e| one_sided[e as usize]);
         for cap in 0..=n {
             let mut reported = Vec::new();
             meet.solve(&p, &live, &[], cap, i64::MAX, |set| reported.push(set.to_vec()));
@@ -4111,8 +4049,6 @@ mod tests {
             if cap < n {
                 continue;
             }
-            counts.heaviest += 1;
-            counts.heaviest_with_one_sided += usize::from(holds_one_sided(&chosen));
             // The split, with no size limit.
             let value = meet.value;
             let mut bounds = Vec::new();
@@ -4141,7 +4077,6 @@ mod tests {
                     assert!(meet.value <= truth && (meet.stopped == (meet.value >= stop)), "trial {trial}");
                     assert!(meet.stopped || meet.value == truth, "trial {trial}: stop {stop}");
                     counts.warm += 1;
-                    counts.warm_with_one_sided += usize::from(holds_one_sided(set) || one_sided[d as usize]);
                 }
             }
         }
@@ -4150,9 +4085,8 @@ mod tests {
     /// The checks of the loss of the smaller sets ([`Meet::smaller_loss`], against the heaviest set one smaller, by
     /// brute force) and of the larger ones ([`Meet::gap`]), and of the heaviest set without each member of the
     /// heaviest set read off its exchange graph where they certify it ([`Meet::without`]), under every size limit from
-    /// the heaviest set's size up, on one problem, against brute force.  `one_sided` is as for
-    /// [`check_warm_starts_and_split`].
-    fn check_heaviest_set_without_a_member(owned: &Owned<1>, one_sided: &[bool], trial: usize, counts: &mut Counts) {
+    /// the heaviest set's size up, on one problem, against brute force.
+    fn check_heaviest_set_without_a_member(owned: &Owned<1>, trial: usize, counts: &mut Counts) {
         let n = owned.weight.len();
         let p = owned.problem();
         let mut meet = Meet::<1>::new(n, owned.blocks());
@@ -4161,8 +4095,6 @@ mod tests {
         let members: Vec<u32> = live.iter().copied().filter(|&e| meet.contains(e)).collect();
         let size = members.len();
         assert!(meet.settled && meet.split_bounds(&p, &live, |_, _| {}), "trial {trial}: no split");
-        counts.heaviest += 1;
-        counts.heaviest_with_one_sided += usize::from(members.iter().any(|&e| one_sided[e as usize]));
         let pot = meet.potentials().to_vec();
         let loss = meet.smaller_loss(&p, &pot);
         if size == 0 {
@@ -4190,10 +4122,8 @@ mod tests {
             let limit = if cap > size { loss.min(gap) } else { loss };
             for &x in &members {
                 counts.asked += 1;
-                counts.asked_one_sided += usize::from(one_sided[x as usize]);
                 if let Some(value) = meet.without(&p, &pot, x, limit, &[]) {
                     counts.certified += 1;
-                    counts.certified_one_sided += usize::from(one_sided[x as usize]);
                     let rest: Vec<u32> = live.iter().copied().filter(|&e| e != x).collect();
                     assert_eq!(value, brute(&p, &rest, cap), "trial {trial}: without {x}, at most {cap}");
                 }
@@ -4290,50 +4220,11 @@ mod tests {
         for trial in 0..trials {
             let n = 1 + rng.below(11) as usize;
             let owned = random(&mut rng, n, 5);
-            check_warm_starts_and_split(&mut rng, &owned, &vec![false; n], trial, &mut counts);
+            check_warm_starts_and_split(&mut rng, &owned, trial, &mut counts);
         }
         let Counts { warm, splits, .. } = counts;
         let at_least = |count: usize, most: usize| count * 100 >= most * percent;
         assert!(at_least(warm, 10_000) && at_least(splits, 2_000), "{warm} warm starts, {splits} splits");
-    }
-
-    /// The same checks on problems with one-sided elements, whose own coordinates are in free blocks after the random
-    /// blocks of the other matroid (see [`random_one_sided`]), at the end of the weight order and at random places in
-    /// it: the solver, which knows blocks and not frames, must find the heaviest sets, split and warm-start as it does
-    /// without them.  Many of the heaviest sets must hold one-sided elements, and many of the warm starts start from,
-    /// or delete, one.
-    #[test]
-    #[cfg_attr(
-        debug_assertions,
-        ignore = "long: the quick check is some_intersection_warm_starts_and_splits_with_free_blocks_against_brute_force"
-    )]
-    fn intersection_warm_starts_and_split_with_free_blocks_against_brute_force() {
-        warm_starts_and_split_with_free_blocks(3000, 100);
-    }
-
-    /// [`intersection_warm_starts_and_split_with_free_blocks_against_brute_force`] for the first 100 problems.
-    #[test]
-    fn some_intersection_warm_starts_and_splits_with_free_blocks_against_brute_force() {
-        warm_starts_and_split_with_free_blocks(100, 2);
-    }
-
-    /// The first `trials` problems of [`intersection_warm_starts_and_split_with_free_blocks_against_brute_force`],
-    /// which must reach `percent` percent of the counts that it asks.
-    fn warm_starts_and_split_with_free_blocks(trials: usize, percent: usize) {
-        let mut rng = Rng(0x51DE_D00D_0F5E_ED01);
-        let mut counts = Counts::default();
-        for trial in 0..trials {
-            let n = 1 + rng.below(11) as usize;
-            let (owned, one_sided) = random_one_sided(&mut rng, n, 5, trial % 2 == 0);
-            check_warm_starts_and_split(&mut rng, &owned, &one_sided, trial, &mut counts);
-        }
-        let Counts { warm, splits, heaviest, heaviest_with_one_sided, warm_with_one_sided, .. } = counts;
-        println!("{heaviest} problems, {heaviest_with_one_sided} with a one-sided element in the heaviest set");
-        println!("{warm} warm starts, {warm_with_one_sided} from or without a one-sided element, {splits} splits");
-        let at_least = |count: usize, most: usize| count * 100 >= most * percent;
-        assert!(at_least(warm, 10_000) && at_least(splits, 2_000), "{warm} warm starts, {splits} splits");
-        assert!(heaviest_with_one_sided > heaviest / 2, "{heaviest_with_one_sided} of {heaviest} heaviest sets");
-        assert!(warm_with_one_sided > warm / 2, "{warm_with_one_sided} of {warm} warm starts");
     }
 
     /// The loss of the smaller sets ([`Meet::smaller_loss`], against the heaviest set one smaller, by brute force)
@@ -4363,7 +4254,7 @@ mod tests {
         for trial in 0..trials {
             let n = 2 + rng.below(10) as usize;
             let owned = random(&mut rng, n, 4);
-            check_heaviest_set_without_a_member(&owned, &vec![false; n], trial, &mut counts);
+            check_heaviest_set_without_a_member(&owned, trial, &mut counts);
         }
         let Counts { exact_losses, asked, certified, .. } = counts;
         let at_least = |count: usize, most: usize| count * 100 >= most * percent;
@@ -4376,25 +4267,6 @@ mod tests {
         assert!(any_size_smaller > any_size / 20 && any_size_larger > 0, "{any_size_smaller} {any_size_larger}");
     }
 
-    /// The same checks on problems with one-sided elements, as for the warm starts above.  The heaviest sets must hold
-    /// one-sided elements, and the bounds without a member must be asked for, and certified for, one-sided members.
-    #[test]
-    #[cfg_attr(
-        debug_assertions,
-        ignore = "long: the quick check is the_heaviest_set_without_a_member_of_some_problems_with_free_blocks_against_brute_force"
-    )]
-    fn heaviest_set_without_a_member_with_free_blocks_against_brute_force() {
-        heaviest_set_without_a_member_with_free_blocks(4000, 100);
-    }
-
-    /// [`heaviest_set_without_a_member_with_free_blocks_against_brute_force`] for the first 120 problems.
-    #[test]
-    fn the_heaviest_set_without_a_member_of_some_problems_with_free_blocks_against_brute_force() {
-        heaviest_set_without_a_member_with_free_blocks(120, 2);
-    }
-
-    /// The first `trials` problems of [`heaviest_set_without_a_member_with_free_blocks_against_brute_force`], which must
-    /// reach `percent` percent of the counts that it asks.
     /// On random problems of one to three blocks a matroid, with tied weights, for each member `x` of the heaviest
     /// set: its least arcs out and in ([`Meet::opening_length`], [`Meet::closing_lengths`]) are those of the arcs of
     /// the exchange graph found one by one (`x → y` where `I − x + y` is independent in A, `y → x` where it is in B);
@@ -4460,26 +4332,6 @@ mod tests {
         }
         println!("{members} members, {found} cycles within a limit, {cut} limits below the least arcs");
         assert!(members > 500 && found > 500 && cut > 500, "{members} {found} {cut}");
-    }
-
-    fn heaviest_set_without_a_member_with_free_blocks(trials: usize, percent: usize) {
-        let mut rng = Rng(0x7A3C_91E5_B0D2_4F68);
-        let mut counts = Counts::default();
-        for trial in 0..trials {
-            let n = 2 + rng.below(10) as usize;
-            let (owned, one_sided) = random_one_sided(&mut rng, n, 4, trial % 2 == 0);
-            check_heaviest_set_without_a_member(&owned, &one_sided, trial, &mut counts);
-        }
-        let Counts { heaviest, heaviest_with_one_sided, exact_losses, asked, certified, .. } = counts;
-        let (asked_one_sided, certified_one_sided) = (counts.asked_one_sided, counts.certified_one_sided);
-        println!("{heaviest} problems, {heaviest_with_one_sided} with a one-sided element in the heaviest set");
-        println!("{certified} of {asked} certified, {certified_one_sided} of {asked_one_sided} for one-sided members");
-        let at_least = |count: usize, most: usize| count * 100 >= most * percent;
-        assert!(heaviest_with_one_sided > heaviest / 2, "{heaviest_with_one_sided} of {heaviest} heaviest sets");
-        assert!(at_least(exact_losses, 3000), "{exact_losses} exact losses");
-        assert!(at_least(asked, 10_000) && certified > asked / 6, "{certified} of {asked} certified");
-        assert!(asked_one_sided > asked / 4, "{asked_one_sided} of {asked} asked about are one-sided");
-        assert!(certified_one_sided > asked_one_sided / 8, "{certified_one_sided} of {asked_one_sided} certified");
     }
 
     /// What a workspace computes from one problem, as numbers: the solve's value, whether it split, the split's bounds

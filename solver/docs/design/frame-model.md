@@ -153,32 +153,8 @@ chain reach.  The prover ([its README](../../noframe/README.md)) is a separate p
 [the section on its proofs](../../noframe/docs/proofs.md) lists the facts that they use.
 
 Past the prover's proofs, the committed lines are proven within the frame model, so each is opt(n) wherever U holds at
-n.  Proving U at such an n takes two steps, which the command `taxman certify` combines game by game
-([certificates.md](certificates.md)); [results/README.md](../../../results/README.md#certificates) says which games have
-certificates.
-
-First, the prover's [barred bounds](../../../docs/GLOSSARY.md#bounds) settle most members of U\*: each member that a
-barred bound certifies is played by every set of moves that beats the recorded score and obeys the bottom-layers
-theorem, and the members it does not certify are *open*.  It certifies most members in each game, within the prover's
-proofs and past them, but closes no game alone
-([solver/noframe/docs/proofs.md](../../noframe/docs/proofs.md#the-upper-part-game-by-game) has the method, and [the
-entry](https://github.com/bvchess/taxman-notebook/blob/main/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md)
-the shares).
-
-Second, a search settles the open members.  It is the search of the [extended
-problem](../../../docs/GLOSSARY.md#the-frame-model) Π⁺(O), with the set O of open members optional ([the extended
-exactness theorem (E1)](../../../docs/theory/extended-problem.md#the-extended-exactness-theorem);
-`frames::build_extended`, research code).  The extended problem is exact like Π_n, so a search of it that finds nothing
-better, with the other members certified, proves opt(n) on the whole board.  The search takes the open members as
-one-sided candidates ([extended-mode.md](extended-mode.md); `Board::prepare_extended_with`).
-
-Details of the extended problem: it keeps the claims of `unzip` that [the kept-claims lemma
-(E4)](../../../docs/theory/extended-problem.md#the-kept-claims-lemma) allows.  With nothing open that is all of them, so
-Π⁺(∅) is Π_n itself.  Without the claims, Π⁺(∅) is the frame model with them put back (the example `extended
---no-claims`, removed since).  A hunt for a counterexample on the boards without each open member, the example `hunt`,
-was prepared and never run.  It is removed from master, and [its
-entry](https://github.com/bvchess/taxman-notebook/blob/main/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md)
-says where it builds ("the program removed from master").
+n.  The theory has a way to prove U at such an n, by a search of [the extended
+problem](../../../docs/theory/extended-problem.md); no program of this repository carries it out.
 
 What each kind of proof needs of the frame model, beyond the code's correctness and the games before it:
 
@@ -195,7 +171,6 @@ The tests tie the theorems to the code:
 
 * `tests/model_exact.rs` checks the exactness theorem (X7) both ways, on every set of every board to 100 and on random
   sets to 8191, against a playability oracle that shares no code with `frames` or `model`.
-* `tests/model_extended.rs` checks the extended exactness theorem (E1) the same way, with sources open.
 * `tests/bottom_layers.rs` checks the bottom-layers theorem (F4) on every recorded and enumerated optimal set.
 * Two exhaustive searches agree with the frame model's games on small boards: `brute`, the solver's own, to 40 in the
   test suite, and `heuristics/evaluation/certify.py`, to 62.

@@ -73,7 +73,6 @@
 //! | | [`results`] | what a result line records about its proof kind, and the checks a results file passes |
 //! | | [`store`] | the bounds store: the line and the file the ledger keeps its bounds in, and the relations between boards |
 //! | | [`known`] | the known moves `solve --use-prev` draws on: the table, the committed chain, the bounds store |
-//! | | [`certify`] | `taxman certify`: a recorded score proven on the whole board; `certify::verify` checks them |
 //! | | [`paths`] | where the default files are, found at run time |
 //! | studies | [`brute`] | exhaustive search without the frame model, to certify small boards |
 //! | | [`root_problem`] | the theory's root problem Π_n, built without the frames code, to check setup against |
@@ -88,7 +87,6 @@ pub mod bits;
 pub mod board;
 pub mod bounds;
 pub mod brute;
-pub mod certify;
 pub mod engine;
 pub mod frames;
 pub mod game;

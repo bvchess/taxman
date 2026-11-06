@@ -3,9 +3,7 @@
 //! The subcommands are in `commands.rs`; the flag parser, the error type and the output macros they share are in
 //! `cli.rs`.  Every subcommand is a plain function of the arguments after its name.  A command
 //! that fails prints `error: ...` and exits with status 1; a bad command line prints the usage and exits with
-//! status 2; a run that SIGINT or SIGTERM stopped (see `solve`) exits with 128 plus the signal; `certify` exits with
-//! status 2 when it finds moves that beat a recorded score.  `verify-certificates` fails with status 1 on the first
-//! line that is not what it says.
+//! status 2; a run that SIGINT or SIGTERM stopped (see `solve`) exits with 128 plus the signal.
 
 mod cli;
 mod commands;
@@ -89,31 +87,6 @@ commands:
                           in .gz is read through the gzip decoder (the committed results are one).  K threads set up the
                           searches of the repeats (default: all CPUs).  A line that cites a known source is checked
                           against the built-in table, the committed chain and the bounds store of results
-  certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE [options]
-                          prove the recorded scores of A..B (or of the boards of the list FILE, one n a
-                          line in the order to certify them, blank lines and # comments skipped) that rest on the
-                          frame model on the whole board, game by game: the extended problem with the open
-                          members of the barred bounds (--upper, the prover's `upper` files) optional, searched
-                          from the recorded moves (--results, over the built-in table; a .gz file is read as gzip);
-                          one line a game in --out, certified or beaten; a game whose extended problem an
-                          earlier certified game of the last 8 games posed is certified without a search
-                          (same_problem); moves that beat the score are also written to
-                          OUT.counterexample.jsonl and the run exits with status 2.
-                          Options: --threads K, --checkpoint-dir DIR, --checkpoint-interval S, --progress S,
-                          --time-limit S, --node-limit N, --mem-cap UNITS, --background, as for solve; --no-claims,
-                          search the extended problem without the claims of `unzip` (the formulation of the
-                          certificates made before the kept-claims lemma, E4; the default keeps the claims it
-                          allows).  A rerun skips the games --out has a verdict for and resumes a stopped search
-                          from its checkpoint
-  verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]
-                          check the files of certificates `certify --out` wrote, without changing them: every
-                          line against the recorded moves, the barred bounds and the extended problem set up
-                          again, the games that rest on one another, and the counterexample files beside them;
-                          the first line to fail ends it with status 1 (that a search explored its whole tree is
-                          taken on trust).  Then says how far the proofs of the recorded scores reach: every
-                          game to some board is proven by the prover (--exact, default every exact_*.jsonl of
-                          solver/noframe/data), by a certificate, or by a ceiling above a proven game.  K threads
-                          set the problems up (default: all CPUs)
   tables N K...           print the maximal factors and composites of each K on the board 1..=N
   help                    show this message
 ";
@@ -150,10 +123,6 @@ fn main() -> ExitCode {
             errln!("error: {message}");
             ExitCode::FAILURE
         }
-        Err(CliError::Counterexample(message)) => {
-            errln!("counterexample: {message}");
-            ExitCode::from(2)
-        }
     }
 }
 
@@ -170,8 +139,6 @@ fn run(args: &[String]) -> CliResult {
         "regress" => commands::regress(rest),
         "verify-results" => commands::verify_results(rest),
         "tables" => commands::tables(rest),
-        "certify" => commands::certify(rest),
-        "verify-certificates" => commands::verify_certificates(rest),
         other => Err(CliError::Usage(format!("unknown command {other:?}"))),
     }
 }

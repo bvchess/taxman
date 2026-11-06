@@ -3,25 +3,18 @@
 //!
 //! The Java bounds every node with a bound of its own and filters the candidates of a child with a preclusion table and
 //! promotability checks.  Here a bound over the node's candidates bounds every node (the GF(2) bound, [`crate::gf2`]),
-//! the conflicts it finds take the place of the checks, and a child's candidates are only narrowed to the frames that still have freedoms
-//! ([`FrameGraph::narrow`]: [`FrameSet::narrow_candidates`], and the one-sided candidates of the extended problem whose
-//! own frame has a freedom).
+//! the conflicts it finds take the place of the checks, and a child's candidates are only narrowed to the frames that
+//! still have freedoms ([`FrameSet::narrow_candidates`]).
 
 use crate::bits::Bits;
 use crate::model::{FrameGraph, FrameSet, Scratch};
 
 /// How many more promotions a node can make, given the overall limit `max_total`, the promotions made so far, and the
 /// candidates left; never negative.  (A count: the bound on the number of further promotions that the freedoms give,
-/// see [`FrameSet::max_promotions`] and [`FrameGraph::max_promotions_among`].)
+/// see [`FrameSet::max_promotions`].)
 #[inline]
-pub fn max_additional<const W: usize>(
-    model: &FrameGraph,
-    max_total: u32,
-    state: &FrameSet<W>,
-    promoted: &Bits<W>,
-    cands: &Bits<W>,
-) -> u32 {
-    let by_state = model.max_promotions_among(state, cands).max(0) as u32;
+pub fn max_additional<const W: usize>(max_total: u32, state: &FrameSet<W>, promoted: &Bits<W>, cands: &Bits<W>) -> u32 {
+    let by_state = state.max_promotions_among(cands).max(0) as u32;
     max_total.saturating_sub(promoted.len()).min(by_state)
 }
 
@@ -35,7 +28,7 @@ pub fn greedy<const W: usize>(model: &FrameGraph, root: &FrameSet<W>, cands: &Bi
     let mut next = cands.max();
     while let Some(n) = next {
         if model.promote_in_place_using(&mut scratch, &mut state, n) {
-            cands = model.narrow(&state, &cands);
+            cands = state.narrow_candidates(&cands);
             promoted.insert(n);
         }
         next = cands.max_below(n);
@@ -84,7 +77,7 @@ mod tests {
         let max_total = root.max_promotions_among(&cands) as u32;
         assert_eq!(max_total, 3);
         let none = Bits::EMPTY;
-        assert_eq!(max_additional(&model, max_total, &root, &none, &cands), 3);
-        assert_eq!(max_additional(&model, 2, &root, &Bits::from_slice(&[42, 40, 28]), &cands), 0);
+        assert_eq!(max_additional(max_total, &root, &none, &cands), 3);
+        assert_eq!(max_additional(2, &root, &Bits::from_slice(&[42, 40, 28]), &cands), 0);
     }
 }

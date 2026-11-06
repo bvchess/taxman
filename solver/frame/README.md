@@ -127,8 +127,8 @@ the search prunes nothing that could win, since every [tactic](../../docs/GLOSSA
 and, for some proof kinds, the moves for n − 1 are optimal, so a [chain](../../docs/GLOSSARY.md#results-and-trust) of
 moves from n = 1 is proven game by game.  So a result rests on nothing but U, where the way it was proven uses the frame
 model; the correctness of the code; and, where its proof kind says so, the moves it was built from.  U is open in
-general.  It holds at every game the [prover](../noframe/README.md) has proven, and `taxman certify` checks it game by
-game past them.  [solver/docs/design/frame-model.md, “What "optimal"
+general.  It holds at every game the [prover](../noframe/README.md) has proven.
+[solver/docs/design/frame-model.md, “What "optimal"
 means”](../docs/design/frame-model.md#what-optimal-means) explains each premise and what each proof kind needs of the
 model, [the reference](../docs/REFERENCE.md#4-why-the-answers-can-be-trusted) says how each result records what it rests
 on, and [results/README.md](../../results/README.md) counts the committed lines of each proof kind.

@@ -107,10 +107,7 @@ pub use incumbent::Neighborhood;
 pub use near_repeat::NearRepeat;
 pub use profile::{ProfilePlan, SearchProfile, DEPTH as PROFILE_DEPTH, MOST_IDS as PROFILE_MOST_IDS};
 pub use searcher::{stat, Found, SearchSpace, TaxSearcher, TaxUnit};
-pub use setup::{
-    extended_words, prepare, prepare_extended, prepare_extended_for_resume, prepare_for_resume, problem_of,
-    problem_of_extended, PrepareTimings, Prepared, Problem, ProblemSize,
-};
+pub use setup::{prepare, prepare_for_resume, problem_of, PrepareTimings, Prepared, Problem, ProblemSize};
 pub use tactics::SearchTactics;
 
 use crate::bits::Bits;

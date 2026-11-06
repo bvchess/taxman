@@ -9,9 +9,10 @@ promoted out of it its unit vector.  A promotion set makes these vectors linearl
 field: [the signed frame theorem (B1)](#the-signed-frame-theorem).  With every entry 1 over GF(2), the heaviest set of
 candidates independent in every frame, with no more members than the promotion limit, bounds the best promotion set, at
 the root and at every node of a search: [the frame bound (B2)](#the-frame-bound).  The same holds for the extended
-problem ([B3](#the-frame-bound-for-the-extended-problem)), whose searches make the certificates of [statement
-U](exactness.md#statement-u).  Proofs of scores rest on these three.  Two more results serve studies of stronger bounds,
-and no proof of a score rests on them: frames under other signings join the frame bound through Lagrange multipliers in
+problem ([B3](#the-frame-bound-for-the-extended-problem)), whose searches prove [statement
+U](exactness.md#statement-u) at a game.  Proofs of scores rest on these three.  Two more results serve studies of
+stronger bounds, and no proof of a score rests on them: frames under other signings join the frame bound through
+Lagrange multipliers in
 [the decomposition bound (B4)](#the-decomposition-bound), and over GF(3) the signings together lose nothing that
 winnability keeps ([the GF(3) proposition, B5](#the-gf3-proposition), explanatory).  A set of candidates is independent
 in every frame exactly when it is [independent at both parities](parity-bound.md#the-parity-vectors) together with U\*
@@ -226,7 +227,7 @@ there, and the bound is computed as the frame bound is.
    candidates of C.  ∎
 
 [The certificate theorem (E2)](extended-problem.md#the-certificate-theorem) searches Π⁺(O), and its search cuts by this
-bound ([solver/docs/design/extended-mode.md](../../solver/docs/design/extended-mode.md)).
+bound.
 
 ## The decomposition bound
 

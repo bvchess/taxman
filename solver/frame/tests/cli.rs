@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::{committed_results, path, taxman, TempDir};
+use common::{path, taxman, TempDir};
 use std::fs;
 use std::path::Path;
 use taxman::game::Optimal;
@@ -27,9 +27,6 @@ fn help_lists_the_commands_and_every_tactic() {
             "solve N|A-B",
             "regress",
             "verify-results [--threads K] FILE...",
-            "certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE",
-            "verify-certificates CERTS... --results FILE... --upper FILE...",
-            "--no-claims",
             "--finder-after NODES",
             "--finder-seconds S",
             "--gate GAP",
@@ -43,7 +40,9 @@ fn help_lists_the_commands_and_every_tactic() {
             assert!(run.stdout.contains(name), "{args:?}: the help does not name the tactic {name}");
         }
         // The results are checked by `verify-results`, which reads the committed file; no command writes the table.
-        for gone in ["verify-optimal", "extend-optimal", "strict.jsonl"] {
+        for gone in
+            ["verify-optimal", "extend-optimal", "strict.jsonl", "certify", "verify-certificates", "--no-claims"]
+        {
             assert!(!run.stdout.contains(gone), "{args:?}: the help still names {gone}");
         }
     }
@@ -80,178 +79,11 @@ fn bad_command_lines_are_usage_errors() {
     assert_usage_error(&["tables", "x", "5"], "N must be");
     assert_usage_error(&["verify-optimal"], "unknown command");
     assert_usage_error(&["extend-optimal"], "unknown command");
+    assert_usage_error(&["certify"], "unknown command");
+    assert_usage_error(&["verify-certificates"], "unknown command");
     assert_usage_error(&["verify-results"], "usage: verify-results [--threads K] FILE...");
     assert_usage_error(&["verify-results", "--threads", "0", "a"], "--threads must be at least 1");
     assert_usage_error(&["verify-results", "--tactic", "nogoods=on", "a"], "unknown option --tactic");
-}
-
-/// `certify` finds a bad command line before it opens a file or starts a search (the files named here do not exist):
-/// no range or more than one, a range that is none, a missing `--results`, `--upper` or `--out`, a flag it does not
-/// have (the search tactics are `solve`'s, not `certify`'s: its search is always the extended mode) and values that
-/// are no counts or limits.
-#[test]
-fn certify_command_lines_are_usage_errors() {
-    const USAGE: &str = "usage: certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE [options]";
-    let files = ["--results", "r.jsonl", "--upper", "u.jsonl", "--out", "o.jsonl"];
-    let with_files = |head: &[&'static str]| [head, &files[..]].concat();
-
-    // The range.
-    assert_usage_error(&["certify"], "certify takes one range A-B");
-    assert_usage_error(&with_files(&["certify"]), "certify takes one range A-B");
-    assert_usage_error(&with_files(&["certify", "1302", "1303"]), "certify takes one range A-B");
-    assert_usage_error(&with_files(&["certify", "x"]), "expected a game N or a range A-B");
-    assert_usage_error(&with_files(&["certify", "1302-"]), "expected a game N or a range A-B");
-    assert_usage_error(&with_files(&["certify", "1303-1302"]), "empty or starts below 1");
-    assert_usage_error(&with_files(&["certify", "0-5"]), "empty or starts below 1");
-
-    // The three files it cannot do without, each missing in turn; these also print the command's own usage line.
-    let missing = [
-        (
-            &["certify", "1302", "--upper", "u.jsonl", "--out", "o.jsonl"][..],
-            "certify needs --results FILE and --upper FILE",
-        ),
-        (
-            &["certify", "1302", "--results", "r.jsonl", "--out", "o.jsonl"],
-            "certify needs --results FILE and --upper FILE",
-        ),
-        (&["certify", "1302", "--results", "r.jsonl", "--upper", "u.jsonl"], "certify needs --out FILE"),
-    ];
-    for (args, message) in missing {
-        assert_usage_error(args, message);
-        assert_usage_error(args, USAGE);
-    }
-    assert_usage_error(
-        &["certify", "1302", "--results", "r.jsonl", "--upper", "u.jsonl", "--out"],
-        "--out needs a value",
-    );
-
-    // The flags.
-    assert_usage_error(&with_files(&["certify", "1302", "--tactic", "nogoods=off"]), "unknown option --tactic");
-    assert_usage_error(&with_files(&["certify", "1302", "--show"]), "unknown option --show");
-    assert_usage_error(&with_files(&["certify", "1302", "--window", "2"]), "unknown option --window");
-    assert_usage_error(&with_files(&["certify", "1302", "--threads", "0"]), "--threads must be at least 1");
-    assert_usage_error(&with_files(&["certify", "1302", "--threads", "many"]), "--threads: cannot read");
-    assert_usage_error(&with_files(&["certify", "1302", "--node-limit", "0"]), "--node-limit must be at least 1");
-    assert_usage_error(&with_files(&["certify", "1302", "--time-limit", "-1"]), "not a number of seconds");
-    assert_usage_error(&with_files(&["certify", "1302", "--checkpoint-interval", "0"]), "must be more than 0 seconds");
-    // `--no-claims` is a switch of `certify` alone: it takes no value, and `verify-certificates` has none (each line
-    // says its formulation).
-    assert_usage_error(&with_files(&["certify", "1302", "--no-claims=yes"]), "--no-claims takes no value");
-    assert_usage_error(&["verify-certificates", "c.jsonl", "--no-claims"], "unknown option --no-claims");
-}
-
-/// `certify` takes a range or a list file of boards, exactly one of them, and reads the list before it opens any other
-/// file or starts a search: both, neither, two lists, a missing list file, a line that is no board, a board out of
-/// range, a board twice and a list with no board are usage errors that name the file and the line.
-#[test]
-fn certify_takes_a_range_or_a_list_of_boards_and_not_both() {
-    let dir = TempDir::new("certify-list-usage");
-    let files = ["--results", "r.jsonl", "--upper", "u.jsonl", "--out", "o.jsonl"];
-    let list = |name: &str, text: &str| {
-        let file = dir.join(name);
-        fs::write(&file, text).unwrap();
-        file
-    };
-    // The command line `head` followed by the files it cannot do without, refused with `message`.
-    let refused = |head: &[&str], message: &str| {
-        let args: Vec<&str> = head.iter().chain(&files).copied().collect();
-        assert_usage_error(&args, message);
-    };
-
-    let good = list("good.txt", "# the boards\n1304\n\n1302\n");
-    let (good, missing) = (path(&good), path(&dir.join("missing.txt")).to_owned());
-    refused(&["certify", "1302", "--list", good], "certify takes a range A-B or --list FILE, not both");
-    refused(&["certify", "--list", good, "--list", good], "certify takes one --list FILE");
-    refused(&["certify"], "certify takes one range A-B or --list FILE");
-    refused(&["certify", "--list", &missing], "missing.txt: ");
-    assert_usage_error(&["certify", "--list"], "--list needs a value");
-
-    let bad = |name: &str, text: &str, why: &str| {
-        let file = list(name, text);
-        refused(&["certify", "--list", path(&file)], &format!("{name}: line {why}"));
-    };
-    bad("word.txt", "1302\nboard\n", "2: expected a game n, got \"board\"");
-    bad("note.txt", "1302 # a note\n", "1: expected a game n, got \"1302 # a note\"");
-    bad("zero.txt", "0\n", "1: 0 is not a game from 1 to 8191");
-    bad("large.txt", "# c\n\n8192\n", "3: 8192 is not a game from 1 to 8191");
-    bad("twice.txt", "1302\n1304\n\n1302\n", "4: the board 1302 is listed again (first on line 1)");
-    let empty = list("empty.txt", "# nothing\n\n");
-    refused(&["certify", "--list", path(&empty)], "empty.txt: no board is listed");
-}
-
-/// `verify-certificates` needs a file of certificates, `--results` and `--upper`, takes `--exact` and `--threads` and
-/// no other flag, and a file that is not there is a failure (status 1) that names it.
-#[test]
-fn verify_certificates_command_lines() {
-    const USAGE: &str = "usage: verify-certificates CERTS... --results FILE... --upper FILE...";
-    assert_usage_error(
-        &["verify-certificates", "--results", "r.jsonl", "--upper", "u.jsonl"],
-        "needs a file of certificates",
-    );
-    assert_usage_error(
-        &["verify-certificates", "c.jsonl", "--upper", "u.jsonl"],
-        "needs --results FILE and --upper FILE",
-    );
-    assert_usage_error(&["verify-certificates", "c.jsonl", "--results", "r.jsonl"], USAGE);
-    let files = ["c.jsonl", "--results", "r.jsonl", "--upper", "u.jsonl"];
-    assert_usage_error(
-        &[&["verify-certificates"][..], &files, &["--threads", "0"]].concat(),
-        "--threads must be at least 1",
-    );
-    assert_usage_error(&[&["verify-certificates"][..], &files, &["--out", "o.jsonl"]].concat(), "unknown option --out");
-    assert_usage_error(&[&["verify-certificates"][..], &files, &["--exact"]].concat(), "--exact needs a value");
-
-    let dir = TempDir::new("verify-certificates-missing");
-    let missing = dir.join("missing.jsonl");
-    let run = taxman(&["verify-certificates", path(&missing), "--results", path(&missing), "--upper", path(&missing)]);
-    assert_eq!(run.code, Some(1), "{}{}", run.stdout, run.stderr);
-    assert!(run.stderr.contains("missing.jsonl"), "{}", run.stderr);
-    assert_eq!(run.stdout, "");
-}
-
-/// A command that fails on its inputs, not on its command line, exits with status 1 and names what is wrong, without
-/// searching: a results file that is not there, a board the barred bounds have no line for (it is named, also when
-/// the boards before it are fine), and a board whose game the results lack.
-#[test]
-fn certify_names_the_input_that_is_missing() {
-    let dir = TempDir::new("certify-missing");
-    let (committed, out) = (committed_results(), dir.join("out.jsonl"));
-    // The barred bounds of a prime and, on the board after it, nothing.
-    let upper = dir.join("upper.jsonl");
-    fs::write(&upper, "{\"n\":1301,\"score\":532272,\"relation\":\"prime\",\"needs\":0,\"secs\":0.002}\n").unwrap();
-    let certify = |range: &str, results: &Path| {
-        let args = ["certify", range, "--results", path(results), "--upper", path(&upper), "--out", path(&out)];
-        taxman(&[&args[..], &["--threads", "1", "--progress", "0"]].concat())
-    };
-
-    let run = certify("1301-1302", &committed);
-    assert_eq!(run.code, Some(1), "{}", run.stderr);
-    assert!(run.stderr.contains("error: n=1302: the --upper files have no line for it"), "{}", run.stderr);
-    assert_eq!(run.stdout, "");
-    let run = certify("2176", &committed);
-    assert_eq!(run.code, Some(1), "{}", run.stderr);
-    assert!(run.stderr.contains("n=2176: the --upper files have no line for it"), "{}", run.stderr);
-
-    let missing = dir.join("missing.jsonl");
-    let run = certify("1301", &missing);
-    assert_eq!(run.code, Some(1), "{}", run.stderr);
-    assert!(run.stderr.contains("missing.jsonl"), "{}", run.stderr);
-    assert_eq!(run.stdout, "");
-
-    // The barred bounds say that the first board past the end of the table built into the binary needs a certificate,
-    // and the results given have no game of it.  Certify says so before it sets the board up (a board of 5001 numbers
-    // takes seconds), so the line needs no open member; an open member is a source that setup keeps on the board it
-    // is for (682 is one on the board 1302, not on 5001).
-    let past = Optimal::built_in().max_n() + 1;
-    let needs = dir.join("needs.jsonl");
-    fs::write(&needs, format!("{{\"n\":{past},\"score\":533559,\"needs\":1,\"open\":[]}}\n")).unwrap();
-    let alone = dir.join("alone.jsonl");
-    fs::write(&alone, "").unwrap();
-    let board = past.to_string();
-    let args = ["certify", &board, "--results", path(&alone), "--upper", path(&needs), "--out", path(&out)];
-    let run = taxman(&args);
-    assert_eq!(run.code, Some(1), "{}", run.stderr);
-    assert!(run.stderr.contains(&format!("n={past}: the results have no moves for n")), "{}", run.stderr);
 }
 
 /// `verify-results` reports the same on one thread and on several (the games of 22, 34 and 38 are repeats, whose
@@ -419,12 +251,11 @@ fn the_progress_line_has_the_time_of_day_and_what_the_game_has_spent() {
     assert!(seconds("active=") > 0.0 && seconds("cpu=") > 0.0, "{summary}");
 }
 
-/// `--background` is a switch that `solve` and `certify` take, which changes no score, which a line records in its
-/// `options` where it was given, and which says on stderr, once, that it does nothing where there is no idle policy.
+/// `--background` is a switch of `solve`, which changes no score, which a line records in its `options` where it was
+/// given, and which says on stderr, once, that it does nothing where there is no idle policy.
 #[test]
 fn background_is_a_switch_that_is_recorded_and_changes_no_score() {
     assert_usage_error(&["solve", "12", "--background=1"], "--background takes no value");
-    assert_usage_error(&["certify", "12", "--background"], "certify needs --results FILE and --upper FILE");
 
     let dir = TempDir::new("solve-background");
     // A game of 125 nodes, searched by three workers.

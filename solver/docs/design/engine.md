@@ -214,7 +214,7 @@ what the window buys and what was tried on the way.
 **The table of optimal moves is built into the binary** (`results/optimal.jsonl.gz`, through `include_bytes!` and
 `game::Optimal::built_in`): the lines of the file as it was when the crate was compiled, which a rebuild picks up when
 the file changes.  The solver confirms every completed game's score against it, and a score that differs is a hard error
-that names the game.  No option of `solve`, `regress` or `certify` names another table, so their runs cannot be checked
+that names the game.  No option of `solve` or `regress` names another table, so their runs cannot be checked
 against anything else; the library takes another table where a test needs one (`solver::solve_range_each_with`,
 `results::read_results`).
 
@@ -225,11 +225,10 @@ game the first time it is asked for.  A process that asks for no game decodes no
 as far as the last of them, and one that goes over every game decodes the whole file.
 
 A results file given by a path that ends in `.gz` is read the same way where it is used as a source of games: the
-committed chain that `--use-prev` and `verify-results` draw on (`known::Known::load`), and the `--results` of `certify` and
-`verify-certificates`.  Such a file must be one game a line, line n
-for game n, as the committed results are.  It is read into memory when it is opened, with its first member decoded (so
-that a file that is no gzip file is refused at once), and its other members are decoded as games are asked for, so a
-check that cites few of its lines reads a member or two of it.  A fault in a member that is decoded later stops the
+committed chain that `--use-prev` and `verify-results` draw on (`known::Known::load`).  Such a file must be one game a
+line, line n for game n, as the committed results are.  It is read into memory when it is opened, with its first member
+decoded (so that a file that is no gzip file is refused at once), and its other members are decoded as games are asked
+for, so a check that cites few of its lines reads a member or two of it.  A fault in a member that is decoded later stops the
 call that needs the game and names the file.  A plain file is read whole when it is opened.  The measurement tools take
 their `--known` files through `Optimal::with_results_files`, which checks that a line of a file scores what the lines
 before it say: for a plain file when it is opened, for a gzip file when a line of it is looked up, where a difference

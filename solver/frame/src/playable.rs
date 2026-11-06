@@ -5,9 +5,7 @@
 //! pairs every member with a maximal factor of its own, whatever the order of the peel's moves.  The code uses only the
 //! tables of maximal factors and composites of [`crate::numtheory::Tables`], which are foundation code, and `std`: it
 //! shares nothing with `frames` or `model`.  So the tests that decide playability here check the frame model against
-//! the board and not against itself (`tests/model_exact.rs`, `tests/model_extended.rs`), and `taxman certify`
-//! ([`crate::certify`]) orders the moves for a set that beats a recorded score with it, independently of the search
-//! that found the set.
+//! the board and not against itself (`tests/model_exact.rs`).
 //!
 //! [`peel`] gives the pairing, [`playable`] the answer, and [`play_order`] a legal order of the set.
 //! [`playable_against`] decides an instance whose pool is given, as the frame model's definitions use it

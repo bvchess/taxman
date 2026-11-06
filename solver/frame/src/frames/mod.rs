@@ -20,10 +20,6 @@
 //! * [`Numbering`] is the board's frames as [`BoardFrames::new`] forms them, before any is merged, each as a
 //!   [`NumberedFrame`] with its number, the frames in front of it and the pairs `unzip` settled in it; it is for the
 //!   tests of this module, and the solver does not use it.
-//! * [`ExtendedFrames`] is the frames of the extended problem, in which some of the sources of three or more prime
-//!   factors are optional and only the claims of `unzip` that the kept-claims lemma (E4,
-//!   docs/theory/extended-problem.md) allows are kept ([`build_extended`]); research code, which the solver does not
-//!   use either.
 //!
 //! The Java has several names for the one idea (solver/docs/design/frame-model.md, "The Java solver and the frame
 //! solver", maps them); this module calls it a frame throughout.  [`Frame`] has the name of [`crate::model::Frame`],
@@ -113,10 +109,9 @@
 //! docs/theory/frame-model.md.  The Java numbered the frames breadth first from the front instead (number 0 to every
 //! frame with freedoms with no frame with freedoms directly in front of it, `k + 1` to every one directly behind a
 //! frame numbered `k` and not yet numbered); on every board up to 8191, the largest the solver supports, the two
-//! numberings are the same (the census `examples/structure.rs` at commit 3ca11bf,
-//! `solver/docs/design/extended-mode.md`, and this module's tests), so the frames,
-//! candidates and searches are those of the Java's numbering.  [`numbering`] exposes the numbers of the board's frames,
-//! for this module's tests.
+//! numberings are the same (the census `examples/structure.rs` at commit 3ca11bf, and this module's tests), so the
+//! frames, candidates and searches are those of the Java's numbering.  [`numbering`] exposes the numbers of the
+//! board's frames, for this module's tests.
 //!
 //! Every layer between `ℓ₀` and the highest layer with freedoms has a frame with freedoms, so every number from 0 to the
 //! last has a frame: on every board to 8191, the largest the solver supports (the census `examples/structure.rs` at
@@ -182,10 +177,8 @@
 //! many passes visit it (`Answers`).
 
 mod board_frames;
-mod extended;
 
 pub use board_frames::{BoardFrames, ClaimKind, Frame};
-pub use extended::{build_extended, extended_frame_count, Claim, ClaimCheck, ExtendedFrames};
 
 use crate::bits::Bits;
 use crate::model;
@@ -206,9 +199,8 @@ pub struct SearchFrames<const W: usize> {
     pub names: Vec<String>,
     /// For each of `frames`, the pairs `unzip` settled in the merged frame as the final `finish_setup` left it (the
     /// [`Frame::claims`] of the frame that `frames` takes its remaining moves and factors from), in the order made.
-    /// For the extended problem, which keeps those the kept-claims lemma (E4,
-    /// docs/theory/extended-problem.md) allows ([`build_extended`]); the solver's search does not read them.
-    pub claims: Vec<Vec<Claim>>,
+    /// For the tests; the solver's search does not read them.
+    pub claims: Vec<Vec<(u32, u32, ClaimKind)>>,
     /// Every number that could be promoted, in any frame: for each frame with freedoms, the factors it could spare
     /// that a frame in front of it could take on as a source ([`BoardFrames::promotion_candidates_of`]), collected
     /// number by number before the frames with that number are merged.

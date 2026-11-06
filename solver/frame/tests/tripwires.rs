@@ -18,25 +18,18 @@
 //! because a non-release run checks only the rows of the trees of [`QUICK_NODES`] nodes or fewer, in the quick tests.)
 //! Check that the changes are the intended ones (the promotion sum, which is the answer, never moves), paste the rows
 //! in, and change the node counts quoted in solver/docs/design/ and in the notebook if they are affected.  The same
-//! goes for [`GATED`], the trees under the gates that make conflict branching act, for [`FORGETTING`] and for
-//! [`EXTENDED`], the table of the search of the extended problem Π⁺(∅) in its
-//! formulation without the claims of `unzip` (the frame model with the claims put back and no source open;
-//! `Board::prepare_extended_with` with `claims` unset), whose rows are checked the same way.  Besides its table, Π⁺(∅)
-//! is held to the default engine: without the claims, with no one-sided candidate its search is that engine's on the
-//! same frames and candidates, node for node; and with the claims that the kept-claims lemma (E4,
-//! docs/theory/extended-problem.md) allows, which with no source open are all of them, Π⁺(∅) is the frame model's
-//! problem itself, so its search reproduces every tree of [`EXPECTED`], which no table needs to say.  [`NEAR_REPEATS`] counts the trees of games that the near-repeat cut shortens, solved as the solver solves
-//! them, with the cut and without it; its test prints its rows as observed.
+//! goes for [`GATED`], the trees under the gates that make conflict branching act, and for [`FORGETTING`].
+//! [`NEAR_REPEATS`] counts the trees of games that the near-repeat cut shortens, solved as the solver solves them, with
+//! the cut and without it; its test prints its rows as observed.
 
 mod common;
 
 use common::{options, prev_of, search_at_width, stored_games, Config, Game};
 use std::sync::{Arc, OnceLock};
-use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::bounds::greedy;
 use taxman::json::Json;
-use taxman::search::{prepare, search, search_steered, BranchSettings, Branching, Prepared, SearchTactics};
+use taxman::search::{search_steered, BranchSettings, Branching, SearchTactics};
 use taxman::solver::{self, Method};
 use taxman::tactics::Tactics;
 use taxman::with_width;
@@ -72,37 +65,6 @@ const EXPECTED: [(u32, &str, u64, u64); 20] = [
     (1133, "nogoods=off", 28690, 34),
 ];
 
-/// (board, tactics, promotion sum, nodes): the search of the extended problem Π⁺(∅) of the board in its formulation
-/// without the claims of `unzip`, set up by `Board::prepare_extended_with` with no source open and `claims` unset, on
-/// one thread.  (With the claims that the kept-claims lemma (E4, docs/theory/extended-problem.md) allows, which with no
-/// source open are all of them, Π⁺(∅) is the frame model's problem and its trees are those of [`EXPECTED`], node for
-/// node: [`extended_search_with_claims`].)  The tactics are `default` and `extended` ([`SearchTactics::extended`]: the
-/// default without the rule of the symmetric pairs, the tactics of a search with one-sided candidates, which refuses
-/// the rule).  The promotion sums are those of [`EXPECTED`]: Π⁺(∅) has the frame model's promotion sets, and the sum is
-/// the answer.  The rows `extended` are the frame model's trees, node for node, where [`EXPECTED`] has the same tactics
-/// (its rows `symmetry=off` for 600, 936 and 1000); the rows `default` differ from those of [`EXPECTED`] (408 against
-/// 365 nodes at 600, 366 against 449 at 936, 3,094 against 2,841 at 1000), so what differs is what the rule of the
-/// symmetric pairs reads from the two models, not the search.  Both are also held to the default engine's search of the
-/// same frames and candidates ([`extended_searches`]), whatever the table says.
-const EXTENDED: [(u32, &str, u64, u64); 16] = [
-    (480, "default", 5350, 37),
-    (480, "extended", 5350, 37),
-    (600, "default", 8507, 408),
-    (600, "extended", 8507, 533),
-    (640, "default", 9220, 15),
-    (640, "extended", 9220, 21),
-    (660, "default", 10242, 545),
-    (660, "extended", 10242, 571),
-    (760, "default", 14170, 180),
-    (760, "extended", 14170, 184),
-    (936, "default", 20507, 366),
-    (936, "extended", 20507, 652),
-    (1000, "default", 24168, 3094),
-    (1000, "extended", 24168, 3801),
-    (1133, "default", 28690, 41),
-    (1133, "extended", 28690, 41),
-];
-
 /// (board, tactics, promotion sum, nodes): the game searched from the frame builder on one thread, as [`EXPECTED`]'s,
 /// with a gate named among the assignments, `gate=N`: the gap from which conflict branching chooses.  [`EXPECTED`]'s
 /// rows have the default gate, 300, which changes the tree of only one of their games (1000), so these rows hold the
@@ -127,14 +89,13 @@ const GATED: [(u32, &str, u64, u64); 10] = [
 /// The boards of [`GATED`].
 const GATED_BOARDS: [u32; 4] = [760, 775, 1000, 1133];
 
-/// The tactics a row names: `default` and `extended` as in the tables, the others `--tactic` assignments after the
-/// default, and `gate=N`, a gate of [`GATED`], none.
+/// The tactics a row names: `default` as in the tables, the others `--tactic` assignments after the default, and
+/// `gate=N`, a gate of [`GATED`], none.
 fn tactics(assignments: &str) -> SearchTactics {
     let mut tactics = Tactics::default();
     for assignment in assignments.split(',') {
         match assignment {
             "default" => {}
-            "extended" => tactics.search = SearchTactics::extended(),
             _ if assignment.starts_with("gate=") => {}
             _ => tactics.set(assignment).unwrap(),
         }
@@ -146,7 +107,7 @@ fn tactics(assignments: &str) -> SearchTactics {
 /// each.
 const QUICK_NODES: u64 = 250;
 
-/// Checks the rows of `table` ([`EXPECTED`] or [`EXTENDED`]) for the boards `ns` whose trees have `most_nodes` nodes or
+/// Checks the rows of `table` ([`EXPECTED`] or [`GATED`]) for the boards `ns` whose trees have `most_nodes` nodes or
 /// fewer against `tree`, the function that computes the (promotion sum, nodes) of a row's board and tactics; `what`
 /// names the trees in the message of a difference, and on one the rows of those boards are printed as observed.
 fn check_trees(
@@ -173,13 +134,6 @@ fn check_trees(
     );
 }
 
-/// (promotion sum, nodes) of the search of `p` on one thread, which must complete.
-fn searched<const W: usize>(p: &Prepared<W>) -> (u64, u64) {
-    let r = search(p, &common::config(1), None, None, false).unwrap();
-    assert!(r.completed);
-    (r.sum, r.stats.nodes)
-}
-
 /// The tree [`EXPECTED`] counts: (promotion sum, nodes) of the default engine's search of game `n` from the frame
 /// builder under the tactics `assignments`, on one thread.
 fn default_tree(n: u32, assignments: &str) -> (u64, u64) {
@@ -201,55 +155,7 @@ fn gated_tree(n: u32, assignments: &str) -> (u64, u64) {
     })
 }
 
-/// (promotion sum, nodes) of the search of the extended problem Π⁺(∅) of game `n` at width `W` without the claims of
-/// `unzip` (set up by `Board::prepare_extended_with` with no source open and `claims` unset), and of the default
-/// engine's search of the same problem: the frames of Π⁺(∅) and its candidates given to `search::prepare`, which builds
-/// the model with `FrameGraph::build`.  The two setups pose the same problem, and (the problem has no one-sided
-/// candidate) the two searches are one search.
-fn extended_searches<const W: usize>(n: u32, tactics: SearchTactics) -> ((u64, u64), (u64, u64)) {
-    let board = Board::<W>::for_n(n);
-    let (ext, prepared) = board.prepare_extended_with(&Bits::EMPTY, false, tactics).unwrap();
-    assert!(!prepared.model.has_one_sided(), "n={n}: Π⁺(∅) has a one-sided candidate");
-    let engine = prepare::<W>(&board.tables, &ext.columns(), &ext.candidates, tactics).unwrap();
-    assert_eq!(prepared.problem(), engine.problem(), "n={n}: the two setups pose different problems");
-    assert_eq!((prepared.root, prepared.candidates), (engine.root, engine.candidates), "n={n}: the roots");
-    assert_eq!((prepared.greedy, prepared.max_total), (engine.greedy, engine.max_total), "n={n}: the starts");
-    (searched(&prepared), searched(&engine))
-}
-
-/// The tree [`EXTENDED`] counts: that of the search of Π⁺(∅) without the claims of `unzip`, which must be the default
-/// engine's search of the same problem ([`extended_searches`]).
-fn extended_tree(n: u32, assignments: &str) -> (u64, u64) {
-    let (actual, engine) = with_width!(n, W => extended_searches::<W>(n, tactics(assignments)));
-    assert_eq!(actual, engine, "n={n} {assignments}: the search of Π⁺(∅) is not the default engine's");
-    actual
-}
-
-/// (promotion sum, nodes) of the search of the extended problem Π⁺(∅) of game `n` at width `W` with the claims of
-/// `unzip` (set up by `Board::prepare_extended_with` with no source open and `claims` set).  With no source open the
-/// kept-claims lemma (E4, docs/theory/extended-problem.md) keeps every claim, so Π⁺(∅) is the frame model's problem: it
-/// must pose the problem `Board::prepare` poses (the roots, candidates, greedy sets and `max_total` too), and its
-/// search is that search.
-fn extended_search_with_claims<const W: usize>(n: u32, tactics: SearchTactics) -> (u64, u64) {
-    let board = Board::<W>::for_n(n);
-    let (ext, prepared) = board.prepare_extended_with(&Bits::EMPTY, true, tactics).unwrap();
-    assert!(ext.refused.is_empty(), "n={n}: a claim refused: {:?}", ext.refused);
-    assert!(!prepared.model.has_one_sided(), "n={n}: Π⁺(∅) has a one-sided candidate");
-    let plain = board.prepare(tactics).unwrap();
-    assert_eq!(prepared.problem(), plain.problem(), "n={n}: Π⁺(∅) with the claims and Π_n pose different problems");
-    assert_eq!((prepared.root, prepared.candidates), (plain.root, plain.candidates), "n={n}: the roots");
-    assert_eq!((prepared.greedy, prepared.max_total), (plain.greedy, plain.max_total), "n={n}: the starts");
-    searched(&prepared)
-}
-
-/// The tree of the search of Π⁺(∅) with the claims of `unzip`, which must be the frame model's tree that [`EXPECTED`]
-/// counts, node for node.
-fn tree_with_claims(n: u32, assignments: &str) -> (u64, u64) {
-    with_width!(n, W => extended_search_with_claims::<W>(n, tactics(assignments)))
-}
-
-/// The boards of [`EXPECTED`] and of [`EXTENDED`] in three tests each, so that the test threads share the work; every
-/// board is in one of each.
+/// The boards of [`EXPECTED`] in three tests, so that the test threads share the work; every board is in one.
 const GROUPS: [&[u32]; 3] = [&[480, 600, 640], &[660, 760, 1000], &[936, 1133]];
 
 /// Every board, for the quick tests that check the small trees of all of them.
@@ -275,16 +181,6 @@ fn the_search_trees_under_a_gate_that_chooses_have_not_changed() {
 }
 
 #[test]
-fn the_small_extended_search_trees_have_not_changed() {
-    check_trees(&EXTENDED, &ALL_BOARDS, QUICK_NODES, "search trees of Π⁺(∅)", extended_tree);
-}
-
-#[test]
-fn the_small_search_trees_with_claims_are_the_default_ones() {
-    check_trees(&EXPECTED, &ALL_BOARDS, QUICK_NODES, WITH_CLAIMS, tree_with_claims);
-}
-
-#[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is the_small_search_trees_have_not_changed")]
 fn the_search_trees_of_480_600_and_640_have_not_changed() {
     check_trees(&EXPECTED, GROUPS[0], u64::MAX, "search trees", default_tree);
@@ -303,86 +199,13 @@ fn the_search_trees_of_936_and_1133_have_not_changed() {
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_small_extended_search_trees_have_not_changed")]
-fn the_extended_search_trees_of_480_600_and_640_have_not_changed() {
-    check_trees(&EXTENDED, GROUPS[0], u64::MAX, "search trees of Π⁺(∅)", extended_tree);
-}
-
-#[test]
-#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_small_extended_search_trees_have_not_changed")]
-fn the_extended_search_trees_of_660_760_and_1000_have_not_changed() {
-    check_trees(&EXTENDED, GROUPS[1], u64::MAX, "search trees of Π⁺(∅)", extended_tree);
-}
-
-#[test]
-#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_small_extended_search_trees_have_not_changed")]
-fn the_extended_search_trees_of_936_and_1133_have_not_changed() {
-    check_trees(&EXTENDED, GROUPS[2], u64::MAX, "search trees of Π⁺(∅)", extended_tree);
-}
-
-// Π⁺(∅) with the claims of `unzip` is the frame model's problem, so its search reproduces the trees of EXPECTED, every
-// row of the boards, node for node.
-
-/// What the trees of Π⁺(∅) with the claims of `unzip` are called in the message of a difference.
-const WITH_CLAIMS: &str = "search trees of Π⁺(∅) with the claims of unzip";
-
-#[test]
-#[cfg_attr(
-    debug_assertions,
-    ignore = "long: the quick check is the_small_search_trees_with_claims_are_the_default_ones"
-)]
-fn the_search_trees_of_480_600_and_640_with_claims_are_the_default_ones() {
-    check_trees(&EXPECTED, GROUPS[0], u64::MAX, WITH_CLAIMS, tree_with_claims);
-}
-
-#[test]
-#[cfg_attr(
-    debug_assertions,
-    ignore = "long: the quick check is the_small_search_trees_with_claims_are_the_default_ones"
-)]
-fn the_search_trees_of_660_760_and_1000_with_claims_are_the_default_ones() {
-    check_trees(&EXPECTED, GROUPS[1], u64::MAX, WITH_CLAIMS, tree_with_claims);
-}
-
-#[test]
-#[cfg_attr(
-    debug_assertions,
-    ignore = "long: the quick check is the_small_search_trees_with_claims_are_the_default_ones"
-)]
-fn the_search_trees_of_936_and_1133_with_claims_are_the_default_ones() {
-    check_trees(&EXPECTED, GROUPS[2], u64::MAX, WITH_CLAIMS, tree_with_claims);
-}
-
-#[test]
-fn every_board_of_the_tables_is_checked() {
+fn every_board_of_the_table_is_checked() {
     let mut covered: Vec<u32> = GROUPS.concat();
     covered.sort_unstable();
-    let tables: [(&str, Vec<u32>); 2] = [
-        ("EXPECTED", EXPECTED.iter().map(|row| row.0).collect()),
-        ("EXTENDED", EXTENDED.iter().map(|row| row.0).collect()),
-    ];
-    for (name, mut boards) in tables {
-        boards.sort_unstable();
-        boards.dedup();
-        assert_eq!(boards, covered, "the boards of {name} and of GROUPS");
-    }
-    // Each board of EXTENDED has a row for the default tactics and one for those of extended mode.
-    for n in covered {
-        let tactics: Vec<&str> = EXTENDED.iter().filter(|row| row.0 == n).map(|row| row.1).collect();
-        assert_eq!(tactics, ["default", "extended"], "n={n}: the tactics of EXTENDED");
-    }
-}
-
-/// `SearchTactics::extended` is the default without the rule of the symmetric pairs, which is how the table `EXPECTED`
-/// names it (`symmetry=off`), so its rows of that name and the table `EXTENDED`'s of `extended` are searches under the
-/// same tactics.
-#[test]
-fn the_tactics_of_extended_mode_are_the_default_without_the_symmetry_rule() {
-    assert_eq!(tactics("extended"), tactics("symmetry=off"));
-    assert_eq!(tactics("extended"), SearchTactics { symmetry: false, ..SearchTactics::default() });
-    assert_ne!(tactics("extended"), tactics("default"));
-    assert_eq!(tactics("extended").refusal_with_one_sided(), None);
-    assert!(tactics("default").refusal_with_one_sided().is_some_and(|why| why.contains("symmetry=on")));
+    let mut boards: Vec<u32> = EXPECTED.iter().map(|row| row.0).collect();
+    boards.sort_unstable();
+    boards.dedup();
+    assert_eq!(boards, covered, "the boards of EXPECTED and of GROUPS");
 }
 
 /// solver/docs/design/search.md: deterministic on one thread (nogoods, forgetting and all); nothing else asserts it for

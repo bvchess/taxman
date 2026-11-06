@@ -14,8 +14,7 @@ The hunt for a larger n ended on 2026-10-29: the project's owner ended it at 17:
 18:01 PDT, after game 5060.  The committed chain, `results/optimal.jsonl.gz`, reaches game 5060.  The priority is a
 run of the full chain, 1 to 5060, with one build and the one policy that makes the whole run the fastest; other work
 (the last cleanup step, the prover's run to 2530, the unsound mode) waits until it ends.
-Certifying [statement U](../../docs/theory/exactness.md#statement-u), for particular games or in general, is not a
-priority.  The committed chain is also the table built into the frame solver: the chain's lines are appended to it
+The committed chain is also the table built into the frame solver: the chain's lines are appended to it
 ([the runbook](runbook/chain.md)), and a rebuild takes them into the table.
 
 ## In flight
@@ -34,11 +33,9 @@ priority.  The committed chain is also the table built into the frame solver: th
   to leave the prover alone.  The code is done: the removals and the defaults are on master, and a consistency pass has
   brought the docs and the code left behind into line.  The lab notebook and the agenda files have moved, with their
   history, to the repository [bvchess/taxman-notebook](https://github.com/bvchess/taxman-notebook).  One step remains.
-  * **The retirement of the bounds store and the certificates.**  It waits for the Nov 1 run.  When its file
+  * **The retirement of the bounds store.**  It waits for the Nov 1 run.  When its file
     replaces `results/optimal.jsonl.gz`, the games have no `known` lines, so the bounds store, the ledger, `--use-prev`
-    and `check_bounds.py` retire, with the readers of older line formats and `REFERENCE.md`'s keys of older lines.  The
-    certificates of statement U retire too (`taxman certify`, `verify-certificates`, the extended mode they need, the
-    certificates of games 600 to 1300): the prover's own proofs, from game 2 up, replace them.
+    and `check_bounds.py` retire, with the readers of older line formats and `REFERENCE.md`'s keys of older lines.
 * **The documentation.**  Every long document is a folder of files with an index, and every doc follows
   [docs/WRITING.md](../../docs/WRITING.md), whose docs test checks the links, the citations, the sizes and the words.
   The project's owner reviews the docs one file at a time, and each review's changes land as they are decided.

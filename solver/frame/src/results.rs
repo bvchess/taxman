@@ -447,7 +447,7 @@ enum Line {
     },
 }
 
-/// Field access with errors that name the field (also the reader of `taxman certify`'s certificates uses it).
+/// Field access with errors that name the field.
 pub(crate) struct Fields<'a>(pub(crate) &'a Json);
 
 impl<'a> Fields<'a> {
@@ -467,14 +467,6 @@ impl<'a> Fields<'a> {
         self.get(name)?.as_u64().ok_or_else(|| Self::bad(name))
     }
 
-    pub(crate) fn usize(&self, name: &str) -> Result<usize, String> {
-        self.get(name)?.as_u64().and_then(|value| usize::try_from(value).ok()).ok_or_else(|| Self::bad(name))
-    }
-
-    pub(crate) fn f64(&self, name: &str) -> Result<f64, String> {
-        self.get(name)?.as_f64().ok_or_else(|| Self::bad(name))
-    }
-
     fn opt_u64(&self, name: &str) -> Result<Option<u64>, String> {
         match self.get(name)? {
             Json::Null => Ok(None),
@@ -484,12 +476,6 @@ impl<'a> Fields<'a> {
 
     fn bool(&self, name: &str) -> Result<bool, String> {
         self.get(name)?.as_bool().ok_or_else(|| Self::bad(name))
-    }
-
-    /// A flag that older lines do not have: `default` where the field is absent, an error if it is there and is no
-    /// boolean.
-    pub(crate) fn bool_or(&self, name: &str, default: bool) -> Result<bool, String> {
-        self.0.get(name).map_or(Ok(default), |_| self.bool(name))
     }
 
     fn str(&self, name: &str) -> Result<&'a str, String> {

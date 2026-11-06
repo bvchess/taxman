@@ -1,4 +1,4 @@
-//! The subcommands: `solve`, `regress`, `verify-results`, `tables`, `certify` and `verify-certificates`.
+//! The subcommands: `solve`, `regress`, `verify-results` and `tables`.
 //!
 //! The ones that solve games read their flags with [`Args`], build [`SolveOptions`] from them ([`solver_options`],
 //! or [`range_options`] for those that solve a range) and call the library's pipeline ([`taxman::solver`]); what
@@ -6,34 +6,23 @@
 //!
 //! * `solve` stops on SIGINT and SIGTERM with a final checkpoint, locks its checkpoint directory and (when it opens
 //!   it, `results::ResultsFile`) its results file, and prints one summary line per game as it is concluded;
-//! * `regress` solves in memory and compares every score with the table of optimal moves;
-//! * `certify` searches as `solve` does (the same flags for checkpoints, limits and progress, the same lock and
-//!   signals), appends a certificate a game to its `--out` file (locked while it is open), takes the games of a range
-//!   or of a list file, and exits with status 2 on moves that beat a recorded score.
+//! * `regress` solves in memory and compares every score with the table of optimal moves.
 //!
 //! The small ones: `verify-results` checks results files without changing them (a path that ends in `.gz` is read
-//! through the gzip decoder, as every results file a command is given by path), `verify-certificates` does the same for
-//! the files `certify` wrote and says how far the proofs of the recorded scores reach, and `tables` prints the maximal
+//! through the gzip decoder, as every results file a command is given by path), and `tables` prints the maximal
 //! factors and composites of numbers on a board.  Every command that meets a score for a board that the table of
 //! optimal moves has checks it against the table built into the binary ([`Optimal::built_in`]): no flag turns that off.
 
 use crate::cli::{
-    count, errln, outln, parse_range, range_options, read_board_list, solver_options, Args, CliError, CliResult,
-    SOLVER_FLAGS, WINDOW_FLAG,
+    errln, outln, parse_range, range_options, solver_options, Args, CliError, CliResult, SOLVER_FLAGS, WINDOW_FLAG,
 };
-use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
-use taxman::certify::verify::{
-    compact_ranges, frontier, read_exact, verify_certificates as verify_certificates_in, Frontier, Gap,
-};
-use taxman::certify::{certify_game_with, read_upper, CertificateFile, EarlierCertificates, Upper, Verdict};
 use taxman::engine;
 use taxman::game::Optimal;
 use taxman::known::{Known, KnownSources};
 use taxman::numtheory::Tables;
-use taxman::paths;
 use taxman::results::verify_files_with;
 use taxman::search::{finder, gate_trial, MAX_GATE};
 use taxman::solver::{self, GameResult, Method, SolveOptions};
@@ -49,15 +38,6 @@ fn known_in_repository(optimal: &Optimal) -> Result<Known<'_>, CliError> {
     Known::load(optimal, &sources).map_err(failed)
 }
 
-/// The moves that `certify` and `verify-certificates` take as recorded: those of the results files, and the built-in
-/// table's for any they lack.  A file's moves stand where it scores differently from the table's: what is certified is
-/// the file's score, and a wrong score is the counterexample that `certify` is there to find, not a refused file
-/// (`verify-results` is the check of a file against the table).
-fn recorded_games(results: &[PathBuf]) -> Result<Optimal, CliError> {
-    let table = Optimal::built_in().clone();
-    results.iter().try_fold(table, |recorded, path| recorded.with_results(path)).map_err(failed)
-}
-
 /// Flags that take a value: the solver's and the command's own.
 fn flags_with(own: &[&'static str]) -> Vec<&'static str> {
     [&SOLVER_FLAGS[..], own].concat()
@@ -66,13 +46,12 @@ fn flags_with(own: &[&'static str]) -> Vec<&'static str> {
 // ---------------------------------------------------------------------------------------------------------
 // solve
 
-/// The flags of a long search that `solve` and `certify` share, read by [`search_options`]: checkpoints, progress,
-/// limits and memory.
+/// The flags of a long search, read by [`search_options`]: checkpoints, progress, limits and memory.
 const SEARCH_FLAGS: [&str; 6] =
     ["--checkpoint-dir", "--checkpoint-interval", "--progress", "--time-limit", "--node-limit", "--mem-cap"];
 
-/// The switch of a long search that `solve` and `certify` share, read by [`search_options`]: the workers run at the
-/// lowest priority ([`SolveOptions::background`]).
+/// The switch of a long search, read by [`search_options`]: the workers run at the lowest priority
+/// ([`SolveOptions::background`]).
 const SEARCH_SWITCHES: [&str; 1] = ["--background"];
 
 /// Reads [`SEARCH_FLAGS`] and [`SEARCH_SWITCHES`] into `opts`.
@@ -243,201 +222,6 @@ pub fn solve(args: &[String]) -> CliResult {
         outln!("{}", stopped_line(n, &opts));
     }
     Ok(())
-}
-
-// ---------------------------------------------------------------------------------------------------------
-// certify
-
-const CERTIFY_FLAGS: [&str; 5] = ["--results", "--upper", "--out", "--threads", "--list"];
-
-/// `certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE [options]`: certifies, game by game, the
-/// recorded scores of A..B, or of the boards of the list FILE in its order (one n a line, `#` for comments;
-/// [`read_board_list`]), that rest on the frame model, by a search of the extended problem ([`taxman::certify`]).  The
-/// scores and moves come from the results files ([`recorded_games`]: the table of optimal moves has any they lack), the
-/// open members from the prover's barred bounds (`upper` files).  A game whose line there does not say `needs` (a
-/// prime, or a score at its ceiling, which rest on n − 1) is passed over.  Each game's certificate is appended to
-/// `--out` as it is made, and a rerun skips the games the file has a certificate for and resumes a stopped search from
-/// its checkpoint.  The extended problem is searched with the claims of `unzip` that the kept-claims lemma (E4,
-/// docs/theory/extended-problem.md) keeps, unless `--no-claims` says to search it without them (the formulation of the
-/// certificates made before that lemma); each certificate records its formulation.  A game whose extended problem a
-/// certified game of the last 8 games (of this run, or of the file, made in either formulation) posed, with recorded
-/// moves worth what that game's certificate proved the most, is certified with no search (`same_problem`;
-/// [`taxman::certify`]).  Moves found to beat the recorded score are printed, written to `<out>.counterexample.jsonl`
-/// too, and ends the run with status 2, as does a rerun over a game the file records beaten.
-pub fn certify(args: &[String]) -> CliResult {
-    let usage = |why: &str| {
-        CliError::Usage(format!(
-            "{why}\nusage: certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE [options]"
-        ))
-    };
-    let args = Args::parse(
-        args,
-        &[&CERTIFY_FLAGS[..], &SEARCH_FLAGS[..]].concat(),
-        &[&["--no-claims"][..], &SEARCH_SWITCHES[..]].concat(),
-    )?;
-    let claims = !args.has("--no-claims");
-    // The boards in the order to certify them, and how the tally names them.
-    let lists = args.values("--list");
-    let (boards, label) = match (args.positional(), lists.as_slice()) {
-        ([range], []) => {
-            let (lo, hi) = parse_range(range)?;
-            ((lo..=hi).collect::<Vec<_>>(), format!("{lo}..={hi}"))
-        }
-        ([], [list]) => {
-            let boards = read_board_list(Path::new(list))?;
-            let label = format!("list {list} ({} boards)", boards.len());
-            (boards, label)
-        }
-        ([_], [_]) => return Err(usage("certify takes a range A-B or --list FILE, not both")),
-        ([], [_, ..]) => return Err(usage("certify takes one --list FILE")),
-        _ => return Err(usage("certify takes one range A-B or --list FILE")),
-    };
-    let files = |flag: &str| args.values(flag).into_iter().map(PathBuf::from).collect::<Vec<_>>();
-    let (results, uppers) = (files("--results"), files("--upper"));
-    if results.is_empty() || uppers.is_empty() {
-        return Err(usage("certify needs --results FILE and --upper FILE"));
-    }
-    let out = PathBuf::from(args.value("--out").ok_or_else(|| usage("certify needs --out FILE"))?);
-    let mut opts = SolveOptions::default();
-    if let Some(threads) = count(&args, "--threads")? {
-        opts.threads = threads;
-    }
-    search_options(&args, &mut opts)?;
-
-    let known = recorded_games(&results)?;
-    let upper = read_upper(&uppers).map_err(failed)?;
-    let mut file = CertificateFile::open(&out).map_err(failed)?;
-    let mut earlier = EarlierCertificates::of_file(&file);
-    let _lock = guard_checkpoints(&opts)?;
-
-    let mut tally = BTreeMap::<&str, usize>::new();
-    for n in boards {
-        let line = upper.get(&n).ok_or_else(|| failed(format!("n={n}: the --upper files have no line for it")))?;
-        if !line.needs {
-            *tally.entry("not needing one").or_default() += 1;
-            continue;
-        }
-        match file.verdict(n) {
-            Some(Verdict::Beaten) => {
-                // A counterexample stays one: a rerun over it says so again, rather than pass it over.
-                let path = file.counterexample_path();
-                return Err(CliError::Counterexample(format!(
-                    "n={n}: --out already records moves that beat the recorded score (see {})",
-                    path.display()
-                )));
-            }
-            Some(_) => {
-                *tally.entry("already in --out").or_default() += 1;
-                continue;
-            }
-            None => {}
-        }
-        let certificate = certify_game_with(n, &known, line, claims, &opts, &mut earlier).map_err(failed)?;
-        file.append(&certificate).map_err(failed)?;
-        outln!("{}", certificate.summary_line());
-        let _ = std::io::stdout().flush();
-        match certificate.verdict {
-            Verdict::Incomplete => {
-                outln!("{}", stopped_line(n, &opts));
-                return Ok(());
-            }
-            Verdict::Beaten => {
-                // The line is safe in --out: the checkpoint can go.
-                solver::discard_checkpoint(&opts, n);
-                let path = file.append_counterexample(&certificate).map_err(failed)?;
-                let (score, moves) = certificate.beaten_by.as_ref().expect("moves that beat the score");
-                outln!("  moves scoring {score}: {moves:?}");
-                return Err(CliError::Counterexample(format!(
-                    "n={n}: moves worth {score} beat the recorded score {} (written to {})",
-                    certificate.score,
-                    path.display()
-                )));
-            }
-            Verdict::Certified => {
-                solver::discard_checkpoint(&opts, n);
-                let how = if certificate.same_problem.is_some() { "certified (same problem)" } else { "certified" };
-                *tally.entry(how).or_default() += 1;
-            }
-        }
-    }
-    let counts: Vec<String> = tally.iter().map(|(what, count)| format!("{what} {count}")).collect();
-    outln!("{label}: {}", counts.join(", "));
-    Ok(())
-}
-
-// ---------------------------------------------------------------------------------------------------------
-// verify-certificates
-
-/// `verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]`: checks the files
-/// of certificates `taxman certify --out` wrote without changing them ([`taxman::certify::verify`]): every line
-/// against the recorded moves, the barred bounds and Π⁺(O) set up again, and the games that rest on one another; the
-/// first that fails ends the command with status 1.  Then it says how far the proofs of the recorded scores reach:
-/// every game to some board is proven by the prover (`--exact`, default every `exact_*.jsonl` of the repository's
-/// `solver/noframe/data`), by a certificate that passed, or by a ceiling above a proven game.  K threads set Π⁺(O) up
-/// again for the lines (default: all CPUs), as `verify-results` does for the repeats.
-pub fn verify_certificates(args: &[String]) -> CliResult {
-    let usage = |why: &str| {
-        CliError::Usage(format!(
-            "{why}\nusage: verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] \
-             [--threads K]"
-        ))
-    };
-    let args = Args::parse(args, &["--results", "--upper", "--exact", "--threads"], &[])?;
-    let files = |flag: &str| args.values(flag).into_iter().map(PathBuf::from).collect::<Vec<_>>();
-    let certificates: Vec<PathBuf> = args.positional().iter().map(PathBuf::from).collect();
-    if certificates.is_empty() {
-        return Err(usage("verify-certificates needs a file of certificates"));
-    }
-    let (results, uppers) = (files("--results"), files("--upper"));
-    if results.is_empty() || uppers.is_empty() {
-        return Err(usage("verify-certificates needs --results FILE and --upper FILE"));
-    }
-    let threads = solver_options(&args)?.threads;
-    let start = Instant::now();
-    let exact = match files("--exact") {
-        given if !given.is_empty() => given,
-        _ => paths::exact_files_in_repository().map_err(failed)?,
-    };
-
-    let known = recorded_games(&results)?;
-    let upper = read_upper(&uppers).map_err(failed)?;
-    let verified = verify_certificates_in(&certificates, &known, &upper, threads).map_err(failed)?;
-    for file in verified.files.iter().filter(|file| file.torn) {
-        errln!("note: {}: torn last line ignored", file.path.display());
-    }
-    outln!("{verified}");
-
-    let proofs = read_exact(&exact).map_err(failed)?;
-    let scores = known.games().map(|(n, score, _)| (n, score)).collect();
-    let reached = frontier(&scores, &proofs, &verified.certified).map_err(failed)?;
-    let names: Vec<String> = exact.iter().map(|path| path.display().to_string()).collect();
-    outln!("the prover's proofs read, from {} files: {}", names.len(), names.join(", "));
-    outln!("{}", frontier_text(&reached, &upper));
-    outln!("checked in {:.1} s", start.elapsed().as_secs_f64());
-    Ok(())
-}
-
-/// The lines that say how far the proofs reach: every game to `reached.through` is proven, the first that is not and
-/// why (the barred bounds `upper` say whether it needs a certificate), and the games past it that are proven anyway.
-fn frontier_text(reached: &Frontier, upper: &BTreeMap<u32, Upper>) -> String {
-    let through = reached.through;
-    let Some((n, gap)) = reached.first_gap else {
-        return format!("proven frontier: every game to {through} is proven, the largest board of the results");
-    };
-    let why = match gap {
-        Gap::NoGame => "no game in the results",
-        Gap::Unproven if upper.get(&n).is_some_and(|line| line.needs) => {
-            "needs a certificate and has none in the files given"
-        }
-        Gap::Unproven => "no proof by the prover, no certificate, and not at a proven ceiling",
-    };
-    let beyond = &reached.beyond;
-    let list = if beyond.is_empty() { String::new() } else { format!(": {}", compact_ranges(beyond.iter().copied())) };
-    format!(
-        "proven frontier: every game to {through} is proven; the first that is not is {n} ({why})\n\
-         proven past it all the same: {} games{list}",
-        beyond.len()
-    )
 }
 
 // ---------------------------------------------------------------------------------------------------------

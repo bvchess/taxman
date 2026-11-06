@@ -1,8 +1,7 @@
 # Results of the solver
 
 This directory holds the project's results: the chain of optimal moves, bounds on opt(n) for the games at the chain's
-end and past it, the certificates of [statement U](../docs/theory/exactness.md#statement-u), and the chain's scores in
-the OEIS's format.  This page says what each file holds, how far it reaches, how it was made and what supports its
+end and past it, and the chain's scores in the OEIS's format.  This page says what each file holds, how far it reaches, how it was made and what supports its
 scores. The [glossary](../docs/GLOSSARY.md) defines the terms; [the frame
 model](../docs/theory/frame-model.md#the-frame-model) and statement U, on which the frame solver's scores rest, are
 defined in the theory, and the prover in [its README](../solver/noframe/README.md).
@@ -18,7 +17,6 @@ counts on this page are a snapshot, dated 2026-10-29, which no test pins: the co
 |---|---|---|---|
 | `optimal.jsonl.gz` | the committed chain: the moves of an optimal game for every n, each found from the moves for n − 1; the table of moves built into the frame solver | 1–5060 on 2026-10-29 | six runs of `taxman solve` ([below](#optimaljsonlgz)) |
 | `bounds.jsonl` | the bounds store: bounds on opt(n) for the games from 3915 on, one line a bound | 3915–8191 | the ledger's exports ([below](#boundsjsonl)) |
-| `certificates/` | certificates of [statement U](../docs/theory/exactness.md#statement-u) | 600–1300 | `taxman certify` ([below](#certificates)) |
 | `b019312.txt` | the scores of `optimal.jsonl.gz`, as a b-file of [A019312](https://oeis.org/A019312) in the OEIS | 1–5060 | the command [below](#b019312txt) |
 
 How far each proof kind reaches:
@@ -26,8 +24,8 @@ How far each proof kind reaches:
 * **Every line of `optimal.jsonl.gz`** is proven within the frame model.
 * **Games 2 to 2175** are also proven on the whole board by the prover, so their scores are opt(n) without the frame
   model.
-* **Games 2176 on** are proven within the frame model, which is exact given statement U.  U is not certified past 2175,
-  and `taxman certify` can check it game by game.  A line of them proven by the ceiling or the prime formula is opt(n)
+* **Games 2176 on** are proven within the frame model, which is exact given statement U.  U is not proven past 2175.
+  A line of them proven by the ceiling or the prime formula is opt(n)
   wherever the game before it is.
 
 "What supports the scores", below, gives the evidence for each.
@@ -250,9 +248,7 @@ What that evidence amounts to:
    games 1301–2175 were proven in the cloud run of 2026-10-14 and 15 ([the
    notebook](https://github.com/bvchess/taxman-notebook/blob/main/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)).
    The 2885 games of 2176–5060 are proven within the frame model, which is exact given U ([the exactness theorem
-   (X7)](../docs/theory/exactness.md#the-exactness-theorem)).  `taxman certify` can check U there game by game, with the
-   prover's barred bounds ([the prover's README](../solver/noframe/docs/proofs.md#the-upper-part-game-by-game) has them
-   to 3440).
+   (X7)](../docs/theory/exactness.md#the-exactness-theorem)).
 
 The checks cannot catch a game that is legal, finished and within the chain bounds but not optimal, when the moves for n
 − 1 are not optimal either.  That is what the proof kinds and the assumptions track, and why the chain from n = 1 and
@@ -391,7 +387,7 @@ game it is carried to.  `rests_on` lists the games:
   itself;
 * a repeat adds its own game.
 
-U is certified for every n up to 2175 ([solver/docs/design/frame-model.md, “What "optimal"
+U holds at every n up to 2175, the games the prover has proven ([solver/docs/design/frame-model.md, “What "optimal"
 means”](../solver/docs/design/frame-model.md#what-optimal-means)), so a bound whose list holds only games up to 2175
 rests on no open statement.  A proven game is opt(n) wherever U holds at the games of the `rests_on` of its upper bound.
 A results line that rests on a proven game assumes that, one statement a game (`"statement U holds at n=4501"`), in its
@@ -433,21 +429,3 @@ game.  Its lines took 330 bytes for promotions, 135 for cited moves, 1.7 kilobyt
 about 15, and cited moves and an upper bound about 150 and 220 bytes.  On 2026-10-22 the store held 4,277 games in 9.2
 megabytes, about 2.1 kilobytes a game, against the chain's 7.3 (36.8 megabytes for 5,060 games uncompressed; the file of
 5,060 games is 1.10 megabytes).
-
-## certificates
-
-`certificates/` holds the committed certificates of U that `taxman certify` made
-([solver/docs/design/certificates.md](../solver/docs/design/certificates.md) says what a certificate is and what it
-proves).
-
-`certificates_600_1300.jsonl` has a certificate for each of the 377 games of 600..1300 that need one: 296 certified by
-a search, and 81 by posing the same problem as an earlier game.  `taxman verify-certificates` passes it, in 4.6 s.  It
-was made by `taxman certify 600-1300 --results results/optimal.jsonl.gz U --out
-results/certificates/certificates_600_1300.jsonl --threads 1 --progress 0`, in 39 s, on the code of commit 35c614b.
-`U` there stands for the four `--upper` files, the prover's barred bounds for 2..1300, 1301..2175, 2176..3314 and
-3315..3440 (`solver/noframe/data/upper_*.jsonl`).
-
-The certificates are in a directory of their own because `tests/results.rs` and `solver/tools/check_results.py` take
-every `results/*.jsonl` for a chain or the bounds store.  `tests/certify.rs` checks the work list's prediction against
-the file: the games that need a certificate, their open and rejected sources, and the games that the rule of the same
-problem settles ([the work list of 2176-3440](../solver/tools/certify/README.md)).

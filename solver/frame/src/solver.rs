@@ -1520,7 +1520,7 @@ fn different_tactics(checkpoint: &Path, made: SearchTactics, now: Tactics) -> St
 }
 
 /// Deletes game `n`'s checkpoint, if checkpointing is on.  Called only once the game's result is safe: in the
-/// results file (or `taxman certify`'s file of certificates), or (without one) handed to the caller.
+/// results file, or (without one) handed to the caller.
 pub fn discard_checkpoint(opts: &SolveOptions, n: u32) {
     if let Some(path) = opts.checkpoint_file(n) {
         if let Err(e) = engine::remove_checkpoint(&path) {

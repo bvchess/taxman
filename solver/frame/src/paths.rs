@@ -3,17 +3,9 @@
 //! Nothing here is a path fixed at compile time, so a binary works wherever it is as long as it can find the
 //! repository: the nearest directory above the working directory, and failing that above the directory of the
 //! executable, that holds the committed results, `results/optimal.jsonl.gz`.  (The solver itself needs no
-//! file: the table of optimal moves is built into the binary, [`crate::game::Optimal::built_in`].)  The defaults are
-//! relative to that directory:
-//!
-//! | file | default | flag |
-//! |---|---|---|
-//! | the prover's proofs (`verify-certificates`) | `solver/noframe/data/exact_*.jsonl` | `--exact FILE...` |
-//!
-//! A flag wins over the repository.  When the repository cannot be found the error says where it looked and what to
-//! give instead.
+//! file: the table of optimal moves is built into the binary, [`crate::game::Optimal::built_in`].)  When the repository
+//! cannot be found the error says where it looked.
 
-use std::fs;
 use std::path::{Path, PathBuf};
 
 /// The committed results, the chain of lines from n = 1 (gzip), relative to the repository; its presence is what makes
@@ -22,9 +14,6 @@ pub const RESULTS_IN_REPOSITORY: &str = "results/optimal.jsonl.gz";
 
 /// The bounds store, the bounds on opt(n) that the ledger finds, relative to the repository.
 pub const BOUNDS_STORE_IN_REPOSITORY: &str = "results/bounds.jsonl";
-
-/// The prover's data (the barred bounds, the proofs of the scores), relative to the repository.
-pub const PROVER_DATA_IN_REPOSITORY: &str = "solver/noframe/data";
 
 /// The nearest directory at or above one of `starts`, tried in order, that contains `marker`.
 fn find_above(starts: &[PathBuf], marker: &str) -> Option<PathBuf> {
@@ -56,45 +45,11 @@ pub fn repository_root() -> Result<PathBuf, String> {
     })
 }
 
-/// `relative` in the repository, for a default file; `flag` is what to give instead of finding it.
-///
-/// # Errors
-///
-/// If there is no repository.
-pub fn in_repository(relative: &str, flag: &str) -> Result<PathBuf, String> {
-    repository_root().map(|root| root.join(relative)).map_err(|e| format!("{e}.  Give {flag} instead"))
-}
-
-/// The prover's proofs of the scores, `exact_*.jsonl` in its data directory in the repository, ordered by name (a later
-/// file's line for a game replaces an earlier file's: `certify::verify::read_exact`).
-///
-/// # Errors
-///
-/// If there is no repository, or its data directory cannot be read.
-pub fn exact_files_in_repository() -> Result<Vec<PathBuf>, String> {
-    let dir = in_repository(PROVER_DATA_IN_REPOSITORY, "--exact FILE")?;
-    exact_files_in(&dir)
-}
-
-/// The files `exact_*.jsonl` of the directory `dir`, ordered by name.
-fn exact_files_in(dir: &Path) -> Result<Vec<PathBuf>, String> {
-    let read = |e: std::io::Error| format!("{}: {e}", dir.display());
-    let mut files = Vec::new();
-    for entry in fs::read_dir(dir).map_err(read)? {
-        let path = entry.map_err(read)?.path();
-        let name = path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
-        if path.is_file() && name.starts_with("exact_") && name.ends_with(".jsonl") {
-            files.push(path);
-        }
-    }
-    files.sort();
-    Ok(files)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_support::TempDir;
+    use std::fs;
 
     #[test]
     fn the_repository_is_the_nearest_directory_above_with_the_results() {
@@ -114,24 +69,9 @@ mod tests {
     }
 
     #[test]
-    fn the_exact_files_are_those_named_exact_ending_in_jsonl_by_name() {
-        let dir = TempDir::new("paths-exact");
-        for name in
-            ["exact_parity_2_1300.jsonl", "exact_2_1231.jsonl", "upper_2_1300.jsonl", "exact_x.txt", "exact.jsonl"]
-        {
-            fs::write(dir.join(name), "").unwrap();
-        }
-        fs::create_dir(dir.join("exact_dir.jsonl")).unwrap();
-        let names: Vec<_> = exact_files_in(&dir).unwrap().iter().map(|p| p.file_name().unwrap().to_owned()).collect();
-        assert_eq!(names, ["exact_2_1231.jsonl", "exact_parity_2_1300.jsonl"]);
-        assert!(exact_files_in(&dir.join("missing")).unwrap_err().contains("missing"));
-    }
-
-    #[test]
     fn this_checkout_is_found_from_the_working_directory() {
         // `cargo test` runs in the crate's directory, which is in the repository.
         let root = repository_root().expect("tests run in the repository");
         assert!(root.join(RESULTS_IN_REPOSITORY).is_file());
-        assert!(in_repository(PROVER_DATA_IN_REPOSITORY, "--exact FILE").unwrap().starts_with(&root));
     }
 }

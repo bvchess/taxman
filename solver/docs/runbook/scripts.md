@@ -5,8 +5,8 @@ Part of the [runbook](../RUNBOOK.md).
 ## The scripts
 
 The scripts of `solver/tools/cloud/`; the ledger's are in `solver/tools/ledger/` ([ledger.md](ledger.md)).  The top of
-each says how to run it, and the long runs' scripts (`run.sh`, `chain.sh`, `prover.sh`, `certify.sh`) also give their
-variables, and `chain.sh` and `certify.sh` their exit statuses.
+each says how to run it, and the long runs' scripts (`run.sh`, `chain.sh`, `prover.sh`) also give their
+variables, and `chain.sh` its exit statuses.
 
 | file | what it does |
 |---|---|
@@ -20,8 +20,7 @@ variables, and `chain.sh` and `certify.sh` their exit statuses.
 | `status.sh [--recorded N] --host USER@HOST` | the games recorded and in flight of a chain on another machine, read over ssh, with no AWS ([chain.md](chain.md#from-another-machine)) |
 | `save.sh` | copy results, logs and checkpoints to S3 (`--restore` on a fresh machine) |
 | `prover.sh A B` | the prover's proofs of opt(n) for n = A..B ([prover.md](prover.md)): resumable passes, all CPUs; `--verify` checks the output; `--list N1,N2,...` runs `exact` on given games as a measurement ([study E6](https://github.com/bvchess/taxman-notebook/blob/main/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md#the-plan-of-e6)) |
-| `certify.sh LIST[:THREADS]...` | the certificates campaign ([certify.md](certify.md)): `taxman certify` over the lists of `solver/tools/certify/lists/stage4`, several at once, resumable, with a final `verify-certificates` |
-| `spot-watch.sh` | on a spot interruption notice: stop `chain.sh`, `prover.sh` or `certify.sh` and save |
+| `spot-watch.sh` | on a spot interruption notice: stop `chain.sh` or `prover.sh` and save |
 | `test/run.sh` | tests of `chain.sh`'s date and ledger, the lock of `run.sh` and `status.sh`, against stand-ins for aws and ssh (no cloud) |
 | `test/test_build_cache.py`, `test/test_run_tests.py`, `test/test_setup.py` | tests of the build cache (a directory for the bucket, and the stand-in for aws), of the release suite's runner (a toy crate) and of `setup.sh`'s build logic (a stand-in for cargo); no cloud, no release build |
 | `Dockerfile`, `Dockerfile.dockerignore` | a Linux build-and-test image ([Dry run in Docker (optional)](before-a-big-run.md#dry-run-in-docker-optional)) |
@@ -41,13 +40,12 @@ on macOS cannot.
 
 | script | on macOS, or in the Docker image | on EC2 |
 |---|---|---|
-| `chain.sh` | a complete chain, a SIGTERM stop, deliberate interruptions and resumes, a crash loop and a deadline; in the image (Linux, arm64) after the split of `run.sh`; through the change of `run.sh` for `certify.sh` (`run_start`, `run_reap`) to a complete chain, a SIGTERM stop and a deadline | the chain's run of 2026-10-15 and 16 (2176 to 3440 on a `c8g.16xlarge`, 24 hours, two instances: [the cloud run to 3440](https://github.com/bvchess/taxman-notebook/blob/main/the-frontier-chain-to-3440-2026-10/README.md)), after a rehearsal of [Rehearsal of the chain, with interruptions](before-a-big-run.md#rehearsal-of-the-chain-with-interruptions) on the same machine type |
+| `chain.sh` | a complete chain, a SIGTERM stop, deliberate interruptions and resumes, a crash loop and a deadline; in the image (Linux, arm64) after the split of `run.sh` | the chain's run of 2026-10-15 and 16 (2176 to 3440 on a `c8g.16xlarge`, 24 hours, two instances: [the cloud run to 3440](https://github.com/bvchess/taxman-notebook/blob/main/the-frontier-chain-to-3440-2026-10/README.md)), after a rehearsal of [Rehearsal of the chain, with interruptions](before-a-big-run.md#rehearsal-of-the-chain-with-interruptions) on the same machine type |
 | `setup.sh` | its build and checks | the prover's run (`PROVER_ONLY=1`), the chain's run, the scaling run on a `c8g.48xlarge` (in full, without the tests), and the releases of [build-cache.md](build-cache.md) |
 | `verify.sh` | yes | the chain's rehearsal; the scaling run |
 | `save.sh` | | the prover's run (with an instance role); the chain's run (with its restore on the second instance) |
 | `spot-watch.sh` | | the prover's run, the chain's run, and [the run to 5000](https://github.com/bvchess/taxman-notebook/blob/main/the-run-to-5000-2026-10/README.md), whose two spot interruptions it handled |
 | `prover.sh` | over a range, with a SIGTERM stop and a resume, on macOS and in the image | the run of [prover.md](prover.md) (2026-10-14 and 15, to the end) |
-| `certify.sh` | `taxman certify` on two lists at once (bash 3.2) through a complete run and its `verify-certificates`, a SIGTERM stop and its resume; with a stand-in for the binary, a counterexample, an error, a crash and a deadline | not run |
 | the instance-hours ledger of `run.sh` | against a stand-in for aws (`test/run.sh`) | [the run to 5000](https://github.com/bvchess/taxman-notebook/blob/main/the-run-to-5000-2026-10/README.md) |
 | `status.sh` | against a stand-in for ssh (`test/run.sh status`) | not run: it reads a chain on a machine reached by ssh |
 | `ledger/cloud.sh` | the laptop's dry run of 1301..1500, with the test profile's `ledger` | the ledger's launches of 2026-10-17 and 18 ([its entry](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/README.md)) |

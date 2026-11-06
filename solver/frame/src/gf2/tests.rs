@@ -1,13 +1,9 @@
 use super::*;
 use crate::board::Board;
-use crate::frames::{build_extended, ExtendedFrames};
 use crate::model::Scratch;
 use crate::search::{Prepared, SearchTactics};
 use crate::test_support::Rng;
-use std::collections::HashSet;
 use std::fmt::Debug;
-use std::sync::Arc;
-use std::time::Instant;
 
 /// Whether the candidates `set` are elements and independent in every frame (at the root), on both of `graph`'s sides,
 /// the even frames' and the odd frames': Gaussian elimination of their vectors, block by block.
@@ -224,156 +220,6 @@ fn a_reweighted_graph_bounds_by_its_weights() {
     assert!(checked > 40 && largest >= 12, "{checked} boards checked, the largest of {largest} elements");
 }
 
-/// The extended problem Π⁺(`open`) of `board` as the search is given it, built by hand since its setup comes in a later
-/// step: the frames with the one-sided candidates, the model and root they make, the candidates (two-sided and
-/// one-sided) and the most promotions a promotion set can have.  The extended frames come with it, for their
-/// `in_the_bag`.
-///
-/// # Errors
-///
-/// If a member of `open` cannot be open on the board, or the problem has more frames than a frame set holds.
-fn extended_problem<const W: usize>(
-    board: &Board<W>,
-    open: &Bits<W>,
-) -> Result<(ExtendedFrames<W>, Prepared<W>), String> {
-    let ext = build_extended::<W>(&board.tables, open, &[])?;
-    let (model, root) = FrameGraph::build_extended::<W>(&board.tables, &ext.columns(), &ext.one_sided)?;
-    let one_sided: Bits<W> = ext.one_sided.iter().map(|&(s, _)| s).collect();
-    let candidates = ext.candidates | one_sided;
-    let max_total = model.max_promotions_among(&root, &candidates).max(0) as u32;
-    let prepared = Prepared {
-        n: board.n(),
-        model: Arc::new(model),
-        root,
-        candidates,
-        tactics: SearchTactics::default(),
-        greedy: Bits::EMPTY,
-        max_total,
-        timings: Default::default(),
-    };
-    Ok((ext, prepared))
-}
-
-/// U\*_{≥3} of `board`, the sources that can be open: the numbers above n/2 of the moves with no promotions that have
-/// three or more prime factors, ascending.
-fn upper_from_3<const W: usize>(board: &Board<W>) -> Vec<u32> {
-    let mut upper: Vec<u32> =
-        board.plain.iter().copied().filter(|&x| 2 * x > board.n() && board.tables.omega(x) >= 3).collect();
-    upper.sort_unstable();
-    upper
-}
-
-/// What the extended problems of [`bound_and_independence_in_the_extended_problem`] met, so that the test can see that
-/// it reached what it was meant to.
-#[derive(Default)]
-struct ExtendedTally {
-    /// Problems with candidates, and those that have a one-sided candidate.
-    problems: usize,
-    with_one_sided: usize,
-    /// Problems whose promotion sets were enumerated, those of them that hit the limit on the sets, the sets
-    /// enumerated, and those that hold a one-sided candidate.
-    enumerated: usize,
-    capped: usize,
-    sets: usize,
-    sets_with_one_sided: usize,
-    /// Problems on boards that the table of optimal moves knows, whose bound was compared with its optimum.
-    optimum_checks: usize,
-}
-
-/// On every board from 2 to 120, for the open sets U\*_{≥3} and three random subsets of it, the bound of the extended
-/// problem Π⁺(O) at the root: every promotion set found by enumeration (at most 2²⁰ of them, for problems of at most
-/// 22 candidates) is independent in every frame, one-sided members included, and the bound is at least the heaviest
-/// of them; and since the optimal moves for these boards play U\*_{≥3} (the table of optimal moves has their score),
-/// the bound is at least that score less what the fixed sources bring.
-#[test]
-#[cfg_attr(
-    debug_assertions,
-    ignore = "long: the quick check is bound_and_independence_in_the_extended_problem_of_the_small_boards"
-)]
-fn bound_and_independence_in_the_extended_problem() {
-    bound_and_independence_in_extended_problems(2..=120, 100);
-}
-
-/// [`bound_and_independence_in_the_extended_problem`] on the boards 2 to 46.
-#[test]
-fn bound_and_independence_in_the_extended_problem_of_the_small_boards() {
-    bound_and_independence_in_extended_problems(2..=46, 2);
-}
-
-/// The checks of [`bound_and_independence_in_the_extended_problem`] on the boards `ns`, which must reach `percent`
-/// percent of what it asks.
-fn bound_and_independence_in_extended_problems(ns: std::ops::RangeInclusive<u32>, percent: usize) {
-    const W: usize = 8;
-    let optimal = crate::game::Optimal::built_in();
-    let mut rng = Rng(0xE87E_ADED_0000_0001);
-    let (mut tally, start) = (ExtendedTally::default(), Instant::now());
-    for n in ns {
-        let board = Board::<W>::for_n(n);
-        let all = upper_from_3(&board);
-        let mut opens: Vec<Bits<W>> = vec![all.iter().copied().collect()];
-        for _ in 0..3 {
-            opens.push(all.iter().copied().filter(|_| rng.chance(50)).collect());
-        }
-        for (k, open) in opens.iter().enumerate() {
-            if opens[..k].contains(open) {
-                continue;
-            }
-            let (ext, p) = extended_problem(&board, open).unwrap_or_else(|e| panic!("n={n}: O={open:?}: {e}"));
-            if p.candidates.is_empty() {
-                continue;
-            }
-            let one_sided: Bits<W> = ext.one_sided.iter().map(|&(s, _)| s).collect();
-            let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
-            let mut bound = Gf2Bound::<W>::new(&graph);
-            bound.reset(&Bits::EMPTY, &p.candidates);
-            let value = bound.evaluate(p.max_total, None).value;
-            tally.problems += 1;
-            tally.with_one_sided += usize::from(!one_sided.is_empty());
-            if p.candidates.len() <= 22 {
-                const LIMIT: usize = 1 << 20;
-                let sets = promotable_sets(&p.model, &p.root, &p.candidates, LIMIT);
-                tally.capped += usize::from(sets.len() >= LIMIT);
-                for set in &sets {
-                    assert!(independent(&graph, set), "n={n}, O={open:?}: the promotion set {set:?} is dependent");
-                }
-                let best = sets.iter().map(Bits::sum).max().unwrap_or(0);
-                assert!(
-                    value >= best,
-                    "n={n}, O={open:?}: the bound {value} is below the heaviest promotion set {best}"
-                );
-                tally.enumerated += 1;
-                tally.sets += sets.len();
-                tally.sets_with_one_sided += sets.iter().filter(|set| set.intersects(&one_sided)).count();
-            }
-            if let Some(score) = optimal.score(n) {
-                let opt = score.checked_sub(ext.in_the_bag).expect("the fixed sources score less than the game");
-                assert!(value >= opt, "n={n}, O={open:?}: the bound {value} is below P* {opt}");
-                tally.optimum_checks += 1;
-            }
-        }
-    }
-    let ExtendedTally { problems, with_one_sided, enumerated, capped, sets, sets_with_one_sided, optimum_checks } =
-        tally;
-    println!(
-        "{problems} problems, {with_one_sided} with a one-sided candidate, {optimum_checks} against P*, \
-         in {:.1?}",
-        start.elapsed()
-    );
-    println!(
-        "{enumerated} enumerated ({capped} stopped at the limit): {sets} promotion sets, {sets_with_one_sided} with a \
-         one-sided member"
-    );
-    let at_least = |count: usize, most: usize| count * 100 >= most * percent;
-    assert!(
-        at_least(problems, 300) && at_least(with_one_sided, 300) && at_least(optimum_checks, 300),
-        "{problems} {with_one_sided} {optimum_checks}"
-    );
-    assert!(
-        at_least(enumerated, 150) && at_least(sets, 1_000_000) && at_least(sets_with_one_sided, 1_000_000),
-        "{enumerated} {sets} {sets_with_one_sided}"
-    );
-}
-
 /// What [`walk_random_paths`] checked, so that the tests can see that their walks reached what they were meant to.
 #[derive(Default)]
 struct Walked {
@@ -389,11 +235,6 @@ struct Walked {
     children: u64,
     /// Weight-split bounds without a candidate (of those a level had one for) compared across the engines.
     splits_compared: u64,
-    /// In the extended problem: the bounds compared at nodes whose candidates hold a one-sided candidate, the forced
-    /// members that are one-sided, and the promotions of one-sided candidates along the paths.
-    checks_with_one_sided: u64,
-    forced_one_sided: u64,
-    one_sided_promoted: u64,
     /// Tableaux of solved levels derived from a related one (of those from a copy), each checked against the one a
     /// solve builds ([`Gf2Bound::check_derivations`]).
     derived: u64,
@@ -437,10 +278,8 @@ fn agree<const W: usize, T: PartialEq + Debug>(
 /// whose warm start shows it below the need is cut, its bound no lower than that of a [`Gf2Graph`] built afresh from
 /// its state, and the node goes on.  Every node's members are priced as conflict branching prices them, carrying its
 /// parent's cycles, and the prices are the
-/// bounds found without the carry.  The narrowing of a child's candidates and the count of the promotions left are
-/// the model's, so that `p` may be an extended problem with one-sided candidates (for a problem without them they are
-/// the frame set's own).  Of the forced members of a node, which can be hundreds when the need is close to the bound,
-/// at most `forced_cap` are checked, evenly spread over them.  Every tableau the first engine derives from a related
+/// bounds found without the carry.  Of the forced members of a node, which can be hundreds when the need is close to
+/// the bound, at most `forced_cap` are checked, evenly spread over them.  Every tableau the first engine derives from a related
 /// one instead of building it ([`Gf2Bound::check_derivations`]) is checked against the one a solve builds.  At each
 /// node a child is looked at as the tactic `conflict_look` looks: it promotes some members of the heaviest set and
 /// leaves out another, and the bound from the node's weight split ([`Gf2Bound::child_bound`]) does no other work and
@@ -455,7 +294,6 @@ fn walk_random_paths<const W: usize>(
     walked: &mut Walked,
 ) {
     let n = p.n;
-    let one_sided: Bits<W> = p.model.one_sided().iter().map(|&(s, _)| s).collect();
     let mut scratch = Scratch::<W>::new();
     // The looks draw from their own generator, so that the paths are those a walk without them takes.
     let mut look_rng = Rng(rng.0 ^ 0x100C_A7C4_11D0_0001);
@@ -466,7 +304,7 @@ fn walk_random_paths<const W: usize>(
         let mut path = vec![(p.root, Bits::<W>::EMPTY, p.candidates)];
         for _ in 0..40 {
             let (state, promoted, cands) = *path.last().unwrap();
-            let cap = (p.max_total - promoted.len()).min(p.model.max_promotions_among(&state, &cands).max(0) as u32);
+            let cap = (p.max_total - promoted.len()).min(state.max_promotions_among(&cands).max(0) as u32);
             let eval = agree(engines, |e| e.evaluate(cap, None));
             let fresh_graph = Gf2Graph::new(&p.model, &state, &cands);
             let mut fresh = Gf2Bound::<W>::new(&fresh_graph);
@@ -474,7 +312,6 @@ fn walk_random_paths<const W: usize>(
             let truth = fresh.evaluate(cap, None).value;
             assert_eq!(eval.value, truth, "n={n}: promoted {promoted:?}, candidates {cands:?}");
             walked.checks += 1;
-            walked.checks_with_one_sided += u64::from(cands.intersects(&one_sided));
             // Forced members at a need just below the bound.
             let need = eval.value.saturating_sub(rng.below(40));
             let with_forced = agree(engines, |e| e.evaluate(cap, Some(need)));
@@ -497,7 +334,6 @@ fn walk_random_paths<const W: usize>(
                 let without = fresh.value_excluding(x, cap, u64::MAX);
                 assert!(without < need, "n={n}: {x} is not forced: {without} without it, need {need}");
                 walked.forced_checked += 1;
-                walked.forced_one_sided += u64::from(one_sided.contains(x));
             }
             // The weight split's bound without each candidate: for the members of the heaviest set, if the level
             // has a split.
@@ -558,7 +394,7 @@ fn walk_random_paths<const W: usize>(
                         agree(engines, |e| e.remove_candidate(x));
                         path.last_mut().unwrap().2.remove(x);
                     }
-                    let mut child_cands = p.model.narrow(&next, &cands.without(x));
+                    let mut child_cands = next.narrow_candidates(&cands.without(x));
                     // Drop a few more, as the search's rule-outs do.
                     for y in child_cands.to_vec() {
                         if rng.chance(5) {
@@ -571,7 +407,7 @@ fn walk_random_paths<const W: usize>(
                         // a warm start may show the child below before its heaviest set is known.  A child below it is
                         // cut, and the node goes on; another is checked against a fresh graph as every level is.
                         let room = p.max_total.saturating_sub(promoted.len() + 1);
-                        let child_cap = room.min(p.model.max_promotions_among(&next, &child_cands).max(0) as u32);
+                        let child_cap = room.min(next.max_promotions_among(&child_cands).max(0) as u32);
                         let need = (eval.value.saturating_sub(u64::from(x)) + 10).saturating_sub(rng.below(40));
                         let below = engines[0].stats().warm_below;
                         agree(engines, |e| e.push_all_at(&Bits::EMPTY.with(x), &child_cands, need));
@@ -590,7 +426,6 @@ fn walk_random_paths<const W: usize>(
                         agree(engines, |e| e.push_all(&Bits::EMPTY.with(x), &child_cands));
                     }
                     walked.inherited += engines[0].stats().inherited - before;
-                    walked.one_sided_promoted += u64::from(one_sided.contains(x));
                     path.push((next, promoted.with(x), child_cands));
                 }
                 // Delete a candidate, often one of the heaviest set; half the time after its bound without it is
@@ -665,14 +500,14 @@ fn look_at_a_child<const W: usize>(
         return;
     }
     let Some(next) = p.model.promote_all_using(scratch, state, &added) else { return };
-    let mut child_cands = p.model.narrow(&next, &(*cands - added).without(left_out));
+    let mut child_cands = next.narrow_candidates(&(*cands - added).without(left_out));
     for y in child_cands.to_vec() {
         if rng.chance(5) {
             child_cands.remove(y);
         }
     }
     let room = p.max_total.saturating_sub(promoted.len() + added.len());
-    let cap = room.min(p.model.max_promotions_among(&next, &child_cands).max(0) as u32);
+    let cap = room.min(next.max_promotions_among(&child_cands).max(0) as u32);
     let before = engines[0].stats();
     let Some(bound) = agree(engines, |e| e.child_bound(&added, &child_cands)) else { return };
     let after = engines[0].stats();
@@ -806,229 +641,6 @@ fn engines_agree_across_the_wrap_of_the_stamp_counter() {
             assert!(end < start, "n={n}: the stamps from {start} did not wrap ({end})");
         }
     }
-}
-
-/// The most forced members per node that the walks of the extended problem check: with hundreds of one-sided
-/// candidates, most members of the heaviest set are forced when the need is close to the bound, and a fresh solve for
-/// each would take most of the walk's time.
-const FORCED_CAP: usize = 12;
-
-/// Walks `paths` random paths (`walk_random_paths`) of the extended problem Π⁺(O) of each of `boards` with the open
-/// sources U\*_{≥3} and with a random half of them (a board whose Π⁺(U\*_{≥3}) has more frames than a frame set holds
-/// is walked with the half only), with the one engine each needs.
-fn walk_extended_problems<const W: usize>(boards: &[u32], paths: usize, rng: &mut Rng, walked: &mut Walked) {
-    let mut walks = 0;
-    for &n in boards {
-        let board = Board::<W>::for_n(n);
-        let all = upper_from_3(&board);
-        let half: Vec<u32> = all.iter().copied().filter(|_| rng.chance(50)).collect();
-        for open in [all, half] {
-            let Ok((_, p)) = extended_problem(&board, &open.into_iter().collect()) else { continue };
-            let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
-            walk_random_paths(&p, rng, paths, FORCED_CAP, true, &mut [Gf2Bound::<W>::new(&graph)], walked);
-            walks += 1;
-        }
-    }
-    assert!(walks >= boards.len(), "{walks} problems walked on {} boards", boards.len());
-}
-
-/// What the walks of the extended problem reached, and the assertions that they reached enough of it (`percent` percent
-/// of what the default walk of [`levels_match_fresh_matroids_along_random_paths_in_the_extended_problem`] must): nodes
-/// checked, children that inherited, forced members, certified and solved bounds without a member, and, of the
-/// one-sided candidates, the nodes that had one among their candidates, the forced members and the promotions.
-fn assert_walks_reached(walked: &Walked, percent: u64) {
-    let Walked {
-        checks,
-        inherited,
-        forced_checked,
-        certified_checked,
-        excluded_checked,
-        children,
-        checks_with_one_sided,
-        forced_one_sided,
-        one_sided_promoted,
-        ..
-    } = *walked;
-    println!(
-        "{checks} nodes checked, {checks_with_one_sided} with a one-sided candidate; {inherited} inherited,          {forced_checked} forced ({forced_one_sided} one-sided), {certified_checked} certified,          {excluded_checked} solved, {children} certified children; {one_sided_promoted} one-sided promotions"
-    );
-    let at_least = |count: u64, most: u64| count * 100 >= most * percent;
-    assert!(
-        at_least(checks, 4000)
-            && at_least(inherited, 300)
-            && at_least(forced_checked, 30_000)
-            && at_least(certified_checked, 2500)
-            && at_least(children, 20)
-            && at_least(excluded_checked, 1200),
-        "{checks} {inherited} {forced_checked} {certified_checked} {children} {excluded_checked}"
-    );
-    assert!(
-        at_least(checks_with_one_sided, 4000)
-            && at_least(forced_one_sided, 20_000)
-            && at_least(one_sided_promoted, 1000),
-        "{checks_with_one_sided} {forced_one_sided} {one_sided_promoted}"
-    );
-    let Walked { derived, derived_from_copies, derivations_checked, .. } = *walked;
-    println!("{derived} tableaux derived, {derived_from_copies} from a copy, {derivations_checked} checked");
-    assert!(at_least(derived, 500) && derivations_checked == derived, "{derived} {derivations_checked}");
-}
-
-/// [`levels_match_fresh_matroids_along_random_paths_in_the_extended_problem`] along 3 paths of the boards 60, 120 and
-/// 200 at W = 16.
-#[test]
-fn levels_match_fresh_matroids_along_a_few_random_paths_in_the_extended_problem() {
-    let (mut rng, mut walked) = (Rng(0x0E87_5EED_C0FF_EE03), Walked::default());
-    walk_extended_problems::<16>(&[60, 120, 200], 3, &mut rng, &mut walked);
-    assert_walks_reached(&walked, 3);
-}
-
-/// Along random paths of the extended problem Π⁺(O) on the boards from 60 to 1000 at W = 16, with O = U\*_{≥3} and with
-/// a random half of it (`walk_random_paths`), the bound of every node, with one-sided candidates promoted, deleted and
-/// forced along the way, equals the bound of a [`Gf2Graph`] built afresh from its state, and the forced members, the
-/// certified bounds and the solved bounds without a candidate are right.  Also on the board 1300 at W = 128, where the
-/// frames of Π⁺(U\*_{≥3}) are too wide for the engines of three words that the narrower sets have, and need that of
-/// four.
-#[test]
-#[cfg_attr(
-    debug_assertions,
-    ignore = "long: the quick check is levels_match_fresh_matroids_along_a_few_random_paths_in_the_extended_problem"
-)]
-fn levels_match_fresh_matroids_along_random_paths_in_the_extended_problem() {
-    let mut rng = Rng(0x0E87_5EED_C0FF_EE01);
-    let (mut walked, start) = (Walked::default(), Instant::now());
-    let boards = [60, 90, 120, 160, 200, 260, 300, 360, 420, 520, 600, 760, 1000];
-    walk_extended_problems::<16>(&boards, 12, &mut rng, &mut walked);
-    walk_extended_problems::<128>(&[1300], 4, &mut rng, &mut walked);
-    println!("walked in {:.1?}", start.elapsed());
-    assert_walks_reached(&walked, 100);
-}
-
-/// The same walks, longer: more paths on more boards, with the boards 1300 and 1500 at W = 128 as well.
-#[test]
-#[ignore = "walks the extended problem on 16 boards, 40 or 10 paths a problem, about 50 s in release"]
-fn levels_match_fresh_matroids_along_many_random_paths_in_the_extended_problem() {
-    let mut rng = Rng(0x0E87_5EED_C0FF_EE02);
-    let (mut walked, start) = (Walked::default(), Instant::now());
-    let boards = [45, 60, 75, 90, 105, 120, 150, 200, 260, 330, 420, 600, 800, 1000];
-    walk_extended_problems::<16>(&boards, 40, &mut rng, &mut walked);
-    walk_extended_problems::<128>(&[1300, 1500], 10, &mut rng, &mut walked);
-    println!("walked in {:.1?}", start.elapsed());
-    assert_walks_reached(&walked, 300);
-}
-
-/// The free blocks of a graph of the extended problem are as described (`Gf2Graph`, "One-sided candidates"), on a
-/// board with many one-sided candidates: the blocks of each side (side 0 holds the even frames, side 1 the odd ones)
-/// are its frames' blocks and `ceil(coloops / (64·words))` free blocks (the `coloops` being the one-sided candidates
-/// whose own frame is on the other side, so that each has a coordinate of its own on this one); each one-sided element
-/// is, on the side of the other parity, in a free block with a unit vector that no other element shares, and on the
-/// side of its own frame in block `own / 2`, a frame's block with a vector that is not zero; and no free block holds
-/// another element or is empty.  Returns the number of free blocks on each side.
-fn check_free_blocks<const W: usize>(n: u32) -> [usize; 2] {
-    let board = Board::<W>::for_n(n);
-    let open: Bits<W> = upper_from_3(&board).into_iter().collect();
-    let (_, p) = extended_problem(&board, &open).unwrap_or_else(|e| panic!("n={n}: {e}"));
-    let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
-    let frames = p.root.frames().len();
-    let (words, per_block) = (graph.words, 64 * graph.words);
-    let frame_blocks = [frames.div_ceil(2), frames / 2];
-    assert_eq!(graph.ranks.len(), frames, "n={n}: a rank for each frame");
-
-    // The one-sided candidates that are elements, by the side on which each has a coordinate of its own.
-    let mut coloops: [Vec<usize>; 2] = Default::default();
-    for &(s, j) in p.model.one_sided() {
-        assert_eq!(p.model.own(s), Some(j), "n={n}: the own frame of {s}");
-        if let Some(e) = graph.element(s) {
-            coloops[1 - j % 2].push(e as usize);
-        }
-    }
-    let total = coloops[0].len() + coloops[1].len();
-    println!(
-        "n={n}: {} one-sided candidates, {total} of them elements, coloops {}+{}, {frames} frames, {words} words, \
-         blocks {:?}, ranks {:?}",
-        p.model.one_sided().len(),
-        coloops[0].len(),
-        coloops[1].len(),
-        graph.blocks,
-        graph.ranks()
-    );
-    assert!(total > 100, "n={n}: only {total} one-sided elements");
-    for m in 0..2 {
-        let free = coloops[m].len().div_ceil(per_block);
-        assert_eq!(graph.blocks[m], frame_blocks[m] + free, "n={n}, side {m}: the number of blocks");
-        assert_eq!(graph.block_elems[m].len(), graph.blocks[m], "n={n}, side {m}: the lists of the blocks");
-
-        // The coordinates of the free blocks: one unit vector for each of `coloops`, each used once.
-        let mut used = HashSet::new();
-        for &e in &coloops[m] {
-            let block = usize::from(graph.block[m][e]);
-            assert!(block >= frame_blocks[m], "n={n}: the coloop {} is in the frame block {block}", graph.elems[e]);
-            let vector = &graph.vecs[m][e * words..(e + 1) * words];
-            let bits: u32 = vector.iter().map(|w| w.count_ones()).sum();
-            assert_eq!(bits, 1, "n={n}: the coloop {} has a vector of {bits} set bits", graph.elems[e]);
-            let coordinate = vector.iter().position(|&w| w != 0).map(|i| 64 * i + vector[i].trailing_zeros() as usize);
-            assert!(
-                used.insert((block, coordinate)),
-                "n={n}: the coordinate {coordinate:?} of block {block} is shared"
-            );
-        }
-        // The free blocks hold only elements of `coloops`, at most `per_block` of them, and none is empty.
-        for block in frame_blocks[m]..graph.blocks[m] {
-            let members = &graph.block_elems[m][block];
-            assert!(
-                !members.is_empty() && members.len() <= per_block,
-                "n={n}: free block {block} holds {}",
-                members.len()
-            );
-            assert!(
-                members.iter().all(|e| coloops[m].contains(&(*e as usize))),
-                "n={n}: free block {block}: not coloops"
-            );
-        }
-        let in_free_blocks: usize = (frame_blocks[m]..graph.blocks[m]).map(|b| graph.block_elems[m][b].len()).sum();
-        assert_eq!(in_free_blocks, coloops[m].len(), "n={n}, side {m}: coloops in free blocks");
-        // The frames' blocks hold none of `coloops`.
-        for block in 0..frame_blocks[m] {
-            assert!(
-                graph.block_elems[m][block].iter().all(|e| !coloops[m].contains(&(*e as usize))),
-                "n={n}: a coloop in the frame block {block} of side {m}"
-            );
-        }
-    }
-
-    // Each one-sided element's block on the side of its own frame is the frame's, with a vector that is not zero.
-    for &(s, j) in p.model.one_sided() {
-        let Some(e) = graph.element(s) else { continue };
-        let e = e as usize;
-        assert_eq!(usize::from(graph.block[j % 2][e]), j / 2, "n={n}: the block of {s} on the side of its frame {j}");
-        assert!(
-            graph.vecs[j % 2][e * words..(e + 1) * words].iter().any(|&w| w != 0),
-            "n={n}: {s} is a loop of its frame"
-        );
-    }
-    // Every list of a block holds exactly the elements that say they are in it.
-    for m in 0..2 {
-        for e in 0..graph.len() {
-            let block = usize::from(graph.block[m][e]);
-            assert!(
-                graph.block_elems[m][block].contains(&(e as u32)),
-                "n={n}: element {e} is not in its block {block}"
-            );
-        }
-        let listed: usize = graph.block_elems[m].iter().map(Vec::len).sum();
-        assert_eq!(listed, graph.len(), "n={n}, side {m}: elements listed in blocks");
-    }
-    [0, 1].map(|m| graph.blocks[m] - frame_blocks[m])
-}
-
-/// The free blocks of the graph of Π⁺(U\*_{≥3}) on the board 1000, where each side has at least one, and on the
-/// board 2000, where there are more one-sided elements on one side than a block holds and so more than one free block
-/// (see [`check_free_blocks`]).
-#[test]
-fn free_blocks_hold_the_coloops_of_the_one_sided_candidates() {
-    let free = check_free_blocks::<16>(1000);
-    assert!(free.iter().all(|&blocks| blocks >= 1), "free blocks on the board 1000: {free:?}");
-    let free = check_free_blocks::<32>(2000);
-    assert!(free.iter().any(|&blocks| blocks >= 2), "free blocks on the board 2000: {free:?}");
 }
 
 /// The engines of every number of block words search alike.  For boards whose frames need one or two words, the

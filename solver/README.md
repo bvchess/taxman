@@ -49,5 +49,4 @@ file your task needs.
 * `check_results.py` and `check_bounds.py`, the second verifiers of the results files and of the bounds store, which
   share no code with the programs;
 * `read_profile.py`, the reader of the profile of a search (`taxman solve --profile`): where its steps went;
-* `cloud/`, the scripts of the RUNBOOK, and `certify/`, the work list of the certificates of U
-  ([its README](tools/certify/README.md)).
+* `cloud/`, the scripts of the RUNBOOK.

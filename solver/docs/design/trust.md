@@ -35,11 +35,10 @@ results file it appends to.
 a checkpoint of another search.  It holds:
 
 * a format version, the set width and n;
-* digests of the root's candidates, of the frames (every frame's moves, factors and freedoms, as built) and of the
-  one-sided candidates of the extended problem ([extended-mode.md](extended-mode.md));
+* digests of the root's candidates and of the frames (every frame's moves, factors and freedoms, as built);
 * `max_total` and the search tactics, one bit for each that is on ([tactics.md](tactics.md)).
 
-The header's format is version 7, and this build reads no other: a header of any other version is refused with one
+The header's format is version 8, and this build reads no other: a header of any other version is refused with one
 message, naming the version, and a search is finished by the build that made it.  The finder (`--finder-after`,
 [finder.md](finder.md)) is in no version: it only offers sets, each after the check below, so a checkpoint resumes with
 any finder or none.  The switches `conflict_branching` and `conflict_look` have a bit each among the search tactics,

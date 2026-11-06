@@ -13,13 +13,12 @@ solver's design](../../solver/docs/design/tests.md#the-theorys-results).
 ## Statement U
 
 Statement U holds at n exactly when the frame solver's answer ΣU\* + P\*(Π_n) equals opt(n), by [the corollary of U
-(X8)](exactness.md#statement-u).  Two computations prove that equality game by game, and how far each reaches grows as
-the work goes on, so the ranges are behind the links.
+(X8)](exactness.md#statement-u).  The prover proves that equality game by game, and how far it reaches grows as the work
+goes on, so the range is behind the link.
 
 | statement | evidence | what one must trust |
 |---|---|---|
 | [statement U](exactness.md#statement-u), at the games the prover has proven | The prover proves opt(n) on the whole board, game by game, by a branch and bound with peel, [the parity bound (W1)](parity-bound.md#the-parity-bound) and the bounds between neighboring games ([solver/noframe/docs/proofs.md](../../solver/noframe/docs/proofs.md); from scratch to 1300 in 1.18 hours of thread time, `solver/noframe/data/exact_parity_2_1300.jsonl`).  Wherever its opt(n) is the score that the frame solver recorded for a game that plays U\*, U holds at n.  [results/README.md](../../results/README.md#what-supports-the-scores) gives the range. | the prover, and the frame solver for the score it matches |
-| statement U, at the games with a certificate | The frame solver's `taxman certify` applies [the certificate theorem (E2)](extended-problem.md#the-certificate-theorem): the prover's barred bounds certify most members of U\*_{≥3}, and a search of the extended problem with the others open finds nothing above the recorded score; `taxman verify-certificates` checks the file.  [results/README.md](../../results/README.md#certificates) gives the games and the time. | the frame solver's search of the extended problem, and the prover's barred bounds |
 | statement U: the share that barred bounds certify | The prover's `src/bin/upper.rs` computes [the barred bound (W2)](parity-bound.md#the-barred-bound) of each member of U\*_{≥3} in every game of 2..3440 that needs it, in four files (`solver/noframe/data/upper_2_1300.jsonl`, `upper_1301_2175.jsonl`, `upper_2176_3314.jsonl` and `upper_3315_3440.jsonl`; 65 s, 300 s, 1,272 s and 277 s on one thread).  It certifies every member of many games up to 1300 and of none past it; [proofs.md, "The upper part, game by game"](../../solver/noframe/docs/proofs.md#the-upper-part-game-by-game) has the counts by band. | the prover |
 | [the strong form of U](uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board) | In every game whose optimal sets the prover listed completely (the row on [the uniqueness of the optimal set](#observations)), every optimal set has the upper part U\*. | the prover's enumeration |
 

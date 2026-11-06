@@ -14,8 +14,7 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 1. `src/game.rs`: the rules as a referee, and the built-in table of optimal moves, the lines of
    `results/optimal.jsonl.gz` as of the build, decoded through [the gzip crate](../../gzip/README.md).
 2. `src/numtheory.rs`: maximal factors and composites; and `src/playable.rs`, whether a set of numbers can all be played
-   on the whole board, with nothing of the frame model (the oracle of the model's tests, and the referee of
-   `taxman certify`).
+   on the whole board, with nothing of the frame model (the oracle of the model's tests).
 3. `src/bits.rs`: `Bits<W>`, the fixed-width bitsets of game numbers that everything above is generic over, and the set
    widths.  The module comment is enough at first.
 4. `src/json.rs`: the small JSON reader and writer.  Skim it; it matters once you read results lines.  `src/rng.rs`
@@ -62,16 +61,16 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 **Solving.**
 
 13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/store.rs`, `src/known.rs`,
-    `src/certify.rs`, `src/paths.rs`: the switchable tactics, a board prepared for a search, the per-game pipeline,
+    `src/paths.rs`: the switchable tactics, a board prepared for a search, the per-game pipeline,
     provenance and verification, the bounds store's line and the relations between games, the known moves that
-    `--use-prev` draws on, the certificates of `taxman certify`, and the default files.  The range driver is
+    `--use-prev` draws on, and the default files.  The range driver is
     `src/solver/window.rs`, the window of games in flight, and its child `window/allot.rs` shares the threads among
     them.
 
 **The front end.**
 
 14. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line, with the commands `solve`, `regress`,
-    `verify-results`, `tables`, `certify` and `verify-certificates`.
+    `verify-results` and `tables`.
 
 **Studies**, which the solver does not use and a first read skips:
 

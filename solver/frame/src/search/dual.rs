@@ -46,7 +46,7 @@ impl<'a, const W: usize> NodeBound<'a, W> {
     pub fn completions(&mut self, unit: &TaxUnit<W>) -> Option<u64> {
         let p = self.prepared;
         let state = p.model.promote_all_using(&mut self.scratch, &p.root, &unit.promoted)?;
-        let max_add = max_additional(&p.model, p.max_total, &state, &unit.promoted, &unit.cands);
+        let max_add = max_additional(p.max_total, &state, &unit.promoted, &unit.cands);
         self.gf2.reset(&unit.promoted, &unit.cands);
         Some(self.gf2.evaluate(max_add, None).value)
     }

@@ -659,7 +659,7 @@ fn units_and_headers_round_trip() {
     let header = Header::of(&p);
     let bytes = header.encode();
     assert_eq!(bytes.len(), Header::<8>::LEN);
-    assert_eq!((Header::<8>::LEN, Header::<8>::VERSION), (46, 7));
+    assert_eq!((Header::<8>::LEN, Header::<8>::VERSION), (38, 8));
     let back = Header::<8>::decode(&bytes).unwrap();
     assert_eq!(back, header);
     assert_eq!((back.n, back.max_total, back.tactics), (300, p.max_total, p.tactics));
@@ -667,31 +667,31 @@ fn units_and_headers_round_trip() {
     assert!(Header::<16>::decode(&bytes).unwrap_err().contains("Bits<8>"));
     assert!(Header::<8>::decode(b"nonsense").unwrap_err().contains("not a checkpoint"));
     assert!(Header::<8>::decode(&bytes[..20]).is_err());
-    // The layout: the magic, the version, the width and n, the digests (the extended problem's test finds them where
-    // they are), `max_total` and the tactics' bits, which the defaults make 0x2FF.
+    // The layout: the magic, the version, the width and n, the digests of the candidates and of the frames,
+    // `max_total` and the tactics' bits, which the defaults make 0x2FF.
     assert_eq!(&bytes[..4], b"TXSH");
-    assert_eq!(bytes[4..8], 7u32.to_le_bytes());
+    assert_eq!(bytes[4..8], 8u32.to_le_bytes());
     assert_eq!(bytes[8..12], 8u32.to_le_bytes());
     assert_eq!(bytes[12..16], 300u32.to_le_bytes());
-    assert_eq!(bytes[40..44], p.max_total.to_le_bytes());
-    assert_eq!(Header::of(&prepare_golden::<8>(&load(300), SearchTactics::default())).encode()[44..], [0xFF, 0x02]);
+    assert_eq!(bytes[32..36], p.max_total.to_le_bytes());
+    assert_eq!(Header::of(&prepare_golden::<8>(&load(300), SearchTactics::default())).encode()[36..], [0xFF, 0x02]);
     // Every other format version, the older ones included (`TXS2` was version 2), is refused with one message, naming
     // its number; a header of the magic of another format is no checkpoint of a search at all.
     let versioned = |version: u32| [&bytes[..4], &version.to_le_bytes(), &bytes[8..]].concat();
-    assert_eq!(Header::<8>::decode(&versioned(7)), Ok(header));
-    for (version, bytes) in [3, 4, 5, 6, 8]
+    assert_eq!(Header::<8>::decode(&versioned(8)), Ok(header));
+    for (version, bytes) in [3, 4, 5, 6, 7, 9]
         .map(|v| (v.to_string(), versioned(v)))
         .into_iter()
         .chain([("unreadable".to_owned(), b"TXSH".to_vec())])
     {
         let err = Header::<8>::decode(&bytes).unwrap_err();
-        let message = format!("format version {version}, and this build reads version 7 only");
+        let message = format!("format version {version}, and this build reads version 8 only");
         assert!(err.contains(&message), "{err}");
     }
     assert!(Header::<8>::decode(&[b"TXS2".as_slice(), &bytes[4..]].concat()).unwrap_err().contains("not a checkpoint"));
     // A bit that no tactic uses is refused.
     let mut unknown = bytes.clone();
-    unknown[45] = 0x04;
+    unknown[37] = 0x04;
     assert!(Header::<8>::decode(&unknown).unwrap_err().contains("unknown tactics"));
     // Every field that differs is named.
     let other = |change: fn(&mut Header<8>)| {
@@ -702,7 +702,6 @@ fn units_and_headers_round_trip() {
     assert!(other(|h| h.n = 301).contains("n=301, not n=300"));
     assert!(other(|h| h.candidates ^= 1).contains("candidates"));
     assert!(other(|h| h.frames ^= 1).contains("frames"));
-    assert!(other(|h| h.one_sided ^= 1).contains("one-sided candidates"));
     assert!(other(|h| h.max_total += 1).contains("max_total"));
     assert!(other(|h| h.tactics.nogoods = !h.tactics.nogoods).contains("tactics"));
     // The branching switch is recorded, as the search began with it, but binds nothing: a header with it the other way
@@ -797,216 +796,14 @@ fn units_and_headers_round_trip() {
     assert_eq!(SearchTactics::WARM_START_BIT, 1 << 9);
 }
 
-// ---- the extended problem: one-sided candidates ----
-
-/// U\*_{≥3} of `board`: the sources that setup keeps (the numbers above n/2 of the moves with no promotions) with three
-/// or more prime factors, which can be open in the extended problem Π⁺(O).
-fn open_sources<const W: usize>(board: &Board<W>) -> Bits<W> {
-    board.plain.iter().copied().filter(|&x| 2 * x > board.n() && board.tables.omega(x) >= 3).collect()
-}
-
-/// A checkpoint of the search of `prepared` that holds the root unit, made by a deadline that has passed before the
-/// search starts, in `path`.
-fn root_checkpoint<const W: usize>(prepared: &Prepared<W>, path: &std::path::Path) {
-    let cfg = EngineConfig {
-        checkpoint: Some((path.to_path_buf(), Duration::from_secs(3600))),
-        time_limit: Some(Duration::ZERO),
-        ..config(1)
-    };
-    assert!(!search(prepared, &cfg, None, None, false).unwrap().completed);
-    assert!(path.exists(), "a search stopped by its limit leaves a checkpoint");
-}
-
-/// The header of a problem with one-sided candidates carries a digest of them, each with its frame, after the digest
-/// of the frames: it round-trips, sits where the layout says, differs from that of a problem with none and from that of
-/// other one-sided candidates, and the difference is named.
-#[test]
-fn the_header_of_an_extended_problem_records_its_one_sided_candidates() {
-    let board = Board::<8>::for_n(300);
-    let open = open_sources(&board);
-    assert!(open.len() > 2, "{open:?}");
-    let (ext, prepared) = board.prepare_extended_with(&open, false, SearchTactics::extended()).unwrap();
-    let (_, empty) = board.prepare_extended(false, SearchTactics::extended()).unwrap();
-    assert!(prepared.model.has_one_sided() && !empty.model.has_one_sided());
-
-    let header = Header::of(&prepared);
-    let bytes = header.encode();
-    assert_eq!(bytes.len(), Header::<8>::LEN);
-    assert_eq!(Header::<8>::decode(&bytes), Ok(header));
-    // Magic, version, width, n, then the digests of the candidates, of the frames and of the one-sided candidates.
-    let digest_at = |at: usize| u64::from_le_bytes(bytes[at..at + 8].try_into().unwrap());
-    assert_eq!(digest_at(16), header.candidates);
-    assert_eq!(digest_at(24), header.frames);
-    assert_eq!(digest_at(32), header.one_sided);
-
-    // The digest is of the model's one-sided candidates, which are the open sources and those greedy rejected.
-    let digest = |one_sided: &[(u32, usize)]| Header::<8>::digest_one_sided(one_sided);
-    assert_eq!(header.one_sided, digest(&ext.one_sided));
-    assert_eq!(header.one_sided, digest(prepared.model.one_sided()));
-    assert!(ext.one_sided.len() >= open.len() as usize);
-    assert_eq!(Header::of(&empty).one_sided, digest(&[]));
-    assert_ne!(header.one_sided, digest(&[]));
-    // A candidate and its frame are both in the digest, and so is every candidate.
-    let mut other_frame = ext.one_sided.clone();
-    other_frame[0].1 += 1;
-    assert_ne!(digest(&other_frame), header.one_sided);
-    assert_ne!(digest(&ext.one_sided[1..]), header.one_sided);
-    assert_ne!(digest(&ext.one_sided[..ext.one_sided.len() - 1]), header.one_sided);
-
-    // Another problem's header is refused, saying what differs.
-    let message = Header::of(&empty).mismatch(&header).unwrap();
-    assert!(message.starts_with("the checkpoint is of other "), "{message}");
-    let mut forged = header;
-    forged.one_sided = digest(&other_frame);
-    let message = forged.mismatch(&header).unwrap();
-    assert!(message.contains("other one-sided candidates"), "{message}");
-    assert_eq!(header.mismatch(&header), None);
-}
-
-/// A checkpoint written for Π⁺(O) is resumed for Π⁺(O) and for nothing else: not for the same board with other open
-/// sources, with none, or as the frame model's problem.  The problems differ in their candidates (every open source is
-/// one) and in their frames (an open source is no move), well before the digest of the one-sided candidates, so the
-/// message names the candidates.  (Of the open sets tried on every board to 400, the empty set, all of U\*_{≥3}, each
-/// source alone and six random subsets, no two pose problems with the same candidates, frames and `max_total` and other
-/// one-sided candidates, so the refusal for that is tested on a header above and on a checkpoint forged to carry
-/// another digest, in `tests/robustness.rs`.)
-#[test]
-fn a_checkpoint_of_one_extended_problem_is_refused_for_another() {
-    let board = Board::<8>::for_n(300);
-    let open = open_sources(&board);
-    let fewer: Bits<8> = open.iter().take(open.len() as usize / 2).collect();
-    assert!(!fewer.is_empty() && fewer != open);
-    let dir = TempDir::new("extended-other");
-    let checkpoint = dir.0.join("ckpt.bin");
-    let (ext, prepared) = board.prepare_extended_with(&open, false, SearchTactics::extended()).unwrap();
-    root_checkpoint(&prepared, &checkpoint);
-
-    // The same problem resumes, and finishes with P*.
-    let (_, resumed) = board.prepare_extended_for_resume(&open, false, &checkpoint).unwrap();
-    assert_eq!((resumed.problem(), resumed.tactics), (prepared.problem(), prepared.tactics));
-    let cfg = EngineConfig { checkpoint: Some((checkpoint.clone(), Duration::from_secs(3600))), ..config(1) };
-    let result = search(&resumed, &cfg, None, None, true).unwrap();
-    let truth = crate::game::Optimal::built_in().score(300).unwrap() - ext.in_the_bag;
-    assert!(result.completed && result.sum == truth, "{} not {truth}", result.sum);
-
-    // Another problem is refused, naming what differs, and the checkpoint is left alone.
-    root_checkpoint(&prepared, &checkpoint);
-    for (what, other) in [("fewer open sources", fewer), ("no open source", Bits::EMPTY)] {
-        let err = board.prepare_extended_for_resume(&other, false, &checkpoint).err().expect(what);
-        assert!(err.starts_with("the checkpoint is of other promotion candidates"), "{what}: {err}");
-    }
-    let err = board.prepare_for_resume(&checkpoint).err().expect("the frame model");
-    assert!(err.starts_with("the checkpoint is of other "), "the frame model: {err}");
-    let next = Board::<8>::for_n(301);
-    let err = next.prepare_extended_for_resume(&open_sources(&next), false, &checkpoint).err().expect("another board");
-    assert!(err.contains("the game n=300, not n=301"), "another board: {err}");
-    assert!(checkpoint.exists(), "a refused checkpoint is left alone");
-    // The tactics of a checkpoint that the problem refuses are refused when it is resumed, by the setup: a checkpoint
-    // of Π⁺(∅) under the default tactics, with the rule of the symmetric pairs, resumed for Π⁺(O).
-    root_checkpoint(&board.prepare_extended(false, SearchTactics::default()).unwrap().1, &checkpoint);
-    let err =
-        board.prepare_extended_for_resume(&open, false, &checkpoint).err().expect("tactics that cannot search it");
-    assert!(err.contains("one-sided") && err.contains("symmetry=on"), "{err}");
-}
-
-/// A search with one-sided candidates refuses the rule of the symmetric pairs, and the setup says so; the tactics of
-/// extended mode are accepted.  With no open source (and no source greedy rejected) there is no one-sided candidate and
-/// every tactics are accepted.
-#[test]
-fn a_problem_with_one_sided_candidates_is_set_up_only_for_the_tactics_that_know_them() {
-    let board = Board::<8>::for_n(200);
-    let open = open_sources(&board);
-    assert!(!open.is_empty());
-    let extended = SearchTactics::extended();
-    assert_eq!(extended, SearchTactics { symmetry: false, ..SearchTactics::default() });
-    assert_eq!(extended.refusal_with_one_sided(), None);
-
-    let (ext, prepared) = board.prepare_extended_with(&open, false, extended).unwrap();
-    assert!(prepared.model.has_one_sided() && prepared.tactics == extended);
-    assert_eq!(prepared.candidates, ext.one_sided.iter().fold(ext.candidates, |set, &(s, _)| set.with(s)));
-    assert_eq!(prepared.model.one_sided(), ext.one_sided.as_slice());
-
-    let cases = [
-        ("the default", SearchTactics::default()),
-        ("the rule, no forced members", SearchTactics { fix_forced: false, symmetry: true, ..extended }),
-    ];
-    for &(what, tactics) in &cases {
-        let err =
-            board.prepare_extended_with(&open, false, tactics).err().unwrap_or_else(|| panic!("{what}: accepted"));
-        assert!(err.contains("one-sided candidates (extended mode) cannot run with symmetry=on"), "{what}: {err}");
-        assert_eq!(Some(err.clone()), tactics.refusal_with_one_sided(), "{what}");
-        // The setup of a resumed search takes the tactics of the checkpoint through the same check, and the setup that
-        // takes no one-sided candidate (the default path's) is not asked.
-        let columns = ext.columns();
-        let refused = prepare_extended(&board.tables, &columns, &ext.one_sided, &ext.candidates, tactics);
-        assert_eq!(refused.err().as_ref(), Some(&err), "{what}: prepare_extended");
-        assert!(prepare::<8>(&board.tables, &columns, &ext.candidates, tactics).is_ok(), "{what}: prepare");
-    }
-
-    // With nothing open, any tactics: Π⁺(∅) is the frame model's problem.
-    for &(what, tactics) in &cases {
-        let (empty, prepared) = board.prepare_extended(false, tactics).unwrap_or_else(|e| panic!("{what}: {e}"));
-        assert!(!prepared.model.has_one_sided() && empty.one_sided.is_empty(), "{what}");
-        let (_, same) = board.prepare_extended_with(&Bits::EMPTY, false, tactics).unwrap();
-        assert_eq!((same.problem(), same.tactics), (prepared.problem(), tactics), "{what}");
-    }
-}
-
-/// An open source adds one to the rank of its frame, so a problem with many open sources can need more block words of
-/// the GF(2) bound than the engines of a narrow set width have (three, rank 192; five, rank 320, for the widest): the
-/// setup refuses it, naming the words, instead of failing in the search; at 128 words it is accepted.  With every
-/// source of three or more prime factors open, frame 0 of the board 1265 has rank 192 or less and that of 1266 more.
-#[test]
-fn a_problem_whose_frame_needs_more_block_words_than_the_set_width_has_is_refused() {
-    fn words<const W: usize>(prepared: &Prepared<W>) -> usize {
-        Gf2Graph::new(&prepared.model, &prepared.root, &prepared.candidates).words()
-    }
-    assert_eq!((Gf2Bound::<20>::MOST_WORDS, Gf2Bound::<64>::MOST_WORDS, Gf2Bound::<128>::MOST_WORDS), (3, 3, 5));
-
-    // Below the boundary the problem fits the narrow engines (the rank is high, near 192).
-    let board = Board::<20>::for_n(1265);
-    let (_, fits) = board.prepare_extended_with(&open_sources(&board), false, SearchTactics::extended()).unwrap();
-    assert_eq!(words(&fits), 3);
-
-    for n in [1266, 1300] {
-        let narrow = crate::with_width!(n, W => {
-            let board = Board::<W>::for_n(n);
-            let err = board.prepare_extended_with(&open_sources(&board), false, SearchTactics::extended());
-            (W, err.err().unwrap_or_else(|| panic!("n={n}: accepted at W={W}")))
-        });
-        let (width, err) = narrow;
-        assert!(width < 64, "n={n}: the natural width {width}");
-        let wanted = format!(
-            "n={n}: a frame of the problem needs 4 block words of the GF(2) bound, and the set width {width} has \
-             engines of at most 3 "
-        );
-        assert!(err.starts_with(&wanted), "n={n}: {err}");
-
-        // The widest set holds engines of five words, and the engine of four is made for the problem it accepts.
-        let wide = Board::<128>::for_n(n);
-        let (_, accepted) = wide.prepare_extended_with(&open_sources(&wide), false, SearchTactics::extended()).unwrap();
-        assert_eq!(words(&accepted), 4, "n={n}: the words the problem needs");
-        let graph = Gf2Graph::new(&accepted.model, &accepted.root, &accepted.candidates);
-        let mut bound = Gf2Bound::<128>::new(&graph);
-        bound.reset(&Bits::EMPTY, &accepted.candidates);
-        let root = bound.evaluate(accepted.max_total, None).value;
-        assert!(
-            root >= accepted.greedy.sum(),
-            "n={n}: the root's bound {root}, the greedy set {}",
-            accepted.greedy.sum()
-        );
-    }
-}
-
 /// The form of `problem` ([`Problem`]'s list of numbers).
 fn form_of(problem: &Problem) -> Vec<u32> {
     problem.form().to_vec()
 }
 
-/// Where the part of `form` that a problem without one-sided candidates ends: after the frames (their freedoms, moves
-/// and factors), the candidates, `max_total`, and for each number of the frames, ascending, its record.  Checked as it
-/// is walked: the frames of `prepared` are what it lists.
-fn plain_part_of<const W: usize>(form: &[u32], prepared: &Prepared<W>) -> usize {
+/// Where `form` ends: after the frames (their freedoms, moves and factors), the candidates, `max_total`, and for each
+/// number of the frames, ascending, its record.  Checked as it is walked: the frames of `prepared` are what it lists.
+fn end_of_form<const W: usize>(form: &[u32], prepared: &Prepared<W>) -> usize {
     let list = |at: &mut usize| -> Vec<u32> {
         let len = form[*at] as usize;
         *at += 1 + len;
@@ -1036,78 +833,24 @@ fn plain_part_of<const W: usize>(form: &[u32], prepared: &Prepared<W>) -> usize 
     at
 }
 
-/// The extended problem Π⁺(∅) poses the search problem that [`prepare`] poses for the same frames and candidates: the
-/// same form and digest, with no tag of one-sided candidates, on every board to 300 (at width 8) and at larger boards
-/// at their own widths.
+/// The form of the problem that [`prepare`] poses is what [`Problem`] lists, with nothing after it; its digest is the
+/// checksum of the whole form; and [`problem_of`] rebuilds the same problem: on every board to 300 (at width 8) and at
+/// larger boards at their own widths.
 #[test]
-fn the_problem_of_the_extended_problem_with_no_open_source_is_the_plain_problem() {
+fn the_form_of_a_problem_is_what_the_problem_lists() {
     fn check<const W: usize>(n: u32) {
         let board = Board::<W>::for_n(n);
-        let (ext, extended) = board.prepare_extended(false, SearchTactics::default()).unwrap();
-        let plain = prepare::<W>(&board.tables, &ext.columns(), &ext.candidates, SearchTactics::default()).unwrap();
-        let (problem, other) = (extended.problem(), plain.problem());
-        assert_eq!(problem, other, "n={n}");
-        assert_eq!(problem.digest(), other.digest(), "n={n}");
-        assert_eq!(problem, problem_of::<W>(&board.tables, &ext.columns(), &ext.candidates).unwrap(), "n={n}");
-        let form = form_of(&problem);
-        assert_eq!(plain_part_of(&form, &extended), form.len(), "n={n}: a form with nothing after the numbers' lists");
-        assert!(!form.contains(&Problem::ONE_SIDED), "n={n}: a tag of one-sided candidates");
-        assert_eq!(problem.size().candidates, extended.candidates.len(), "n={n}");
+        let prepared = board.prepare(SearchTactics::default()).unwrap();
+        let (problem, form) = (prepared.problem(), form_of(&prepared.problem()));
+        assert_eq!(problem, board.problem().unwrap(), "n={n}");
+        assert_eq!(end_of_form(&form, &prepared), form.len(), "n={n}: a form with nothing after the numbers' lists");
+        let bytes: Vec<u8> = form.iter().flat_map(|word| word.to_le_bytes()).collect();
+        assert_eq!(problem.digest(), engine::checksum(&bytes), "n={n}");
+        assert_eq!(problem.size().candidates, prepared.candidates.len(), "n={n}");
     }
     (2..=300).for_each(check::<8>);
     for n in [480, 600, 760, 1000, 1133, 1300] {
         crate::with_width!(n, W => check::<W>(n));
-    }
-}
-
-/// The form of a problem with one-sided candidates ends, after the lists of the numbers of the frames, with the tag
-/// [`Problem::ONE_SIDED`] once, their number, and for each, ascending, the number, its own frame and the maximal
-/// factors that can pay for it; the digest is that of the whole form, so it tells the problem from every one with other
-/// one-sided candidates, and from the same frames and candidates without them.
-#[test]
-fn the_form_of_a_problem_with_one_sided_candidates_ends_with_them() {
-    fn check<const W: usize>(n: u32) {
-        let board = Board::<W>::for_n(n);
-        let open = open_sources(&board);
-        let few: Bits<W> = open.iter().take(5).collect();
-        let (_, empty) = board.prepare_extended(false, SearchTactics::extended()).unwrap();
-        for (what, set) in [("all of U*>=3", open), ("five sources", few)] {
-            let (_, prepared) = board.prepare_extended_with(&set, false, SearchTactics::extended()).unwrap();
-            let one_sided = prepared.model.one_sided();
-            assert!(one_sided.len() >= set.len() as usize, "n={n} {what}");
-            let (problem, form) = (prepared.problem(), form_of(&prepared.problem()));
-            let at = plain_part_of(&form, &prepared);
-            assert_eq!(form.iter().filter(|&&word| word == Problem::ONE_SIDED).count(), 1, "n={n} {what}: the tag");
-            assert_eq!(form[at], Problem::ONE_SIDED, "n={n} {what}: the tag follows the numbers' lists");
-            assert_eq!(form[at + 1] as usize, one_sided.len(), "n={n} {what}: their number");
-            let mut rest = at + 2;
-            for &(s, frame) in one_sided {
-                let factors: Vec<u32> = prepared.model.graph().factors(s).iter().map(|&y| u32::from(y)).collect();
-                assert!(!factors.is_empty(), "n={n} {what}: {s} has no factor to pay for it");
-                assert_eq!(form[rest..rest + 3], [s, frame as u32, factors.len() as u32], "n={n} {what}: {s}");
-                assert_eq!(form[rest + 3..rest + 3 + factors.len()], factors[..], "n={n} {what}: the factors of {s}");
-                rest += 3 + factors.len();
-            }
-            assert_eq!(rest, form.len(), "n={n} {what}: nothing after the one-sided candidates");
-            assert_eq!(problem.size().candidates, prepared.candidates.len(), "n={n} {what}: the candidates");
-            assert_eq!(problem.size().frames as usize, prepared.root.len(), "n={n} {what}: the frames");
-
-            // The digest covers the whole form, the one-sided candidates and all, and differs from Π⁺(∅)'s.
-            let bytes = |words: &[u32]| -> Vec<u8> { words.iter().flat_map(|word| word.to_le_bytes()).collect() };
-            assert_eq!(problem.digest(), engine::checksum(&bytes(&form)), "n={n} {what}");
-            assert_ne!(problem.digest(), engine::checksum(&bytes(&form[..at])), "n={n} {what}: without the tag");
-            assert_ne!(problem, empty.problem(), "n={n} {what}");
-            assert_ne!(problem.digest(), empty.problem().digest(), "n={n} {what}");
-            // The same problem set up again is the same.
-            let (_, again) = board.prepare_extended_with(&set, false, SearchTactics::extended()).unwrap();
-            assert_eq!((again.problem(), again.problem().digest()), (problem.clone(), problem.digest()));
-        }
-    }
-    for n in [100, 200, 300] {
-        check::<8>(n);
-    }
-    for n in [600, 1000] {
-        check::<16>(n);
     }
 }
 

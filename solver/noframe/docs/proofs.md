@@ -326,8 +326,8 @@ bound which of those members every set beating the recorded score V must play.
 Only the games that rest on the frame model need it: those neither at the ceiling nor given by the prime formula or the
 semiprime formula, whose lines say `"needs":1`.  The four files below were made before the semiprime formula, so their
 lines for the games it proves say `"needs":1` and `"relation":"none"`.  Certified members can be fixed in a search that leaves the open ones optional, the integrated
-search of the theory track, which the certificates of U carry out
-([solver/docs/design/certificates.md](../../docs/design/certificates.md)).  That is why the files are kept: U\* less a
+search of the theory track ([the certificate theorem
+(E2)](../../../docs/theory/extended-problem.md#the-certificate-theorem)).  That is why the files are kept: U\* less a
 game's open members is that search's fixed set.
 
 The tests check the certificates against every playable set that obeys F4, on boards to 60 (1,403 checks):
@@ -343,10 +343,10 @@ Four files, each made on one thread of the laptop:
 
 | file | games | needing it | time | what for |
 |---|---|---|---|---|
-| `data/upper_2_1300.jsonl` | the table's lines for 2..1300, 1,299 | 665 (417 of them with nothing open; 1.0% of the members open) | 65 s | the tests of `taxman certify` |
+| `data/upper_2_1300.jsonl` | the table's lines for 2..1300, 1,299 | 665 (417 of them with nothing open; 1.0% of the members open) | 65 s | |
 | `data/upper_1301_2175.jsonl` | the committed chain's lines for 1301–2175, 875 | 490 | 300 s | |
 | `data/upper_2176_3314.jsonl` | the copy of the cloud chain's results taken on 2026-10-15, games that the committed chain also holds, which [the gap past 2175](https://github.com/bvchess/taxman-notebook/blob/main/search/the-gap-past-2175-2026-10/README.md) measured; 1,139 | 635 | 1,272 s, 4.1 s for the slowest game | |
-| `data/upper_3315_3440.jsonl` | the rest of the committed chain as it stood then, 126 | 73, 3424, 3425 and 3440 among them | 277 s, 4.3 s for the slowest game | the input of the certificates of 2176-3440 (`../tools/certify/`) |
+| `data/upper_3315_3440.jsonl` | the rest of the committed chain as it stood then, 126 | 73, 3424, 3425 and 3440 among them | 277 s, 4.3 s for the slowest game | |
 
 By band, the open members and the margins of each game (the share is of all members):
 

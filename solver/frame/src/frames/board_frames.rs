@@ -39,7 +39,7 @@ pub struct Frame<const W: usize> {
     claimed: Bits<W>,
     /// The pairs `unzip` settled in this frame, as (source, factor, kind), in the order made, across all its calls on
     /// the frame.  The sources are exactly `mandatory` and the factors exactly `claimed`, each once.  Nothing in the
-    /// search reads them; they are for the extended problem and the tests of the frames.
+    /// search reads them; they are for the tests of the frames.
     claims: Vec<(u32, u32, ClaimKind)>,
     /// Sources that cannot be played together with the others.
     impossible: Bits<W>,
@@ -113,8 +113,8 @@ impl<const W: usize> Frame<W> {
     }
 
     /// The pairs `unzip` settled in the frame, as (source, factor, kind), in the order made.  The sources are exactly
-    /// the `mandatory` ones and the factors exactly the `claimed` ones, each once.  For the extended problem and the
-    /// tests of the frames; nothing in the search reads them.
+    /// the `mandatory` ones and the factors exactly the `claimed` ones, each once.  For the tests of the frames;
+    /// nothing in the search reads them.
     pub fn claims(&self) -> &[(u32, u32, ClaimKind)] {
         &self.claims
     }

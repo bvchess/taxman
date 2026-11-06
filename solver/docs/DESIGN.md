@@ -52,13 +52,11 @@ Each file explains one part of the solver and the reasons for it, and defines ea
 | carried nogoods | [carried-nogoods.md](design/carried-nogoods.md) | carry the nogoods of another search into a search, to prune with, and see why that keeps the search exact |
 | the finder | [finder.md](design/finder.md) | see how a thread beside a long search looks for a better incumbent, and why it cannot make an answer wrong |
 | the gate trial | [gate-trial.md](design/gate-trial.md) | see how a search tries gates of conflict branching on its own units and keeps the cheapest, and why that changes no answer |
-| extended mode | [extended-mode.md](design/extended-mode.md) | search the extended problem, with one-sided candidates, that a certificate of U searches |
 | the GF(2) bound, prime exchanges | [gf2-bound.md](design/gf2-bound.md) | change the GF(2) bound, or the symmetries of the promotions that prime exchanges give |
 | the tactics | [tactics.md](design/tactics.md) | add, change or switch off a tactic, and see what each one is proven or sound by |
 | the engine, the per-game pipeline | [engine.md](design/engine.md) | change how the threads share a search, how one game goes from its board to its result, or the window of games in flight |
 | results and the trust model | [trust.md](design/trust.md) | see why a result can be trusted: what a window changes, files with holes, known moves, the ledger |
 | same search | [same-search.md](design/same-search.md) | see why a game whose search problem an earlier game posed needs no search |
-| certificates of U | [certificates.md](design/certificates.md) | make or check a certificate of [statement U](../../docs/theory/exactness.md#statement-u) |
 | testing | [testing.md](design/testing.md) | test a change: why small games, the quick check and its limits, and the checklist before a merge |
 | the tests | [tests.md](design/tests.md) | find the tests that cover a part, and where a new test belongs |
 | performance | [performance.md](design/performance.md) | make the solver faster: what it costs and the probe |

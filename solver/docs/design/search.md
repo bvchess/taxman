@@ -9,8 +9,8 @@ incumbent), and the conflicts and nogoods that the branching rests on; the GF(2)
 rule of symmetric pairs are in [gf2-bound.md](gf2-bound.md).  "The default step" then puts them together, "Conflict branching"
 changes which conflict a node branches on, "The invariant of a running search" says what may change while it runs, and
 the last two parts are the search's start and the cut that the game before gives it.  The finder, a thread beside a
-long search, is in [finder.md](finder.md), and the search of a problem with one-sided candidates in
-[extended-mode.md](extended-mode.md).  The [glossary](../../../docs/GLOSSARY.md#the-search) defines the search's words.
+long search, is in [finder.md](finder.md).  The [glossary](../../../docs/GLOSSARY.md#the-search) defines the search's
+words.
 
 ## Search state and order
 
@@ -376,7 +376,6 @@ checks (tactic `near_repeat`, on by default; `search::NearRepeat`).
   state in Π_m is found only where it passes, once, from its parent's (one promotion) or from Π_m's root, and kept
   beside the node's own.
 
-The cut gives up only completions no heavier than the incumbent, and learns nothing, so the search stays exact.  It
-does not treat the one-sided candidates of extended mode.  A checkpoint records the tactic in bit 11 of its tactics,
-and the bit binds nothing: each run sets its cut up again, as it takes its ceiling, so a checkpoint resumes with the
-cut on or off.
+The cut gives up only completions no heavier than the incumbent, and learns nothing, so the search stays exact.  A
+checkpoint records the tactic in bit 6 of its tactics, and the bit binds nothing: each run sets its cut up again, as it
+takes its ceiling, so a checkpoint resumes with the cut on or off.

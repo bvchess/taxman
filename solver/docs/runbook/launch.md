@@ -22,7 +22,7 @@ calibration.  The jobs link here instead of repeating them.
   `shutdown -h +MINUTES` in the user data, with MINUTES a little past the run's own deadline (`DEADLINE_HOURS`, [Cost
   guardrails](#cost-guardrails)).  Any shutdown (the timer, `POWEROFF`, the spot service) then terminates the instance,
   so a forgotten instance ends by itself.  The timer is the backstop that depends on no script.
-* **Tag everything.**  Put `Project=taxman` and `Purpose=...` (`trial`, `prover`, `chain`, `ledger`, `certify`) on everything the launch creates that takes a tag: the instance, its volumes and spot request, a key pair,
+* **Tag everything.**  Put `Project=taxman` and `Purpose=...` (`trial`, `prover`, `chain`, `ledger`) on everything the launch creates that takes a tag: the instance, its volumes and spot request, a key pair,
   a security group.  The check at the end finds them by `Project`.
 * **Take the binaries from the build cache.**  A machine does not build what a machine has already built and tested.
   `setup.sh` takes the commit's release binaries from S3 ([build-cache.md](build-cache.md)) and, when the cache has
@@ -184,8 +184,8 @@ made.  `RELEASE_TESTS=1 solver/tools/cloud/setup.sh` puts the tested binaries in
 ### Cost guardrails
 
 These variables bound a run.  `DEADLINE_HOURS`, `POWEROFF`, `BUDGET_HOURS` and `RUN_UNTIL` belong to `run.sh`, so
-`chain.sh`,
-`prover.sh` and `certify.sh` read them.  The table says what `chain.sh` does.
+`chain.sh` and
+`prover.sh` read them.  The table says what `chain.sh` does.
 
 | variable | effect |
 |---|---|
@@ -247,17 +247,14 @@ The bill is the instance's hours, not the search's.  For each instance, find its
 while it exists; the console's instance history or CloudTrail afterwards), multiply the hours by the spot price of those
 hours (`describe-spot-price-history`: [machine.md](machine.md)), and set the product beside the estimate that was
 approved.  Report the job's own measure of work beside it where it has one: the thread-hours of the prover's searches
-(`summarize.py exact`, [Bring the data home, verify, commit](prover.md#bring-the-data-home-verify-commit)), or those of
-the certificates against the plan's ([Results home, verification, and the
-spending](certify.md#results-home-verification-and-the-spending)).  The "Cost" paragraph of the calibration entry is the
-model.  Then do the end of the [rules for every launch](#rules-for-every-launch): terminate what is left, confirm that
+(`summarize.py exact`, [Bring the data home, verify, commit](prover.md#bring-the-data-home-verify-commit)).  The "Cost"
+paragraph of the calibration entry is the model.  Then do the end of the [rules for every launch](#rules-for-every-launch): terminate what is left, confirm that
 nothing of the project remains, and delete the launch's security group.
 
 ## When something goes wrong
 
 Most failures leave a message in the logs of `~/taxman-work/logs/`; the table gives the cause and the remedy of each.  A
-job's own failures are in its section: the prover's error stop in [Watch, stop, resume](prover.md#watch-stop-resume), and a
-counterexample to U in [Watch, stop, resume, and a counterexample](certify.md#watch-stop-resume-and-a-counterexample).
+job's own failures are in its section: the prover's error stop in [Watch, stop, resume](prover.md#watch-stop-resume).
 
 | what you see | cause | remedy |
 |---|---|---|
@@ -271,6 +268,6 @@ counterexample to U in [Watch, stop, resume, and a counterexample](certify.md#wa
 | `DIR is on a memory filesystem: it would vanish with the instance (set TAXMAN_WORK)` | `/tmp` or `$TAXMAN_WORK` is tmpfs | set `TAXMAN_WORK` to a directory on EBS ([Storage](machine.md#storage)) |
 | `installing packages needs root or sudo (or SKIP_PACKAGES=1 if git, cc, python3 and curl are there)` | `setup.sh` runs as a user without sudo | run it as a user with sudo, or install those four and set `SKIP_PACKAGES=1` |
 | a step sent with `aws ssm send-command` runs as root, or its quoting is mangled | `send-command` runs as root, and `sudo -i` mangles a multi-line `bash -lc '...'` | put the step in a script file and run `sudo -u ec2-user -i bash FILE` ([Steps through SSM, or SSH](#steps-through-ssm-or-ssh)) |
-| the SSH connection dropped | the run is in tmux | reconnect and `tmux attach -t NAME` (`tx` for the chain, `pv` for the prover, `cert` for the certificates); if tmux is gone, the machine rebooted (next row) |
+| the SSH connection dropped | the run is in tmux | reconnect and `tmux attach -t NAME` (`tx` for the chain, `pv` for the prover); if tmux is gone, the machine rebooted (next row) |
 | the machine rebooted | tmux and the job are gone; the state is in `~/taxman-work`, and the build survives | run the job's command again (`chain.sh N`) |
 | `lock` of several percent on long games | the shared deque is contended | report it; fewer threads is the remedy at hand (`THREADS=96`) |

@@ -1246,7 +1246,6 @@ const REWRITTEN: &[&str] = &[
     "solver/docs/RUNBOOK.md",
     "solver/docs/runbook/",
     "solver/docs/STATUS.md",
-    "solver/tools/certify/README.md",
     "solver/tools/ledger/README.md",
     "solver/noframe/README.md",
     "solver/noframe/docs/",
@@ -1815,7 +1814,7 @@ fn the_quick_check_passes_its_own_tests_and_design_states_its_limits() {
 // ---------------------------------------------------------------------------------------------------------
 // Citations of headings
 
-/// The documents that a text may name without a path or `.md`: `RUNBOOK, "Certifying U (stage 4)"` cites RUNBOOK.md.
+/// The documents that a text may name without a path or `.md`: `RUNBOOK, "Before a big run"` cites RUNBOOK.md.
 const BARE_DOCS: &[&str] = &["RUNBOOK", "DESIGN", "THEORY", "REFERENCE", "AGENDA", "GLOSSARY", "STATUS", "WRITING"];
 
 /// What may stand between a document and the quoted heading it cites by name, longest first.
@@ -2656,7 +2655,7 @@ fn a_citation_wrapped_over_two_comment_lines_is_found_at_the_line_where_it_start
         "//! The theory is in docs/THEORY.md, \"The frame",
         "//! model is exact\", and DESIGN.md, section",
         "/// 9 has the limits; see also solver/docs/RUNBOOK.md,",
-        "    // \"Certifying U (stage 4)\" (a comment inside a function).",
+        "    // \"Before a big run\" (a comment inside a function).",
         "let m = \"see DESIGN.md, \\\"Same search\\\"\";",
         "let n = \"see DESIGN.md, \\",
         "         section 4\";",
@@ -2667,7 +2666,7 @@ fn a_citation_wrapped_over_two_comment_lines_is_found_at_the_line_where_it_start
         [
             "1 docs/THEORY.md \"The frame model is exact\"",
             "2 DESIGN.md §9",
-            "3 solver/docs/RUNBOOK.md \"Certifying U (stage 4)\"",
+            "3 solver/docs/RUNBOOK.md \"Before a big run\"",
             "5 DESIGN.md \"Same search\"",
             "6 DESIGN.md §4",
         ]
@@ -2711,7 +2710,7 @@ fn headings_are_quoted_with_their_number_or_without_and_sections_are_named_by_nu
     assert!(names_heading("`taxman` runs.", "**`taxman`** runs") && names_heading("A, B,", "A, B"));
     assert!(names_heading("The span certificate (♦)", "The span certificate (♦)"));
     assert!(!names_heading("same search", "Same search"), "case counts");
-    assert!(!names_heading("Extended mode", "Extended mode: one-sided candidates"), "the whole heading");
+    assert!(!names_heading("Gate trial", "Gate trial: the gates"), "the whole heading");
     assert!(!names_heading("2. Tactics", "Tactics"), "a number the heading does not have");
 
     assert!(has_number("9. Testing", "9") && has_number("5.4 Foo", "5.4") && has_number("5.4. Foo", "5.4"));

@@ -12,7 +12,7 @@
 #
 # The checkpoints are copied so that a replacement instance can resume a game that has taken hours, not start it
 # again.  `--delete` keeps the copy to the checkpoints that exist (a finished game's is removed).  The spill and lock
-# files are left out at any depth: certify.sh keeps a checkpoint directory of its own for each list ($CKPT/NAME).
+# files are left out at any depth.
 
 set -eu
 set -o pipefail

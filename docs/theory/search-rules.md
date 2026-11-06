@@ -21,7 +21,8 @@ C, completions and state(P) under [Searching the frame model](frame-model.md#sea
 
 Throughout, Π is a root problem of the frame model: Π_n, or Π(B) of a board B with holes ([the holes theorem
 (X9)](exactness.md#boards-with-holes)).  Of [the extended problem](extended-problem.md#the-extended-problem) Π⁺(O),
-which a certificate of U searches, the file claims [the state lemma (R1)](#the-state-lemma), and the dual-bound and
+which [the certificate theorem (E2)](extended-problem.md#the-certificate-theorem) searches, the file claims [the state
+lemma (R1)](#the-state-lemma), and the dual-bound and
 floor lemmas ([R4](#the-dual-bound-lemma), [R5](#the-floor-lemma)) with no symmetric pair; it claims nothing of
 [R2](#the-prime-exchange-theorem), [R3](#pruning-by-prime-exchanges), [R6](#the-repeat-lemma) or
 [R7](#the-near-repeat-lemma) there.

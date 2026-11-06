@@ -39,7 +39,7 @@ allowed more.
 debug assertions are on, and `--release` runs it.  `quick_one` is the quick test that checks the same property at a
 small size: a prefix of the range that the long test walks (which then takes the rest of it), a sample of the chain or
 of the golden games, fewer random draws, a smaller game.  Where several tests walk one path at different sizes (a ledger
-run for each of its features, a certify test for each refusal), the quick check keeps one small test of the path, and
+run for each of its features), the quick check keeps one small test of the path, and
 the `ignore` message of each long one names the test that stands in for it.
 
 **The budget.**  The target of 10 s on ten cores is a budget of about 80 CPU seconds for all the tests of the quick

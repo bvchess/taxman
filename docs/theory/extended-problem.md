@@ -6,7 +6,7 @@ The *extended problem* Π⁺(O) is the frame model with a set O of the sources o
 is exact as the frame model is: [the extended exactness theorem (E1)](#the-extended-exactness-theorem).  So a search of
 it that finds nothing better than a recorded score proves the score optimal, once the other members of U\* in layers 3
 and up are certified: [the certificate theorem (E2)](#the-certificate-theorem).  When the recorded moves play U\*, this
-proves [statement U](exactness.md#statement-u) at that game.  That is how a certificate of U is made, game by game.
+proves [statement U](exactness.md#statement-u) at that game.
 
 *Words.*  [Sources](../GLOSSARY.md#the-frame-model) are the glossary's, and [U\*](sources.md#descending-greedy) is what
 descending greedy keeps of them; U\*_k and U\*_{≥3} are its parts in layer k and in layers 3 and up, and ΣS is the sum
@@ -129,7 +129,7 @@ the corollary of U (X8).  ∎
 At n = 24 with Φ = U\* ∖ {16, 20, 24} and V = 182, the heaviest promotion set is worth 69 = V − ΣΦ; so once 16, 20 and
 24 are certified against 182, E2 proves opt(24) = 182, and U at 24.  In a search for opt(n), rather than a check of V,
 V can be the search's starting incumbent: the members certified against it are certified against every set that beats
-it.  [results/README.md](../../results/README.md#certificates) lists the games with a certificate.
+it.
 
 A search for a certificate can also stop at the ceiling of [the ceiling lemma (N4)](neighbors.md#the-ceiling-lemma),
 but then it rests on the game before.

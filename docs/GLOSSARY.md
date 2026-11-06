@@ -174,12 +174,13 @@ changed"](https://github.com/bvchess/taxman-notebook/blob/main/terms-changed.md)
   search or rule that proved them uses the frame model: an exhausted search, a trivial game or a repeat assumes U at n,
   and a game proven by the ceiling or by the prime formula does not ([solver/docs/design/frame-model.md, “What "optimal"
   means”](../solver/docs/design/frame-model.md#what-optimal-means)).  U is open in general, and proven at every n the
-  prover has proven.  Past those games `taxman certify` checks it game by game ([certificate of U](#results-and-trust)).
+  prover has proven.
 * **extended problem**, **Π⁺(O)**: the frame model with a set O of members of U\* made optional, the *open* sources,
   and the rest *fixed* ([the extended exactness theorem
-  (E1)](theory/extended-problem.md#the-extended-exactness-theorem); `frames::build_extended`).  The members of O and
+  (E1)](theory/extended-problem.md#the-extended-exactness-theorem)).  The members of O and
   the sources rejected in their frames are *one-sided candidates*, the factors that can be promoted *two-sided* ones
-  ([definitions](theory/extended-problem.md#the-extended-problem)).  The certificates of U search it.
+  ([definitions](theory/extended-problem.md#the-extended-problem)).  [The certificate theorem
+  (E2)](theory/extended-problem.md#the-certificate-theorem) searches it.
 
 ## The search
 
@@ -366,9 +367,6 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   lower bound equals its best upper bound.
 * **the ledger**: the example program `ledger` (`solver/frame/examples/ledger/`).  It works on a whole stretch of games
   at once, raising lower bounds and lowering upper bounds until they meet.
-* **certificate of U**: a line of `taxman certify` that proves statement U at one game.  The extended problem with the
-  game's open members optional, searched from the recorded moves, ends `certified` when nothing beats the recorded
-  score ([solver/docs/design/certificates.md](../solver/docs/design/certificates.md)).
 * **the built-in table**: the lines of `results/optimal.jsonl.gz` as of the build, which the binary holds as the
   compressed file and decodes as far as a game asks ([results/README.md](../results/README.md#optimaljsonlgz) says where
   the moves came from).  **optimal ok**: a score equals the table's.  That proves nothing, and above the table's last
@@ -378,8 +376,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   found are **rejected**, written to `<results>.rejected.jsonl`.
 * **verifier**: a program that checks a whole results file or bounds file without changing it.  Results files have two,
   `taxman verify-results` and `solver/tools/check_results.py`; the bounds store has `ledger verify-bounds` and
-  `solver/tools/check_bounds.py`; certificates have `taxman verify-certificates`.  The two verifiers of a kind of file
-  share no code.  Not "checker".
+  `solver/tools/check_bounds.py`.  The two verifiers of a kind of file share no code.  Not "checker".
 * **results line**: one line of a results file, the JSON object that `taxman solve --out` writes for a game, in schema
   5 ([the frame solver's reference](../solver/docs/REFERENCE.md#a-results-line---out-schema-5)).  Two old words survive
   only as field names there: `nodes` counts steps, and `prev.source` says where the moves for n − 1 came from.

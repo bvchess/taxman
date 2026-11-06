@@ -30,7 +30,7 @@ fn problem(frames: &[(&[u32], &[u32])], candidates: &[u32]) -> Problem {
 /// Whether the cut of a search of `n` by `m` cuts the node with the promotions `promoted` (a promotion set of `n`)
 /// and the candidates `cands`.
 fn cuts(n: &Problem, m: &Problem, promoted: &[u32], cands: &[u32]) -> bool {
-    let near = NearRepeat::of(&n.model, &n.candidates, Arc::clone(&m.model), m.root, &m.candidates, 0).unwrap();
+    let near = NearRepeat::of(&n.model, &n.candidates, Arc::clone(&m.model), m.root, &m.candidates, 0);
     let (promoted, scratch) = (Bits::from_slice(promoted), &mut Scratch::new());
     let state = n.model.promote_all_using(scratch, &n.root, &promoted).expect("a promotion set of N");
     near.cuts(scratch, &n.model, &state, &promoted, &Bits::from_slice(cands))
@@ -177,7 +177,7 @@ fn where_the_checks_hold_every_completion_promotable_in_n_is_promotable_in_m() {
             continue;
         }
         let (pn, pm) = (board_n.prepare(tactics).unwrap(), board_m.prepare(tactics).unwrap());
-        let near = NearRepeat::new(&pn, &pm, 0).unwrap();
+        let near = NearRepeat::new(&pn, &pm, 0);
         let both = pn.candidates & pm.candidates;
         for _ in 0..30 {
             let (mut state, mut promoted) = (pn.root, Bits::EMPTY);
@@ -188,7 +188,7 @@ fn where_the_checks_hold_every_completion_promotable_in_n_is_promotable_in_m() {
                     promoted.insert(x);
                 }
             }
-            let mut left = pn.model.narrow(&state, &(both - promoted)).to_vec();
+            let mut left = state.narrow_candidates(&(both - promoted)).to_vec();
             rng.shuffle(&mut left);
             let cands: Vec<u32> = left.into_iter().take(1 + rng.below(8) as usize).collect();
             if !near.cuts(scratch, &pn.model, &state, &promoted, &Bits::from_slice(&cands)) {

@@ -58,29 +58,10 @@ $ taxman tables 85 8 45                         # the maximal factors and compos
   are set up first, on K threads (default: all CPUs).  With `--threads 1` it sets them up one at a time, as the checks
   need them.  The result, and the first line to fail, are the same for any K.  `solve` takes the threads for this from
   its own `--threads`.
-* **A results file named by path**, in `verify-results` and in the `--results` flags of `certify` and
-  `verify-certificates`, is read through the gzip decoder if the path ends in `.gz`, as
+* **A results file named by path**, in `verify-results`, is read through the gzip decoder if the path ends in `.gz`, as
   `results/optimal.jsonl.gz` does, and as plain JSONL if it does not.  The files that `--out` writes are plain JSONL.
   Except in `verify-results`, which reads a file whole, a gzip file is decoded only as far as the lines asked for, and
   must be one game a line ([design/engine.md](design/engine.md)).
-* **`certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE`** proves, game by game, that [statement
-  U](../../docs/theory/exactness.md#statement-u) holds: that the recorded scores of A..B that rest on the frame model
-  are opt(n) on the whole board ([design/frame-model.md, “What "optimal"
-  means”](design/frame-model.md#what-optimal-means)).  The list FILE instead names the games, one n a line, in order.
-  For each game that the prover's barred bounds (`--upper`, `solver/noframe/data/upper_*.jsonl`) say needs it, it
-  searches the extended problem, with the bounds' open members optional, from the recorded moves.  The search ends
-  `certified` (nothing beats the score) or `beaten`.  Moves that beat the score are written to
-  `OUT.counterexample.jsonl` too, and the run exits with the status 2.  `certify` takes `--threads`, `--background`, the
-  checkpoint flags and the limits of `solve`, and resumes like it.  The extended problem keeps the claims of `unzip`
-  that [the kept-claims lemma (E4)](../../docs/theory/extended-problem.md#the-kept-claims-lemma) allows, unless
-  `--no-claims`, the formulation of the certificates made before it; a line records which.  The recorded moves are
-  those of the `--results` files, with the built-in table's for any game they lack; where a file scores a game
-  differently from the table, the file's moves are the ones certified, and a wrong score comes out `beaten`
-  (`verify-results` is the check of a file against the table).
-* **`verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]`** checks the files
-  that `certify` wrote, without changing them, line by line.  It says how far the proofs of the recorded scores reach:
-  the prover's, the certificates' and the ceilings'.  [design/certificates.md](design/certificates.md) has what they
-  check and what a line holds.
 
 ## 3. Reading the output
 
@@ -281,7 +262,7 @@ some game.
 What a game rests on through the frame model, statement U at n ([design/frame-model.md, “What "optimal"
 means”](design/frame-model.md#what-optimal-means)), is not recorded for the games that the frame model proves: those
 proven by an exhausted search, the trivial games and the repeats.  It holds at every game the prover has proven; past
-those, it is not yet certified.
+those, it is not yet proven.
 
 ### What a game had from n - 1
 

@@ -184,8 +184,8 @@ source s because the kept sources above s with s are unplayable, and so is any s
    every playable set that contains U\* weighs less than opt(n).  ∎
 
 The solver's results that rest on a search of Π_n assume U at n ([which they
-are](../../results/README.md#what-supports-the-scores)), and [the certificate theorem
-(E2)](extended-problem.md#the-certificate-theorem) proves U game by game.
+are](../../results/README.md#what-supports-the-scores)).  [The certificate theorem
+(E2)](extended-problem.md#the-certificate-theorem) shows how a search of the extended problem proves U at a game.
 
 ### Where a proof stops
 
