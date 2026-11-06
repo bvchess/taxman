@@ -310,8 +310,8 @@ p.hurry { font-size: 0.92rem; color: var(--ink-3); margin: -0.4em 0 0; }
 .links li span { display: block; color: var(--ink-3); font-size: 0.74rem; }
 
 /* The standing of a statement: a pill told apart by its outline or its fill, never by color: filled for proved, gray
-   under a solid outline for proved by computation, a double outline for proved given statement U, gray stripes for
-   open but proved in every game up to some N, dotted for measured, dashed for open. */
+   under a solid outline for proved by computation, a double outline for conditional (proved given statement U),
+   gray stripes for open but proved in every game up to some N, dotted for measured, dashed for open. */
 .standing {
   display: inline-block; flex: none; padding: 0.04rem 0.5rem 0.1rem; border: 1.5px solid var(--ink); border-radius: 999px;
   font-size: 0.68rem; font-weight: 700; line-height: 1.35; color: var(--ink); white-space: nowrap; background: var(--paper);

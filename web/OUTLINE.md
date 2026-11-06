@@ -12,8 +12,8 @@ entries are meant to be moved, merged and cut.
   its proof, technical notes, and links to the code, the data and the literature.  A reader who never looks right misses
   nothing of the story.  So no page needs to be set apart: the search is a chapter like the others, and its depth
   sits on the right.
-* **Standings.**  Every claim says where it stands: proved, proved given statement U, proved by computation, measured,
-  or open.
+* **Standings.**  Every claim says where it stands: proved, conditional (proved given statement U),
+  proved by computation, measured, or open.
   The words are the theory's ([statements.md](../docs/theory/statements.md#the-statements)).
 * **Numbers come from the data.**  Counts, scores and shares are read from `results/optimal.jsonl.gz` when the page is
   built or loaded, never typed.
