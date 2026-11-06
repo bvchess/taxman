@@ -507,6 +507,8 @@ figure { margin: 30px 0 34px; }
 .btn.primary:hover:not(:disabled) { border-color: var(--ink); box-shadow: 0 3px 0 var(--player-rim); transform: translateY(-1px); }
 .btn.primary:active:not(:disabled) { transform: translateY(1.5px); box-shadow: 0 0.5px 0 var(--player-side); }
 .btn:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; }
+/* The choice shown: its button is pressed in, a quiet wash, never the ink fill of a standing. */
+.btn[aria-pressed="true"] { background: var(--wash); border-color: var(--ink-3); box-shadow: inset 0 1.5px 0 var(--tray-edge); transform: translateY(1px); }
 
 .tray-box {
   background: var(--tray); border: 1.5px solid var(--tray-edge); border-radius: 18px; padding: 10px 12px 12px;

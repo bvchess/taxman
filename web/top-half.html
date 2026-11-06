@@ -176,13 +176,14 @@
   a loop builds the heaviest tree, a classic fact, and here it settles the game: every optimal game plays exactly the
   sources of layer 2 that greedy keeps.</p>
   <p>Game 100's tree has 14 edges, so it needs 14 of the 15 primes to pay for them, and one is to spare.  From game
-  187 on, none ever is, and layer 2 is settled completely.</p>
+  187 on, no prime is ever left to spare: the sources greedy keeps in layer 2 need every prime up to n/2, so no other
+  number of layer 2 can be played, and layer 2 is settled completely.</p>
 </section>
 
 <section class="chapter" id="above-layer-two" data-toc="above-layer-two" aria-labelledby="h-above">
   <h2 id="h-above">Above layer 2</h2>
-  <p>From <a class="gloss" href="glossary.html#layer">layer</a> 3 up, a number can have three different prime factors, and then it has three
-  <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a>: 30 = 2 · 3 · 5 has 15, 10 and 6.  It is no
+  <p>From <a class="gloss" href="glossary.html#layer">layer</a> 3 up, a number can have more than two
+  <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a>: 30 has three, 15, 10 and 6.  It is no
   longer an edge between two numbers, and the reason greedy is safe in layer 2 is gone.</p>
 
   <div class="para">
@@ -195,12 +196,14 @@
       member of Y′ fits into Y: the playable subsets of the six lack the exchange property.  That exactly 48 orders
       trap <a class="gloss" href="glossary.html#descending-greedy">descending greedy</a> is proved by computation, which the figure repeats.</p>
     </aside>
-    <p>That reason is simple.  In layer 2, all the sets of <a class="gloss" href="glossary.html#source">sources</a>
-    that can be played and can take no more have the same size, as all the trees on the same primes have the same
-    number of edges.  So greedy is never stuck with too few.  With three maximal factors this can fail, and in game
-    2,873 it does: six of its sources, built from the primes 11, 13 and 17, can be stuck at four, though five fit.
-    Taken in some orders, greedy keeps four of them and then can fit no more.  Taken in others, it keeps five.  No
-    smaller game is known where greedy can be stuck like this.</p>
+    <p>Here is why greedy is safe in layer 2.  There, a set of <a class="gloss" href="glossary.html#source">sources</a>
+    that can be played and has no room for another is a <a class="gloss" href="glossary.html#forest">forest</a> on the
+    primes, and every such forest has the same number of edges.  So once nothing more fits, greedy has as many sources
+    as any playable set can have: it is never stuck with too few.</p>
+    <p>With more than two maximal factors, that can fail, and game 2,873 shows it with six of its sources, built from
+    the primes 11, 13 and 17.  Taken in some orders, greedy keeps four of them, and then neither of the other two fits,
+    though five of the six can be played together.  Taken in other orders, it keeps five.  No smaller game is known
+    where greedy can be stuck like this.</p>
   </div>
 
   <figure class="fig trap-fig" id="trap">

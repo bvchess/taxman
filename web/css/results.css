@@ -34,8 +34,6 @@
 .ex-picks { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .ex-picks-word { font-size: 0.8rem; font-weight: 600; color: var(--ink-3); margin-right: 2px; }
 .ex-chip { padding: 6px 10px; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
-/* The game shown: its button is pressed in, a quiet wash, never the ink fill of a standing. */
-.ex-chip[aria-pressed="true"] { background: var(--wash); border-color: var(--ink-3); box-shadow: inset 0 1.5px 0 var(--tray-edge); transform: translateY(1px); }
 
 .ex-body {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 23rem); gap: 22px 34px; align-items: start;
