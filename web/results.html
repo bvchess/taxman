@@ -42,12 +42,13 @@
     <aside class="note tech" aria-label="A game's record, precisely">
       <div class="note-head"><span class="note-name">A game’s record, precisely</span></div>
       <p>The record is the game’s line of the results file.  Its <code>in_the_bag</code> is ΣU*, the score with no
-      promotions, and its time is <code>seconds.active_all_runs</code>, the time it had at least one thread at work.
-      One run on one machine of 88 threads made every line.  A game proved by the prime formula sets up no frames, so it
-      records no ΣU* and no <a class="gloss" href="glossary.html#candidate">candidates</a>
+      promotions.</p>
+      <p>One run made every line, from November 1 to 6, 2026, on one machine with 88 threads, and it worked on up to
+      four games at once.  A game’s time, <code>seconds.active_all_runs</code>, counts only the time that at least one
+      thread worked on it, not the time it waited while the threads worked on other games
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#a-results-line---out-schema-5">the
       frame solver’s reference</a>; <a href="https://github.com/bvchess/taxman/blob/master/results/runs.md">the
-      runs</a>).</p>
+      run</a>).</p>
     </aside>
     <p>The top half carries most of each score: <a class="gloss" href="glossary.html#u-star">U*</a>, the numbers above
     n/2 that <a class="gloss" href="glossary.html#descending-greedy">descending greedy</a> keeps, scores ΣU* before any

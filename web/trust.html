@@ -206,7 +206,8 @@
     <aside class="note tech" aria-label="Proof kinds and assumptions">
       <div class="note-head"><span class="note-name">Proof kinds and assumptions</span></div>
       <p>Each line of <code>results/optimal.jsonl.gz</code> has a <code>proof</code>, which names how its score was
-      proven, and an <code>assumes</code>.  What a game assumes is what that rests on beyond the frame model; the verifiers derive both again
+      proven, and an <code>assumes</code>.  What a game assumes is what that rests on beyond the frame model, and
+      every <code>assumes</code> of this file is empty.  The verifiers derive both again
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#proof-kinds">proof kinds</a>,
       <a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#assumptions">assumptions</a>;
       <a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what
@@ -217,8 +218,7 @@
     <a class="gloss" href="glossary.html#prime-formula">prime formula</a> rests on the game before it, and a
     <a class="gloss" href="glossary.html#repeat">repeat</a> on the game it repeats.  A
     <a class="gloss" href="glossary.html#search">search</a> rests on the frame model of its own game.</p>
-    <p>Each game's line in the file says this itself: it names how the score was proven and lists what that assumes.
-    Every line assumes nothing, so each is proved within the frame model, given that the solver is right.</p>
+    <p>Each game's line in the file says this itself: it names how its score was proven.</p>
   </div>
 
   <div class="para">
