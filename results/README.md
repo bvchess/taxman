@@ -21,7 +21,7 @@ counts on this page are a snapshot, dated 2026-10-29, which no test pins: the co
 | `certificates/` | certificates of [statement U](../docs/theory/exactness.md#statement-u) | 600–1300 | `taxman certify` ([below](#certificates)) |
 | `b019312.txt` | the scores of `optimal.jsonl.gz`, as a b-file of [A019312](https://oeis.org/A019312) in the OEIS | 1–5060 | the command [below](#b019312txt) |
 
-How far each kind of proof reaches:
+How far each proof kind reaches:
 
 * **Every game of `optimal.jsonl.gz`** is proven within the frame model.
 * **Games 2 to 2175** are also proven on the whole board by the prover, so their scores are opt(n) without the frame
@@ -33,20 +33,20 @@ How far each kind of proof reaches:
 "What supports the scores", below, gives the evidence for each.
 
 **A file with holes is not a chain, and never goes into `optimal.jsonl.gz`.**  Such a file has games with only an
-unfinished search (a lower bound, no proof), games that no run reached, games built on the best game of an unfinished
-search, with no ceiling and no prime formula, or several lines of one game.  Each completed game in it is proven by
-its own proof, given what it assumes, but one that follows a hole may rest on nothing the chain would have given it.  The
-verifiers read such files ([verifiers.md](../solver/docs/verifiers.md)); none is committed here.
+unfinished search (a lower bound, nothing proven), games that no run reached, games built on the best game of an
+unfinished search, with no ceiling and no prime formula, or several lines of one game.  Each completed game in it is
+proven on its own terms, given what it assumes, but one that follows a hole may rest on nothing the chain would have
+given it.  The verifiers read such files ([verifiers.md](../solver/docs/verifiers.md)); none is committed here.
 
 ## optimal.jsonl.gz
 
 The chain of optimal games from n = 1, the file to build on, and the table of optimal games that the frame solver has
-built in.  Every game is built from the one before, every line has its full provenance, and no game rests on a table.  It
-has one line a game in schema 5, the completed games in order of n (so line n is game n), and no line of an unfinished
-search.  Some of its lines are games that the bounds store had proven (proof `known`, in the table below): the fourth and
-fifth runs took each from the store with no search, and its line cites the store's two lines ([the frame solver's
-reference, "Citing a known source"](../solver/docs/REFERENCE.md#citing-a-known-source)).  [runs.md](runs.md) records the
-six runs that made it.
+built in.  Every game is built from the one before, every line has its full provenance, and no game rests on a table.
+It has one line a game in schema 5, the completed games in order of n (so line n is game n), and no line of an
+unfinished search.  Some of its lines are games that the bounds store had proven (proof kind `known`, in the table
+below): the fourth and fifth runs took each from the store with no search, and its line cites the store's two lines
+([the frame solver's reference, "Citing a known source"](../solver/docs/REFERENCE.md#citing-a-known-source)).
+[runs.md](runs.md) records the six runs that made it.
 
 **The file is gzip, one member for each batch of games.**  The first 500 games are one member, the next 500 the next, and
 so on; a batch of games brought home later is appended as one member of its own (`solver/docs/runbook/chain.md`,
@@ -56,8 +56,8 @@ so the bytes of the games before it never change.  Both Rust programs read it th
 Python and the shell read it with `gzip`.  The frame solver builds the file into its binary.  Its table is the games of
 the file as of the build, each decoded and parsed when it is asked for, member by member: a run that needs none decodes
 nothing, and one that needs the first games decodes the first members ([the design](../solver/docs/design/engine.md)).
-The table holds each line's score and moves and not its proof, so a game taken from it (`--use-prev`) is assumed
-optimal, and the results whose proofs rest on it say so: "the game of n in results/optimal.jsonl.gz is optimal".  A
+The table holds each line's score and moves and not how its game was proven, so a game taken from it (`--use-prev`) is
+assumed optimal, and the results that rest on it say so: "the game of n in results/optimal.jsonl.gz is optimal".  A
 chain that assumes nothing beyond the frame model starts at n = 1, as this one does.
 
 To read it, from the top of the repository:
@@ -69,7 +69,7 @@ To read it, from the top of the repository:
 The last two are the verifiers, which print the counts below as they stand.
 
 **The snapshot of 2026-10-29: games 1–5060** in 12 members (ten of 500 games, one of 55 and one of 5), 1,097,929
-bytes, which decompress to 36,779,313 bytes.  Its games, by proof, as the verifiers report them:
+bytes, which decompress to 36,779,313 bytes.  Its games, by proof kind, as the verifiers report them:
 
 | | 1–1300 | 1301–2175 | 2176–3440 | 3441–3914 | 3915–4547 | 4548–4874 | 4875–5000 | 5001–5060 | all |
 |---|---|---|---|---|---|---|---|---|---|
@@ -84,13 +84,13 @@ bytes, which decompress to 36,779,313 bytes.  Its games, by proof, as the verifi
 | score = n + score(n − 1) | 424 | 270 | 402 | 148 | 218 | 115 | 42 | 20 | 1639 |
 | score = n + score(n − 1) − P (a prime n) | 210 | 115 | 155 | 60 | 75 | 36 | 17 | 8 | 676 |
 
-The near-repeat cut shortens a search and leaves its proof `exhausted`, so a line counts the nodes it cut in
+The near-repeat cut shortens a search and leaves its proof kind `exhausted`, so a line counts the nodes it cut in
 `stats.near_repeat_cut`.  The first five runs and the sixth run to game 4920 searched the games without the cut, and
 no line of them has the key; 66 lines of games 4921–5060 have it, and nine of them cut nodes: 4929 (20,458,994), 4936
 (52,079), 4952 (2,670), 4953 (165), 4991 (58,300,645), 5037 (254,558), 5043 (12,716,671), 5047 (1,925,714) and 5048
 (585,636).
 
-Of its 2056 searched games, 1612 are exhausted and 444 at the ceiling.  The proofs at the ceiling were all decided
+Of its 2056 searched games, 1612 are exhausted and 444 at the ceiling.  The games proven at the ceiling were all decided
 before the search explored a node (the method `start`) but six: 686's took 29 nodes, and 2695's, 3052's, 3306's, 3796's
 and 3933's took 7,175, 2,826, 5,366, 5,530 and 3,093.  A repeat takes the promotions of the latest earlier game that
 posed the same search problem: the game of n − 1 for 1758 of the 1975 repeats, and of n − 2 for the other 217, where
@@ -104,7 +104,7 @@ method `search`.  [The lab notebook's
 entry](https://github.com/bvchess/taxman-notebook/blob/main/search/which-games-need-no-search-the-cofactor-of-n-2026-10/README.md)
 has the tables and the cofactors that are always searched.
 
-*The proofs by range, in detail:*
+*The proof kinds by range, in detail:*
 
 * 1–1000: 311 exhausted, 92 at the ceiling, 168 prime, 13 trivial and 416 repeats.
 * 1001–1231: 81 exhausted, 16 at the ceiling, 34 prime and 100 repeats.
@@ -173,10 +173,10 @@ What that evidence amounts to:
 1. **Arithmetic certificates.**  A score at the [ceiling](../docs/GLOSSARY.md#the-game), n + score(n − 1), is optimal
    whenever the game of n − 1 is, whatever found it.  So is a score equal to n + score(n − 1) − P for a prime n, with P
    the largest prime below n (the [prime formula](../docs/GLOSSARY.md#the-game), proven in `src/accelerate.rs`).  2315
-   of the file's games have such a score: 1639 at n + score(n − 1), among them its 444 proofs at the ceiling, and
+   of the file's games have such a score: 1639 at n + score(n − 1), among them its 444 games proven at the ceiling, and
    676 prime ones.
-2. **Exhaustive searches.**  The file's 1612 `exhausted` games are proven by a search that explored its whole
-   tree, as the solver reports it.  The rest of the file is its 444 proofs at the ceiling, its 634 prime games, its 13
+2. **Exhaustive searches.**  The file's 1612 `exhausted` games are proven by a search that explored its whole tree, as
+   the solver reports it.  The rest of the file is its 444 games proven at the ceiling, its 634 prime games, its 13
    trivial ones (no promotion candidate, so there is only one game), its 1975
    [repeats](../docs/GLOSSARY.md#results-and-trust), which both verifiers check against the earlier game
    (`src/results.rs`), and its 382 games of the bounds store.  A game of the store is a game the referee replays at the
@@ -186,16 +186,16 @@ What that evidence amounts to:
      holds 197 standalone searches, one for every game of 1001–1231 that is not prime (the example `ladder`, which
      builds at commit 3ca11bf: `ladder --no-seed --no-cap --tactic revise_freedoms=off`, 8 threads, commit e710d16; see
      [`taxman-notebook/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md`](https://github.com/bvchess/taxman-notebook/blob/main/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md)).
-     All of them finished, and each found the promotion sum of the score recorded here.  These proofs rest on no other
+     All of them finished, and each found the promotion sum of the score recorded here.  These solves rest on no other
      game.  So every game of 1001–1231 that is not prime is proven without the chain, and every prime one by the prime
      formula from a game so proven.
    * There is no such solve for 1232–1300.  Of those 69 games, 24 are proven by an exhausted search of their own, and
-     the 7 proofs at the ceiling, the 9 prime ones and the 29 repeats rest on the game before them or on the game they
-     repeat, so on the chain from n = 1 (see 5).
+     the 7 games proven at the ceiling, the 9 prime ones and the 29 repeats rest on the game before them or on the game
+     they repeat, so on the chain from n = 1 (see 5).
    * Past 1300,
      [taxman-notebook/search/benchmarks-the-probe-pgo-and-scaling/bands.jsonl](https://github.com/bvchess/taxman-notebook/blob/main/search/benchmarks-the-probe-pgo-and-scaling/bands.jsonl)
      has ten games of 1302–1352 solved standalone (the matching path, 8 threads), each finishing with the promotion sum
-     recorded here.  The rest of 1301–5060 is the chain's: 1196 exhausted searches of their own, 329 proofs at the
+     recorded here.  The rest of 1301–5060 is the chain's: 1196 exhausted searches of their own, 329 games proven at the
      ceiling, 423 prime ones and 1430 repeats that rest on the games before them, and 382 games of the store.
 4. **Agreement between builds and files.**
    * n ≤ 1000: the chain's scores are the table's, all 1000, where the table was the Java solver's `optimal.json` when
@@ -209,19 +209,19 @@ What that evidence amounts to:
      these games from 2026-10-28), so the comparison is with another run of the same search.  The GF(2) study's chain
      was made from the table's game of 1300 (`--use-prev`) by the build of commit 716ebd9, on 2 threads in three
      invocations, and reached 2175 from 1301 in 92 minutes of game time.  Its 875 games have this file's scores and
-     proofs in every game, and its moves in all but 1560–1563 (above).  Its methods are this file's too, except that a
-     game whose search took no step was labeled `search` then and is `start` here.  Only its game of 1301 assumes
-     anything: that the table's game of 1300 is optimal.
-     `taxman verify-results results/optimal.jsonl.gz solver/notebook/search/the-gf2-bound-in-the-search-2026-10/chain.jsonl`
-     (93 s) accepts them and finds 875 games in both files, with equal scores in all.  `solver/tools/check_results.py`
-     finds the same, and refuses the label `search` of the games with no node.
+     proof kinds in every game, and its moves in all but 1560–1563 (above).  Its methods are this file's too, except
+     that a game whose search took no step was labeled `search` then and is `start` here.  Only its game of 1301 assumes
+     anything: that the table's game of 1300 is optimal.  `taxman verify-results results/optimal.jsonl.gz
+     solver/notebook/search/the-gf2-bound-in-the-search-2026-10/chain.jsonl` (93 s) accepts them and finds 875 games in
+     both files, with equal scores in all.  `solver/tools/check_results.py` finds the same, and refuses the label
+     `search` of the games with no node.
    * n = 2176–3440: the table had no game here either, and no other chain reaches far.
-     `solver/frame/testdata/c8g.chain-2176.jsonl`, the Graviton calibration's chain (64 threads, one game after
-     another, the build of commit 407645f, 15 minutes), has the games 2176–2276, 101 in all.  A rehearsal of the second
-     run, made on the same machine type just before it started (the build of commit 55287ff, 64 threads, a window of
-     16, stopped and killed and resumed on purpose; not committed), has 2176–2300, 125 in all.  Both have this file's
-     scores, proofs, promotions and moves in every game they share with it, and its methods but for that label (checked
-     on the final file).  Past 2300 the evidence is the run's own: the verifiers on the whole file.
+     `solver/frame/testdata/c8g.chain-2176.jsonl`, the Graviton calibration's chain (64 threads, one game after another,
+     the build of commit 407645f, 15 minutes), has the games 2176–2276, 101 in all.  A rehearsal of the second run, made
+     on the same machine type just before it started (the build of commit 55287ff, 64 threads, a window of 16, stopped
+     and killed and resumed on purpose; not committed), has 2176–2300, 125 in all.  Both have this file's scores, proof
+     kinds, promotions and moves in every game they share with it, and its methods but for that label (checked on the
+     final file).  Past 2300 the evidence is the run's own: the verifiers on the whole file.
    * n = 3441–3914: no other chain reaches here either.  The evidence is the third run's own: it solved 1–3440 again
      before these games, with this file's scores in all of them (its lines of those games are kept in [its
      entry](https://github.com/bvchess/taxman-notebook/blob/main/the-run-to-the-wall-2026-10/README.md), not here), and
@@ -278,7 +278,8 @@ repository, with `who` the name of whoever submits it:
 The bounds store: the bounds on opt(n) that [the
 ledger](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/README.md)
 finds, kept for good, for the games from 3915 on.  A game is *proven* when its best lower bound equals its best upper
-bound, and the file is the record of those proofs, which the lines of proof `known` in `optimal.jsonl.gz` cite.  The
+bound, and the file records the bounds that prove those games, which the lines of proof kind `known` in
+`optimal.jsonl.gz` cite.  The
 first `ledger export` made it, from stage 1 of the ledger past 4400 (2026-10-18), and each export since appends to it.
 
 Its lines are bounds that hold.  A lower bound is the score of a finished game that the referee replays.  An upper
@@ -319,11 +320,11 @@ flag.
   on the file first, since the run takes its upper bounds on their word.
 * **`taxman solve --use-prev`** takes the upper bounds on their word too, and reads the same best bounds
   (`src/store.rs`, the one copy of the format).  A game whose best bounds meet is recorded as the game of its lower
-  bound, replayed by the referee, with proof `known`, citing the two lines and assuming U at the games the upper line
-  rests on.  A game with one bound, or a gap between two, seeds its search with the lower bound's game and stops it at
-  the upper bound.  The verifiers of results files check that the cited lines exist and say what the results line says
-  (rule, run, value).  The bounds themselves are checked by `ledger verify-bounds` and `solver/tools/check_bounds.py`,
-  not again by them.
+  bound, replayed by the referee, with proof kind `known`, citing the two lines and assuming U at the games the upper
+  line rests on.  A game with one bound, or a gap between two, seeds its search with the lower bound's game and stops it
+  at the upper bound.  The verifiers of results files check that the cited lines exist and say what the results line
+  says (rule, run, value).  The bounds themselves are checked by `ledger verify-bounds` and
+  `solver/tools/check_bounds.py`, not again by them.
 
 **The line.**  One JSON object, with the fields below and no others:
 

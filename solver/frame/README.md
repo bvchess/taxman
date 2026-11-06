@@ -122,16 +122,16 @@ into one frame 0 with two freedoms.
 
 The solver's answer for game n is `in_the_bag` + [P\*](../../docs/GLOSSARY.md#the-frame-model).  That is opt(n) given
 three things: the frame model is exact at n, which it is exactly when [statement
-U](../../docs/GLOSSARY.md#the-frame-model) holds at n (a proof by the ceiling or the prime formula uses no model); the
-search prunes nothing that could win, since every [tactic](../../docs/GLOSSARY.md#the-search) is proven or sound; and,
-for some proofs, the game of n − 1 is optimal, so a [chain](../../docs/GLOSSARY.md#results-and-trust) of games from n =
-1 is proven game by game.  So a result rests on nothing but U, where its proof uses the frame model; the correctness of
-the code; and, where its proof says so, the game it was built from.  U is open in general.  It holds at every game the
-[prover](../noframe/README.md) has proven, and `taxman certify` checks it game by game past them.
-[solver/docs/design/frame-model.md, “What "optimal" means”](../docs/design/frame-model.md#what-optimal-means) explains
-each premise and what each kind of proof needs of the model, [the
-reference](../docs/REFERENCE.md#4-why-the-answers-can-be-trusted) says how each result records what it rests on, and
-[results/README.md](../../results/README.md) counts the committed games of each kind of proof.
+U](../../docs/GLOSSARY.md#the-frame-model) holds at n (a game proven by the ceiling or the prime formula uses no model);
+the search prunes nothing that could win, since every [tactic](../../docs/GLOSSARY.md#the-search) is proven or sound;
+and, for some proof kinds, the game of n − 1 is optimal, so a [chain](../../docs/GLOSSARY.md#results-and-trust) of games
+from n = 1 is proven game by game.  So a result rests on nothing but U, where the way it was proven uses the frame
+model; the correctness of the code; and, where its proof kind says so, the game it was built from.  U is open in
+general.  It holds at every game the [prover](../noframe/README.md) has proven, and `taxman certify` checks it game by
+game past them.  [solver/docs/design/frame-model.md, “What "optimal"
+means”](../docs/design/frame-model.md#what-optimal-means) explains each premise and what each proof kind needs of the
+model, [the reference](../docs/REFERENCE.md#4-why-the-answers-can-be-trusted) says how each result records what it rests
+on, and [results/README.md](../../results/README.md) counts the committed games of each proof kind.
 
 ## 2. Build, test, run
 
@@ -190,7 +190,7 @@ n=22    score=166       repeat  nodes=0               0.000 s  optimal ok  proof
 ```
 
 Each line is one game: n, its score, how the solver found it, the search's steps, the seconds, a check against the
-built-in table, the proof, the seconds the game had a worker, the CPU seconds of its search's workers and its best
+built-in table, the proof kind, the seconds the game had a worker, the CPU seconds of its search's workers and its best
 promotion sum.  [The reference, section
 3](../docs/REFERENCE.md#3-reading-the-output) reads a line field by field.  The methods:
 
@@ -198,9 +198,9 @@ promotion sum.  [The reference, section
   only one.
 * `prime` (games 2, 3, 5 and every other prime): the [prime formula](../../docs/GLOSSARY.md#the-game) gives the game of
   n from the game of n − 1.
-* `start` with the proof `cap` (game 18): the search's starting game reached the
+* `start` with the proof kind `cap` (game 18): the search's starting game reached the
   [ceiling](../../docs/GLOSSARY.md#the-game) of game 18, 18 + 93 = 111, before it took a step.
-* `search` with the proof `exhausted` (games 20 and 21): the search explored its whole tree.
+* `search` with the proof kind `exhausted` (games 20 and 21): the search explored its whole tree.
 * `repeat` (game 22): game 22 poses the same search problem as game 21, which settled it, so the solver takes 21's
   promotions without a search.
 
@@ -218,7 +218,7 @@ n=21    score=144       search  nodes=1               0.001 s  optimal ok  proof
 ```
 
 The note says that game 21 has no game of 20 to start from here, so the solver solves it *standalone*.  Finally, the two
-verifiers check the file the first command wrote.  Each replays every game and derives every proof again ([the
+verifiers check the file the first command wrote.  Each replays every game and derives every proof kind again ([the
 reference, section 4](../docs/REFERENCE.md#4-why-the-answers-can-be-trusted)):
 
 ```
@@ -355,17 +355,17 @@ the file `results/optimal.jsonl.gz`, read twice:
 | source | holds | a game of it rests on |
 |---|---|---|
 | the built-in table | the games of `results/optimal.jsonl.gz` as of the build | nothing but the table's word: the line records that it assumes the game optimal |
-| the committed chain | the file `results/optimal.jsonl.gz` of the checkout, each game with its proof | what its line assumes |
+| the committed chain | the file `results/optimal.jsonl.gz` of the checkout, each game with its proof kind | what its line assumes |
 | `results/bounds.jsonl` | the bounds the ledger found ([results/README.md](../../results/README.md#boundsjsonl)); a game whose best lower bound is its best upper bound is *proven* | [statement U](../../docs/theory/exactness.md#statement-u) at the games its upper bound rests on (`rests_on`), one assumption each |
 
 Of a game that several sources hold, the solver takes the committed chain's, then the store's, then the table's.  What
 it does with them:
 
-* **A game that a source has proven is recorded with no search.**  Its line has the method `known`, the proof `known`,
-  no `setup`, and a `known` field that cites the source ([the reference, "Citing a known
+* **A game that a source has proven is recorded with no search.**  Its line has the method `known`, the proof kind
+  `known`, no `setup`, and a `known` field that cites the source ([the reference, "Citing a known
   source"](../docs/REFERENCE.md#citing-a-known-source)).  The referee replays it like every game, and it is checked
-  against the game before it (`score(n − 1) <= score(n) <= n + score(n − 1)`) and against the built-in table.  Game
-  n + 1 has the game of n for its ceiling and seed as usual, and a proof that rests on it, by the ceiling or the prime
+  against the game before it (`score(n − 1) <= score(n) <= n + score(n − 1)`) and against the built-in table.  Game n +
+  1 has the game of n for its ceiling and seed as usual, and a game that rests on it, proven by the ceiling or the prime
   formula, assumes what it does.
 * **The game before the range** is the known game of A − 1, if `--out` lacks it.  The `prev` of the first line says
   where it came from: `optimal` (the built-in table), `strict` (the committed chain) or `bounds`.
@@ -373,7 +373,7 @@ it does with them:
   or both with a gap between them.  The game of its best lower bound is a seed beside the game of n − 1, and the one
   that keeps more is used.  Its best upper bound is a ceiling next to the one that the game of n − 1 gives, and a
   search that reaches the lower of the two stops.  A search that stopped at the store's bound is proven by it: proof
-  `known`, with `known` citing the bound, assuming U where the bound rests.
+  kind `known`, with `known` citing the bound, assuming U where the bound rests.
 * `--force-search` leaves the games to their searches, and the store does not help them, as it leaves the prime
   formula and the repeats.  `regress --use-prev` takes the game before its range from the table only.
 
@@ -388,8 +388,8 @@ $ taxman solve 1-2175 --out chain.jsonl --checkpoint-dir ckpt --checkpoint-inter
 ```
 
 Started at n = 1, a chain takes no game from the built-in table, which it only compares with, as far as the table goes;
-a score that differs is a hard error.  So no proof in the file assumes anything beyond the frame model.  A run that
-takes a game from the table (`--use-prev`) records, in every result whose proof rests on it, that it assumes that game
+a score that differs is a hard error.  So no game in the file assumes anything beyond the frame model.  A run that
+takes a game from the table (`--use-prev`) records, in every result that rests on it, that it assumes that game
 optimal ("Known games", above).
 
 `results/optimal.jsonl.gz` is such a chain, compressed.  This command, up to the paths, the thread count and the
@@ -407,11 +407,11 @@ where one game's search cannot use them all.  Game n + 1 is set up while n searc
 best game so far, without the ceiling.  It gets the ceiling, with n's final game as a seed, the moment n is concluded.
 While the searches run, the threads move between them, to the oldest game that keeps them busy.
 
-Games are still concluded, checked and recorded in order.  Every line has the score, proof, repeat and assumptions that
-a range solved one game after another gives it.  The moves may be another optimal set, and the nodes and times differ
-([solver/docs/design/engine.md, "The window: games in flight"](../docs/design/engine.md#the-window-games-in-flight) and
-[solver/docs/design/trust.md, "What a window changes in the
-results"](../docs/design/trust.md#what-a-window-changes-in-the-results)).
+Games are still concluded, checked and recorded in order.  Every line has the score, proof kind, repeat and assumptions
+that a range solved one game after another gives it.  The moves may be another optimal set, and the nodes and times
+differ ([solver/docs/design/engine.md, "The window: games in
+flight"](../docs/design/engine.md#the-window-games-in-flight) and [solver/docs/design/trust.md, "What a window changes
+in the results"](../docs/design/trust.md#what-a-window-changes-in-the-results)).
 
 The default window is 4, the best measured on 64 threads, and what `solver/tools/cloud/chain.sh` runs with.  With one
 thread the window is always 1, one game after another.

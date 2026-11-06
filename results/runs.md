@@ -64,7 +64,7 @@ hour, in two instances.  The first ran from 2026-10-15 04:05:42Z with a window o
 3310, and was stopped on purpose.  The second, restored from the saved state, ran with a window of 4 from 10:40:41Z to
 the deadline.  The run cost about $16.46 in all.
 
-* The window is not in the lines, since a window changes neither a score nor a proof ([the frame solver's
+* The window is not in the lines, since a window changes neither a score nor a proof kind ([the frame solver's
   README](../solver/frame/README.md#games-in-flight)).  `invocations` is: it is 1 in every line of 2176–3440 but 3311,
   3312 and 3315.  Those games were in flight when the first instance stopped, and the second took them up from their
   checkpoints (2 each).
@@ -145,9 +145,9 @@ solver, with no interruption, for 18.86 instance-hours and $13.58 at the ledger'
 entry](https://github.com/bvchess/taxman-notebook/blob/main/the-run-past-5000-2026-10/README.md) records the run.
 
 * `prev.source` is `run` in every kept line.
-* The 327 games are 35 searches (all exhausted), 14 proofs at the ceiling (method `start`), 13 primes, 50 repeats and
-  215 games of the store: 4550–4640, 4650–4759 and 4770–4783, all that the store had proven in 4548–4783.  Each cites
-  its two lines of the store, from the runs `ledger-frontier-stage1` and `ledger-frontier-stage2`.
+* The 327 games are 35 searches (all exhausted), 14 games proven at the ceiling (method `start`), 13 primes, 50 repeats
+  and 215 games of the store: 4550–4640, 4650–4759 and 4770–4783, all that the store had proven in 4548–4783.  Each
+  cites its two lines of the store, from the runs `ledger-frontier-stage1` and `ledger-frontier-stage2`.
 * The searches took 9.18 G nodes and 14.9 hours of game time; the games overlap in the window.  Every search took 30 M
   nodes or more.  The dearest by nodes were 4864 (1.13 G nodes, 4,636 s), 4865, 4872, 4860 and 4856 (1.01, 0.945, 0.857
   and 0.532 G); by time, 4865 (8,995 s or 2.50 h), 4864, 4872 and 4860.  The queue of work units never held more than
@@ -171,7 +171,7 @@ made by builds in which `conflict_look` is on by default, no longer name it in `
 `price_reuse=on`, which the command switched on.  The lines of 4984 on record `carried_nogoods=on` and `warm_start=on`
 too, and `conflict_branching=off` in all but 4991, 4992, 4995, 4998, 5000 and the 30 searched games of 5001–5060, whose
 searches the lab switched to conflict branching at a gate of 1200 (below).  The first line, 4875, records its game of
-4874 as the line of this file, with its proof, `same_search`, which both verifiers accept.
+4874 as the line of this file, with its proof kind, `same_search`, which both verifiers accept.
 
 *Details.*  `chain.sh` ran twenty-three times, from 2026-10-21 to 30 (times UTC).  Each stop was a SIGTERM to
 `chain.sh`: the solver wrote a final checkpoint, and the next invocation resumed from it; the last stop ended the run.
@@ -236,7 +236,7 @@ searched 5049 and wrote only an incomplete line):
   4880, 4895, 4899, 4914, 4921, 4944, 4950, 4953, 4956, 4960, 4984, 4991, 4992, 5037, 5047, 5049 and 5054, the first
   game of each of the nineteen invocations whose lines are kept that read the game of n − 1 from the results file, and
   `run` for the other 167.  Threads: 88 in 4875–4878 and 4899–5060, and 72 in 4879–4898.
-* The 186 games are 71 searches (all exhausted), 19 proofs at the ceiling (method `start`: 4876, 4878, 4887, 4896,
+* The 186 games are 71 searches (all exhausted), 19 games proven at the ceiling (method `start`: 4876, 4878, 4887, 4896,
   4902, 4917, 4923, 4959, 4965, 4977, 4986, 5005, 5012, 5013, 5025, 5031, 5044, 5055 and 5058), 25 primes (4877, 4889,
   4903, 4909, 4919, 4931, 4933, 4937, 4943, 4951, 4957, 4967, 4969, 4973, 4987, 4993, 4999, 5003, 5009, 5011, 5021,
   5023, 5039, 5051 and 5059) and 71 repeats.  No game came from the bounds store, which has proven none past 4783.
@@ -263,7 +263,7 @@ searched 5049 and wrote only an incomplete line):
   trial in `engine.gate_trial`: 24 units at 57.2 M and 58.3 M steps, a CPU for the gate of 600 of 0.855 and 0.874 of
   the gate of 1200's, and the gate 600 chosen and applied in both ([the
   notebook](https://github.com/bvchess/taxman-notebook/blob/main/search/a-gate-for-each-game-2026-10/README.md)).  5055
-  and 5058 were proofs at the ceiling with no node.
+  and 5058 were games proven at the ceiling with no node.
 * During the fourth to the sixth invocations the lab ran studies in a sandbox beside the chain, on 16 threads at nice
   19.  Its command folder carried no command to the solver, and no line up to 4919 has a `lab` key, so the lab changed
   no search there.  From 4920 on the lab set a policy for the tactic `conflict_look` (the `lab` key of 67 lines, 4920 to
@@ -299,18 +299,17 @@ searched 5049 and wrote only an incomplete line):
 * the second, of commit 243af9b, in schema 4: `git show 2487671:rust/results/strict.jsonl`;
 * the third, of commit 271c817, in schema 5, on 4 threads: `git show 0133afe:rust/results/strict.jsonl`.
 
-All three have this file's scores in games 1–1300, and the second and the third its proofs and methods too, but that a
-game whose search took no step is `search` in them and `start` here.  The first was made before the tactic
-`same_search` existed, so it searched the 545 games that this file concludes as repeats.
-Their moves differ from this file's in a few games ([README.md, "Games with several optimal
-sets"](README.md#games-with-several-optimal-sets)).
+All three have this file's scores in games 1–1300, and the second and the third its proof kinds and methods too, but
+that a game whose search took no step is `search` in them and `start` here.  The first was made before the tactic
+`same_search` existed, so it searched the 545 games that this file concludes as repeats.  Their moves differ from this
+file's in a few games ([README.md, "Games with several optimal sets"](README.md#games-with-several-optimal-sets)).
 
 **Other files checked with it.**  Three other files were checked with this file, and agree with it ([README.md,
 "What supports the scores"](README.md#what-supports-the-scores)):
 
 * `default.jsonl` (1001–1231, schema 1), the first run past 1000, made with the unproven tactics `reuse_prev` and
   `revise_freedoms` on.  It is gone from the tree; `git show f72c332:rust/results/default.jsonl` has it.  It had 34
-  prime, 78 exhausted and 119 proofs by `reuse_prev`, and 19 games resting on nothing unproven.
+  prime, 78 exhausted and 119 games concluded by `reuse_prev`, and 19 games resting on nothing unproven.
 * The cost-curve study's
   [taxman-notebook/search/benchmarks-the-probe-pgo-and-scaling/chain.jsonl](https://github.com/bvchess/taxman-notebook/blob/main/search/benchmarks-the-probe-pgo-and-scaling/chain.jsonl)
   (1001–1231, schema 1, commit e710d16), a chain with those tactics off.  It has 34 prime, 127 exhausted and 70 at the

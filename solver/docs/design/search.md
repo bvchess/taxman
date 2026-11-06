@@ -371,7 +371,7 @@ checks (tactic `near_repeat`, on by default; `search::NearRepeat`).
   candidate of home j + 1 that y pays for, and no other candidate.  The factor graphs need no check: on a state's frame
   both list the maximal factors among its factors.
 * **The record.**  A search armed with the cut counts the nodes it cuts, as `stats.near_repeat_cut` in its results line
-  ([the reference](../REFERENCE.md#a-results-line---out-schema-5)).  The proof stays `exhausted`.
+  ([the reference](../REFERENCE.md#a-results-line---out-schema-5)).  The proof kind stays `exhausted`.
 * **Cost.**  Below Z the cut costs one comparison, and where the first check fails a few set operations.  A node's
   state in Π_m is found only where it passes, once, from its parent's (one promotion) or from Π_m's root, and kept
   beside the node's own.

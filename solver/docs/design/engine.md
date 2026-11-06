@@ -78,7 +78,7 @@ has the exact steps and checks.  The steps:
 | 2 | the prime shortcut: a prime n plays the game of n − 1 with its first move replaced by n (method `prime`) |
 | 3 | the frames, formed, simplified, numbered and merged; with no candidates the game with no promotions is the only one (method `trivial`) |
 | 4 | the search (method `search`, or `start` when its starting game reaches a ceiling before the search takes a step): the frame set and the greedy incumbent (`search::prepare`); a repeat of an earlier game's search (method `repeat`, tactic `same_search`; [same-search.md](same-search.md)); the starting incumbent, the ceiling and the seed; the engine; promotions → moves |
-| 5 | `conclude`: replay and check the game, confirm its score against the built-in table, assign its proof and what it assumes |
+| 5 | `conclude`: replay and check the game, confirm its score against the built-in table, assign its proof kind and what it assumes |
 | 6 | record the result (a range) |
 
 The steps again, with the functions that take them:
@@ -119,7 +119,7 @@ The steps again, with the functions that take them:
    |  never replaced)
    v
  [5] solver::conclude                replay (game::replay_finished); score == in_the_bag + promotions; the ceilings;
-   |                                 confirm the score against the built-in table; the proof and what it assumes
+   |                                 confirm the score against the built-in table; the proof kind and what it assumes
    v
  [6] results::ResultsFile::append    the JSON line, synced; only then is the game's checkpoint deleted;
                                      the game becomes the previous game of n+1
@@ -133,7 +133,7 @@ the two), and its best upper bound, a ceiling beside the one that the game of n 
 the search).  `force_search` leaves the store out.
 
 *The game of n − 1* is checked before anything uses it: it must replay legally to its recorded score, be over, and open
-with the largest prime (`conclude` has already checked a game that this run made).  The results whose proofs rest on it
+with the largest prime (`conclude` has already checked a game that this run made).  The results that rest on it
 assume what it assumes ([trust.md](trust.md)).
 
 *Limits.*  A search that a time or node limit stops gives an incomplete result (`completed` false, `best_so_far` the

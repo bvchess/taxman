@@ -37,43 +37,43 @@ side of telling problems apart.  Equal forms are equal problems, with the same p
 results line records the form's 64-bit digest (`setup.digest`), but nothing rests on the digest alone ("Finding m",
 below).
 
-*Which proofs settle P\*.*  A repeat is only as good as the earlier game's proof.  Four kinds of proof of a game m
-establish P\*(Π_m):
+*Which proof kinds settle P\*.*  A repeat is only as good as the way the earlier game was proven.  Four proof kinds of
+a game m establish P\*(Π_m):
 
 * `exhausted`: the search explored the whole tree of Π_m.  So the sum of m's promotions is P\*(Π_m), given that the
-  pruning is exact, which every exhausted proof rests on.
+  pruning is exact, which every exhausted search rests on.
 * `cap`: m's promotions S are promotable and sum to ceiling(m) = m + score(m − 1) − in_the_bag(m), the ceiling as a
   promotion sum.  So P\*(Π_m) ≥ ceiling(m).  Conversely, every promotable set T of Π_m is a legal game of m scoring
   in_the_bag(m) + sum(T).  This is the soundness of the frame model ([the exactness theorem
   (X7)](../../../docs/theory/exactness.md#the-exactness-theorem)).  Every search relies on it each time it offers an
   incumbent, and the referee replays every game built from one; none has ever failed.  So in_the_bag(m) + P\*(Π_m) ≤
-  opt(m) ≤ m + opt(m − 1) = m + score(m − 1).  The last step needs the game of m − 1 to be optimal: the proof by the
+  opt(m) ≤ m + opt(m − 1) = m + score(m − 1).  The last step needs the game of m − 1 to be optimal: a game proven by the
   ceiling rests on that, and m's assumptions record it.  So P\*(Π_m) = ceiling(m), the sum of m's promotions, whatever
   tactics shaped the search.
-* `same_search`, by induction: m repeats a game k with Π_k = Π_m whose proof settles P\*(Π_k), and m's promotions are
-  k's.
+* `same_search`, by induction: m repeats a game k with Π_k = Π_m whose proof kind settles P\*(Π_k), and m's promotions
+  are k's.
 * `known`, where an upper bound of the bounds store ended m's search: the search found a promotable set of the largest
   sum the bound allows, so no set sums to more, given the bound, whose assumptions m's line records
   (`Proof::settles_search`).  A game only taken from a known source, with no search, sets none up.
 
-No other proof settles P\*.  A trivial game has no candidates and sets no search up.  A prime game is the prime
+No other proof kind settles P\*.  A trivial game has no candidates and sets no search up.  A prime game is the prime
 formula's and sets none up either.  Neither is ever repeated, and the verifiers refuse a repeat that names one.  An
 unfinished search settles nothing.
 
-*The repeat.*  Suppose game n poses Π_n = Π_m, and m's proof settles it.  Then P\*(Π_n) = P\*(Π_m) = P, the sum of m's
-promotions S, and S is promotable in Π_n.  The game of n is S played on the board of n (`solution_for_promotions`).  It
-goes through `conclude` like any game.  It must replay legally, be over, and open with the largest prime.  It must score
-in_the_bag(n) + P, stay within `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`, and match the built-in table where it has
-n.
+*The repeat.*  Suppose game n poses Π_n = Π_m, and m's proof kind settles it.  Then P\*(Π_n) = P\*(Π_m) = P, the sum of
+m's promotions S, and S is promotable in Π_n.  The game of n is S played on the board of n (`solution_for_promotions`).
+It goes through `conclude` like any game.  It must replay legally, be over, and open with the largest prime.  It must
+score in_the_bag(n) + P, stay within `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`, and match the built-in table where it
+has n.
 
-The game is optimal on the premise of an exhausted proof of n: that the best game of n scores in_the_bag(n) + P\*(Π_n),
-which is U at n ([frame-model.md](frame-model.md)).  Only P\*(Π_n) is established differently, by m's proof instead of a
-search.  So the proof `same_search` rests on m, not on the game of n − 1, and it assumes what m assumes.
+The game is optimal on the premise of an exhausted search of n: that the best game of n scores in_the_bag(n) + P\*(Π_n),
+which is U at n ([frame-model.md](frame-model.md)).  Only P\*(Π_n) is established differently, from m instead of a
+search.  So the proof kind `same_search` rests on m, not on the game of n − 1, and it assumes what m assumes.
 
 *Finding m.*  Before it searches game n, the solver looks for an earlier game whose problem is Π_n.  It looks among the
-completed games of the results file and of the run, in the `SAME_SEARCH_WINDOW` = 8 games before n, latest first,
-for one that set a search up and whose proof settles it.  It does not look when the search resumes from a checkpoint, or
-with `force_search`.
+completed games of the results file and of the run, in the `SAME_SEARCH_WINDOW` = 8 games before n, latest first, for
+one that set a search up and whose proof kind settles it.  It does not look when the search resumes from a checkpoint,
+or with `force_search`.
 
 The digest finds candidates; the whole problem decides.  A game whose recorded digest differs is passed over.  For one
 whose digest agrees, the solver sets its problem up again from its n, which takes milliseconds
@@ -90,14 +90,14 @@ function of the window's games.
 
 *The verifiers.*  The first, `taxman verify-results`, checks a repeat's line against m's:
 
-* m is a completed game on an earlier line of the same file, and its proof settles its search;
-* the line's record of m (proof, assumptions, digest) is m's;
+* m is a completed game on an earlier line of the same file, and its proof kind settles its search;
+* the line's record of m (proof kind, assumptions, digest) is m's;
 * the promotions are m's and sum to the recorded promotion sum;
 * both problems, set up again from the two values of n, are as large as their lines record, have the recorded digest,
   and are equal;
 * both games score their board's in_the_bag plus that sum.
 
-It then derives the proof and the assumptions (m's) as for any line.
+It then derives the proof kind and the assumptions (m's) as for any line.
 
 The second, `solver/tools/check_results.py`, shares no code with the solver and cannot build the model.  It checks the
 same structure from the lines alone: m is earlier, completed and settles its search; the recorded digests and sizes are

@@ -23,7 +23,7 @@ the docs listed at the end.  Paths here are from the top of the repository; Carg
 * **[solver/README.md](README.md)**: the map of the solvers and their documents.
 * **[solver/frame/README.md](frame/README.md)**: the frame solver's guide: build, a first run, the commands.
 * **[solver/docs/REFERENCE.md](docs/REFERENCE.md)**: the frame solver's reference: every flag and command, the output,
-  the proofs.
+  how the answers can be trusted.
 * **[docs/GLOSSARY.md](../docs/GLOSSARY.md)**: every term, defined once.
 * **[solver/docs/DESIGN.md](docs/DESIGN.md)**: the design, the index of solver/docs/design/, a file a part
   ([testing.md](docs/design/testing.md) says how changes are tested).

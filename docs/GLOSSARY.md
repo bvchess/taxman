@@ -77,12 +77,12 @@ changed"](https://github.com/bvchess/taxman-notebook/blob/main/terms-changed.md)
   game of n − 1.  The solver uses n + score(n − 1), with the recorded score of n − 1.  A game *at its ceiling* scores
   exactly that, and needs no search to prove (`results::CeilingProof`; the bound is [the ceiling lemma
   (N4)](theory/neighbors.md#the-ceiling-lemma), and [the step theorem (N6)](theory/neighbors.md#the-step-theorem) gives
-  the optimal sets there).  As a bound on the promotion sum,
-  the ceiling is n + score(n − 1) − `in_the_bag`, which the results lines and a tactic call `cap`: the proof `cap`, the
-  fields `reached_cap` and `setup.cap`, the tactic `prev_cap`.
+  the optimal sets there).  As a bound on the promotion sum, the ceiling is n + score(n − 1) − `in_the_bag`, which the
+  results lines and a tactic call `cap`: the proof kind `cap`, the fields `reached_cap` and `setup.cap`, the tactic
+  `prev_cap`.
 * **prime formula**: for a prime n, opt(n) = n + opt(n − 1) − q, with q the largest prime below n.  The optimal game
   of n is that of n − 1 with its first move, q, replaced by n.  For game 7: 7 + 15 − 5 = 17.  The tactic is
-  `prime_shortcut`, the proof `prime_formula`, and the theory proves the formula ([the prime formula
+  `prime_shortcut`, the proof kind `prime_formula`, and the theory proves the formula ([the prime formula
   (N5)](theory/neighbors.md#the-prime-formula)).
 
 ## The frame model
@@ -167,9 +167,9 @@ changed"](https://github.com/bvchess/taxman-notebook/blob/main/terms-changed.md)
   "optimal" means”](../solver/docs/design/frame-model.md#what-optimal-means)).  `model::FrameGraph` is the immutable
   factor graph and home frames, not "the model".
 * **statement U**: some optimal game plays every member of U\*_{≥3} ([statement U](theory/exactness.md#statement-u)).
-  The frame solver's answers rest on it where their
-  proofs use the frame model: an exhausted search, a trivial game or a repeat assumes U at n, and a proof by the ceiling
-  or by the prime formula does not ([solver/docs/design/frame-model.md, “What "optimal"
+  The frame solver's answers rest on it where the
+  search or rule that proved them uses the frame model: an exhausted search, a trivial game or a repeat assumes U at n,
+  and a game proven by the ceiling or by the prime formula does not ([solver/docs/design/frame-model.md, “What "optimal"
   means”](../solver/docs/design/frame-model.md#what-optimal-means)).  U is open in general, and proven at every n the
   prover has proven.  Past those games `taxman certify` checks it game by game ([certificate of U](#results-and-trust)).
 * **extended problem**, **Π⁺(O)**: the frame model with a set O of members of U\* made optional, the *open* sources,
@@ -344,17 +344,17 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **repeat**: a game that poses the same search problem as an earlier game, which settled it.  The frame solver
   concludes it with the earlier game's promotions instead of searching ([the repeat lemma
   (R6)](theory/search-rules.md#the-repeat-lemma)).  `same_search` is the name of the tactic and of
-  the proof; the method of the line is `repeat`.
+  the proof kind; the method of the line is `repeat`.
 * **near repeat**, **near-repeat cut**: a game that poses nearly the search problem of a game before it, one move
   swapped for another, say.  The near-repeat cut (tactic `near_repeat`) ends a node of its search whose completions are
   all promotion sets of the proven game before, once the incumbent reaches that game's best promotion sum ([the
   near-repeat lemma (R7)](theory/search-rules.md#the-near-repeat-lemma); [solver/docs/design/search.md, "The
   near-repeat cut"](../solver/docs/design/search.md#the-near-repeat-cut)).
-* **proof** (kind): how a completed game's optimality is established: `trivial`, `exhausted`, `cap`, `prime_formula`,
-  `same_search` or `known` ([the frame solver's reference, "Proof
+* **proof kind** (the field `proof`): how a completed game was proven optimal: `trivial`, `exhausted`, `cap`,
+  `prime_formula`, `same_search` or `known` ([the frame solver's reference, "Proof
   kinds"](../solver/docs/REFERENCE.md#proof-kinds)).
-* **assumes**: what a proof rests on beyond the frame model, inherited down the chain.  A game of n − 1, or of n, taken
-  from the built-in table is assumed optimal.  A bound of the bounds store assumes [statement
+* **assumes**: what the proof kind of a game rests on beyond the frame model, inherited down the chain.  A game of n −
+  1, or of n, taken from the built-in table is assumed optimal.  A bound of the bounds store assumes [statement
   U](theory/exactness.md#statement-u) at the games it rests on.
 * **known game**, **known source**: a game that `taxman solve --use-prev` takes instead of searching for it, from the
   built-in table, the committed chain, or a game that the bounds store has proven (`src/known.rs`).
@@ -368,7 +368,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   score ([solver/docs/design/certificates.md](../solver/docs/design/certificates.md)).
 * **the built-in table**: the games of `results/optimal.jsonl.gz` as of the build, which the binary holds as the
   compressed file and decodes as far as a game asks ([results/README.md](../results/README.md#optimaljsonlgz) says where
-  the games came from).  **optimal ok**: a score equals the table's.  That is not a proof, and above the table's last
+  the games came from).  **optimal ok**: a score equals the table's.  That proves nothing, and above the table's last
   game there is no table to match; a score that differs is a hard error.
 * **referee**: code that replays one game and checks it: legal, over, opening with the largest prime, scoring what is
   recorded.  `game::replay` and `game::replay_finished` are the frame solver's.  A game that fails after it was found

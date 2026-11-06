@@ -17,7 +17,7 @@ of the root, nor `warm_start`, which only changes which of several heaviest sets
 | tactic | default | status | effect |
 |---|---|---|---|
 | `prime_shortcut` | on | proven (given an optimal game of n − 1: the proof is at `accelerate::prime_shortcut`) | a prime n plays the game of n − 1 with its first move replaced by n |
-| `same_search` | on | proven (given the proof of the earlier game: [same-search.md](same-search.md)) | a game whose search problem an earlier game of the chain posed and settled is that game's promotions on this board, with no search (method `repeat`, proof `same_search`) |
+| `same_search` | on | proven (given how the earlier game was proven: [same-search.md](same-search.md)) | a game whose search problem an earlier game of the chain posed and settled is that game's promotions on this board, with no search (method `repeat`, proof kind `same_search`) |
 | `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | a node's child promotes all its forced members, and the node's loop ends after that child |
 | `nogoods` | on | sound (a nogood holds at every node; see `model::Nogoods`) | learn each conflict as a nogood of the root, and use the table at every node: for the conflict to branch on, and to rule candidates out of children |
 | `forget_nogoods` | on | sound (the table is a cache) | with `nogoods`, each searcher forgets every nogood it knows after each 50,000 of its steps (`search::NOGOOD_PERIOD`); off: never ([search.md](search.md#forced-members-and-nogoods), the item "Forgetting nogoods") |

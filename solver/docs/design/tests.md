@@ -202,10 +202,10 @@ every second line of the Java fixtures), and the comment on each says what the w
   unit a searcher hands over.  The folder of `--profile`, like that of `--carried-dir`, is made when the run starts, and
   a folder that cannot be made fails the run before its first game (`tests/solver.rs`).
 * **The window** (`tests/window.rs`; the policy's unit tests in `src/solver/window/allot.rs`):
-  * chains 1..600 with windows of 1, 2, 4 and 8 on 4 threads have the scores, methods, proofs, ceilings, assumptions,
-    repeats and previous games of the committed chain (a game at its ceiling is `start` or `search` in a window, by
-    whether its search took a step), and pass `verify_files`; with one thread any window gives the lines of a window
-    of one, but for the times and the build;
+  * chains 1..600 with windows of 1, 2, 4 and 8 on 4 threads have the scores, methods, proof kinds, ceilings,
+    assumptions, repeats and previous games of the committed chain (a game at its ceiling is `start` or `search` in a
+    window, by whether its search took a step), and pass `verify_files`; with one thread any window gives the lines of a
+    window of one, but for the times and the build;
   * a repeat of a game still in flight (301 of 300) names it, on a later line;
   * a range stopped by a node limit ends at its first unfinished game, with the lines before it in order, and completes
     when run again;
@@ -253,9 +253,9 @@ every second line of the Java fixtures), and the comment on each says what the w
   (`stats.near_repeat_cut`: game 256 after 255 cuts one, game 21 after 20 is armed and cuts none, and the first game of
   a run and a run without the tactic have no such key), both verifiers accept the files and count the shortened search,
   and both refuse the key on a prime game or with a value that is no count.
-* **Files with holes** (`tests/results.rs`): both verifiers accept a file with holes and unfinished lines, and refuse
-  a ceiling, a `cap` or `prime_formula` proof, a changed score, moves or assumptions, or a later line, for a game built
-  on one.  The solver no longer writes such a file, so the test makes its lines from games solved alone.
+* **Files with holes** (`tests/results.rs`): both verifiers accept a file with holes and unfinished lines, and refuse a
+  ceiling, the proof kind `cap` or `prime_formula`, a changed score, moves or assumptions, or a later line, for a game
+  built on one.  The solver no longer writes such a file, so the test makes its lines from games solved alone.
 * **Repeats** (`tests/same_search.rs`): the games that repeat an earlier search are found from the setups alone, and a
   chain concludes exactly those, with the scores of a chain that searches them, from n = 1 (1..300) and from a results
   file that a stopped run left; a game with a checkpoint is resumed, not repeated; a repeat assumes what the game it
@@ -268,13 +268,13 @@ every second line of the Java fixtures), and the comment on each says what the w
     carried from the game of another line is played and recorded;
   * the committed chain's and the table's games are recorded with their own assumptions, and the game before the range
     from each of the three has the source in `prev`;
-  * an open game's upper bound ends its search (proof `known`, citing the one line), and its lower bound's game seeds
-    it (fewer nodes); `force_search` leaves the games to their searches; a store game that does not play, or that the
-    chain bounds contradict, stops the run at its game;
+  * an open game's upper bound ends its search (proof kind `known`, citing the one line), and its lower bound's game
+    seeds it (fewer nodes); `force_search` leaves the games to their searches; a store game that does not play, or that
+    the chain bounds contradict, stops the run at its game;
   * both verifiers accept those files, and refuse each of: an upper bound of the store worth another value, a missing
     lower or upper line, a line by another rule or from another run, no store given, a citation of other lines,
-    assumptions dropped or added, no citation, a changed proof or score, a citation on a game that is not a known one.
-    `tests/docs.rs` has `known` among the keys a line has.
+    assumptions dropped or added, no citation, a changed proof kind or score, a citation on a game that is not a known
+    one.  `tests/docs.rs` has `known` among the keys a line has.
 * **Large games** (`tests/wide.rs`): the Java stopped at 1000, and the sets that hold a game are 8 to 128 words wide,
   so these tests check the widths past 1023 against each other and against the committed results.
   * The same game at every width that holds it (128 included) has the same frames, candidates, greedy set,

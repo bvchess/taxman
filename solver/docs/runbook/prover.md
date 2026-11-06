@@ -5,17 +5,16 @@ Part of the [runbook](../RUNBOOK.md).
 `prover.sh A B` proves opt(n) = V(n), the score that `results/optimal.jsonl.gz` records, for every n from A to B, on the
 whole board.  It runs the prover's `exact` over the range in passes on every CPU, and it is a small job next to the
 chain.  It runs on EC2 ([Run](#run)) or on a machine of your own ([On a machine of your
-own](#on-a-machine-of-your-own)).  [The prover's proofs](../../noframe/docs/proofs.md) holds the proofs made so far and
-their cost.
+own](#on-a-machine-of-your-own)).  [The prover's results](../../noframe/docs/proofs.md) records what the prover proved
+and its cost.
 
 **A run searches from the roles of the bottom-layers theorem.**  `exact` starts there by default (`--fix-low 1`), and
-the search is still a proof, because every optimal set obeys the roles (the bottom-layers theorem
-(F4)).  Each line records `"fix_low":1`, and the check
-counts the proofs that rest on the theorem.  Over 2..999 the roles took the plain root's nodes within 5 % at half the
-time a node, 0.61 ms against 1.16 ms (proofs.md, the paragraph "From the roles of F4"),
-so by that measurement a run from the roles costs about half as much as one from the plain root.  `EXTRA_ARGS='--fix-low
-0'` searches from the plain root.  The two kinds of search keep separate checkpoints: `ckpt/exact_N_low.ckpt` from the
-roles, `ckpt/exact_N.ckpt` from the plain root.
+the search is still a proof, because every optimal set obeys the roles (the bottom-layers theorem (F4)).  Each line
+records `"fix_low":1`, and the check counts the games whose search rests on the theorem.  Over 2..999 the roles took the
+plain root's nodes within 5 % at half the time a node, 0.61 ms against 1.16 ms (proofs.md, the paragraph "From the roles
+of F4"), so by that measurement a run from the roles costs about half as much as one from the plain root.
+`EXTRA_ARGS='--fix-low 0'` searches from the plain root.  The two kinds of search keep separate checkpoints:
+`ckpt/exact_N_low.ckpt` from the roles, `ckpt/exact_N.ckpt` from the plain root.
 
 ## How `exact` uses the CPUs
 
@@ -135,7 +134,7 @@ SSH](launch.md#steps-through-ssm-or-ssh)), the first as root and the others as `
    to compare with the estimate ([What it costs](#what-it-costs)); the late games cost more.
 
 **`BASELINE`, from A = 1302 on.**  The check at the end needs every n in 2..A − 1 proven, from one file: `BASELINE`,
-whose default holds the proofs of 2..1300.  For a later range, join the committed files of the proofs that cover 2..A −
+whose default holds the scores proven for 2..1300.  For a later range, join the committed files that cover 2..A −
 1 and set `BASELINE` to the joined file before `prover.sh` in step 3 and before `prover.sh --verify`; for 2176..B:
 
 ```
@@ -164,9 +163,9 @@ The guardrails are those of [launch.md](launch.md#cost-guardrails), with these d
 
 ## On a machine of your own
 
-**Make the proofs of 2..B in one run, `prover.sh 2 B`.**  A range that starts at 2 is made by one build into one
-output file, and its check reads that file alone, so every proof comes from the build that ran.  A range from A > 2
-relies on the proofs of 2..A − 1 that `BASELINE` names ([Run](#run)), which earlier builds made.  On a machine that
+**Make the proofs of 2..B in one run, `prover.sh 2 B`.**  A range that starts at 2 is made by one build into one output
+file, and its check reads that file alone, so every result comes from the build that ran.  A range from A > 2 relies on
+the prover's results for 2..A − 1 that `BASELINE` names ([Run](#run)), which earlier builds made.  On a machine that
 nothing interrupts, `prover.sh` runs as on EC2 without the parts for the cloud: no `S3_DEST`, no `POWEROFF` and no
 `spot-watch.sh`, in passes of the default 3600 s, on every CPU.  The steps for 2..2530 follow, with `W` the work
 directory (the results, the checkpoints and the logs), on a disk that survives a reboot.
@@ -301,7 +300,7 @@ The check (`summarize.py check A B`, which `prover.sh` also ran at the end) pass
 * every line's score is the score that `results/optimal.jsonl.gz` records.
 
 It then exits with status 0 and prints `OK: opt(n) is proven equal to the recorded score for every n in 2..B`;
-anything else prints which n failed.  Then, on your machine, count the proofs and their cost by bands of 100 in n:
+anything else prints which n failed.  Then, on your machine, count the games proven and their cost by bands of 100 in n:
 
 ```
 # BASELINE from A = 1302 on; for A = 2, the file alone
@@ -313,9 +312,9 @@ Commit `solver/noframe/data/exact_parity_A_B.jsonl`, and never let a later run o
 names another file.  Do not commit the work directory, the checkpoints or the logs.  Record the run:
 
 * the totals of the two commands (`summarize.py exact` gives the searches' thread-hours), and the real milliseconds a
-  node by n, in [the prover's proofs](../../noframe/docs/proofs.md), which holds the proofs and their cost;
-* the new end of the prover's proofs in [results/README.md](../../../results/README.md), which holds how far each kind
-  of proof reaches; then search the docs for the old end and update what still names it;
+  node by n, in [the prover's results](../../noframe/docs/proofs.md), which records what the prover proved and its cost;
+* the new end of the prover's results in [results/README.md](../../../results/README.md), which holds how far each proof
+  kind reaches; then search the docs for the old end and update what still names it;
 * the run itself in a notebook entry, with its rows in the register ([the notebook's
   rules](https://github.com/bvchess/taxman-notebook/blob/main/README.md#how-this-notebook-is-kept)), and its cost as
   [The spending, and the end](launch.md#the-spending-and-the-end) says.

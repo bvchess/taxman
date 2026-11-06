@@ -3,7 +3,7 @@
 Part of the [design](../DESIGN.md).
 
 A *certificate* proves [statement U](../../../docs/theory/exactness.md#statement-u) at one game: that the recorded score
-of a game whose proof uses the frame model (`exhausted`, `trivial`, `same_search`) is opt(n) on the whole board
+of a game whose proof kind uses the frame model (`exhausted`, `trivial`, `same_search`) is opt(n) on the whole board
 ([frame-model.md](frame-model.md)).  `taxman certify` makes certificates game by game, by [the certificate theorem
 (E2)](../../../docs/theory/extended-problem.md#the-certificate-theorem), and `taxman verify-certificates` checks them.
 [results/README.md](../../../results/README.md#certificates) says which games have one.
@@ -127,7 +127,7 @@ error.  It counts and skips an `incomplete` line, and checks a line with a final
 The first line to fail ends the command with the status 1, naming the file, the line and the game.  The dear checks
 (the problems set up again) run on K threads (default: all CPUs), and the first line to fail is the same for any K.
 What the command cannot check is that a search explored its whole tree: it takes a `certified` line made by a search on
-trust, as an exhausted proof is, and the summary says so.  The summary has, for each file, the lines, the final and
+trust, as an exhausted search is, and the summary says so.  The summary has, for each file, the lines, the final and
 `incomplete` ones, the `certified` ones by search and by the same problem, and the `beaten` ones; then the games
 certified; the counterexamples (the game, the recorded score, the score of the game that beats it); the builds that
 wrote the lines (commit, `dirty`, lines); and the proven end of the chain.

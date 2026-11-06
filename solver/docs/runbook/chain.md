@@ -61,7 +61,7 @@ and `chain.sh` runs there with `TAXMAN_WORK` set to the chain's data folder inst
 `WINDOW` is the number of consecutive games kept in flight at once (`taxman solve --window`).  While the solver still
 proves game n, it sets up and searches game n + 1 from n's best game so far, and the threads move to the searches that
 keep them busy, so one game's search does not leave a machine of many threads idle.  Games still conclude and record in
-order, with the scores, proofs and repeats of a window of 1, which solves them one after the other ([the
+order, with the scores, proof kinds and repeats of a window of 1, which solves them one after the other ([the
 README](../../frame/README.md#games-in-flight); [DESIGN.md](../design/engine.md#the-window-games-in-flight)).  The
 default is 4, in `chain.sh` and in `taxman solve --window`: on 64 and 192 threads the [scaling
 run](https://github.com/bvchess/taxman-notebook/blob/main/scaling-to-192-threads-2026-10/README.md) found 4 the best of
@@ -190,8 +190,8 @@ that has recorded none shows the games in flight alone:
   best promotion sum, the score less `in_the_bag`.  All are `-` where the solver that printed the line did not print
   them, and `best` is `-` for a prime or known game; a game that ran no search has a cpu of 0.0s;
 * `nodes`: the line's nodes;
-* `state`: `recorded`, the score, and in parentheses the line's method and proof, then `optimal ok` when the score is
-  the one in the built-in table.
+* `state`: `recorded`, the score, and in parentheses the line's method and proof kind, then `optimal ok` when the score
+  is the one in the built-in table.
 
 The state of a game in flight is told from its last progress line in `logs/chain.err` (the last 3000 lines are read):
 
@@ -245,10 +245,10 @@ taxman verify-results results/optimal.jsonl.gz
 python3 solver/tools/check_results.py results/optimal.jsonl.gz
 ```
 
-The first appended line records its game of n − 1 with the proof `known`, as the run's own line, while the committed
-file's line has the proof it was made with.  Both referees accept that record, because the score, the moves and the
-assumptions are the line's.  The built-in table takes the appended games at the next build, because the binary carries
-the file as it was when it was built.
+The first appended line records its game of n − 1 with the proof kind `known`, as the run's own line, while the
+committed file's line has the proof kind it was made with.  Both referees accept that record, because the score, the
+moves and the assumptions are the line's.  The built-in table takes the appended games at the next build, because the
+binary carries the file as it was when it was built.
 
 Then decide what to keep.  [Storage](machine.md#storage) gives the file's size.  Scripts must not overwrite the
 committed `results/`: put a file next to them (say `results/chain-1-N.jsonl`) and update

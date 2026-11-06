@@ -25,8 +25,8 @@ The other documents:
   [results/README.md](../../results/README.md#optimaljsonlgz) says how far the committed chain of games reaches, and
   [results/runs.md](../../results/runs.md) which machine made each part of it.
 * **Be right before being fast.**  A game counts only once an independent
-  [referee](../../docs/GLOSSARY.md#results-and-trust) has replayed it.  Every result records how its optimality is
-  proven and what that proof takes as given.  Every [tactic](../../docs/GLOSSARY.md#the-search) is proven or sound
+  [referee](../../docs/GLOSSARY.md#results-and-trust) has replayed it.  Every result names how its game was
+  proven optimal and what that takes as given.  Every [tactic](../../docs/GLOSSARY.md#the-search) is proven or sound
   ([tactics.md](design/tactics.md)), and can be switched off to measure its effect on speed.
 * **Search an enormous tree efficiently.**  Each node is fast on a single thread.  The search scales cleanly to the CPUs
   available, up to a 192-CPU machine, without depending on many of them.
@@ -45,7 +45,7 @@ Each file explains one part of the solver and the reasons for it, and defines ea
 
 | topic | file | read it to |
 |---|---|---|
-| the game and the frame model | [frame-model.md](design/frame-model.md) | see how the solver models a game, and what "optimal" means for each kind of proof |
+| the game and the frame model | [frame-model.md](design/frame-model.md) | see how the solver models a game, and what "optimal" means for each proof kind |
 | the architecture | [architecture.md](design/architecture.md) | find your way in the code: the modules in their reading order |
 | the search | [search.md](design/search.md) | change the search: its state and order, the matching bound, conflicts, forced members and nogoods, the default step, conflict branching, what may change while it runs, the start, the near-repeat cut |
 | price reuse | [price-reuse.md](design/price-reuse.md) | change how conflict branching keeps its prices from one check to the next, and see why that keeps the search exact |
