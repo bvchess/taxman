@@ -90,6 +90,12 @@ class TableTest(FileCase):
     def test_without_a_file_the_table_is_empty(self):
         self.assertEqual(check_results.read_table(None), {})
 
+    def test_a_table_that_holds_an_unsound_line_is_refused(self):
+        unsound = {"unsound": True, "n": 4, "score": 7, "moves": [3, 4], "promotions": []}
+        with self.assertRaises(SystemExit) as refused:
+            check_results.read_table(self.plain("table.jsonl", GAMES + [unsound]))
+        self.assertIn("an unsound line (taxman solve --unsound)", str(refused.exception.code))
+
 
 class CheckFileTest(FileCase):
     def check(self, path, table):
@@ -106,6 +112,16 @@ class CheckFileTest(FileCase):
         table = check_results.read_table(self.gz("committed.jsonl.gz", GAMES[:2], [dict(THREE, score=5)]))
         _done, problems = self.check(self.plain("results.jsonl", GAMES), table)
         self.assertEqual(problems, ["results.jsonl line 3 (n=3): scores 3, but the table has 5"])
+
+    def test_an_unsound_line_is_a_problem_whatever_its_mark_says(self):
+        table = check_results.read_table(self.gz("committed.jsonl.gz", GAMES))
+        for mark in [True, False]:
+            unsound = {"unsound": mark, "n": 3, "score": 3, "moves": [3], "promotions": []}
+            done, problems = self.check(self.plain("results.jsonl", GAMES[:2] + [unsound]), table)
+            expected = "results.jsonl line 3 (n=3): an unsound line (taxman solve --unsound), whose score is a lower"
+            self.assertEqual(sorted(done), [1, 2])
+            self.assertEqual(len(problems), 1)
+            self.assertTrue(problems[0].startswith(expected), problems)
 
     def test_the_committed_file_is_checked_as_a_gz_file_against_its_own_games(self):
         path = self.gz("committed.jsonl.gz", GAMES[:1], GAMES[1:])

@@ -19,7 +19,7 @@
 //!   the register links to it, and the front page holds no entry and no table row; `solver/docs/STATUS.md` is short and
 //!   dated;
 //! * the reference's (`solver/docs/REFERENCE.md`) table of the fields of a result line has the keys the code writes,
-//!   and its example line shows them;
+//!   and its example line shows them, and so do its table and its example of an unsound line;
 //! * the design's reading order (`solver/docs/design/architecture.md`) is the module map of `src/lib.rs`, and
 //!   `rust-version` is what the README and the cloud setup say;
 //! * the docs call `unzip`'s moves *mandatory*, never *forced* (which is the search's word);
@@ -45,7 +45,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use taxman::json::Json;
-use taxman::solver::{solve_game, SolveOptions};
+use taxman::solver::{solve_game, unsound, SolveOptions};
 use taxman::tactics::{on_off, Tactics};
 
 /// The crate's directory (`solver/frame/`).
@@ -1046,6 +1046,36 @@ fn the_reference_documents_exactly_the_keys_of_a_result_line() {
     assert_eq!(top_level_keys(example), complete, "REFERENCE.md's example line, and the keys of a finished game");
     assert!(example.contains("\"setup\":{"), "the example is a searched game");
     assert!(part.contains("null on a `trivial` or `prime` line"), "the table says when `setup` is null");
+}
+
+/// The keys of the unsound line the code writes for game `n`, with `--stop-at-known`.
+fn unsound_keys(n: u32) -> BTreeSet<String> {
+    let plan = unsound::Plan { effort: 1, seed: 1, stop_at_known: true, from_known: false };
+    let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
+    let mut keys = BTreeSet::new();
+    unsound::solve_range(n, n, &opts, &plan, None, |line| {
+        let json = line.to_json();
+        keys = json.as_obj().expect("an object").iter().map(|(key, _)| key.clone()).collect();
+    })
+    .expect("a game");
+    keys
+}
+
+#[test]
+fn the_reference_documents_exactly_the_keys_of_an_unsound_line() {
+    let reference = read(reference_md());
+    let part = section(&reference, "### An unsound line");
+    // A game with a search (85), and one with none (12).
+    let written = unsound_keys(85);
+    assert_eq!(unsound_keys(12), written, "a game with no search has the keys of one with a search");
+    assert_eq!(
+        first_column_words(part),
+        written,
+        "REFERENCE.md's table of the keys of an unsound line, and the code's"
+    );
+    let example = part.split("```").nth(1).expect("the example line is the first code block");
+    assert_eq!(top_level_keys(example), written, "REFERENCE.md's example of an unsound line, and the code's keys");
+    assert!(example.contains("\"method\":\"search\""), "the example is a searched game");
 }
 
 // ---------------------------------------------------------------------------------------------------------

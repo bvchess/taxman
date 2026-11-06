@@ -75,8 +75,14 @@
 //! busy.  With a window of one, and always with one thread, the range is solved strictly in order, game after game.
 //! The lines are the same either way but for what a multi-threaded search may vary (another optimal set of
 //! promotions, the nodes, the times): `window` has the driver and the argument.
+//!
+//! # The unsound mode
+//!
+//! [`unsound`] plays games with the setup, the prime shortcut and the repeats of this pipeline and the start of its
+//! search, and then LNS in place of the search: its lines are lower bounds, kept apart from the proven ones.
 
 mod clock;
+pub mod unsound;
 mod window;
 
 use crate::accelerate::{prime_shortcut, solution_for_promotions};
@@ -86,13 +92,14 @@ use crate::engine::{self, Control, Counters, EngineConfig, Spent, Stats};
 use crate::frames::BoardFrames;
 use crate::game::{replay, replay_finished, Optimal};
 use crate::json::Json;
+use crate::matchbound::MatchGraph;
 use crate::numtheory::Tables;
 use crate::results::{
     assumptions_json, assumptions_of, build_json, moves_digest, Assumptions, Proof, ResultsFile, SCHEMA,
 };
 use crate::search::{
     self, finder, gate_trial, stat, BranchSettings, Branching, NearRepeat, Prepared, Problem, ProblemSize, ProfilePlan,
-    SearchTactics,
+    SearchSpace, SearchTactics,
 };
 use crate::tactics::{on_off, Tactics};
 use crate::utc;
@@ -921,6 +928,19 @@ trait Job: Send + Sync {
     /// The search, from the go (the game's third phase), and the moves its promotions make.  The game's checkpoint is
     /// left in place, for the caller to delete once the result is safe ([`discard_checkpoint`]).
     fn search(&self, go: Go, opts: &SolveOptions) -> Result<Outcome, String>;
+    /// The unsound mode's search ([`unsound`]) on `threads` threads, with no ceiling: the start that a search makes
+    /// ([`search::start_incumbent`]), from the promotions of `seed`, the moves for `n − 1`, if the search takes a seed,
+    /// then at most `rounds` rounds of LNS on many threads with the options `lns` ([`finder::Lns::rounds`]), which end
+    /// once `enough` says so of the incumbent's promotion sum.  `clock` is the game's seconds so far.
+    fn improve(
+        &self,
+        seed: Option<&[u32]>,
+        rounds: u64,
+        threads: usize,
+        lns: finder::Options,
+        clock: &dyn Fn() -> f64,
+        enough: &dyn Fn(u64) -> bool,
+    ) -> unsound::Improved;
 }
 
 /// The [`Job`] of a board of set width `W`.
@@ -1046,6 +1066,36 @@ impl<const W: usize> Job for SearchJob<W> {
             near_repeat_cut: self.near.get().map(NearRepeat::nodes_cut),
         })
     }
+
+    fn improve(
+        &self,
+        seed: Option<&[u32]>,
+        rounds: u64,
+        threads: usize,
+        lns: finder::Options,
+        clock: &dyn Fn() -> f64,
+        enough: &dyn Fn(u64) -> bool,
+    ) -> unsound::Improved {
+        let prepared = &self.prepared;
+        let seed = self.seed_of(seed.filter(|_| self.seeds));
+        let graph = MatchGraph::new(&prepared.model, &prepared.root);
+        // The job's control has no ceiling, and only takes the start's offers.
+        let start = search::start_incumbent(prepared, &graph, &self.control, threads, seed.as_ref());
+        let start_seconds = clock();
+        let space = SearchSpace::new(prepared);
+        let lns = finder::Lns { p: prepared, space: &space, options: lns };
+        let ran = lns.rounds(&start, rounds, threads, clock, enough);
+        unsound::Improved {
+            start: start.sum(),
+            start_seconds,
+            promotions: ran.set.to_vec(),
+            moves: solution_for_promotions::<W>(&self.board.tables, ran.set),
+            rounds: ran.rounds,
+            nodes: ran.nodes,
+            improvements: ran.improvements,
+            interrupted: ran.interrupted,
+        }
+    }
 }
 
 /// The near-repeat cut of the search of `prepared`, game `n`, by `prev`, the moves for `n − 1` concluded
@@ -1167,9 +1217,7 @@ fn conclude_game(
     let concluded = match found {
         Found::Derived(Derived::Prime { candidates }) => {
             let prev = context.prev.expect("the prime shortcut is taken only with previous moves");
-            let moves = prime_shortcut(n, &prev.moves);
-            let played: BTreeSet<u32> = moves.iter().copied().collect();
-            let promotions = candidates.iter().copied().filter(|c| played.contains(c)).collect();
+            let (moves, promotions) = prime_game(n, candidates, &prev.moves);
             result.method = Method::Prime;
             conclude(result, moves, promotions, context)
         }
@@ -1221,6 +1269,16 @@ fn conclude_game(
         }
     };
     concluded.map_err(|failure| at(n, failure))
+}
+
+/// The moves and the promotions of the prime shortcut on game `n`, a prime, whose board with no promotions has the
+/// promotion candidates `candidates` (ascending), from `prev_moves`, the moves for `n − 1`: those moves with the first
+/// replaced by `n`, and the candidates among them.
+fn prime_game(n: u32, candidates: &[u32], prev_moves: &[u32]) -> (Vec<u32>, Vec<u32>) {
+    let moves = prime_shortcut(n, prev_moves);
+    let played: BTreeSet<u32> = moves.iter().copied().collect();
+    let promotions = candidates.iter().copied().filter(|c| played.contains(c)).collect();
+    (moves, promotions)
 }
 
 /// What [`conclude`] checks the moves of a game against.
@@ -1394,24 +1452,32 @@ fn shared_spill_dir(opts: &SolveOptions) -> Option<PathBuf> {
 /// keeps the setups a range starts with to a few, and makes the game repeated a function of the window's games alone.
 pub const SAME_SEARCH_WINDOW: u32 = 8;
 
-/// An earlier completed game, as much of its result as a repeat of its search needs.
+/// An earlier completed game, as much of its result as a repeat of its search needs: the size and digest of its
+/// problem, its promotions, and what a repeat of it rests on, its `basis` (a [`Basis`] in the proven mode, nothing in
+/// the unsound mode, [`unsound`]).
 #[derive(Clone, Debug)]
-struct Searched {
+struct Searched<B> {
     /// The size of its problem as its setup recorded it, which the problem set up again must have.
     size: ProblemSize,
     /// The digest of its search problem, as its setup recorded it.
     digest: u64,
     promotions: Vec<u32>,
+    basis: B,
+}
+
+/// What a repeat of a proven game rests on: that game's proof and assumptions.
+#[derive(Clone, Debug)]
+struct Basis {
     proof: Proof,
     assumes: Assumptions,
 }
 
 /// The games a game of a range may repeat the search of (tactic `same_search`): the completed games of the results
 /// file and of this run that set a search up and whose proof settles it ([`Proof::settles_search`]), and the games
-/// of the range in flight that set a search up and are not concluded yet (`pending`, see [`find`](Self::find)).
-#[derive(Default)]
-struct Earlier {
-    games: BTreeMap<u32, Searched>,
+/// of the range in flight that set a search up and are not concluded yet (`pending`, see [`find`](Self::find)).  The
+/// unsound mode keeps its own games, the lines of its file and its run that set a search up, with no basis.
+struct Earlier<B = Basis> {
+    games: BTreeMap<u32, Searched<B>>,
     /// The search problems of the boards this run set up ([`remember`](Self::remember)), by n, for the last
     /// [`SAME_SEARCH_WINDOW`] games: what a comparison with an earlier game needs, so that it need not set that
     /// game's board up again.
@@ -1420,15 +1486,20 @@ struct Earlier {
     pending: BTreeSet<u32>,
 }
 
+impl<B> Default for Earlier<B> {
+    fn default() -> Self {
+        Earlier { games: BTreeMap::new(), setups: BTreeMap::new(), pending: BTreeSet::new() }
+    }
+}
+
 impl Earlier {
     /// The games of the results file.
     fn of_file(file: &ResultsFile) -> Earlier {
         let mut earlier = Earlier::default();
         for game in file.games().filter(|game| game.proof.settles_search()) {
             if let Some((size, digest)) = game.size.zip(game.digest) {
-                let (promotions, proof, assumes) = (game.promotions.clone(), game.proof, game.assumes.clone());
-                let searched = Searched { size, digest, promotions, proof, assumes };
-                earlier.games.insert(game.n, searched);
+                let basis = Basis { proof: game.proof, assumes: game.assumes.clone() };
+                earlier.add(game.n, size, digest, game.promotions.clone(), basis);
             }
         }
         earlier
@@ -1439,11 +1510,28 @@ impl Earlier {
         self.pending.remove(&result.n);
         if let (true, Some(proof), Some(setup)) = (result.completed, result.proof, result.setup) {
             if proof.settles_search() {
-                let (promotions, assumes) = (result.promotions.clone(), result.assumes.clone());
-                let (size, digest) = (setup.size(), setup.digest);
-                self.games.insert(result.n, Searched { size, digest, promotions, proof, assumes });
+                let basis = Basis { proof, assumes: result.assumes.clone() };
+                self.add(result.n, setup.size(), setup.digest, result.promotions.clone(), basis);
             }
         }
+    }
+
+    /// The record that a repeat of the search of game `m` keeps, whose problem has the digest given, and `m`'s
+    /// promotions, once `m` is among the games ([`find`](Self::find) found it).
+    fn same_search(&self, m: u32, digest: u64) -> Option<(SameSearch, Vec<u32>)> {
+        let game = self.games.get(&m)?;
+        let promotion_sum = game.promotions.iter().map(|&p| u64::from(p)).sum();
+        let Basis { proof, assumes } = game.basis.clone();
+        let same = SameSearch { n: m, digest, promotion_sum, proof, assumes };
+        Some((same, game.promotions.clone()))
+    }
+}
+
+impl<B> Earlier<B> {
+    /// Adds game `n`, whose problem has the size and the digest given, with its promotions and what a repeat of it rests
+    /// on.
+    fn add(&mut self, n: u32, size: ProblemSize, digest: u64, promotions: Vec<u32>, basis: B) {
+        self.games.insert(n, Searched { size, digest, promotions, basis });
     }
 
     /// Remembers the search problem that this run set board `n` up with (at the repeat lookup of its game, in the
@@ -1495,15 +1583,6 @@ impl Earlier {
             }
         }
         None
-    }
-
-    /// The record that a repeat of the search of game `m` keeps, whose problem has the digest given, and `m`'s
-    /// promotions, once `m` is among the games ([`find`](Self::find) found it).
-    fn same_search(&self, m: u32, digest: u64) -> Option<(SameSearch, Vec<u32>)> {
-        let game = self.games.get(&m)?;
-        let promotion_sum = game.promotions.iter().map(|&p| u64::from(p)).sum();
-        let same = SameSearch { n: m, digest, promotion_sum, proof: game.proof, assumes: game.assumes.clone() };
-        Some((same, game.promotions.clone()))
     }
 
     /// The promotions of game `m`, if it is among the games.
@@ -1814,7 +1893,7 @@ mod tests {
         assert_eq!(in_flight.find(301, &ours), Some(300));
         assert_eq!(in_flight.same_search(300, ours.digest()), concluded.same_search(300, ours.digest()));
         // Pending with another problem, it is passed over.
-        let mut other = Earlier::default();
+        let mut other: Earlier = Earlier::default();
         other.remember(300, search_problem(310).unwrap().0);
         assert_eq!(other.find(301, &ours), None);
     }
@@ -1822,7 +1901,7 @@ mod tests {
     #[test]
     fn only_the_problems_within_the_window_are_remembered() {
         let problem = search_problem(85).unwrap().0;
-        let mut earlier = Earlier::default();
+        let mut earlier: Earlier = Earlier::default();
         for n in [300, 301, 302, 309, 310] {
             earlier.remember(n, problem.clone());
         }

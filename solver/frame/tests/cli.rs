@@ -32,6 +32,11 @@ fn help_lists_the_commands_and_every_tactic() {
             "--gate GAP",
             "--gate-trial GATES",
             "--gate-trial-plan SPEC",
+            "--unsound",
+            "--effort E",
+            "--seed S",
+            "--stop-at-known",
+            "--from-known",
             "tables N K...",
         ] {
             assert!(run.stdout.contains(text), "{args:?}: no {text:?}");
@@ -382,5 +387,78 @@ fn a_game_with_no_previous_game_says_it_is_solved_standalone() {
         let run = standalone(args);
         assert_eq!(run.code, Some(0), "{args:?}: {}", run.stderr);
         assert_eq!(run.stderr, "", "{args:?}");
+    }
+}
+
+/// `solve --unsound` appends unsound lines to its file and skips the games the file has; it needs `--effort` and
+/// `--out`, and refuses every flag of the proof search, while the flags of the unsound mode are refused without it.
+/// Neither `solve` without it nor `verify-results` takes its file, and it takes no file of results lines.
+#[test]
+fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_search() {
+    let dir = TempDir::new("unsound");
+    let file = dir.join("unsound.jsonl");
+    let unsound =
+        |range: &str| taxman(&["solve", range, "--unsound", "--effort", "1", "--threads", "1", "--out", path(&file)]);
+    let run = unsound("1-30");
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert_eq!(run.stdout.lines().filter(|line| line.contains("  unsound")).count(), 30, "{}", run.stdout);
+    let text = fs::read_to_string(&file).unwrap();
+    assert_eq!(text.lines().count(), 30);
+    assert!(text.lines().all(|line| Json::parse(line).unwrap().get("unsound") == Some(&Json::Bool(true))));
+    let run = unsound("1-32");
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert!(run.stdout.contains("n=32 ") && run.stdout.contains("skipped 30 games already done"), "{}", run.stdout);
+
+    // The proven mode and the verifier refuse the file, and the unsound mode refuses a file of results lines.
+    let solve = ["solve", "33", "--threads", "1", "--progress", "0", "--out", path(&file)];
+    for args in [&solve[..], &["verify-results", path(&file)]] {
+        let run = taxman(args);
+        assert_eq!(run.code, Some(1), "{args:?}: {}", run.stdout);
+        assert!(run.stderr.contains("line 1: an unsound line"), "{args:?}: {}", run.stderr);
+    }
+    let proven = solve_into(&dir, "proven.jsonl", "1-5");
+    let run = taxman(&["solve", "6", "--unsound", "--effort", "0", "--threads", "1", "--out", &proven]);
+    assert_eq!(run.code, Some(1), "{}", run.stdout);
+    assert!(run.stderr.contains("line 1: not an unsound line"), "{}", run.stderr);
+    // The measuring options take the games of the built-in table only.
+    let past = (Optimal::built_in().max_n() + 1).to_string();
+    let elsewhere = dir.join("past.jsonl");
+    let run = taxman(&["solve", &past, "--unsound", "--effort", "0", "--stop-at-known", "--out", path(&elsewhere)]);
+    assert_eq!(run.code, Some(1), "{}", run.stdout);
+    assert!(run.stderr.contains(&format!("lacks game {past}")), "{}", run.stderr);
+
+    let base = ["solve", "12", "--unsound", "--effort", "1", "--out", path(&elsewhere)];
+    assert_usage_error(&base[..3], "--unsound needs --effort E");
+    assert_usage_error(&base[..5], "--unsound needs --out FILE");
+    assert_usage_error(
+        &["solve", "12", "--unsound", "--effort", "33"],
+        "--effort 33: the level of effort, from 0 to 32",
+    );
+    let proof_search: [&[&str]; 17] = [
+        &["--window", "2"],
+        &["--finder-after", "1"],
+        &["--finder-seconds", "1"],
+        &["--profile", "p"],
+        &["--profile-depth", "3"],
+        &["--carried-dir", "c"],
+        &["--gate", "300"],
+        &["--gate-trial", "none"],
+        &["--gate-trial-plan", "after=1"],
+        &["--checkpoint-dir", "c"],
+        &["--checkpoint-interval", "1"],
+        &["--progress", "0"],
+        &["--time-limit", "1"],
+        &["--node-limit", "1"],
+        &["--mem-cap", "1"],
+        &["--background"],
+        &["--force-search"],
+    ];
+    for flag in proof_search {
+        let message = format!("{} is a flag of the proof search, which --unsound does not run", flag[0]);
+        assert_usage_error(&[&base[..], flag].concat(), &message);
+    }
+    for flag in [&["--effort", "1"][..], &["--seed", "2"], &["--stop-at-known"], &["--from-known"]] {
+        let message = format!("{} is a flag of the unsound mode: give --unsound with it", flag[0]);
+        assert_usage_error(&[&["solve", "12"][..], flag].concat(), &message);
     }
 }

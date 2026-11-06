@@ -24,6 +24,8 @@
 //!   assumed to be), where the file read by path ([`read_results_text`]) brings the proof kinds.  The file is megabytes
 //!   compressed, so the binary decodes a member of it when moves of that member are asked for and no sooner (see
 //!   [`Optimal::built_in`]).
+//! * [`refuse_unsound`]: the wall that keeps an unsound line ([`UNSOUND`], `taxman solve --unsound`) out of every
+//!   reader of proven lines, the table's included.
 
 use crate::json::Json;
 use std::collections::BTreeMap;
@@ -156,6 +158,27 @@ pub const BUILT_IN: &[u8] = include_bytes!("../../../results/optimal.jsonl.gz");
 
 /// The score and the moves of a results line.
 type Recorded = (u64, Vec<u32>);
+
+/// The key that marks an unsound line, the line of a game that `taxman solve --unsound` played
+/// ([`crate::solver::unsound`]): legal moves and their score, which is a lower bound on opt(n) that nothing proves to
+/// be opt(n).
+pub const UNSOUND: &str = "unsound";
+
+/// Refuses an unsound line (one with the key [`UNSOUND`], whatever its value), which no reader of proven lines takes:
+/// the table ([`Optimal`]), the results file of `solve` and the verifiers ([`crate::results`]) all call this on every
+/// line they read.  The error says why.
+///
+/// # Errors
+///
+/// If `line` is an unsound line.
+pub fn refuse_unsound(line: &Json) -> Result<(), String> {
+    const WHY: &str = "an unsound line (taxman solve --unsound), whose score is a lower bound that nothing proves; a \
+                       reader of proven lines takes none";
+    match line.get(UNSOUND) {
+        None => Ok(()),
+        Some(_) => Err(WHY.to_owned()),
+    }
+}
 
 /// Whether `path` names a gzip file: the committed results, `results/optimal.jsonl.gz`, are one.
 pub fn is_gzip(path: &Path) -> bool {
@@ -408,11 +431,17 @@ fn broken(e: &str) -> ! {
 /// Reads one line of the file of a table: the n, the score and the moves of a completed line, none for any other line.
 fn parse_game(_number: usize, line: &str) -> Result<Option<(u32, Recorded)>, String> {
     let json = Json::parse(line).map_err(|e| format!(": {e}"))?;
-    if json.get("completed").and_then(Json::as_bool) != Some(true) {
+    Ok(completed_entry(&json)?.map(|(n, score, moves)| (n, (score, moves))))
+}
+
+/// The n, score and moves of a line of a results file that is completed, none for any other line.  An unsound line is
+/// an error ([`refuse_unsound`]), which starts with ": " or " (", as [`Optimal::parse_entry`]'s do.
+fn completed_entry(line: &Json) -> Result<Option<(u32, u64, Vec<u32>)>, String> {
+    refuse_unsound(line).map_err(|e| format!(": {e}"))?;
+    if line.get("completed").and_then(Json::as_bool) != Some(true) {
         return Ok(None);
     }
-    let (n, score, moves) = Optimal::parse_entry(&json)?;
-    Ok(Some((n, (score, moves))))
+    Optimal::parse_entry(line).map(Some)
 }
 
 impl Optimal {
@@ -516,8 +545,7 @@ impl Optimal {
         for (i, line) in text.lines().enumerate().filter(|(_, line)| !line.trim().is_empty()) {
             let at = |e: String| format!("{}: line {}{e}", path.display(), i + 1);
             let game = Json::parse(line).map_err(|e| at(format!(": {e}")))?;
-            if game.get("completed").and_then(Json::as_bool) == Some(true) {
-                let (n, score, moves) = Self::parse_entry(&game).map_err(at)?;
+            if let Some((n, score, moves)) = completed_entry(&game).map_err(at)? {
                 games.insert(n, (score, moves));
             }
         }

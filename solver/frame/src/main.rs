@@ -12,6 +12,7 @@ use cli::{errln, outln, CliError, CliResult};
 use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, gate_trial, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
+use taxman::solver::unsound::MAX_EFFORT;
 use taxman::tactics::Tactics;
 
 /// The usage text with its `{...}` parts to fill in by [`usage`].
@@ -69,6 +70,16 @@ commands:
       --mem-cap UNITS          search units kept in memory before spilling to disk
       --force-search           search even where the previous game or an earlier search gives the answer
       --show                   print each game's promotions and moves
+      --unsound                play each game as well as --effort finds, with no proof, on all the threads: each
+                               line, appended to --out (needed), holds legal moves and their score, a lower bound,
+                               and is marked unsound, which every reader of proven lines refuses.  It takes
+                               --threads, --tactic, --show and the four flags below, and refuses the others
+      --effort E               with --unsound: the level of effort, from 0 (the search's start alone) to {max_effort}
+                               (2^(E-1) rounds of {neighborhoods} neighborhoods of the finder's search); a higher level
+                               does the rounds of a lower one first
+      --seed S                 with --unsound: the seed of the rounds' random choices (default {seed})
+      --stop-at-known          with --unsound: end a game's rounds once its score is the built-in table's
+      --from-known             with --unsound: start every game from the built-in table's moves for n-1
   regress [--from A] [--to N] [--threads K] [--window K] [--tactic ...]
                           solve A..N (default 1..400) in memory and check every score against the built-in table
   verify-results [--threads K] FILE...
@@ -98,6 +109,9 @@ fn usage() -> String {
         .replace("{trial_steps}", &gate_trial::STEPS.to_string())
         .replace("{trial_threads}", &gate_trial::THREADS.to_string())
         .replace("{trial_least_gap}", &gate_trial::LEAST_GAP.to_string())
+        .replace("{max_effort}", &MAX_EFFORT.to_string())
+        .replace("{neighborhoods}", &finder::NEIGHBORHOODS.to_string())
+        .replace("{seed}", &finder::Options::default().seed.to_string())
 }
 
 fn main() -> ExitCode {

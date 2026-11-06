@@ -32,4 +32,6 @@ mode.
   ([the full run at gate
   300](https://github.com/bvchess/taxman-notebook/blob/main/search/the-full-run-at-gate-300-2026-11/README.md)).
 * **The unsound mode.**  A mode of `taxman solve` that searches for a high score and skips the proof, for the games past
-  5060; its lines would be lower bounds, kept apart from the proven ones.  It is not built.
+  5060; its lines are lower bounds, kept apart from the proven ones ([the reference](REFERENCE.md#an-unsound-line)).
+  Its first form is built, with a level of effort that is a number of rounds; the next step measures, on the games
+  3441-5060, the rounds that each game needs to reach its proven score.

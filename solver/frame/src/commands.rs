@@ -5,7 +5,8 @@
 //! they add is output, and the policies of a command-line run:
 //!
 //! * `solve` stops on SIGINT and SIGTERM with a final checkpoint, locks its checkpoint directory and (when it opens
-//!   it, `results::ResultsFile`) its results file, and prints one summary line per game as it is concluded;
+//!   it, `results::ResultsFile`) its results file, and prints one summary line per game as it is concluded; with
+//!   `--unsound` it runs the unsound mode instead (`solver::unsound`), which refuses the flags of the proof search;
 //! * `regress` solves in memory and compares every score with the table of optimal moves.
 //!
 //! The small ones: `verify-results` checks results files without changing them (a path that ends in `.gz` is read
@@ -24,6 +25,7 @@ use taxman::game::Optimal;
 use taxman::numtheory::Tables;
 use taxman::results::verify_files;
 use taxman::search::{finder, gate_trial, MAX_GATE};
+use taxman::solver::unsound::{self, Plan, MAX_EFFORT};
 use taxman::solver::{self, GameResult, Method, SolveOptions};
 
 fn failed(message: String) -> CliError {
@@ -153,14 +155,27 @@ const SOLVE_FLAGS: [&str; 10] = [
     "--gate-trial-plan",
 ];
 
-/// `solve N|A-B [options]`: solves game N or a range, each from the one before (`solver::solve_range_each`).
+/// The flags of the unsound mode that take a value, besides `--out` and the solver's: the level of effort and the seed.
+const UNSOUND_FLAGS: [&str; 2] = ["--effort", "--seed"];
+
+/// The switches of the unsound mode: the mode itself, and its measuring options.
+const UNSOUND_SWITCHES: [&str; 3] = ["--unsound", "--stop-at-known", "--from-known"];
+
+/// `solve N|A-B [options]`: solves game N or a range, each from the one before (`solver::solve_range_each`); with
+/// `--unsound`, plays them in the unsound mode ([`solve_unsound`]).
 pub fn solve(args: &[String]) -> CliResult {
     let usage = || CliError::Usage("usage: solve N|A-B [options]".into());
-    let flags = [&SOLVE_FLAGS[..], &SEARCH_FLAGS[..]].concat();
-    let switches = [&["--force-search", "--show"][..], &SEARCH_SWITCHES[..]].concat();
+    let flags = [&SOLVE_FLAGS[..], &SEARCH_FLAGS[..], &UNSOUND_FLAGS[..]].concat();
+    let switches = [&["--force-search", "--show"][..], &SEARCH_SWITCHES[..], &UNSOUND_SWITCHES[..]].concat();
     let args = Args::parse(args, &flags_with(&flags), &switches)?;
     let [range] = args.positional() else { return Err(usage()) };
     let (lo, hi) = parse_range(range)?;
+    if args.has("--unsound") {
+        return solve_unsound(&args, lo, hi);
+    }
+    if let Some(flag) = UNSOUND_FLAGS.iter().chain(&UNSOUND_SWITCHES).find(|flag| args.has(flag)) {
+        return Err(CliError::Usage(format!("{flag} is a flag of the unsound mode: give --unsound with it")));
+    }
 
     let mut opts = range_options(&args)?;
     opts.force_search = args.has("--force-search");
@@ -204,6 +219,60 @@ pub fn solve(args: &[String]) -> CliResult {
     }
     if let Some(n) = summary.stopped_at {
         outln!("{}", stopped_line(n, &opts));
+    }
+    Ok(())
+}
+
+/// The flags of `solve` that only the proof search takes, which `--unsound` refuses: the window, the finder, the
+/// profile, the carried nogoods, the gate and its trial ([`SOLVE_FLAGS`] but `--out`), the flags of a long search
+/// ([`SEARCH_FLAGS`], [`SEARCH_SWITCHES`]: checkpoints, progress, limits, memory, the idle priority), and
+/// `--force-search`.
+fn proof_search_flags() -> impl Iterator<Item = &'static str> {
+    let solve = SOLVE_FLAGS.into_iter().filter(|&flag| flag != "--out");
+    solve.chain(SEARCH_FLAGS).chain(SEARCH_SWITCHES).chain(["--force-search"])
+}
+
+/// `solve A-B --unsound --effort E --out FILE [--seed S] [--stop-at-known] [--from-known]`, with `--threads`,
+/// `--tactic` and `--show`: plays the games in the unsound mode (`solver::unsound::solve_range`), with no proof, and
+/// appends their unsound lines to FILE.  It stops on SIGINT and SIGTERM between rounds, the game in play unrecorded.
+fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
+    if let Some(flag) = proof_search_flags().find(|flag| args.has(flag)) {
+        return Err(CliError::Usage(format!("{flag} is a flag of the proof search, which --unsound does not run")));
+    }
+    let opts = solver_options(args)?;
+    let levels = format!("the level of effort, from 0 to {MAX_EFFORT}");
+    let effort = args
+        .parsed::<u32>("--effort")?
+        .ok_or_else(|| CliError::Usage(format!("--unsound needs --effort E, {levels}")))?;
+    if effort > MAX_EFFORT {
+        return Err(CliError::Usage(format!("--effort {effort}: {levels}")));
+    }
+    let plan = Plan {
+        effort,
+        seed: args.parsed("--seed")?.unwrap_or(finder::Options::default().seed),
+        stop_at_known: args.has("--stop-at-known"),
+        from_known: args.has("--from-known"),
+    };
+    let out = args.value("--out").map(Path::new);
+    let out = out.ok_or_else(|| CliError::Usage("--unsound needs --out FILE, the file of its lines".into()))?;
+    if let Err(e) = engine::stop_on_signals() {
+        errln!("warning: SIGINT and SIGTERM will kill the run instead of stopping it: {e}");
+    }
+    let show = args.has("--show");
+    let summary = unsound::solve_range(lo, hi, &opts, &plan, Some(out), |line| {
+        outln!("{}", line.summary_line());
+        if show {
+            outln!("  promotions: {:?}", line.promotions);
+            outln!("  moves: {:?}", line.moves);
+        }
+        let _ = std::io::stdout().flush();
+    })
+    .map_err(failed)?;
+    if summary.skipped > 0 {
+        outln!("skipped {} games already done in {}", summary.skipped, out.display());
+    }
+    if let Some(n) = summary.stopped_at {
+        outln!("stopped: a signal ended the run in game n={n}, which is not recorded; run the same command to go on");
     }
     Ok(())
 }

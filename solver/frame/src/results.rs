@@ -29,7 +29,9 @@
 //!
 //! # Checks
 //!
-//! [`read_results`] checks every completed line, in order of `n`, and fails naming the line:
+//! [`read_results`] checks every completed line, in order of `n`, and fails naming the line.  It refuses an unsound line
+//! (`taxman solve --unsound`, [`crate::solver::unsound`]) wherever it meets one, as every reader of proven lines does
+//! ([`refuse_unsound`]): its score is a lower bound that nothing proves.  The checks of a completed line:
 //!
 //! * the moves replay legally to the recorded score, are over (no legal move left) and open with the largest
 //!   prime ([`replay_finished`]); the promotions are among the moves;
@@ -92,7 +94,10 @@
 //! the version of the format.
 
 use crate::board::search_problem;
-use crate::game::{is_gzip, largest_prime_at_most, read_results_text, replay, replay_finished, Optimal};
+use crate::engine::in_parallel;
+use crate::game::{
+    is_gzip, largest_prime_at_most, read_results_text, refuse_unsound, replay, replay_finished, Optimal,
+};
 use crate::json::Json;
 use crate::search::{Problem, ProblemSize};
 use crate::solver::{parse_digest, GameResult, Method, PrevSource, SameSearch, MAX_N};
@@ -101,8 +106,6 @@ use std::fmt;
 use std::fs::{File, OpenOptions, TryLockError};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::thread;
 
 /// The version of the result-line format, the only one this build reads.
 pub const SCHEMA: u32 = 5;
@@ -384,7 +387,7 @@ impl<'a> Fields<'a> {
         self.get(name)?.as_u64().ok_or_else(|| Self::bad(name))
     }
 
-    fn opt_u64(&self, name: &str) -> Result<Option<u64>, String> {
+    pub(crate) fn opt_u64(&self, name: &str) -> Result<Option<u64>, String> {
         match self.get(name)? {
             Json::Null => Ok(None),
             value => value.as_u64().map(Some).ok_or_else(|| Self::bad(name)),
@@ -395,7 +398,7 @@ impl<'a> Fields<'a> {
         self.get(name)?.as_bool().ok_or_else(|| Self::bad(name))
     }
 
-    fn str(&self, name: &str) -> Result<&'a str, String> {
+    pub(crate) fn str(&self, name: &str) -> Result<&'a str, String> {
         self.get(name)?.as_str().ok_or_else(|| Self::bad(name))
     }
 
@@ -469,6 +472,7 @@ fn check_unfinished(game: &UnfinishedGame, optimal: &Optimal) -> Result<(), Stri
 
 /// Parses a line that is valid JSON.
 fn parse_line(json: &Json, line: usize) -> Result<Line, String> {
+    refuse_unsound(json)?;
     let f = Fields(json);
     let schema = f.u32("schema")?;
     if schema != SCHEMA {
@@ -538,6 +542,41 @@ fn parse_line(json: &Json, line: usize) -> Result<Line, String> {
     })))
 }
 
+/// How far the lines of a file's text are kept ("Torn lines" in the module documentation): the lines up to the end of
+/// the last one kept and the bytes up to it, blank lines included, and whether the last line was torn and is dropped.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Kept {
+    pub(crate) lines: usize,
+    pub(crate) valid_len: usize,
+    pub(crate) torn: bool,
+}
+
+/// Hands every line of `text` that is not blank to `line`, in order, as JSON with its number (from 1), and stops at the
+/// first error, `line`'s or a line that is not JSON (which names the line).  The last line that is not blank is dropped
+/// as torn if it is not JSON ("Torn lines" in the module documentation).  Returns how far the lines are kept.
+pub(crate) fn each_line(text: &str, mut line: impl FnMut(usize, &Json) -> Result<(), String>) -> Result<Kept, String> {
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    let last = lines.iter().rposition(|line| !line.trim().is_empty());
+    let mut kept = Kept::default();
+    for (i, raw) in lines.iter().enumerate() {
+        let number = i + 1;
+        if !raw.trim().is_empty() {
+            let json = match Json::parse(raw) {
+                Ok(json) => json,
+                Err(_) if Some(i) == last => {
+                    kept.torn = true;
+                    break;
+                }
+                Err(e) => return Err(format!("line {number}: {e}")),
+            };
+            line(number, &json)?;
+        }
+        kept.valid_len += raw.len();
+        kept.lines = number;
+    }
+    Ok(kept)
+}
+
 /// Reads and checks the text of a results file (see the module documentation).  Errors name the line.
 ///
 /// The checks of the repeats set up search problems, which is most of what a check costs at a large `n`, and those
@@ -548,35 +587,20 @@ fn parse_line(json: &Json, line: usize) -> Result<Line, String> {
 pub fn read_results(text: &str, optimal: &Optimal, threads: usize) -> Result<Contents, String> {
     let mut contents = Contents::default();
     let mut entries: Vec<Entry> = Vec::new();
-    let lines: Vec<&str> = text.split_inclusive('\n').collect();
-    let last = lines.iter().rposition(|line| !line.trim().is_empty());
-    let mut offset = 0;
-    for (i, raw) in lines.iter().enumerate() {
-        let number = i + 1;
-        if !raw.trim().is_empty() {
-            let json = match Json::parse(raw) {
-                Ok(json) => json,
-                Err(_) if Some(i) == last => {
-                    contents.torn = true;
-                    break;
-                }
-                Err(e) => return Err(format!("line {number}: {e}")),
-            };
-            match parse_line(&json, number).map_err(|e| format!("line {number}: {e}"))? {
-                Line::Completed(entry) => entries.push(*entry),
-                Line::Incomplete { n, invocations, best } => {
-                    contents.incomplete_lines += 1;
-                    contents.runs.insert(n, invocations);
-                    if let Some(game) = best {
-                        check_unfinished(&game, optimal).map_err(|e| format!("line {number} (n={n}): {e}"))?;
-                    }
+    let kept = each_line(text, |number, json| {
+        match parse_line(json, number).map_err(|e| format!("line {number}: {e}"))? {
+            Line::Completed(entry) => entries.push(*entry),
+            Line::Incomplete { n, invocations, best } => {
+                contents.incomplete_lines += 1;
+                contents.runs.insert(n, invocations);
+                if let Some(game) = best {
+                    check_unfinished(&game, optimal).map_err(|e| format!("line {number} (n={n}): {e}"))?;
                 }
             }
         }
-        offset += raw.len();
-        contents.lines = number;
-        contents.valid_len = offset;
-    }
+        Ok(())
+    })?;
+    (contents.lines, contents.valid_len, contents.torn) = (kept.lines, kept.valid_len, kept.torn);
 
     entries.sort_by_key(|e| (e.n, e.line));
     for pair in entries.windows(2) {
@@ -629,36 +653,6 @@ fn repeat_boards(entries: &[Entry]) -> BTreeSet<u32> {
 fn set_up_boards(boards: &BTreeSet<u32>, threads: usize) -> Problems {
     let order: Vec<u32> = boards.iter().rev().copied().collect();
     in_parallel(order.len(), threads, |i| (order[i], set_up(order[i]))).into_iter().collect()
-}
-
-/// `task(0)`, `task(1)`, ..., `task(count - 1)` in that order, computed on `threads` threads (at least one) that each
-/// take the next index from one counter, so that a slow task delays no other; with one thread, on the calling thread.
-/// Each task is a function of its index only, so the values are the same whatever `threads` is.
-pub(crate) fn in_parallel<T: Send>(count: usize, threads: usize, task: impl Fn(usize) -> T + Sync) -> Vec<T> {
-    if threads <= 1 {
-        return (0..count).map(task).collect();
-    }
-    let next = AtomicUsize::new(0);
-    let mut done: Vec<(usize, T)> = thread::scope(|scope| {
-        let workers: Vec<_> = (0..threads.min(count))
-            .map(|_| {
-                scope.spawn(|| {
-                    let mut done = Vec::new();
-                    loop {
-                        let i = next.fetch_add(1, Ordering::Relaxed);
-                        if i >= count {
-                            break done;
-                        }
-                        done.push((i, task(i)));
-                    }
-                })
-            })
-            .collect();
-        // A worker that panicked panics here, as the same task would have on the calling thread.
-        workers.into_iter().flat_map(|w| w.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))).collect()
-    });
-    done.sort_unstable_by_key(|&(i, _)| i);
-    done.into_iter().map(|(_, value)| value).collect()
 }
 
 /// The search problem of game `k` and its board's `in_the_bag`: the one in `problems`, or else set up now and kept.
@@ -951,15 +945,10 @@ impl ResultsFile {
     ///
     /// The check runs on `threads` threads where it can ([`read_results`]).
     pub fn open(path: &Path, optimal: &Optimal, threads: usize) -> Result<ResultsFile, String> {
-        let io_error = |e: std::io::Error| format!("{}: {e}", path.display());
         let (mut file, text) = open_locked(path)?;
         let contents = read_results(&text, optimal, threads).map_err(|e| format!("{}: {e}", path.display()))?;
-        if contents.torn {
-            file.set_len(contents.valid_len as u64).map_err(io_error)?;
-        }
-        if contents.valid_len > 0 && !text[..contents.valid_len].ends_with('\n') {
-            file.write_all(b"\n").map_err(io_error)?;
-        }
+        let kept = Kept { lines: contents.lines, valid_len: contents.valid_len, torn: contents.torn };
+        mend(&mut file, &text, kept).map_err(|e| format!("{}: {e}", path.display()))?;
         Ok(ResultsFile { path: path.to_owned(), file, contents })
     }
 
@@ -1070,6 +1059,18 @@ pub(crate) fn open_locked(path: &Path) -> Result<(File, String), String> {
     let mut text = String::new();
     file.read_to_string(&mut text).map_err(io_error)?;
     Ok((file, text))
+}
+
+/// Makes the file that [`open_locked`] opened, whose text was `text` and whose lines are kept as far as `kept` says, ready
+/// for the next line: a torn last line is cut off, and a last line kept that has no newline gets one.
+pub(crate) fn mend(file: &mut File, text: &str, kept: Kept) -> std::io::Result<()> {
+    if kept.torn {
+        file.set_len(kept.valid_len as u64)?;
+    }
+    if kept.valid_len > 0 && !text[..kept.valid_len].ends_with('\n') {
+        file.write_all(b"\n")?;
+    }
+    Ok(())
 }
 
 /// Writes one line and syncs it.
@@ -1220,17 +1221,6 @@ mod tests {
         let Json::Obj(pairs) = line else { panic!("not an object") };
         let pairs = pairs.iter().map(|(k, v)| (k.clone(), if k == key { value.clone() } else { v.clone() }));
         Json::Obj(pairs.collect())
-    }
-
-    #[test]
-    fn tasks_in_parallel_give_their_values_in_the_order_of_their_indices_whatever_the_threads() {
-        let square = |i: usize| i * i;
-        let expected = |count: usize| (0..count).map(square).collect::<Vec<_>>();
-        for (count, threads) in [(0, 1), (0, 3), (1, 4), (7, 1), (7, 2), (7, 3), (7, 16), (100, 4)] {
-            assert_eq!(in_parallel(count, threads, square), expected(count), "{count} tasks on {threads} threads");
-        }
-        // No threads asked for is one.
-        assert_eq!(in_parallel(3, 0, square), expected(3));
     }
 
     #[test]

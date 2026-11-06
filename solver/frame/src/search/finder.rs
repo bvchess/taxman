@@ -31,11 +31,23 @@
 //! stays exhaustive: it prunes against the incumbent as it would against a worker's, its tree is searched to the end,
 //! and its proof is its own.  Nothing of the finder is in the header that a checkpoint is checked against, so a
 //! checkpoint resumes whatever the finder's settings are.  What it did is the [`Report`] in the result line.
+//!
+//! # On many threads, alone
+//!
+//! The unsound mode (`taxman solve --unsound`, [`crate::solver::unsound`]) runs LNS with no search beside it, on every
+//! thread, and its answer is the same on any number of threads and any machine ([`Lns::rounds`]).  It goes in rounds of
+//! [`NEIGHBORHOODS`] neighborhoods, each a unit of at most `unit_nodes` steps.  Every neighborhood of a round starts
+//! from the incumbent as the round starts, and neighborhood k of round r draws its random choices from a generator of
+//! its own, keyed by the seed, n, r and k alone ([`Options::rng_of`]), with a control of its own, so that what it finds
+//! is a function of the incumbent and those four.  The threads take the round's neighborhoods in any order; once all
+//! are done, the best set they found becomes the incumbent, the lowest k's on a tie ([`Lns::round`]).  So the incumbent
+//! after r rounds depends on the start, n, the seed and r alone, and a run of more rounds does those of a run of fewer
+//! first.  These rounds are not those of the finder beside a search, which are timed.
 
 use super::incumbent::surviving;
 use super::{best_so_far, offer_found, payload_of, set_of_payload, Prepared, SearchSpace, TaxSearcher, TaxUnit};
 use crate::bits::Bits;
-use crate::engine::{self, Control, EngineConfig, Start};
+use crate::engine::{self, in_parallel, Control, EngineConfig, Start};
 use crate::rng::Rng;
 use std::fmt;
 use std::io::{self, Write};
@@ -90,6 +102,14 @@ impl Options {
     pub fn rng(&self, n: u32) -> Rng {
         Rng(self.seed ^ u64::from(n).wrapping_mul(0xD1B5_4A32_D192_ED03))
     }
+
+    /// The generator of neighborhood `k` of round `round` of the board `n` ([`Lns::round`]): a function of the seed,
+    /// `n`, `round` and `k` alone.  Each is mixed in by a step of the generator, so that two keys that differ anywhere
+    /// start far apart.
+    pub fn rng_of(&self, n: u32, round: u64, k: u64) -> Rng {
+        let mix = |state: u64, value: u64| Rng(state ^ value).next();
+        Rng(mix(mix(mix(self.seed, u64::from(n)), round), k))
+    }
 }
 
 /// What a search found and what it cost.
@@ -105,6 +125,48 @@ pub struct Outcome<const W: usize> {
     pub improved: u64,
     /// The time, on the caller's clock, at which the last better set was found (0 if none was).
     pub found: f64,
+}
+
+/// The neighborhoods of a round of the rounds on many threads ([`Lns::round`]), K: a constant of the unsound mode, the
+/// same on every machine, since the answer depends on it.  A round keeps at most K threads busy, and the incumbent
+/// moves only between rounds, so a larger K feeds more threads and a smaller one adopts a better set sooner.  64 feeds
+/// every thread of a machine of up to 64 threads, and 64 of a larger one's; and since a level of effort is a power of 2
+/// of rounds, every level is a power of 2 of neighborhoods.
+pub const NEIGHBORHOODS: u64 = 64;
+
+/// What a round of the rounds on many threads came to ([`Lns::round`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Round<const W: usize> {
+    /// The heaviest set its neighborhoods found, the one of the lowest k among equals: the incumbent it started from,
+    /// or better.
+    pub set: Bits<W>,
+    /// The engine's steps, over its neighborhoods.
+    pub nodes: u64,
+    /// Its neighborhoods searched to the end within the step limit.
+    pub finished: u64,
+}
+
+/// A better set that a round of [`Lns::rounds`] found: the round (from 1), the incumbent's new promotion sum, and the
+/// time on the caller's clock when the round ended.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Improvement {
+    pub round: u64,
+    pub sum: u64,
+    pub seconds: f64,
+}
+
+/// What [`Lns::rounds`] came to.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Rounds<const W: usize> {
+    /// The incumbent after the last round: the start, or better.
+    pub set: Bits<W>,
+    /// The rounds done, and their engine's steps.
+    pub rounds: u64,
+    pub nodes: u64,
+    /// Each round that found a better set, in order.
+    pub improvements: Vec<Improvement>,
+    /// A stop signal ended the rounds before `most` were done or `enough` said so.
+    pub interrupted: bool,
 }
 
 /// A game to search: its prepared setup, and the search space of the engine's searchers on it.
@@ -124,6 +186,12 @@ impl<const W: usize> Lns<'_, W> {
         let share = fix.0 + rng.unit() * (fix.1 - fix.0);
         let fixed: Bits<W> = members[..(members.len() as f64 * share).round() as usize].iter().copied().collect();
         TaxUnit { promoted: fixed, cands: self.p.candidates.difference(&fixed) }
+    }
+
+    /// A neighborhood of the incumbent `best` ([`neighborhood`](Self::neighborhood), drawn with `rng`) searched from it
+    /// as a unit, for at most `unit_nodes` steps, steered by `control` ([`run_unit`]).
+    pub fn unit(&self, best: &Bits<W>, rng: &mut Rng, control: &Arc<Control>) -> Ran<W> {
+        run_unit(self.space, control, self.neighborhood(best, rng), best, Some(self.options.unit_nodes))
     }
 
     /// Searches from the incumbent `start` until `over` says to stop (asked before each unit).  Each unit fixes a
@@ -163,6 +231,63 @@ impl<const W: usize> Lns<'_, W> {
             }
         }
         Outcome { set: best, nodes, units, finished, improved, found }
+    }
+
+    /// Round `round` (counted from 1) of the rounds on many threads (see the module documentation, "On many threads,
+    /// alone"), from the incumbent `best`, on `threads` threads: the [`NEIGHBORHOODS`] neighborhoods of `best`, the kth
+    /// drawn from [`Options::rng_of`] and searched as a unit ([`unit`](Self::unit)) with a control of its own, since a
+    /// control passes the incumbent of one run on to the next.  The answer is the same on any number of threads.
+    pub fn round(&self, best: &Bits<W>, round: u64, threads: usize) -> Round<W> {
+        let n = self.p.n;
+        let ran = in_parallel(NEIGHBORHOODS as usize, threads, |k| {
+            self.unit(best, &mut self.options.rng_of(n, round, k as u64), &Control::new())
+        });
+        // The heaviest, the first of equals: a later set replaces it only if it is strictly heavier.
+        let mut out = Round { set: *best, nodes: 0, finished: 0 };
+        for ran in ran {
+            (out.nodes, out.finished) = (out.nodes + ran.nodes, out.finished + u64::from(ran.completed));
+            if ran.set.sum() > out.set.sum() {
+                out.set = ran.set;
+            }
+        }
+        out
+    }
+
+    /// Rounds 1, 2, ... of the rounds on many threads ([`round`](Self::round)), from the incumbent `start`, on
+    /// `threads` threads: at most `most` of them, and none once `enough` says that the incumbent's promotion sum is
+    /// enough (asked of the start, and after each round).  The set a round finds becomes the incumbent if it is
+    /// heavier, as an [`Improvement`], whose time is the caller's `clock`.  A stop signal ([`engine::stop_signal`])
+    /// ends the rounds before the next, or in the middle of one, whose units it stops: then the rounds are
+    /// `interrupted`, and the round it stopped is not counted.
+    pub fn rounds(
+        &self,
+        start: &Bits<W>,
+        most: u64,
+        threads: usize,
+        clock: &dyn Fn() -> f64,
+        enough: &dyn Fn(u64) -> bool,
+    ) -> Rounds<W> {
+        let mut out = Rounds { set: *start, rounds: 0, nodes: 0, improvements: Vec::new(), interrupted: false };
+        let signaled = || engine::stop_signal().is_some();
+        while out.rounds < most && !enough(out.set.sum()) {
+            if signaled() {
+                out.interrupted = true;
+                break;
+            }
+            let round = out.rounds + 1;
+            let ran = self.round(&out.set, round, threads);
+            // A signal in the middle of the round stopped some of its units.
+            if signaled() {
+                out.interrupted = true;
+                break;
+            }
+            (out.rounds, out.nodes) = (round, out.nodes + ran.nodes);
+            if ran.set.sum() > out.set.sum() {
+                out.set = ran.set;
+                out.improvements.push(Improvement { round, sum: ran.set.sum(), seconds: clock() });
+            }
+        }
+        out
     }
 }
 
@@ -332,7 +457,7 @@ fn rounds<const W: usize>(
                     best = theirs;
                 }
             }
-            let ran = run_unit(&space, &units, lns.neighborhood(&best, &mut rng), &best, Some(lns.options.unit_nodes));
+            let ran = lns.unit(&best, &mut rng, &units);
             if ran.set.sum() <= best.sum() {
                 continue;
             }
@@ -428,6 +553,66 @@ mod tests {
         let other = Options { seed: 2, ..lns.options };
         assert_ne!(lns.options.rng(800).next(), other.rng(800).next());
         assert_ne!(lns.options.rng(800).next(), lns.options.rng(801).next());
+    }
+
+    /// The rounds on many threads on the prepared game `p` from its greedy set: at most `most`, on `threads` threads,
+    /// ending once the incumbent reaches `target` if there is one.
+    fn rounds_of(p: &Prepared<W>, most: u64, threads: usize, target: Option<u64>) -> Rounds<W> {
+        let space = SearchSpace::new(p);
+        let lns = Lns { p, space: &space, options: Options::default() };
+        lns.rounds(&p.greedy, most, threads, &|| 0.0, &|sum| target.is_some_and(|target| sum >= target))
+    }
+
+    /// The game of the tests of the rounds on many threads, whose greedy set its rounds 1 and 2 improve.
+    const ROUNDS_GAME: u32 = 400;
+
+    #[test]
+    fn the_rounds_on_many_threads_are_the_same_on_any_number_of_threads() {
+        let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
+        let one = rounds_of(&p, 2, 1, None);
+        let rounds: Vec<u64> = one.improvements.iter().map(|improvement| improvement.round).collect();
+        assert_eq!(rounds, [1, 2], "each round improves the greedy set: {:?}", one.improvements);
+        assert!(p.can_promote(&one.set) && one.set.sum() == one.improvements[1].sum);
+        assert_eq!((one.rounds, one.interrupted), (2, false));
+        for threads in [2, 4] {
+            assert_eq!(rounds_of(&p, 2, threads, None), one, "{threads} threads");
+        }
+    }
+
+    #[test]
+    fn more_rounds_do_the_rounds_of_fewer_first_and_stop_once_they_are_enough() {
+        let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
+        let (short, long) = (rounds_of(&p, 1, 4, None), rounds_of(&p, 2, 4, None));
+        assert!(
+            long.improvements.starts_with(&short.improvements),
+            "{:?}, {:?}",
+            short.improvements,
+            long.improvements
+        );
+        assert!(long.set.sum() > short.set.sum() && !short.improvements.is_empty());
+        // Enough at the first improvement: the rounds end with it.
+        let first = long.improvements[0];
+        let stopped = rounds_of(&p, 2, 4, Some(first.sum));
+        assert_eq!((stopped.rounds, stopped.set.sum(), stopped.improvements), (first.round, first.sum, vec![first]));
+        // A start that is enough runs no round, and neither do no rounds.
+        for none in [rounds_of(&p, 2, 4, Some(0)), rounds_of(&p, 0, 4, None)] {
+            assert_eq!((none.set, none.rounds, none.nodes, none.improvements.len()), (p.greedy, 0, 0, 0));
+        }
+    }
+
+    #[test]
+    fn each_key_of_a_neighborhood_draws_its_own_numbers() {
+        let options = Options::default();
+        let first = |options: Options, n, round, k| options.rng_of(n, round, k).next();
+        let one = first(options, 800, 1, 0);
+        assert_eq!(one, first(options, 800, 1, 0));
+        let others = [
+            first(Options { seed: 2, ..options }, 800, 1, 0),
+            first(options, 801, 1, 0),
+            first(options, 800, 2, 0),
+            first(options, 800, 1, 1),
+        ];
+        assert!(others.iter().all(|&other| other != one), "{one} {others:?}");
     }
 
     #[test]

@@ -47,6 +47,8 @@ For every completed line:
               assumptions are m's; the repeat's setup.digest, its record's digest and m's setup.digest agree, and so do
               the two setups' frames, candidates and max_total; the promotions are m's, and promotion_sum is their sum;
               score(n) - in_the_bag(n) = score(m) - in_the_bag(m)
+  unsound     no line is an unsound line (one with the key "unsound", which `taxman solve --unsound` writes): its score
+              is a lower bound that nothing proves, so this referee, and its table, take none
 and across files: every board that two files share has the same score in both.
 
 What this referee cannot check, because it does not rebuild the frame model: that an exhausted search explored its
@@ -86,6 +88,8 @@ FM_BOUND = REPO / "heuristics" / "results" / "fm_bound_2000.json"
 HEURISTIC_CHAIN = REPO / "heuristics" / "results" / "chain_1001_2000.json"
 
 SCHEMA = 5  # the only format of a result line this referee reads
+UNSOUND = "unsound"  # the key of an unsound line, which this referee refuses
+UNSOUND_LINE = "an unsound line (taxman solve --unsound), whose score is a lower bound that nothing proves"
 RESTS_ON_PREV = {"prime_formula", "cap"}
 SETTLES_SEARCH = {"exhausted", "cap", "same_search"}  # the proofs a repeat can repeat
 SETS_UP = {"start", "search", "repeat"}  # the methods whose lines have a setup
@@ -171,11 +175,16 @@ def finished_problems(n, moves, divisors):
 def read_table(path):
     """The score of each completed line of the results file `path` by n: the table that a file's lines are compared
     with (none, if there is no file).  The Rust program's built-in table is the committed file as of its build, which
-    a test or a newer checkout can make differ from the file."""
+    a test or a newer checkout can make differ from the file.  A file that holds an unsound line is refused."""
     if path is None:
         return {}
-    rows = (json.loads(text) for text in read_text(path).split("\n") if text.strip())
-    return {row["n"]: row["score"] for row in rows if row.get("schema") == SCHEMA and row.get("completed")}
+    table = {}
+    for row in (json.loads(text) for text in read_text(path).split("\n") if text.strip()):
+        if UNSOUND in row:
+            sys.exit(f"{path}: the table holds {UNSOUND_LINE} (n={row.get('n')})")
+        if row.get("schema") == SCHEMA and row.get("completed"):
+            table[row["n"]] = row["score"]
+    return table
 
 
 def read_lines(path, problems):
@@ -325,6 +334,9 @@ def check_file(path, fm, heuristic, divisors, problems, table):
     games = {}
     stopped = set()  # the boards with an incomplete line
     for number, row in rows:
+        if UNSOUND in row:
+            problems.append(f"{path.name} line {number} (n={row.get('n')}): {UNSOUND_LINE}")
+            continue
         if row.get("schema") != SCHEMA:
             problems.append(
                 f"{path.name} line {number} (n={row.get('n')}): schema {row.get('schema')!r} is not the schema "

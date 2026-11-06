@@ -14,7 +14,7 @@ use std::process::Command;
 use taxman::game::Optimal;
 use taxman::json::Json;
 use taxman::results::{verify_files, Proof};
-use taxman::solver::{self, GameResult, Method};
+use taxman::solver::{self, unsound, GameResult, Method};
 
 fn crate_path(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(relative)
@@ -495,6 +495,25 @@ fn an_incomplete_line_is_checked_as_far_as_it_goes_by_both_verifiers() {
         ([stopped, vec![minimal]].concat(), Verdict::Accepted),
     ];
     verifiers_agree(&TempDir::new("incomplete-line"), &cases);
+}
+
+/// An unsound line (`taxman solve --unsound`) is refused by both verifiers, naming it: after the proven lines of a
+/// file, and a file of its own, whatever the value of its mark.  Games 1 to 12, then the unsound line of 13.
+#[test]
+fn an_unsound_line_is_refused_by_both_verifiers() {
+    let games = solver::solve_range(1, 12, &common::options(1), None).unwrap();
+    let lines: Vec<Json> = games.iter().map(GameResult::to_json).collect();
+    let plan = unsound::Plan { effort: 0, seed: 1, stop_at_known: false, from_known: false };
+    let mut unsound_lines = Vec::new();
+    unsound::solve_range(13, 13, &common::options(1), &plan, None, |line| unsound_lines.push(line.to_json())).unwrap();
+    let unsound_line = &unsound_lines[0];
+    let expected = "an unsound line";
+    let cases = vec![
+        (lines.iter().cloned().chain([unsound_line.clone()]).collect(), Verdict::Refused { line: 13, n: 13, expected }),
+        (vec![unsound_line.clone()], Verdict::Refused { line: 1, n: 13, expected }),
+        (vec![with(unsound_line, "unsound", &Json::Bool(false))], Verdict::Refused { line: 1, n: 13, expected }),
+    ];
+    verifiers_agree(&TempDir::new("unsound-line"), &cases);
 }
 
 /// A line's record of the moves for n − 1 it was built from is the file's own line of that game: both verifiers refuse

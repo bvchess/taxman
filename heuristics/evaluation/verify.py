@@ -44,12 +44,16 @@ def load_optimal(path: Path, max_n: Optional[int] = None) -> Dict[int, dict]:
     """The games of the committed results file by n, up to max_n (all if None).
 
     The file is gzip, one result line a game in the order of n; each game has at least "n", "score" and "moves".  A
-    path that does not end in .gz is read as plain lines.  Reading stops at the first game past max_n.
+    path that does not end in .gz is read as plain lines.  Reading stops at the first game past max_n.  An unsound line
+    (one with the key "unsound", which `taxman solve --unsound` writes) is refused: its score is a lower bound that
+    nothing proves, and these games are taken as optimal.
     """
     games: Dict[int, dict] = {}
     with (gzip.open(path, "rt", encoding="utf-8") if path.name.endswith(".gz") else open(path)) as lines:
         for line in lines:
             game = json.loads(line)
+            if "unsound" in game:
+                raise ValueError(f"{path}: game {game.get('n')} is an unsound line, whose score is not proven optimal")
             if max_n is not None and game["n"] > max_n:
                 break
             games[game["n"]] = game

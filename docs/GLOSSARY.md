@@ -366,6 +366,10 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **results line**: one line of a results file, the JSON object that `taxman solve --out` writes for a game, in schema
   5 ([the frame solver's reference](../solver/docs/REFERENCE.md#a-results-line---out-schema-5)).  Two old words survive
   only as field names there: `nodes` counts steps, and `prev.source` says where the moves for n − 1 came from.
+* **unsound line**: the line that `taxman solve --unsound` writes for a game: legal moves and their score, a lower bound
+  on opt(n) that nothing proves, found by the large neighborhood search of the finder (above), with a level of
+  **effort** that buys a better chance of opt(n) with more time.  Its key `"unsound"` keeps it out of every reader of
+  results lines ([the frame solver's reference, "An unsound line"](../solver/docs/REFERENCE.md#an-unsound-line)).
 
 ## Programs, files and documents
 

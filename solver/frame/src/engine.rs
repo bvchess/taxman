@@ -135,7 +135,9 @@
 //! receives SIGINT or SIGTERM after [`stop_on_signals`]: the handler only sets an atomic flag, which the
 //! coordinator polls at least every `SIGNAL_POLL`.  A second such signal ends the process at once.
 //! [`lock_dir`] keeps a second process out of a checkpoint directory, so that two runs never write the same
-//! checkpoint file.
+//! checkpoint file.  [`in_parallel`], apart from the engine's runs, computes tasks that are each a function of an
+//! index on several threads, with their values in order: the setups of a results file's checks, and the neighborhoods
+//! of a round of the unsound mode.
 //!
 //! **Starting stopped.**  The coordinator is the only one who checks the deadline and the stop signal, and the
 //! workers run until it does, so a stop that begins while a run is under way takes effect when the coordinator
@@ -277,7 +279,7 @@ use std::ffi::c_int;
 use std::fs::{self, File, OpenOptions, TryLockError};
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, Once, PoisonError, Weak};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime};
@@ -1155,6 +1157,36 @@ pub fn background_priority() {
             }
         });
     }
+}
+
+/// `task(0)`, `task(1)`, ..., `task(count - 1)` in that order, computed on `threads` threads (at least one) that each
+/// take the next index from one counter, so that a slow task delays no other; with one thread, on the calling thread.
+/// Each task is a function of its index only, so the values are the same whatever `threads` is.
+pub fn in_parallel<T: Send>(count: usize, threads: usize, task: impl Fn(usize) -> T + Sync) -> Vec<T> {
+    if threads <= 1 {
+        return (0..count).map(task).collect();
+    }
+    let next = AtomicUsize::new(0);
+    let mut done: Vec<(usize, T)> = thread::scope(|scope| {
+        let workers: Vec<_> = (0..threads.min(count))
+            .map(|_| {
+                scope.spawn(|| {
+                    let mut done = Vec::new();
+                    loop {
+                        let i = next.fetch_add(1, Ordering::Relaxed);
+                        if i >= count {
+                            break done;
+                        }
+                        done.push((i, task(i)));
+                    }
+                })
+            })
+            .collect();
+        // A worker that panicked panics here, as the same task would have on the calling thread.
+        workers.into_iter().flat_map(|w| w.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))).collect()
+    });
+    done.sort_unstable_by_key(|&(i, _)| i);
+    done.into_iter().map(|(_, value)| value).collect()
 }
 
 /// A worker's handle to the engine, passed to [`Searcher::run`].
@@ -2989,6 +3021,17 @@ fn si(x: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tasks_in_parallel_give_their_values_in_the_order_of_their_indices_whatever_the_threads() {
+        let square = |i: usize| i * i;
+        let expected = |count: usize| (0..count).map(square).collect::<Vec<_>>();
+        for (count, threads) in [(0, 1), (0, 3), (1, 4), (7, 1), (7, 2), (7, 3), (7, 16), (100, 4)] {
+            assert_eq!(in_parallel(count, threads, square), expected(count), "{count} tasks on {threads} threads");
+        }
+        // No threads asked for is one.
+        assert_eq!(in_parallel(3, 0, square), expected(3));
+    }
 
     #[test]
     fn hash_is_independent_of_chunking() {
