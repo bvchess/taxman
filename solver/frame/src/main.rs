@@ -20,8 +20,8 @@ usage: taxman <command> [args]
 
 commands:
   solve N|A-B [options]   solve game N or a range, each from the one before; the first from the moves
-                          for A-1 in --out FILE, or with --use-prev from the known moves (with neither it is
-                          solved standalone, which costs more: no seed from the moves before and no ceiling).
+                          for A-1 in --out FILE (without them it is solved standalone, which costs more: no
+                          seed from the moves before and no ceiling).
                           Every score is checked against the table of optimal moves, which is built into this program
       --threads K              worker threads (default: all CPUs)
       --background             run the workers at the lowest priority (Linux SCHED_IDLE): on a machine shared with
@@ -68,25 +68,15 @@ commands:
                                for a trial of the gates {trial_gates}
       --mem-cap UNITS          search units kept in memory before spilling to disk
       --force-search           search even where the previous game or an earlier search gives the answer
-      --use-prev               draw on the known moves: the built-in table's, the committed chain's
-                               (results/optimal.jsonl.gz) and the proven boards of the bounds store
-                               (results/bounds.jsonl).  A board a source has proven is recorded without a
-                               search (proof known), citing the source and what it assumes (the table's moves
-                               are assumed optimal; the store's, wherever statement U holds at the boards its
-                               bound rests on); the moves for A-1 from them, if --out FILE lacks it, gives the
-                               ceiling and the seed; the store's other boards seed their searches with its lower
-                               bound's moves and stop at its upper bound.  --force-search leaves the boards to
-                               their searches
       --show                   print each game's promotions and moves
-  regress [--from A] [--to N] [--threads K] [--window K] [--tactic ...] [--use-prev]
+  regress [--from A] [--to N] [--threads K] [--window K] [--tactic ...]
                           solve A..N (default 1..400) in memory and check every score against the built-in table
   verify-results [--threads K] FILE...
                           check results files without changing them: every line's moves replayed and its score checked
                           against the built-in table, the chain from n-1, each line's proof and provenance, and that
                           the files agree; counts lines by proof kind and by what they assume.  A file whose name ends
                           in .gz is read through the gzip decoder (the committed results are one).  K threads set up the
-                          searches of the repeats (default: all CPUs).  A line that cites a known source is checked
-                          against the built-in table, the committed chain and the bounds store of results
+                          searches of the repeats (default: all CPUs)
   tables N K...           print the maximal factors and composites of each K on the board 1..=N
   help                    show this message
 ";

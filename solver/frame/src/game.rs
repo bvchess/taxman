@@ -134,7 +134,7 @@ fn play(n: u32, moves: &[u32]) -> Result<(u64, Vec<bool>), String> {
 
 /// The proper divisors of `m` (those below it that divide it), in no particular order: by trial division up to √m, each
 /// divisor found with its partner `m / d`.  Plain divisibility, as the rest of the referee, but a move costs √m
-/// divisions rather than m, which a board of thousands of numbers feels (the ledger replays moves per board).
+/// divisions rather than m, which a board of thousands of numbers feels.
 fn proper_divisors(m: u32) -> impl Iterator<Item = u32> {
     (1..)
         .take_while(move |&d| u64::from(d) * u64::from(d) <= u64::from(m))
@@ -208,9 +208,8 @@ pub(crate) type ParseLine<G> = fn(usize, &str) -> Result<Option<(u32, G)>, Strin
 /// decodes nothing.  A clone shares what is decoded with the table it was cloned from.
 ///
 /// The decoded members are a chain, each holding the one after it once that is decoded, so that a line is handed out as
-/// a reference that stays valid and any number of threads may ask for lines at once.  What a line is, and so what its
-/// line is parsed into, is the reader's (`G`): the table's lines are scores and moves, the committed chain's carry
-/// their proof kinds ([`crate::known`]).
+/// a reference that stays valid and any number of threads may ask for lines at once.  What a line is parsed into is the
+/// reader's (`G`): the table's lines are scores and moves.
 pub(crate) struct Text<G: 'static> {
     file: Arc<GzFile<G>>,
 }
@@ -436,8 +435,8 @@ impl Optimal {
     }
 
     /// The table with the completed lines of the results files `results` added (they replace the table's moves for
-    /// the same values of n; an unfinished search's line is skipped): how a measurement (the probe, the ledger) gets the
-    /// previous moves of a board past the table's end, to seed its search and give it a ceiling.
+    /// the same values of n; an unfinished search's line is skipped): how a measurement (the probe) gets the previous
+    /// moves of a board past the table's end, to seed its search and give it a ceiling.
     ///
     /// A file whose name ends in `.gz` is taken as [`with_results`](Self::with_results) takes it, decoded as its lines
     /// are asked for, so its lines are compared with the known moves where they are looked up, not all now (that would

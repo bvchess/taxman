@@ -5,10 +5,9 @@ Standard library only, and it shares no code with the Rust crate: the rules, the
 are written out again here, so that a bug in the solver cannot vouch for itself.  A file whose name ends in .gz is
 read through gzip, every member of it, as the committed file results/optimal.jsonl.gz is.
 
-The table is the lines of the committed file (results/optimal.jsonl.gz, `--committed`) unless `--table` names another
-file: the lines that a file's lines are compared with, and that a line can cite.  The moves of a line of the table are
-assumed optimal.  The committed file is checked as any other file is; its comparison with the table is then each line
-with itself.
+The table is the lines of the committed file (results/optimal.jsonl.gz) unless `--table` names another file: the
+lines whose scores a file's lines are compared with.  The committed file is checked as any other file is; its
+comparison with the table is then each line with itself.
 
 For every completed line:
   legal       the moves replay under the rules: a move is a number still in the pot with a proper divisor still in
@@ -19,14 +18,12 @@ For every completed line:
   promoted    the promotions are moves, in ascending order
   fields      the fields the proof and the assumptions come from agree with each other, as the solver writes them: a
               searched or repeat line, and only such a line, has a setup, which records the digest of its search
-              problem; every line but a prime or a known one records in_the_bag; only a search reaches its ceiling;
-              a prime line's n is prime; a trivial line promotes nothing; a repeat, and only a repeat, records the
-              line it repeats (same_search), and its setup has no `cap`; a known line, and a search that the bounds
-              store's upper bound ended, and only those, cite a source (`known`); only a search counts the nodes its
-              near-repeat cut cut (`stats.near_repeat_cut`, a count the proof does not rest on); a start line (a
-              search whose start reached a ceiling, so that it took no step) is completed with nodes 0, and a
-              completed search has nodes above 0, so a line of an older build, which called a start line a search,
-              is a problem
+              problem; every line but a prime one records in_the_bag; only a search reaches its ceiling; a prime
+              line's n is prime; a trivial line promotes nothing; a repeat, and only a repeat, records the line it
+              repeats (same_search), and its setup has no `cap`; only a search counts the nodes its near-repeat cut
+              cut (`stats.near_repeat_cut`, a count the proof does not rest on); a start line (a search whose start
+              reached a ceiling, so that it took no step) is completed with nodes 0, and a completed search has
+              nodes above 0, so a line that calls a start line a search is a problem
   optimal     the score is the table's, where the table has a line for n
   chain       score(n-1) <= score(n) <= n + score(n-1), with n-1 from the same file, else from the table
               (both are theorems about optimal scores: the moves for n-1 are legal for n, and deleting the move n from
@@ -37,27 +34,16 @@ For every completed line:
               n + score(n-1) - in_the_bag, the promotions do not exceed it, and a line records reaching the ceiling
               exactly when its promotions sum to it (where the search stops); a prime line scores n + score(n-1) - P,
               P the largest prime below n
-  provenance  the moves for n-1 a line names (prev) are those of the file's line of n-1 (source run or results), the
-              table's (source optimal), the committed chain's (strict) or a board the bounds store has proven (bounds),
-              and the line's record of them matches (score, FNV-1a digest of the moves, proof kind, assumptions; not
-              the digest of a store's moves, which only the Rust program can play; a record of the proof kind known,
-              of the file's own line, needs no more than the same score, moves and assumptions); the recorded proof
-              kind and assumptions are the ones the rules below give
-  known       a line that cites a known source (`known`: optimal, strict, or bounds with the rule and run of its lower
-              and upper lines) has its citation checked: the table or the committed chain (--committed) holds a
-              line of n that scores the line's score, or the bounds store (--bounds) has a lower line (if cited) and
-              an upper line of board n worth the score, of that rule and from that run.  The assumptions are those
-              of the cited lines: the table's moves assumed optimal, the committed line's own, and statement U at
-              each board the upper line rests on.  The sources are read as they are; their own referees check them
-  unfinished  an incomplete line that records its moves (best_so_far, moves, promotions) is legal, scores the
-              best_so_far, has ascending promotions that are moves, and is no better than the table's score; it need
-              not be over.  A line whose prev has source run or results and no proof kind was built on such moves
-              (as an older `solve` went on past limits): an earlier incomplete line of n-1 has that score and those
-              moves.  Those moves seeded the line and prove nothing, so the line has no ceiling (setup.cap), no cap or
-              prime_formula proof, and scores no less than it.  A file may have holes (boards with no completed line,
-              or only incomplete lines)
+  provenance  the moves for n-1 a line names (prev, source run or results) are those of the file's line of n-1, and
+              the line's record of them matches (score, FNV-1a digest of the moves, proof kind, assumptions); a line
+              that names none (the first game of a standalone run) has no ceiling (setup.cap) and no cap or
+              prime_formula proof; the recorded proof kind and assumptions are the ones the rules below give
+  unfinished  an incomplete line (a search that a limit or a signal stopped) that records its moves (best_so_far,
+              moves, promotions) is legal, scores the best_so_far, has ascending promotions that are moves, and is no
+              better than the table's score; it need not be over.  A file may start above 1 or have a gap, where a
+              run began with a standalone game
   repeat      a repeat (method "repeat", proof same_search) names a board m whose line in the same file is completed
-              and earlier, whose proof is exhausted, cap, known or same_search; the record's proof and
+              and earlier, whose proof is exhausted, cap or same_search; the record's proof and
               assumptions are m's; the repeat's setup.digest, its record's digest and m's setup.digest agree, and so do
               the two setups' frames, candidates and max_total; the promotions are m's, and promotion_sum is their sum;
               score(n) - in_the_bag(n) = score(m) - in_the_bag(m)
@@ -69,13 +55,11 @@ m's.  The digests a line records are hashes of the problems, which only the solv
 that they agree and that the two lines are consistent with sharing one problem, and `taxman verify-results` sets
 both problems up again and compares them.
 
-Proof kinds (solver/frame/src/results.rs explains them): trivial, exhausted, cap, prime_formula, same_search, known.
+Proof kinds (solver/frame/src/results.rs explains them): trivial, exhausted, cap, prime_formula, same_search.
 The assumptions of a line are what its proof kind takes as given beyond the frame model: a proof by the ceiling (`cap`)
-or by the prime formula rests on the moves for n-1, so it assumes what the proof kind of their line assumes, and for
-moves for n-1 taken from the table, that "the moves recorded for game n-1 in results/optimal.jsonl.gz are optimal";
-a repeat assumes what the line it repeats assumes; a known proof kind assumes what its source's line does; other
-proof kinds assume nothing.  A line of another
-schema than this referee reads is a problem.
+or by the prime formula rests on the moves for n-1, so it assumes what the proof kind of their line assumes; a repeat
+assumes what the line it repeats assumes; other proof kinds assume nothing.  A line of another schema than this
+referee reads is a problem.
 
 The report counts lines by proof kind and by assumption, and the arithmetic certificates: scores equal to
 n + score(n-1) or to the prime formula, which certify a score whatever found it, given that the moves for n-1 are
@@ -83,8 +67,8 @@ optimal.
 It also counts, by proof kind, the searches that the near-repeat cut shortened: those with a stats.near_repeat_cut
 above 0.
 
-usage: check_results.py [FILE ...] [--fm PATH] [--chain PATH] [--committed PATH] [--table PATH] [--bounds PATH]
-Without FILEs it checks results/*.jsonl and results/*.jsonl.gz but the bounds store, which is not a file of results.
+usage: check_results.py [FILE ...] [--fm PATH] [--chain PATH] [--table PATH]
+Without FILEs it checks results/*.jsonl and results/*.jsonl.gz.
 The exit status is 1 if any check fails.
 """
 import argparse
@@ -92,27 +76,23 @@ import gzip
 import json
 import re
 import sys
-from collections import Counter, namedtuple
+from collections import Counter
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 RESULTS = REPO / "results"
 COMMITTED = RESULTS / "optimal.jsonl.gz"  # the committed file: the table of optimal moves and the committed chain
-BOUNDS = RESULTS / "bounds.jsonl"  # the bounds store, the other (it is not a results file)
 FM_BOUND = REPO / "heuristics" / "results" / "fm_bound_2000.json"
 HEURISTIC_CHAIN = REPO / "heuristics" / "results" / "chain_1001_2000.json"
 
 SCHEMA = 5  # the only format of a result line this referee reads
 RESTS_ON_PREV = {"prime_formula", "cap"}
-SETTLES_SEARCH = {"exhausted", "cap", "same_search", "known"}  # the proofs a repeat can repeat
+SETTLES_SEARCH = {"exhausted", "cap", "same_search"}  # the proofs a repeat can repeat
 SETS_UP = {"start", "search", "repeat"}  # the methods whose lines have a setup
 SEARCHED = {"start", "search"}  # the methods of a line that set a search up to find its moves
-NO_BAG = {"prime", "known"}  # the methods whose lines have no in_the_bag: they set no board up
+NO_BAG = {"prime"}  # the methods whose lines have no in_the_bag: they set no board up
 DIGEST = re.compile("[0-9a-f]{16}")
-PREV_SOURCES = {"run", "results", "optimal", "strict", "bounds"}
-
-
-Game = namedtuple("Game", "score moves proof assumes")  # a completed line of the committed file; assumes is a set
+PREV_SOURCES = {"run", "results"}
 
 
 def read_text(path):
@@ -122,19 +102,6 @@ def read_text(path):
         with gzip.open(path, "rt", encoding="utf-8") as f:
             return f.read()
     return path.read_text()
-
-
-def assumed_optimal(n):
-    """What a proof that rests on the table's moves for n assumes."""
-    return f"the moves recorded for game {n} in results/optimal.jsonl.gz are optimal"
-
-
-U_STATEMENT = "statement U holds at n="
-
-
-def assumed_u(n):
-    """What a bound of the bounds store that rests on statement U at the board n assumes."""
-    return f"{U_STATEMENT}{n}"
 
 
 def is_prime(n):
@@ -201,103 +168,14 @@ def finished_problems(n, moves, divisors):
     return score, found
 
 
-class Sources:
-    """The known sources a line that cites one is checked against: the table, the committed chain and the bounds store,
-    read as they are (their own referees check them: `taxman verify-results`, this script on the committed file;
-    `ledger verify-bounds`, `check_bounds.py`).  By default the table and the committed chain are the same file, read
-    once.  A source that was not given is empty, and a line that cites it is a problem."""
-
-    def __init__(self, committed=None, bounds=None, table="committed"):
-        self.committed = self._games(committed)  # n -> the Game of each completed line of the committed file
-        # The table is the committed file's lines, unless a file of its own is given (the Rust program's built-in table
-        # is the file as of its build, which a test or a newer checkout can make differ from the committed file).
-        self.table = self.committed if table == "committed" else self._games(table)
-        self.lines = {}  # (n, side, value) -> the store's first line of that board, side and value
-        self.lower = {}  # n -> the store's best lower line (the highest value, the later of equals)
-        self.upper = {}  # n -> its best upper line (the lowest value, the later of equals)
-        self.have_store = False
-        if bounds is not None:
-            self.have_store = True
-            for line in self._rows(bounds):
-                n, side, value = line["n"], line["side"], line["value"]
-                self.lines.setdefault((n, side, value), line)
-                best, better = (self.lower, lambda a, b: a <= b) if side == "lower" else (self.upper, lambda a, b: a >= b)
-                if n not in best or better(best[n]["value"], value):
-                    best[n] = line
-
-    @classmethod
-    def _games(cls, path):
-        """The Game of each completed line of the results file `path` by n (none, if there is no file)."""
-        return {
-            line["n"]: Game(line["score"], line["moves"], line["proof"], set(line["assumes"]))
-            for line in cls._rows(path)
-            if line.get("schema") == SCHEMA and line.get("completed")
-        }
-
-    @staticmethod
-    def _rows(path):
-        if path is None:
-            return []
-        return [json.loads(text) for text in read_text(path).split("\n") if text.strip()]
-
-    def proven(self, n):
-        """The store's upper line of the board n if its best bounds meet, else None."""
-        lower, upper = self.lower.get(n), self.upper.get(n)
-        return upper if lower and upper and lower["value"] == upper["value"] else None
-
-    def prev_game(self, source, n):
-        """(score, moves or None, proof, assumptions) of the line of n that `source` ("strict" or "bounds") holds, as
-        the moves for n-1 of a line are recorded: None if it holds none.  The store's moves are ones the Rust program
-        rebuilds from promotions, which this script cannot, so they are not known (their digest is not checked)."""
-        if source == "strict":
-            return self.committed.get(n)
-        upper = self.proven(n)
-        if upper is None:
-            return None
-        return (upper["value"], None, "known", {assumed_u(board) for board in upper.get("rests_on", [])})
-
-    def cite_problems(self, n, score, cite):
-        """(assumptions, problems) of a line that cites a source: the source holds a line of n that scores `score`, or
-        lines of the store with that value as their bound of n, by the rules and from the runs cited.  The assumptions
-        are what the cited lines make the line assume."""
-        allowed = {"optimal": {"source"}, "strict": {"source"}, "bounds": {"source", "lower", "upper"}}
-        source = cite.get("source")
-        if source not in allowed:
-            return None, [f"known cites the source {source!r}, which is none of optimal, strict and bounds"]
-        extra = sorted(set(cite) - allowed[source])
-        if extra:
-            return None, [f"known has the field {extra[0]!r}, which a citation of {source} does not"]
-        if source == "optimal":
-            entry = self.table.get(n)
-            if entry is None or entry.score != score:
-                return None, [f"it cites the table, which has no line for {n} scoring {score}"]
-            return {assumed_optimal(n)}, []
-        if source == "strict":
-            game = self.committed.get(n)
-            if game is None or game.score != score:
-                return None, [f"it cites the committed chain, which has no line for {n} scoring {score}"]
-            return set(game.assumes), []
-        if not self.have_store:
-            return None, ["it cites the bounds store, which was not given to the check"]
-        problems = []
-
-        def find(side, wanted):
-            line = self.lines.get((n, side, score))
-            ok = isinstance(wanted, dict) and set(wanted) == {"rule", "source"}
-            if line is None:
-                problems.append(f"the bounds store has no {side} bound of board {n} worth {score}")
-            elif not ok or (line["rule"], line["source"]) != (wanted["rule"], wanted["source"]):
-                problems.append(f"the bounds store's {side} bound of board {n} worth {score} is not the one cited")
-            return line
-
-        if "lower" not in cite or "upper" not in cite:
-            return None, ["a citation of the bounds store has its lower and upper bound (the lower null for a search)"]
-        if cite["lower"] is not None:
-            find("lower", cite["lower"])
-        upper = find("upper", cite["upper"])
-        if problems:
-            return None, problems
-        return {assumed_u(board) for board in upper.get("rests_on", [])}, []
+def read_table(path):
+    """The score of each completed line of the results file `path` by n: the table that a file's lines are compared
+    with (none, if there is no file).  The Rust program's built-in table is the committed file as of its build, which
+    a test or a newer checkout can make differ from the file."""
+    if path is None:
+        return {}
+    rows = (json.loads(text) for text in read_text(path).split("\n") if text.strip())
+    return {row["n"]: row["score"] for row in rows if row.get("schema") == SCHEMA and row.get("completed")}
 
 
 def read_lines(path, problems):
@@ -318,7 +196,7 @@ def read_lines(path, problems):
 
 def near_repeat_cut(row):
     """The nodes the near-repeat cut cut, as the line of a search armed with it records them (`stats.near_repeat_cut`),
-    else None: the lines made before the cut do not have the key."""
+    else None."""
     stats = row.get("stats")
     return stats.get("near_repeat_cut") if isinstance(stats, dict) else None
 
@@ -353,27 +231,13 @@ def contradictions(n, row, reached):
         found.append(f"stats.near_repeat_cut {cut!r} is not a count")
     elif cut is not None and method not in SEARCHED:
         found.append(f'a {method} game with "stats.near_repeat_cut", which only a search has')
-    # A start game is a completed search that took no step: its start reached a ceiling.  A search with nodes
-    # 0 is a line of an older build, which called it a search.
+    # A start game is a completed search that took no step: its start reached a ceiling.  A completed search with
+    # nodes 0 is a start game with the wrong label.
     nodes = row.get("nodes")
     if method == "start" and nodes != 0:
         found.append(f"a start game with nodes {nodes}, which took no step")
     if method == "search" and nodes == 0:
         found.append("a completed search with nodes 0, which took no step: a start game")
-    known = row.get("known")
-    kind = known.get("source") if isinstance(known, dict) else None
-    if known is None and method == "known":
-        found.append("a known game that cites no source (known)")
-    elif known is not None and not isinstance(known, dict):
-        found.append("known is not an object")
-    elif known is not None and method not in SEARCHED | {"known"}:
-        found.append(f"a {method} game with a known citation, which only a known or searched game has")
-    elif method in SEARCHED and known is not None and (kind != "bounds" or known.get("lower") is not None):
-        found.append("a searched game that cites something other than the store's upper bound")
-    elif method in SEARCHED and known is not None and reached:
-        found.append("a searched game that reached its cap and cites the store's bound as well")
-    elif method == "known" and kind == "bounds" and known.get("lower") is None:
-        found.append("a known game that cites the store without the lower bound whose moves it plays")
     if method == "prime" and not is_prime(n):
         found.append(f"a prime game, but {n} is not prime")
     if method == "trivial" and row["promotions"]:
@@ -388,8 +252,6 @@ def reached_cap(row):
 
 def proof_of(row):
     method = row["method"]
-    if method == "known" or row.get("known") is not None:
-        return "known"
     if method in ("trivial", "prime", "repeat"):
         return {"trivial": "trivial", "prime": "prime_formula", "repeat": "same_search"}[method]
     return "cap" if reached_cap(row) else "exhausted"
@@ -427,13 +289,13 @@ def repeat_problems(n, number, row, done):
     return found
 
 
-def check_unfinished(path, number, row, table, divisors, unfinished, problems):
+def check_unfinished(path, number, row, table, divisors, problems):
     """An incomplete line that records its moves (best_so_far, moves, promotions): the moves are legal, score the
     best_so_far, has ascending promotions that are moves, and is no better than the table's score.  It need not be
-    over, which only a completed line claims.  The line is kept for the lines built on it."""
+    over, which only a completed line claims."""
     best = row.get("best_so_far")
     if best is None:
-        return  # a line made by hand, with no moves: it counts and seeds nothing
+        return  # a line made by hand, with no moves: it counts and checks nothing
 
     def fail(message):
         problems.append(f"{path.name} line {number} (n={n}): {message}")
@@ -451,19 +313,16 @@ def check_unfinished(path, number, row, table, divisors, unfinished, problems):
         fail(f"replays to {score}, not the recorded best_so_far {best}")
     if promotions != sorted(set(promotions)) or not set(promotions) <= set(moves):
         fail("the promotions are not moves in ascending order")
-    if n in table and best > table[n].score:
-        fail(f"best_so_far {best} is above the table's {table[n].score}")
-    unfinished.setdefault(n, []).append((number, best, digest(moves), moves))
+    if n in table and best > table[n]:
+        fail(f"best_so_far {best} is above the table's {table[n]}")
 
 
-def check_file(path, fm, heuristic, divisors, problems, sources):
-    """Checks one file; returns {n: (score, moves, proof, assumptions, line, row)} of its completed lines, the
-    report's counters (including the searches the near-repeat cut shortened, by proof), and the boards that only an
-    unfinished search is recorded for."""
-    table = sources.table
+def check_file(path, fm, heuristic, divisors, problems, table):
+    """Checks one file against the table, the scores by n; returns {n: (score, moves, proof, assumptions, line, row)}
+    of its completed lines, the report's counters (including the searches the near-repeat cut shortened, by proof),
+    and the boards that only an unfinished search is recorded for."""
     rows = read_lines(path, problems)
     games = {}
-    unfinished = {}  # n -> [(line, best_so_far, digest of the moves)] of the incomplete lines that record their moves
     stopped = set()  # the boards with an incomplete line
     for number, row in rows:
         if row.get("schema") != SCHEMA:
@@ -476,7 +335,7 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
             if row.get("method") == "start":
                 problems.append(f"{path.name} line {number} (n={row.get('n')}): a start game that is not completed")
             stopped.add(row["n"])
-            check_unfinished(path, number, row, table, divisors, unfinished, problems)
+            check_unfinished(path, number, row, table, divisors, problems)
             continue
         n = row["n"]
         if n in games:
@@ -506,8 +365,8 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
             fail(message)
         if promotions != sorted(set(promotions)) or not set(promotions) <= set(moves):
             fail("the promotions are not moves in ascending order")
-        if n in table and score != table[n].score:
-            fail(f"scores {score}, but the table has {table[n].score}")
+        if n in table and score != table[n]:
+            fail(f"scores {score}, but the table has {table[n]}")
         reached = reached_cap(row)
         for message in contradictions(n, row, reached):
             fail(message)
@@ -518,8 +377,7 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
 
         # The chain against whichever moves for n-1 there are.
         below = done.get(n - 1)
-        listed = table.get(n - 1)
-        before = below[0] if below else (listed.score if listed else None)
+        before = below[0] if below else table.get(n - 1)
         if before is not None:
             if score < before:
                 fail(f"scores {score}, less than score(n-1) = {before}")
@@ -530,61 +388,25 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
         record = row["prev"]
         source = record["source"] if record is not None else None
         prev = None  # (score, moves, proof, assumptions)
-        proven = True  # whether the moves for n-1 are optimal (given their assumptions); not a stopped search's best
-        if source in ("run", "results") and record["proof"] is None:
-            # The best moves of an unfinished search of n-1 (an older `solve` went on past limits): an earlier
-            # incomplete line of n-1 with that score and those moves.
-            found = [
-                u
-                for u in unfinished.get(n - 1, [])
-                if u[0] < number and u[1] == record["score"] and u[2] == record["moves_digest"]
-            ]
-            if not found:
-                fail("built on the best moves of an unfinished search of n-1, and no earlier line records one with "
-                     "that score and those moves")
-                continue
-            prev = (found[0][1], found[0][3], None, set())
-            proven = False
-            if score < prev[0]:
-                fail(f"scores {score}, less than the {prev[0]} of the unfinished search of n-1 it was built on")
-        elif source in ("run", "results"):
+        if source in PREV_SOURCES:
             if below is None:
                 fail(f"built from game {n - 1} of this file, which it does not hold")
                 continue
             prev = below[:4]
-        elif source == "optimal":
-            # The moves of the table are assumed optimal; the table at hand may lack it (a line made with a longer one).
-            entry = table.get(n - 1)
-            score_before = entry.score if entry is not None else record["score"]
-            moves_before = entry.moves if entry is not None else None
-            prev = (score_before, moves_before, None, {assumed_optimal(n - 1)})
-        elif source in ("strict", "bounds"):
-            # The committed chain's moves, or a board the store has proven.
-            prev = sources.prev_game(source, n - 1)
-            if prev is None:
-                fail(f"it was built on the moves for n-1 of the {source} source, which holds none")
-                continue
-        elif record is not None:
-            fail(f"unknown prev.source {source!r}")
-        if prev is not None:
-            # A record of the proof `known` says where the run got its copy of the moves for n-1 (a known source,
-            # `--use-prev`), not how they are proven.  When the lines of such a run are appended to the file it
-            # drew on, the moves for n-1 are the file's own line, which carries and checks its own proof kind, and this
-            # line's search depends only on those moves' score and moves, which must still match, and on what it
-            # assumes, which must too.  So the record's proof kind need not be the line's, if the line is the file's.
-            known_copy = record["proof"] == "known" and source in ("run", "results")
             same = (
                 record["n"] == n - 1
                 and record["score"] == prev[0]
-                and (prev[1] is None or record["moves_digest"] == digest(prev[1]))
-                and (record["proof"] == prev[2] or known_copy)
+                and record["moves_digest"] == digest(prev[1])
+                and record["proof"] == prev[2]
                 and set(record["assumes"]) == prev[3]
             )
             if not same:
                 fail("its record of the moves for n-1 does not match them")
+        elif record is not None:
+            fail(f"unknown prev.source {source!r}")
 
-        # Arithmetic.  What rests on the moves for n-1 (the ceiling, the prime formula) needs them proven.
-        prev_score = prev[0] if prev and proven else None
+        # Arithmetic.  What rests on the moves for n-1 (the ceiling, the prime formula) needs them.
+        prev_score = prev[0] if prev else None
         total = sum(promotions)
         setup = row.get("setup") or {}
         cap = setup.get("cap")
@@ -592,7 +414,7 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
         if bag is not None and score != bag + total:
             fail(f"scores {score}, not in_the_bag {bag} + promotions {total}")
         if cap is not None and prev_score is None:
-            fail("it has a ceiling (a cap in its setup), which needs proven moves for n-1 it names")
+            fail("it has a ceiling (a cap in its setup), which needs moves for n-1 it names")
         if cap is not None:
             if total > cap:
                 fail(f"promotions {total} exceed the cap {cap}")
@@ -619,18 +441,8 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
         # Proof and assumptions.
         if proof in RESTS_ON_PREV and prev is None:
             fail(f"its proof ({proof}) rests on moves for n-1 it does not name")
-        elif proof in RESTS_ON_PREV and not proven:
-            fail(f"its proof ({proof}) rests on the moves for n-1, which it records as the best moves of an unfinished "
-                 "search")
-        cited = None  # what the cited source makes the line assume
-        if isinstance(row.get("known"), dict):
-            cited, messages = sources.cite_problems(n, score, row["known"])
-            for message in messages:
-                fail(message)
         if repeated is not None:
             assumes = repeated[3]
-        elif cited is not None:
-            assumes = cited
         else:
             assumes = prev[3] if prev and proof in RESTS_ON_PREV else set()
         if row["proof"] != proof:
@@ -643,10 +455,7 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
         cut = near_repeat_cut(row)
         if is_count(cut) and cut > 0:
             shortened[proof] += 1
-        # (Statement U at a board is one assumption of many: counted together, a line once.)
-        assumed.update({s for s in assumes if not s.startswith(U_STATEMENT)})
-        if any(s.startswith(U_STATEMENT) for s in assumes):
-            assumed["statement U at some boards"] += 1
+        assumed.update(assumes)
         if not assumes:
             assumed["(nothing)"] += 1
         if prev_score is not None:
@@ -658,7 +467,7 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
 
 
 def if_file(path):
-    """`path` if it is a file, else None: a source that was not given is a path that is not there."""
+    """`path` if it is a file, else None: a table that is not given is a path that is not there."""
     return path if path.is_file() else None
 
 
@@ -671,21 +480,12 @@ def main():
     ap.add_argument("files", nargs="*", type=Path)
     ap.add_argument("--fm", type=Path, default=FM_BOUND)
     ap.add_argument("--chain", type=Path, default=HEURISTIC_CHAIN)
-    ap.add_argument("--committed", type=Path, default=COMMITTED, help="the committed file, a source of known moves")
-    ap.add_argument("--table", type=Path, help="the file of the table of optimal moves (default: the committed file)")
-    ap.add_argument("--bounds", type=Path, default=BOUNDS, help="the bounds store, the other source of known moves")
+    ap.add_argument("--table", type=Path, default=COMMITTED, help="the file of the table of optimal moves")
     args = ap.parse_args()
-    # (The bounds store is not a file of results: it is read for the lines that cite it.)
-    files = args.files or sorted(
-        f for pattern in ("*.jsonl", "*.jsonl.gz") for f in RESULTS.glob(pattern) if f.name != BOUNDS.name
-    )
+    files = args.files or sorted(f for pattern in ("*.jsonl", "*.jsonl.gz") for f in RESULTS.glob(pattern))
     files = [f for f in files if not f.name.endswith(".rejected.jsonl")]
 
-    sources = Sources(
-        if_file(args.committed),
-        if_file(args.bounds),
-        table="committed" if args.table is None else if_file(args.table),
-    )
+    table = read_table(if_file(args.table))
     fm = json.loads(args.fm.read_text())
     heuristic = {entry["n"]: entry["score"] for entry in json.loads(args.chain.read_text())}
     largest = 2
@@ -703,7 +503,7 @@ def main():
     for path in files:
         print(f"{path}:")
         done, counts, assumed, certificates, shortened, unfinished = check_file(
-            path, fm, heuristic, divisors, problems, sources
+            path, fm, heuristic, divisors, problems, table
         )
         if done:
             missing = sum(1 for n in range(min(done), max(done) + 1) if n not in done)

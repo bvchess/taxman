@@ -45,7 +45,7 @@ case "$1" in
                 --examples)
                     if [ "$crate" = solver ]; then
                         tool $release/examples/perf
-                        tool $release/examples/ledger
+                        tool $release/examples/scratch
                     else
                         tool $release/examples/inspect
                     fi
@@ -189,10 +189,10 @@ class Setup(unittest.TestCase):
 
     def test_build_names_what_is_built_and_leaves_the_prover_out(self):
         machine = self.machine()
-        status, logged, _ = self.setup(machine, BUILD="--bin taxman --example ledger", SKIP_SMOKE="")
+        status, logged, _ = self.setup(machine, BUILD="--bin taxman --example scratch", SKIP_SMOKE="")
         self.assertEqual(status, 0, logged)
-        self.assertEqual(self.cargo_calls(), ["cargo frame build --release --bin taxman --example ledger"])
-        self.assertTrue((machine / "solver/frame/target/release/examples/ledger").exists())
+        self.assertEqual(self.cargo_calls(), ["cargo frame build --release --bin taxman --example scratch"])
+        self.assertTrue((machine / "solver/frame/target/release/examples/scratch").exists())
         self.assertFalse((machine / "solver/frame/target/release/examples/perf").exists())
         self.assertFalse((machine / "solver/noframe/target").exists())
         self.assertIn("smoke: the committed results file", logged)  # the solver has its checks, the prover none
@@ -305,7 +305,7 @@ class Setup(unittest.TestCase):
     def test_require_cached_takes_a_hit(self):
         self.assertEqual(self.setup(self.machine(), RELEASE_TESTS="1")[0], 0)
         self.cargo_calls()
-        status, logged, _ = self.setup(self.machine(), REQUIRE_CACHED="1", BUILD="--example ledger")
+        status, logged, _ = self.setup(self.machine(), REQUIRE_CACHED="1", BUILD="--example scratch")
         self.assertEqual(status, 0, logged)
         self.assertEqual(self.cargo_calls(), [])
 

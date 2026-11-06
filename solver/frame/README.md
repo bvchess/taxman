@@ -145,7 +145,7 @@ the engine uses `File::try_lock`), and it uses no third-party libraries.  The in
 ```
 cd solver/frame
 cargo build --release              # about 100 seconds on an M1 Max; the binary is target/release/taxman
-cargo build --release --examples   # also the probe and the ledger
+cargo build --release --examples   # also the probe
 ./target/release/taxman help
 ```
 
@@ -204,15 +204,14 @@ promotion sum.  [The reference, section
 * `repeat` (game 22): game 22 poses the same search problem as game 21, which settled it, so the solver takes 21's
   promotions without a search.
 
-The sixth method, `known`, takes moves that the repository has already proven (section 3, "Known moves").  "optimal
-ok" says that the score equals the built-in table's: a check, not a proof.
+"optimal ok" says that the score equals the built-in table's: a check, not a proof.
 
 `--show` prints a game's promotions and moves.  Solved alone, game 21 is the example of section 1:
 
 ```
 $ taxman solve 21 --show --progress 0
-note: no previous game for n=21 (the game of 20 is neither in this run nor in the results file): solving it standalone, with no seed and no ceiling, which costs more; to chain, give --out with the earlier games, or --use-prev to take the known game of 20
-n=21    score=144       search  nodes=1               0.001 s  optimal ok  proof=exhausted  active=0.001 s  cpu=0.000 s  best=9
+note: no previous game for n=21 (the game of 20 is neither in this run nor in the results file): solving it standalone, with no seed and no ceiling, which costs more; to chain, give --out with the earlier games
+n=21    score=144       search  nodes=1               0.002 s  optimal ok  proof=exhausted  active=0.003 s  cpu=0.000 s  best=9
   promotions: [9]
   moves: [19, 9, 15, 21, 14, 18, 12, 20, 16]
 ```
@@ -269,19 +268,14 @@ changes the answer.  [The reference](../docs/REFERENCE.md#1-the-flags-of-solve) 
 ### Solve one game
 
 ```
-$ taxman solve 480 --use-prev --force-search --show
-n=480   score=73120     search  nodes=37              0.005 s  optimal ok  proof=exhausted  active=0.005 s  cpu=0.007 s  best=5350
+$ taxman solve 480 --show
+note: no previous game for n=480 (the game of 479 is neither in this run nor in the results file): solving it standalone, ...
+n=480   score=73120     search  nodes=37              0.028 s  optimal ok  proof=exhausted  active=0.029 s  cpu=0.003 s  best=5350
   promotions: [68, 138, 147, 153, 168, 175, 180, 182, 190, 195, 196, 198, 200, 207, 208, 210, 220, 222, 224, ...]
   moves: [479, 361, 437, 299, 403, 341, 473, 301, 469, 335, 445, 267, 471, 314, 478, 466, 458, 454, 446, ...]
-$ taxman solve 480 --use-prev
-n=480   score=73120     known   nodes=0               0.001 s  optimal ok  proof=known from the committed chain  active=0.001 s  cpu=0.000 s  best=-
 ```
 
-`--use-prev` draws on the *known moves*, the moves the repository has already proven (below, "Known moves").  The known
-moves for n − 1 seed the search and give it a ceiling.  A game that a known source has proven is recorded as it is,
-with no search: that is the second command.  The first, with `--force-search`, searches 480 from the known
-moves for 479.  Without `--use-prev` a single game has no game before it, and is solved standalone (below, "Past the known
-     moves").
+A single game has no game before it, so it is solved standalone (below, "Past the committed chain").
 
 The node count of a multi-threaded search varies a little from run to run.  "optimal ok" means that the score equals
 the built-in table's, not that it is proven
@@ -315,25 +309,25 @@ $ taxman solve 1-300 --out mine.jsonl
 skipped 300 games already done in mine.jsonl
 ```
 
-### Past the known moves
+### Past the committed chain
 
 The built-in table and the committed chain end at a game ([results/README.md](../../results/README.md#optimaljsonlgz)
-says which), so a game past them needs the moves for the game before it from the run or from the results file.  Either
-extend a copy of a file that has it, or give `--use-prev`, which takes the known moves for n − 1.  That is the moves of
-the built-in table or the committed chain, or of the bounds store, where the store has proven the game.  A decompressed
-copy of `results/optimal.jsonl.gz`, extended, is such a file (`gzip -dc results/optimal.jsonl.gz > mine.jsonl`).  The
-copy matters: `--out` appends to the file, and `results/` must not be overwritten.
+says which), so a game past them needs the moves for the game before it from the run or from the results file: extend a
+copy of a file that has them.  A decompressed copy of `results/optimal.jsonl.gz`, extended, is such a file (`gzip -dc
+results/optimal.jsonl.gz > mine.jsonl`).  The copy matters: `--out` appends to the file, and `results/` must not be
+overwritten.
 
-The moves for 1301 and 1302 are known, from the committed chain.  So to search them from the known moves for 1300, as a
-range past the known moves does, `--force-search` leaves them to their searches:
+The games 1301 and 1302 are in the committed chain.  So to search them from the moves for 1300 as a range past the chain
+does, take the first 1300 lines of the copy (`head -n 1300`) and give `--force-search`, which leaves them to their
+searches:
 
 ```
-$ taxman solve 1301-1302 --use-prev --force-search --threads 2 \
+$ taxman solve 1301-1302 --force-search --threads 2 \
       --out mine.jsonl --checkpoint-dir ckpt --node-limit 4000 --progress 4
-12:34:56Z n=1301 active 0.1s waited 0.0s cpu 0.0s nodes 1 (done) best 40800 queue 0 spilled 0 | eff 6.4% idle 0.0% lock 0.0% ...
-n=1301  score=532272    search  nodes=1               0.151 s  optimal ok  proof=exhausted  active=0.144 s  cpu=0.021 s  best=40800
-12:34:56Z n=1302 active 0.1s waited 0.0s cpu 0.2s nodes 3868 (done) best 41436 queue 0 spilled 0 | eff 96.2% idle 2.8% lock 0.0% ...
-n=1302  score=533559    search  nodes=3868            0.125 s  optimal ok  proof=exhausted  active=0.118 s  cpu=0.226 s  best=41436
+12:34:56Z n=1301 active 0.3s waited 0.0s cpu 0.0s nodes 1 (done) best 40800 queue 0 spilled 0 | eff 7.7% idle 0.0% lock 0.0% ...
+n=1301  score=532272    search  nodes=1               0.267 s  optimal ok  proof=exhausted  active=0.268 s  cpu=0.001 s  best=40800
+12:34:56Z n=1302 active 0.5s waited 0.3s cpu 0.3s nodes 3870 (done) best 41436 queue 0 spilled 0 | eff 96.6% idle 3.0% lock 0.0% ...
+n=1302  score=533559    search  nodes=3870            0.469 s  optimal ok  proof=exhausted  active=0.471 s  cpu=0.375 s  best=41436
 ```
 
 Game 1301 is a prime, but `--force-search` also skips the prime formula.  Its search takes one node, since [the
@@ -341,46 +335,12 @@ near-repeat cut](../docs/design/search.md#the-near-repeat-cut) ends it at the ro
 1302 started from 1301.  A node limit would have stopped 1302 with its checkpoint; the engine checks the limit every
 1,024 steps of a thread.
 
-A game whose predecessor is in neither the run nor the results file, and not taken with `--use-prev`, runs *standalone*,
-with no seed and no ceiling: for example `taxman solve 1400`, or `taxman solve 480` without the flag.  `solve` says so
-on stderr (`note: no previous game for n=...`), and the result line has `"prev": null`.  The answer is still correct,
+A game whose predecessor is in neither the run nor the results file runs *standalone*, with no seed and no ceiling:
+for example `taxman solve 1400`, or `taxman solve 480`.  `solve` says so on stderr (`note: no previous game for
+n=...`), and the result line has `"prev": null`.  The answer is still correct,
 but costs about twice as much on the hard games, and many times more on the games that a chain settles at once by
 reaching the ceiling ([the cost
 curve](https://github.com/bvchess/taxman-notebook/blob/main/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md)).
-
-### Known moves
-
-`--use-prev` draws on three sources of games that the run has not made, and no option names another.  The first two are
-the file `results/optimal.jsonl.gz`, read twice:
-
-| source | holds | moves taken from it rest on |
-|---|---|---|
-| the built-in table | the lines of `results/optimal.jsonl.gz` as of the build | nothing but the table's word: the line records that it assumes the moves optimal |
-| the committed chain | the file `results/optimal.jsonl.gz` of the checkout, each line with its proof kind | what its line assumes |
-| `results/bounds.jsonl` | the bounds the ledger found ([results/README.md](../../results/README.md#boundsjsonl)); a game whose best lower bound is its best upper bound is *proven* | [statement U](../../docs/theory/exactness.md#statement-u) at the games its upper bound rests on (`rests_on`), one assumption each |
-
-Of the moves for a game that several sources hold, the solver takes the committed chain's, then the store's, then the
-table's.  What it does with them:
-
-* **A game that a source has proven is recorded with no search.**  Its line has the method `known`, the proof kind
-  `known`, no `setup`, and a `known` field that cites the source ([the reference, "Citing a known
-  source"](../docs/REFERENCE.md#citing-a-known-source)).  The referee replays it like every game, and it is checked
-  against the game before it (`score(n − 1) <= score(n) <= n + score(n − 1)`) and against the built-in table.  Game n +
-  1 has the moves for n for its ceiling and seed as usual, and a game that rests on it, proven by the ceiling or the
-  prime formula, assumes what it does.
-* **The moves for the game before the range** are the known moves for A − 1, if `--out` lacks them.  The `prev` of the
-  first line says where it came from: `optimal` (the built-in table), `strict` (the committed chain) or `bounds`.
-* **A game that the store has not proven** still helps its search, whether the store has a lower bound, an upper bound
-  or both with a gap between them.  The moves of its best lower bound are a seed beside the moves for n − 1, and the one
-  that keeps more is used.  Its best upper bound is a ceiling next to the one that the moves for n − 1 give, and a
-  search that reaches the lower of the two stops.  A search that stopped at the store's bound is proven by it: proof
-  kind `known`, with `known` citing the bound, assuming U where the bound rests.
-* `--force-search` leaves the games to their searches, and the store does not help them, as it leaves the prime
-  formula and the repeats.  `regress --use-prev` takes the moves for the game before its range from the table only.
-
-A chain from n = 1 with `--use-prev` takes its moves from the committed chain as far as that goes, so it proves nothing
-again there.  That is for a run that goes past the committed chain
-([solver/docs/runbook/chain.md, "Run"](../docs/runbook/chain.md#run)), not for one that checks the build.
 
 ### A chain from n = 1
 
@@ -389,13 +349,11 @@ $ taxman solve 1-2175 --out chain.jsonl --checkpoint-dir ckpt --checkpoint-inter
 ```
 
 Started at n = 1, a chain takes no moves from the built-in table, which it only compares with, as far as the table goes;
-a score that differs is a hard error.  So no line in the file assumes anything beyond the frame model.  A run that
-takes moves from the table (`--use-prev`) records, in every result that rests on it, that it assumes those moves
-optimal ("Known moves", above).
+a score that differs is a hard error.  So no line in the file assumes anything beyond the frame model.
 
-`results/optimal.jsonl.gz` is such a chain, compressed.  This command, up to the paths, the thread count and the
-progress reports, made its lines for 1 to 2175, and a run of it reproduces their scores.
-[results/runs.md](../../results/runs.md) says how the rest were made.
+`results/optimal.jsonl.gz` is such a chain, compressed, of 1 to 5060.  This command, up to the paths, the thread count
+and the progress reports, made its lines for 1 to 2175, and a run of it reproduces their scores.
+[results/runs.md](../../results/runs.md) says how the file was made.
 
 ### Games in flight
 
@@ -432,13 +390,14 @@ With `--checkpoint-dir DIR`, a game's search writes `DIR/nNNNN.ckpt` every `--ch
 60), and on any stop, atomically and synced.  The same command resumes it:
 
 ```
-$ taxman solve 992 --use-prev --force-search --threads 1 --node-limit 4000 --progress 1 --out r992.jsonl --checkpoint-dir c992
-09:41:07Z n=992 active 0.1s waited 0.0s cpu 0.1s nodes 4095 (stopped) best 24175 queue 12 spilled 0 | eff 92.3% ... pauses 1 (7.6%) max 10.8ms park 0.0ms | nogoods learned 356 ...
-n=992   score=310675    search  nodes=4095            0.184 s  incomplete  active=0.180 s  cpu=0.171 s  best=24175
+$ taxman solve 992 --force-search --threads 1 --node-limit 4000 --progress 1 --out r992.jsonl --checkpoint-dir c992
+note: no previous game for n=992 (the game of 991 is neither in this run nor in the results file): solving it standalone, ...
+14:26:11Z n=992 active 0.7s waited 0.0s cpu 0.3s nodes 4095 (stopped) best 24158 queue 22 spilled 0 | eff 90.5% ... pauses 1 (9.4%) max 38.6ms park 0.0ms | nogoods learned ...
+n=992   score=310658    search  nodes=4095            0.704 s  incomplete  active=0.705 s  cpu=0.372 s  best=24158
 stopped: the search for n=992 hit a limit before it finished; run the same command to resume it
-$ taxman solve 992 --use-prev --force-search --threads 1 --node-limit 4000 --out r992.jsonl --checkpoint-dir c992   # resumes, stops again
-$ taxman solve 992 --use-prev --force-search --threads 1 --out r992.jsonl --checkpoint-dir c992   # resumes and finishes
-n=992   score=310690    search  nodes=14789           0.316 s  optimal ok  proof=exhausted  active=0.681 s  cpu=0.652 s  best=24190
+$ taxman solve 992 --force-search --threads 1 --node-limit 4000 --out r992.jsonl --checkpoint-dir c992   # resumes, stops again
+$ taxman solve 992 --force-search --threads 1 --out r992.jsonl --checkpoint-dir c992   # resumes and finishes
+n=992   score=310690    search  nodes=17337           1.062 s  optimal ok  proof=exhausted  active=2.450 s  cpu=1.497 s  best=24190
 ```
 
 The last line is the third invocation of the game: its `nodes`, `active` and `cpu` cover all three, its seconds only the last.  The results
@@ -473,31 +432,3 @@ them.
 * **Memory.**  A searcher's state is bounded.  The shared queue of work units spills to `DIR/spill` beyond `--mem-cap`
   units (default 1048576).  The runs of the committed chain never came near it
   ([results/runs.md](../../results/runs.md) gives their largest queues).
-
-### The ledger
-
-**The ledger** works on a whole stretch of games at once instead of in order.  For every game it keeps a lower bound
-with moves that reach it, and an upper bound, each with how it was derived, and a game is proven when its bounds
-meet.  It tightens them where a proof looks cheapest (its *forecast*), in three ways:
-
-* limited one-thread searches, P at once, each going on from its checkpoint, with its upper bound read from the
-  checkpoint (the *dual bound*);
-* searches under floors that step an open game's upper bound down, each costing about tenfold more than the one before
-  and giving the game a line that forecasts its proof;
-* the relations between games, both ways: the ceiling, the prime formula, repeats and monotonicity.
-
-A finder of good moves, a large neighborhood search, adds lower bounds.  It is not sound, so its moves count only once
-the referee has replayed them.  The ledger never reads the known optima unless it is given proven games (`--proven
-FILE`), so a run on a stretch that the chain has proven is a fair test, which `report --known` checks.
-
-```
-$ cargo run --release --example ledger -- run A-B --dir DIR --cpu-hours H --workers P
-$ cargo run --release --example ledger -- report DIR --known FILE
-```
-
-The module comment of `examples/ledger/main.rs` has the flags and the files.  What the ledger finds is kept in the
-bounds store, `results/bounds.jsonl` (`ledger export`; `run --bounds` starts from it), which has two verifiers of its
-own ([results/README.md](../../results/README.md#boundsjsonl)) and which `taxman solve --use-prev` draws on too ("Known
-moves", above).  The ledger's files are its own, not results lines ([solver/docs/design/trust.md, "The
-ledger"](../docs/design/trust.md#the-ledger); the experiment: [the
-ledger](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/README.md)).

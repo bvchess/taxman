@@ -41,9 +41,7 @@
 #   CHECKPOINT_INTERVAL  seconds, default 300       PROGRESS  seconds between progress lines, default 60
 #                        (a checkpoint stops every worker for the slowest one's step, up to 0.4 s near n = 4000: 0.15%
 #                        of the machine at 300 s, 0.7% at 60 s; SIGTERM still writes a final one)
-#   EXTRA_ARGS           more flags for `taxman solve`, e.g. "--mem-cap 100000", or "--use-prev": the chain then
-#                        draws on the known moves of the checkout's results/ (the committed chain, the
-#                        proven boards of the bounds store) instead of searching for them
+#   EXTRA_ARGS           more flags for `taxman solve`, e.g. "--mem-cap 100000"
 #   MAX_FAILS            default 5
 #   CHAIN_TO             N, if not given as the argument (the solver goes up to 8191; solver/docs/runbook/chain.md, the item "Past 4095")
 #   DEADLINE_HOURS, BUDGET_HOURS, RUN_UNTIL, LEDGER_*, POWEROFF, S3_DEST, SAVE_EVERY: as in run.sh, which this script

@@ -77,9 +77,8 @@ run](https://github.com/bvchess/taxman-notebook/blob/main/scaling-to-192-threads
   solver/tools/cloud/chain.sh 8191                    # skips the games it holds and solves the next on
   ```
 
-  `chain.sh` checks the file when it opens it.  The file holds no incomplete line, its `known` lines assume [statement
-  U](../../../docs/theory/exactness.md#statement-u), and its lines keep the builds that made them
-  ([results/README.md](../../../results/README.md) names them), as the lines added will keep the cloud's.  The
+  `chain.sh` checks the file when it opens it.  The file holds no incomplete line, and its lines keep the build that
+  made them ([results/runs.md](../../../results/runs.md) names it), as the lines added will keep the cloud's.  The
   comparison of `verify.sh` with the committed file is then trivial for the games it holds, so the referees alone check
   the games above them (each game replayed, the chain bounds, Franklín–Moniot, the heuristic chain); a run from n = 1 is
   the cross-check of the machine and the build.  On a replacement machine, restore the saved state instead ([Surviving a
@@ -188,7 +187,7 @@ that has recorded none shows the games in flight alone:
 * `active`, `cpu` and `best`: the line's `active=`, `cpu=` and `best=`, the seconds the game had a worker and the CPU
   seconds of its search's workers, both over every run of it ([glossary](../../../docs/GLOSSARY.md#the-search)), and its
   best promotion sum, the score less `in_the_bag`.  All are `-` where the solver that printed the line did not print
-  them, and `best` is `-` for a prime or known game; a game that ran no search has a cpu of 0.0s;
+  them, and `best` is `-` for a prime game; a game that ran no search has a cpu of 0.0s;
 * `nodes`: the line's nodes;
 * `state`: `recorded`, the score, and in parentheses the line's method and proof kind, then `optimal ok` when the score
   is the one in the built-in table.
@@ -229,13 +228,11 @@ For a chain from 1, the report says `assumptions: none in N of N games`.  Any as
 is not what it should be: stop and read the line.  (A count of incomplete lines is not a problem: every search that
 stopped and resumed left one.)
 
-A run with `--use-prev` holds the committed chain's lines as `known` lines at the start of its own file, so its file
-does not continue the committed file as it stands.  Bring the lines of any run home by appending the lines past the
-committed file's end to it as one gzip member, which leaves every earlier byte of the file as it was.  In the run's own
-file (the plain JSONL that the run wrote, not in the repository), find the numbers of the lines that are the first
-completed line of each game past the committed file's last game, leaving out the run's `known` copies of the committed
-lines and its incomplete lines (the committed file has none).  A is the number of the first of those lines and B of the
-last.  Where an incomplete line sits between two games, give the sed address of each stretch of consecutive lines
+Bring the lines of a run home by appending the lines past the committed file's end to it as one gzip member, which
+leaves every earlier byte of the file as it was.  In the run's own file (the plain JSONL that the run wrote, not in the
+repository), find the numbers of the lines that are the first completed line of each game past the committed file's last
+game, leaving out its incomplete lines (the committed file has none).  A is the number of the first of those lines and B
+of the last.  Where an incomplete line sits between two games, give the sed address of each stretch of consecutive lines
 (`A,Bp;C,Dp`).  Then run both verifiers on the file:
 
 ```
@@ -245,10 +242,8 @@ taxman verify-results results/optimal.jsonl.gz
 python3 solver/tools/check_results.py results/optimal.jsonl.gz
 ```
 
-The first appended line records its moves for n − 1 with the proof kind `known`, as the run's own line, while the
-committed file's line has the proof kind it was made with.  Both referees accept that record, because the score, the
-moves and the assumptions are the line's.  The built-in table takes the appended lines at the next build, because the
-binary carries the file as it was when it was built.
+The built-in table takes the appended lines at the next build, because the binary carries the file as it was when it
+was built.
 
 Then decide what to keep.  [Storage](machine.md#storage) gives the file's size.  Scripts must not overwrite the
 committed `results/`: put a file next to them (say `results/chain-1-N.jsonl`) and update

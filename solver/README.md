@@ -46,7 +46,6 @@ file your task needs.
 [tools/](tools) holds the scripts around the programs:
 
 * `quick_check.py`, the check that every change passes (formatting, lints and the tests, within time limits);
-* `check_results.py` and `check_bounds.py`, the second verifiers of the results files and of the bounds store, which
-  share no code with the programs;
+* `check_results.py`, the second verifier of the results files, which shares no code with the programs;
 * `read_profile.py`, the reader of the profile of a search (`taxman solve --profile`): where its steps went;
 * `cloud/`, the scripts of the RUNBOOK.

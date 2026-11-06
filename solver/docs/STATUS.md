@@ -1,6 +1,6 @@
 # Status
 
-Updated 2026-11-01.
+Updated 2026-11-06.
 
 The state of the work as of the date above: the priority, and the projects in flight.  This page is rewritten, not
 appended to, when the state changes.  What was done and why is in the [lab
@@ -24,18 +24,23 @@ The committed chain is also the table built into the frame solver: the chain's l
   previous policy (a gate of 1200 with the trial) by 1.5 to 5.5 times on whole games
   ([gate-trial.md](design/gate-trial.md)), with `price_reuse` and `warm_start` on and a finder of 900 seconds.  It started
   on 2026-11-01 at 08:24 PST as `chain.sh 5060` with only the flags of the machine and the run (`--background`,
-  `--carried-dir`, `--profile`) and no `--use-prev`.  Each line records the game's CPU, active and waiting seconds and its
-  start and finish in UTC.  When it completes, its file replaces `results/optimal.jsonl.gz`.  The Oct 29 run it replaces
-  (tag `rerun-2026-10`, commit 3ca11bf, gate 1200 with the trial) stopped at game 4879 and is kept as a record on that
+  `--carried-dir`, `--profile`).  Each line records the game's CPU, active and waiting seconds and its start and finish
+  in UTC.  It ended on 2026-11-06 at 05:00 PST, after game 5060, and its file replaced `results/optimal.jsonl.gz` on
+  that date ([results/runs.md](../../results/runs.md)), with the earlier file's scores.  The Oct 29 run (tag
+  `rerun-2026-10`, commit 3ca11bf, gate 1200 with the trial) stopped at game 4879 and is kept as a record on that
   machine.
 * **The cleanup of the frame solver.**  The project's owner decided on 2026-10-29 to remove the lab, the studies and the
   idle experiments, to make the production policy the default, to split the notebook into a repository of its own, and
   to leave the prover alone.  The code is done: the removals and the defaults are on master, and a consistency pass has
   brought the docs and the code left behind into line.  The lab notebook and the agenda files have moved, with their
   history, to the repository [bvchess/taxman-notebook](https://github.com/bvchess/taxman-notebook).  One step remains.
-  * **The retirement of the bounds store.**  It waits for the Nov 1 run.  When its file
-    replaces `results/optimal.jsonl.gz`, the games have no `known` lines, so the bounds store, the ledger, `--use-prev`
-    and `check_bounds.py` retire, with the readers of older line formats and `REFERENCE.md`'s keys of older lines.
+  * **The retirement of the bounds store and the certificates.**  The Nov 1 run's file has no `known` lines, so the
+    bounds store (`results/bounds.jsonl`, [kept in the
+    notebook](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/committed-store/bounds.jsonl)),
+    the ledger, `--use-prev` and `check_bounds.py` are retired, with the readers of older line formats and
+    `REFERENCE.md`'s keys of older lines.  The certificates of statement U retire too (`taxman certify`,
+    `verify-certificates`, the extended mode they need, the certificates of games 600 to 1300): the prover's own
+    proofs, from game 2 up, replace them.
 * **The documentation.**  Every long document is a folder of files with an index, and every doc follows
   [docs/WRITING.md](../../docs/WRITING.md), whose docs test checks the links, the citations, the sizes and the words.
   The project's owner reviews the docs one file at a time, and each review's changes land as they are decided.

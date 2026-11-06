@@ -275,7 +275,7 @@ scenario_status() {
         recorded_line 37 370 search 7 123.456 unknown exhausted
         recorded_line 38 380 search 9 1.5 unknown exhausted
         recorded_line 37 370 prime 0 0.055 unknown prime_formula "  active=0.000 s  cpu=0.000 s  best=-"
-        recorded_line 38 380 known 0 0.003 ok "known from the committed chain"
+        recorded_line 38 380 repeat 0 0.003 ok "same_search of 37"
         recorded_line 39 7466640 search 0 0.247 unknown cap \
             "  assumes statement U  active=0.247 s  cpu=0.000 s  best=566640"
         recorded_line 40 400 search 248002917 812.5 unknown exhausted "  active=697.250 s  cpu=22318.000 s  best=40000"
@@ -335,9 +335,9 @@ its best" has_line "$tmp/s1.norm" \
         "$tmp/s1.norm" ' 36 0.0s 0.0s 0 34 recorded, score 360 (repeat, same_search of 34)'
     check "a game printed again is the last of its lines: a prime game, with no best sum" has_line "$tmp/s1.norm" \
         ' 37 0.0s 0.0s 0 - recorded, score 370 (prime, prime_formula)'
-    check "a line of an older solver has no times or best sum, and a known game has the words of its proof kind" \
+    check "a line of an older solver has no times or best sum, and a repeat has the words of its proof kind" \
         has_line "$tmp/s1.norm" \
-        ' 38 - - 0 - recorded, score 380 (known, known from the committed chain, optimal ok)'
+        ' 38 - - 0 - recorded, score 380 (repeat, same_search of 37, optimal ok)'
     check "the proof ends at what the solver adds to it, and the fields come after it" has_line "$tmp/s1.norm" \
         ' 39 0.2s 0.0s 0 566,640 recorded, score 7,466,640 (search, cap)'
     check "a recorded line's times are formatted as an in-flight game's, its best with commas" has_line \

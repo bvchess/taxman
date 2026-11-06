@@ -14,12 +14,6 @@ path = "src/lib.rs"
 name = "taxman"
 path = "src/main.rs"
 
-# The ledger has tests of its own (its relations bracket the optimum, its runs prove at the optimum), which `cargo test`
-# runs; no other example has any.
-[[example]]
-name = "ledger"
-test = true
-
 [dependencies]
 # The decoder of the results file, results/optimal.jsonl.gz, which the binary has built in; the prover reads it with the
 # same crate.

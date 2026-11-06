@@ -299,9 +299,9 @@ they hold at every node (fact 4 of [the default step's](#the-default-step) exact
 ## The starting incumbent, the ceiling and the seed
 
 The search starts from the best start of its seeds, and stops as soon as it reaches a proven ceiling. A *seed* is a game
-to start from: the moves for n − 1, and with `--use-prev` the bounds store's lower-bound moves for n, if it has them. A
-seed's *survivors* are its promotions that are candidates here and still promotable, taken one by one from the largest
-down (all of the store's moves survive, being a play of game n). A seed's *start* is the best of three promotable sets:
+to start from: the solver gives the search the moves for n − 1, and the search takes any number of seeds. A seed's
+*survivors* are its promotions that are candidates here and still promotable, taken one by one from the largest down. A
+seed's *start* is the best of three promotable sets:
 
 * the *greedy* set: promote every candidate that can be, from the largest down;
 * the seed's survivors;
@@ -310,10 +310,9 @@ down (all of the store's moves survive, being a play of game n). A seed's *start
 
 improved by a local search, which fills the set greedily, then drops one or two members and refills, until nothing
 improves. The greedy set and the dive are made once, and the local search runs once from each distinct set the seeds'
-starts have reached. The search starts from the heaviest result (of equals, the store's moves or else the moves for n −
-1), or from the greedy set or the dive alone with no seed. A seed needs its own start because a local search climbs only
-as far as its start leads: the store's moves can outweigh the survivors of the moves for n − 1 and still be a local
-optimum, while those survivors climb higher.
+starts have reached. The search starts from the heaviest result (of equals, the first seed's), or from the greedy set or
+the dive alone with no seed. A seed needs its own start because a local search climbs only as far as its start leads: a
+seed can outweigh the survivors of another and still be a local optimum, while those survivors climb higher.
 
 The *ceiling* on the promotion sum, `n + score(n − 1) − in_the_bag`, is proven, and reaching it ends the search (tactic
 `prev_cap`). Nothing can beat a set at the ceiling, so the dive, the local search and the starts not yet made are
@@ -321,9 +320,9 @@ skipped once a set reaches it, and the result is the same.
 
 *Why the start cannot make an answer wrong.* It only chooses the incumbent, a promotable set: the greedy set, the
 survivors, the dive and every move of the local search promote their members one after another ([trust.md](trust.md),
-"Files with holes"). The search is exhaustive from any promotable incumbent, because a node is cut only when its bound is
-below its need, `best + 1 − sum(promoted)` ("Search state and order"): a heavier incumbent prunes only subtrees that
-cannot beat a set already held. A start at the ceiling proves the game by it, as no promotable set is heavier.
+"Files that do not start at game 1"). The search is exhaustive from any promotable incumbent, because a node is cut
+only when its bound is below its need, `best + 1 − sum(promoted)` ("Search state and order"): a heavier incumbent
+prunes only subtrees that cannot beat a set already held. A start at the ceiling proves the game by it, as no promotable set is heavier.
 
 *Details.* The local search runs on the search's threads, the refills of a pass in parallel, and keeps the first
 improvement in the order of the sequential pass, so neither it nor the start depends on the thread count. It reads the

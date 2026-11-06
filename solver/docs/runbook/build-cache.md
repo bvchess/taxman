@@ -28,7 +28,7 @@ depends on:
 * **The cache is not used**, with a message that says why, and the build goes on as before, never reading or writing the
   cache, for a dirty checkout, no commit (a copy without `.git`), `RUSTFLAGS` other than empty or one
   `-C target-cpu=...`, no `aws` command, or `BUILD_CACHE=off`.  With no credentials a lookup is a miss and a put fails.
-* **SET** names what an entry's tarball holds, by its parts: `solver-bin-taxman+solver-example-ledger`, say, or
+* **SET** names what an entry's tarball holds, by its parts: `solver-bin-taxman+solver-example-perf`, say, or
   `prover-bins+prover-examples+solver-bins+solver-examples` for everything.
 * **An entry serves a request it covers**, and a request that none covers is a miss: `--bin X` by `--bin X` or `--bins`,
   `--example X` by `--example X` or `--examples`.  The release holds everything (the default of `setup.sh`), so it
@@ -38,7 +38,7 @@ depends on:
 * **Only a tested entry is used.**  The manifest, uploaded last, records the build and the release suite's result
   (`tests=passed`, the counts in lines such as `tests_solver=P passed, 0 failed, I ignored`, its seconds and the
   tests at once); an entry without one does not exist.  The tarball holds the executables only
-  (`solver/frame/target/release/taxman`, `.../examples/ledger`, `solver/noframe/target/release/exact`).
+  (`solver/frame/target/release/taxman`, `.../examples/perf`, `solver/noframe/target/release/exact`).
   `test-times.json` is how long each test took last time, for ordering the suite ([The
   release](#the-release-the-suite-then-the-cache)).
 * **A download is checked**: the tarball's sha256 against the manifest's before anything is unpacked, and every member
@@ -52,8 +52,8 @@ depends on:
 `setup.sh` looks for an entry that covers the set it was asked for (`BUILD`).  Finding one, it downloads, checks and
 unpacks it, builds nothing, and goes on to the smoke checks, which show that this machine runs the binaries.  Finding
 none, it builds the set and does not store it.  `REQUIRE_CACHED=1` turns a miss, or a cache it cannot use, into an
-error, for a launch that must run only tested binaries.  The user data of [the ledger's experiment](ledger.md) uses it, so that a commit that has not been released ends the
-machine at once and costs minutes, not a run of untested binaries.
+error, for a launch that must run only tested binaries: a commit that has not been released ends the machine at once and
+costs minutes, not a run of untested binaries.
 
 **Build only what a run needs**, with `BUILD`, cargo's arguments for `solver/frame/` (`--bins`, `--examples`,
 `--bin NAME`, `--example NAME`; default `--bins --examples`).  A `BUILD` leaves the prover out, unless `BUILD_PROVER`
@@ -63,7 +63,6 @@ a part that is not built are left out.  What the jobs need:
 | job | `BUILD` |
 |---|---|
 | the chain, `verify.sh` | `--bin taxman` |
-| the ledger ([ledger.md](ledger.md)) | `--bin taxman --example ledger` |
 | the prover's proofs ([prover.md](prover.md)) | `PROVER_ONLY=1` (`BUILD_PROVER="--bin exact"` for `exact` alone) |
 
 `taxman` is there for the smoke checks.  A machine of 32 CPUs or more builds the solver and the prover at the same time

@@ -202,7 +202,7 @@ mod tests {
         assert!(seed.is_subset(&board.candidates()) && seed.iter().all(|x| prev_moves.contains(&x)));
     }
 
-    /// The ledger seeds `n` with the moves for `n + 1`, whose move `n + 1` can be past the set's width: on boards 511
+    /// A caller may seed `n` with the moves for `n + 1`, whose move `n + 1` can be past the set's width: on boards 511
     /// and 1023 it is exactly the capacity.  A move beyond the board is dropped, so the seed is the moves' own, with
     /// `n + 1` or a number far beyond appended.
     #[test]

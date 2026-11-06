@@ -1,12 +1,11 @@
 //! The integrity of results: what the solver checks before it builds on previous moves, the tripwires that catch one
-//! that is not optimal, how an assumption travels down a chain from the table, what a results file must pass when
-//! it is opened, what survives a failure after a search, and the provenance every line carries.  Small boards, one or
-//! two threads.
+//! that is not optimal, how an assumption travels down a chain from the moves it starts from, what a results file must
+//! pass when it is opened, what survives a failure after a search, and the provenance every line carries.  Small
+//! boards, one or two threads.
 
 mod common;
 
 use common::{options, TempDir};
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -15,7 +14,7 @@ use taxman::frames::BoardFrames;
 use taxman::game::{legal_moves_left, replay, Optimal};
 use taxman::json::Json;
 use taxman::numtheory::Tables;
-use taxman::results::{assumed_optimal, moves_digest, rejected_path, Assumptions, Proof, ResultsFile, SCHEMA};
+use taxman::results::{moves_digest, rejected_path, Assumptions, Proof, ResultsFile, SCHEMA};
 use taxman::solver::{self, GameResult, Prev, PrevSource, SolveOptions};
 
 fn lines(path: &Path) -> Vec<Json> {
@@ -101,17 +100,34 @@ fn a_ceiling_tripped_in_a_range_is_recorded_as_rejected() {
     let dir = TempDir::new("tripped");
     let results = dir.join("r.jsonl");
     let (moves, score) = finished_but_worse_game_of_80();
-    // The bad moves as the table's moves for 80, so that a range told to use it builds on it.
+    // The bad moves as the table's moves for 80, and as the line of 80 in the results file (a game with no
+    // promotions, which stands on its own), so that the range builds on them.
     let fake = Json::array([Json::object([
         ("n", Json::from(80u32)),
         ("score", Json::from(score)),
         ("moves", Json::array(moves.iter().copied())),
     ])]);
     let table = Optimal::from_json(&fake).unwrap();
-    let opts = SolveOptions { use_prev: true, ..options(1) };
-    let err = solver::solve_range_each_with(81, 82, &opts, Some(&results), &table, |_| {}).unwrap_err();
+    let line = Json::object([
+        ("schema", Json::from(SCHEMA)),
+        ("n", Json::from(80u32)),
+        ("score", Json::from(score)),
+        ("moves", Json::array(moves.iter().copied())),
+        ("promotions", Json::array(Vec::<u32>::new())),
+        ("method", Json::from("trivial")),
+        ("completed", Json::Bool(true)),
+        ("proof", Json::from("trivial")),
+        ("reached_cap", Json::Bool(false)),
+        ("assumes", Json::array(Vec::<u32>::new())),
+        ("in_the_bag", Json::from(score)),
+        ("prev", Json::Null),
+        ("same_search", Json::Null),
+        ("setup", Json::Null),
+    ]);
+    fs::write(&results, format!("{line}\n")).unwrap();
+    let err = solver::solve_range_each_with(81, 82, &options(1), Some(&results), &table, |_| {}).unwrap_err();
     assert!(err.contains("not optimal") && err.contains("r.rejected.jsonl"), "{err}");
-    assert!(lines(&results).is_empty(), "nothing is recorded as a result");
+    assert_eq!(lines(&results).len(), 1, "nothing is recorded as a result but the line for 80");
     let rejected = lines(&rejected_path(&results));
     assert_eq!(rejected.len(), 1);
     assert_eq!(rejected[0].get("n").and_then(Json::as_u32), Some(81));
@@ -122,41 +138,30 @@ fn a_ceiling_tripped_in_a_range_is_recorded_as_rejected() {
 // ---------------------------------------------------------------------------------------------------------
 // Assumptions
 
-/// A run told to (`use_prev`) builds on the table's moves, which it assumes optimal, and each result records
-/// that assumption exactly where its proof rests on it: a proof by `cap` or the prime formula on the game before, a
-/// repeat on the game it repeats, and an exhausted search on no game.
+/// A game built on moves that a caller gives with an assumption records that assumption exactly where its proof rests
+/// on the moves for n − 1: a proof by `cap` or the prime formula does, and an exhausted search does not.  33 reaches its
+/// ceiling, 35 is an exhausted search, and 37 is a prime built on 36.
 #[test]
-fn the_results_built_on_a_game_of_the_table_assume_it_as_far_as_their_proofs_rest_on_it() {
-    let dir = TempDir::new("assumes");
-    let results = dir.join("r.jsonl");
-    // 33 reaches its ceiling and 34 repeats it, 35 is an exhausted search; 37 is a prime built on 36, an exhausted
-    // search.
-    let opts = SolveOptions { use_prev: true, ..options(1) };
-    let games = solver::solve_range(33, 50, &opts, Some(&results)).unwrap();
-    let first = &games[0];
-    assert_eq!(first.prev.as_ref().map(|p| (p.n, p.source, p.proof)), Some((32, PrevSource::Optimal, None)));
-    let table_assumed = Assumptions::from([assumed_optimal(32)]);
-    let mut assumed: BTreeMap<u32, Assumptions> = BTreeMap::new();
-    assumed.insert(32, table_assumed.clone());
-    for game in &games {
-        let proof = game.proof.unwrap();
-        let rests_on = match &game.same_search {
-            Some(same) => same.n,
-            None => game.n - 1,
-        };
-        let expected = if proof.rests_on_another_game() { assumed[&rests_on].clone() } else { Assumptions::new() };
-        assert_eq!(game.assumes, expected, "n={} ({})", game.n, proof.as_str());
-        assumed.insert(game.n, game.assumes.clone());
+fn the_results_built_on_moves_that_assume_something_assume_it_as_far_as_their_proofs_rest_on_them() {
+    let optimal = Optimal::built_in();
+    let statement = "the moves for the game before are optimal";
+    let assumed = Assumptions::from([statement.to_owned()]);
+    let before = |n: u32| Prev {
+        moves: optimal.moves(n - 1).unwrap().to_vec(),
+        score: optimal.score(n - 1).unwrap(),
+        source: PrevSource::Results,
+        proof: Some(Proof::Exhausted),
+        assumes: assumed.clone(),
+    };
+    for (n, proof, rests) in [(33, Proof::Cap, true), (35, Proof::Exhausted, false), (37, Proof::PrimeFormula, true)] {
+        let game = solver::solve_game(n, Some(&before(n)), &options(1)).unwrap();
+        assert_eq!(game.proof, Some(proof), "n={n}");
+        assert_eq!(game.assumes, if rests { assumed.clone() } else { Assumptions::new() }, "n={n}");
+        let line = game.to_json();
+        assert_eq!(assumptions_of_line(&line), game.assumes, "n={n}");
+        let record = line.get("prev").unwrap();
+        assert_eq!(assumptions_of_line(record), assumed, "n={n}: the record of the game before");
     }
-    assert_eq!((first.proof, &first.assumes), (Some(Proof::Cap), &table_assumed));
-    assert_eq!((games[1].proof, &games[1].assumes), (Some(Proof::SameSearch), &table_assumed));
-    assert_eq!((games[2].proof, games[2].assumes.is_empty()), (Some(Proof::Exhausted), true));
-    assert_eq!((games[4].proof, games[4].assumes.is_empty()), (Some(Proof::PrimeFormula), true));
-    // The file reads back with the same assumptions, and the lines carry them.
-    let reread = ResultsFile::open(&results, Optimal::built_in(), 1).unwrap();
-    assert!(games.iter().all(|g| reread.completed(g.n).unwrap().assumes == g.assumes));
-    assert_eq!(assumptions_of_line(&completed_line(&results, 34)), table_assumed);
-    assert!(assumptions_of_line(&completed_line(&results, 35)).is_empty());
 }
 
 /// A chain from n = 1 assumes nothing.
@@ -338,7 +343,7 @@ fn result_lines_carry_their_provenance() {
     assert_eq!((limits.get("nodes"), limits.get("seconds")), (Some(&Json::Null), Some(&Json::Null)));
     let options = done.get("options").unwrap();
     assert_eq!(options.get("force_search"), Some(&Json::Bool(false)));
-    assert_eq!(options.get("use_prev"), Some(&Json::Bool(false)));
+    assert!(options.get("use_prev").is_none() && done.get("known").is_none());
     assert!(options.get("optimal_file").is_none() && done.get("prev_source").is_none());
     assert!(seconds.get("revise").is_none() && seconds.get("greedy").is_some());
     // The previous game, identified by its moves.

@@ -150,7 +150,7 @@ fn a_game_repeats_the_search_of_a_game_still_in_flight() {
     for window in [2, 4] {
         let dir = TempDir::new(&format!("in-flight-{window}"));
         let path = dir.join("r.jsonl");
-        let opts = SolveOptions { window, use_prev: true, ..options(4) };
+        let opts = SolveOptions { window, ..options(4) };
         solver::solve_range(300, 303, &opts, Some(&path)).unwrap();
         let chain = lines(&path);
         let repeats: Vec<(u32, Option<u32>)> = chain
@@ -194,7 +194,6 @@ fn a_range_stopped_by_a_limit_completes_when_run_again(lo: u32, hi: u32, threads
         checkpoint_dir: Some(checkpoints.clone()),
         node_limit: Some(200),
         force_search: true,
-        use_prev: true,
         window: 4,
         ..options(threads)
     };
@@ -278,7 +277,6 @@ fn a_stopped_game_goes_on_from_its_clock(lo: u32, hi: u32, threads: usize) {
         checkpoint_dir: Some(checkpoints.clone()),
         node_limit: Some(200),
         force_search: true,
-        use_prev: true,
         window: 4,
         ..options(threads)
     };
@@ -383,7 +381,7 @@ fn a_score_that_is_not_the_tables_fails_the_range_at_that_game_with_any_window()
     for window in [1, 4] {
         let dir = TempDir::new(&format!("window-wrong-{window}"));
         let path = dir.join("r.jsonl");
-        let opts = SolveOptions { window, use_prev: true, ..options(4) };
+        let opts = SolveOptions { window, ..options(4) };
         let err = solver::solve_range_each_with(280, 320, &opts, Some(&path), &wrong, |_| {}).unwrap_err();
         assert!(err.starts_with(&format!("n={wrong_at}: scored ")) && err.contains("r.rejected.jsonl"), "{err}");
         let recorded: Vec<u32> = lines(&path).iter().map(n_of).collect();

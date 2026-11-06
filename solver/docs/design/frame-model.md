@@ -165,7 +165,6 @@ What each kind of proof needs of the frame model, beyond the code's correctness 
 | `exhausted`, `trivial` | completeness at n, so U at n |
 | `same_search` of an exhausted game m | U at n, and Π_n = Π_m (checked) |
 | `same_search` of a `cap` game m | U at n, Π_n = Π_m (checked), and soundness at m (X7), which makes m's ceiling P\*(Π_m) |
-| `known` | nothing of the model at n: what the cited game or bound assumes (for the bounds store, U at the games its bounds rest on) |
 
 The tests tie the theorems to the code:
 

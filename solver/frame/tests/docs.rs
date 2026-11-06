@@ -45,7 +45,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use taxman::json::Json;
-use taxman::known::KnownSources;
 use taxman::solver::{solve_game, SolveOptions};
 use taxman::tactics::{on_off, Tactics};
 
@@ -1013,12 +1012,8 @@ fn top_level_keys(text: &str) -> BTreeSet<String> {
     keys
 }
 
-/// The keys that only older result lines carry: the code no longer writes them, and REFERENCE.md still documents them,
-/// since the committed files hold such lines.  `lab` is the record of what a lab changed in a game's search.
-const OLDER_KEYS: [&str; 1] = ["lab"];
-
-/// The keys of the result lines the code writes: those of a game that is searched and one that is not, of one
-/// that a limit stopped (which has `best_so_far`), and of one taken from a known source (`known`).
+/// The keys of the result lines the code writes: those of a game that is searched and one that is not, and of one
+/// that a limit stopped (which has `best_so_far`).
 fn keys_written() -> (BTreeSet<String>, BTreeSet<String>) {
     let keys = |n: u32, opts: &SolveOptions| -> BTreeSet<String> {
         let line = solve_game(n, None, opts).expect("a game").to_json().to_string();
@@ -1031,12 +1026,7 @@ fn keys_written() -> (BTreeSet<String>, BTreeSet<String>) {
     // On its own, the default searches 1000 in more than the 1,024 steps after which the engine checks a limit.
     let stopped = keys(1000, &SolveOptions { node_limit: Some(1), ..opts.clone() });
     assert!(stopped.contains("best_so_far"), "a game that a limit stopped has best_so_far: {stopped:?}");
-    // A game taken from a known source (`--use-prev`) cites it, in a key that only such a line has.
-    let known =
-        SolveOptions { use_prev: true, known: KnownSources { boards: true, ..Default::default() }, ..opts.clone() };
-    let cited = keys(85, &known);
-    assert_eq!(cited.difference(&complete).cloned().collect::<Vec<_>>(), ["known"], "a known game has `known`");
-    (complete, stopped.union(&cited).cloned().collect())
+    (complete, stopped)
 }
 
 #[test]
@@ -1046,18 +1036,16 @@ fn the_reference_documents_exactly_the_keys_of_a_result_line() {
     let (complete, stopped) = keys_written();
 
     let documented = first_column_words(part);
-    let mut written: BTreeSet<String> = complete.union(&stopped).cloned().collect();
-    assert!(OLDER_KEYS.iter().all(|key| !written.contains(*key)), "a key the code writes is not an older key");
-    written.extend(OLDER_KEYS.iter().map(|key| (*key).to_owned()));
+    let written: BTreeSet<String> = complete.union(&stopped).cloned().collect();
     assert_eq!(
         documented, written,
-        "REFERENCE.md's table of the fields of a result line, and the keys the code writes with the older keys"
+        "REFERENCE.md's table of the fields of a result line, and the keys the code writes"
     );
 
     let example = part.split("```").nth(1).expect("the example line is the first code block");
     assert_eq!(top_level_keys(example), complete, "REFERENCE.md's example line, and the keys of a finished game");
     assert!(example.contains("\"setup\":{"), "the example is a searched game");
-    assert!(part.contains("null on a `trivial`, `prime` or `known` line"), "the table says when `setup` is null");
+    assert!(part.contains("null on a `trivial` or `prime` line"), "the table says when `setup` is null");
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -1246,7 +1234,6 @@ const REWRITTEN: &[&str] = &[
     "solver/docs/RUNBOOK.md",
     "solver/docs/runbook/",
     "solver/docs/STATUS.md",
-    "solver/tools/ledger/README.md",
     "solver/noframe/README.md",
     "solver/noframe/docs/",
     "results/runs.md",
@@ -1722,7 +1709,7 @@ fn code_files() -> Vec<PathBuf> {
 #[test]
 fn the_glossarys_words_stay_out_of_the_comments_of_the_code() {
     let files = code_files();
-    assert!(files.len() > 150, "the check found only {} files: has the layout changed?", files.len());
+    assert!(files.len() > 128, "the check found only {} files: has the layout changed?", files.len());
     let mut found = Vec::new();
     for path in files {
         for (at, word, instead) in glossary_words_in(&prose_lines(&path, &read(&path))) {

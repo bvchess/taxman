@@ -22,7 +22,7 @@
 #   SKIP_PACKAGES=1 SKIP_TESTS=1 SKIP_SMOKE=1
 #   PROVER_ONLY=1 build and check only the prover (what prover.sh runs), not the solver: a few minutes less
 #   BUILD           what to build in solver/frame/, as cargo arguments: --bins, --examples, --bin NAME and --example NAME, e.g.
-#                   BUILD="--bin taxman --example ledger".  Default "--bins --examples".  A BUILD leaves the prover out
+#                   BUILD="--bin taxman --example perf".  Default "--bins --examples".  A BUILD leaves the prover out
 #                   unless BUILD_PROVER asks for it; the checks of a part that is not built are left out.
 #   BUILD_PROVER    the same for solver/noframe/ (default "--bins --examples" when BUILD is not set, none when it is; the
 #                   word `none` for none)

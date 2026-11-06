@@ -11,12 +11,10 @@ use common::TempDir;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::Duration;
 use taxman::game::Optimal;
 use taxman::json::Json;
-use taxman::known::{Known, KnownSources};
-use taxman::results::{assumed_optimal, moves_digest, verify_files, verify_files_with, Assumptions, Proof};
-use taxman::solver::{self, GameResult, Method, SolveOptions};
+use taxman::results::{verify_files, Proof};
+use taxman::solver::{self, GameResult, Method};
 
 fn crate_path(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(relative)
@@ -43,14 +41,12 @@ fn with(line: &Json, path: &str, value: &Json) -> Json {
 /// table as the Rust verifier takes the built-in one.
 const TABLE_GAMES: usize = 400;
 
-/// The Python referee `solver/tools/check_results.py` on the files `paths`.  Their lines cite no known source, so it is
-/// given none (a path that is not there): by default it reads the committed chain and the bounds store, 0.4 s each
-/// time.  Its table is the first [`TABLE_GAMES`] lines of the committed results, in a file beside the first of `paths`.
+/// The Python referee `solver/tools/check_results.py` on the files `paths`.  Its table is the first [`TABLE_GAMES`]
+/// lines of the committed results, in a file beside the first of `paths`.
 fn python_referee(paths: &[PathBuf]) -> std::process::Output {
-    let none = "/nonexistent/none.jsonl";
     let table = common::referee_table(&paths[0], TABLE_GAMES);
     let mut command = Command::new("python3");
-    command.arg("-I").arg(crate_path("../tools/check_results.py")).args(["--committed", none, "--bounds", none]);
+    command.arg("-I").arg(crate_path("../tools/check_results.py"));
     command.arg("--table").arg(&table);
     command.args(paths).output().expect("python3 runs solver/tools/check_results.py")
 }
@@ -171,9 +167,9 @@ fn lines_whose_fields_contradict_each_other_are_refused_by_both_verifiers() {
 
 /// A search whose starting moves reach the ceiling before the search takes a step has the method `start`, with the
 /// proof `cap` and no nodes: game 18's greedy set already scores `n + score(n − 1)`.  Games 20 and 21 run their trees
-/// and stay `search`.  Both verifiers read the file.  The line of an older build, which called game 18 a `search`
-/// with no node, still reads in the Rust verifier, which guards what could change a proof and not the label; the
-/// Python referee refuses it, and a `start` line that took a node or did not finish.
+/// and stay `search`.  Both verifiers read the file.  A line that calls game 18 a `search` with no node reads in the
+/// Rust verifier, which guards what could change a proof and not the label; the Python referee refuses it, and a
+/// `start` line that took a node or did not finish.
 #[test]
 fn a_search_whose_starting_game_reaches_the_ceiling_is_a_start_game() {
     let games = solver::solve_range(1, 21, &common::options(1), None).unwrap();
@@ -261,40 +257,26 @@ fn the_line_of_a_search_armed_with_the_near_repeat_cut_counts_the_nodes_it_cut()
     assert_eq!((said("exhausted 1"), said("none")), (1, 2), "{report}");
 }
 
-/// A proof assumes what the game it rests on assumes, and nothing else.  Games 33 to 50, the first built on
-/// the table's moves for 32 (`--use-prev`): 33 reaches its ceiling and 34 repeats 33, so both assume those moves
-/// optimal; 35 exhausts its search, which rests on no game, so it and the games after it that rest on it assume
-/// nothing.  Both verifiers refuse a line that records a proof by `cap` without the assumption, an exhausted search
-/// with it, or a prime game built on a game that assumes nothing with it.
+/// A run that starts from game 1 builds on nothing that is assumed, so no line of it assumes anything: whatever proof
+/// a game has (an exhausted search, the ceiling, the prime formula, a repeat), both verifiers refuse a line that
+/// records an assumption.  Games 1 to 90.
 #[test]
-fn a_proof_assumes_what_the_game_it_rests_on_assumes_and_nothing_else() {
-    let opts = SolveOptions { use_prev: true, ..common::options(1) };
-    let games = solver::solve_range(33, 50, &opts, None).unwrap();
+fn a_line_that_records_an_assumption_is_refused_by_both_verifiers() {
+    let games = solver::solve_range(1, 90, &common::options(1), None).unwrap();
     let lines: Vec<Json> = games.iter().map(GameResult::to_json).collect();
-    let rests_on_optimal = Assumptions::from([assumed_optimal(32)]);
-    let expected = [
-        (33, Proof::Cap, &rests_on_optimal),
-        (34, Proof::SameSearch, &rests_on_optimal),
-        (35, Proof::Exhausted, &Assumptions::new()),
-        (37, Proof::PrimeFormula, &Assumptions::new()),
-    ];
-    for (n, proof, assumes) in expected {
-        let game = &games[n - 33];
-        assert_eq!((game.n as usize, game.proof, &game.assumes), (n, Some(proof), assumes));
-    }
-    let (rests, free) = (Json::array([assumed_optimal(32)]), Json::array(Vec::<&str>::new()));
-    let cut = |i: usize, assumes: &Json| -> Vec<Json> {
-        lines[..i].iter().cloned().chain([with(&lines[i], "assumes", assumes)]).collect()
-    };
-    let refused = |i: usize, assumes: &Json| {
-        (cut(i, assumes), Verdict::Refused { line: i + 1, n: 33 + i as u32, expected: "records the assumptions" })
+    assert!(games.iter().all(|game| game.assumes.is_empty()));
+    let statement = Json::array(["a statement"]);
+    let refused = |proof: Proof| {
+        let i = games.iter().position(|game| game.proof == Some(proof)).unwrap_or_else(|| panic!("no {proof:?} game"));
+        let cut: Vec<Json> = lines[..i].iter().cloned().chain([with(&lines[i], "assumes", &statement)]).collect();
+        (cut, Verdict::Refused { line: i + 1, n: i as u32 + 1, expected: "records the assumptions" })
     };
     let cases = vec![
         (lines.clone(), Verdict::Accepted),
-        refused(0, &free),
-        refused(1, &free),
-        refused(2, &rests),
-        refused(4, &rests),
+        refused(Proof::Exhausted),
+        refused(Proof::Cap),
+        refused(Proof::PrimeFormula),
+        refused(Proof::SameSearch),
     ];
     verifiers_agree(&TempDir::new("assumption-rules"), &cases);
 }
@@ -326,7 +308,7 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     let digest = |g: &GameResult| Json::from(taxman::solver::digest_text(g.setup.unwrap().digest));
     let proof = |g: &GameResult| g.proof.unwrap().as_str();
     let s = |text: &str| Json::from(text);
-    let none = Json::array(Vec::<&str>::new());
+    let statement = Json::array(["a statement"]);
     let mut promotions = repeat.promotions.clone();
     let dropped = promotions.pop().unwrap();
     let sum = repeat.same_search.as_ref().unwrap().promotion_sum;
@@ -385,7 +367,8 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     let mut swapped = lines[..=i].to_vec();
     swapped.swap(i - 1, i);
     cases.push((swapped, Verdict::Refused { line: i, n: 65, expected: "whose line (65) comes after it" }));
-    // The game repeated is only an unfinished search in the file (and 65 is built on the table's 64 instead).
+    // The game repeated is only an unfinished search in the file (and 65 names no game it is built on, so that the
+    // repeat is what is refused).
     let optimal = Optimal::built_in();
     let unfinished = Json::object([
         ("schema", Json::from(taxman::results::SCHEMA)),
@@ -393,21 +376,15 @@ fn forged_repeats_are_refused_by_both_verifiers() {
         ("completed", Json::Bool(false)),
         ("invocations", Json::from(1u32)),
     ]);
-    let from_optimal = [
-        ("prev.source", s("optimal")),
-        ("prev.moves_digest", s(&moves_digest(optimal.moves(64).unwrap()))),
-        ("prev.proof", Json::Null),
-        ("prev.assumes", Json::array([assumed_optimal(64)])),
-    ];
-    let built_on_optimal = from_optimal.iter().fold(lines[i].clone(), |line, (path, value)| with(&line, path, value));
+    let nameless = with(&lines[i], "prev", &Json::Null);
     let mut incomplete: Vec<Json> = lines[..i - 1].to_vec();
-    incomplete.extend([unfinished, built_on_optimal.clone()]);
+    incomplete.extend([unfinished, nameless.clone()]);
     cases.push((
         incomplete,
         Verdict::Refused { line: 65, n: 65, expected: "not a completed game of the file below it" },
     ));
     let mut complete = lines[..i].to_vec();
-    complete.push(built_on_optimal);
+    complete.push(nameless);
     cases.push((complete, Verdict::Accepted));
     // The game repeated says its problem has one more promotion to spare than it has (as a line of a build whose
     // frame builder posed another problem would): the problem set up again is not the one its line records.
@@ -426,19 +403,14 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     let twinned = twin_edits.iter().fold(lines[i].clone(), |line, (path, value)| with(&line, path, value));
     let twinned: Vec<Json> = lines[..i].iter().cloned().chain([twinned]).collect();
     cases.push((twinned, Verdict::Refused { line: 65, n: 65, expected: "its search problem's digest is" }));
-    // A repeat assumes what the game it repeats assumes: 34 repeats 33, which, built on the table's 32, reaches
-    // its ceiling and so assumes that game optimal.
-    let use_prev = SolveOptions { use_prev: true, ..common::options(1) };
-    let assuming: Vec<Json> =
-        solver::solve_range(33, 34, &use_prev, None).unwrap().iter().map(GameResult::to_json).collect();
-    assert_eq!(assuming[1].get("assumes"), Some(&Json::array([assumed_optimal(32)])));
-    cases.push((assuming.clone(), Verdict::Accepted));
-    for (path, value, expected) in [
-        ("assumes", none.clone(), "records the assumptions"),
-        ("same_search.assumes", none.clone(), "its record of game 33 does not match line 1"),
+    // A repeat assumes what the game it repeats assumes, which is nothing here: an assumption in its line, or in its
+    // record of the game it repeats, is not that game's.
+    for (path, expected) in [
+        ("assumes", "records the assumptions"),
+        ("same_search.assumes", "its record of game 64 does not match line 64"),
     ] {
-        let forged = vec![assuming[0].clone(), with(&assuming[1], path, &value)];
-        cases.push((forged, Verdict::Refused { line: 2, n: 34, expected }));
+        let forged: Vec<Json> = lines[..i].iter().cloned().chain([with(&lines[i], path, &statement)]).collect();
+        cases.push((forged, Verdict::Refused { line: 65, n: 65, expected }));
     }
     verifiers_agree(&TempDir::new("forged-repeats-files"), &cases);
 
@@ -500,140 +472,54 @@ fn stopped_at(line: &Json) -> Json {
     edits.iter().fold(line.clone(), |line, (path, value)| with(&line, path, value))
 }
 
-/// A file with holes, and unfinished searches, passes both verifiers when each line stands against what it rests on in
-/// the file: a line built on the best moves of an unfinished search (as a `solve` that went on past limits wrote it)
-/// has no ceiling and no proof that rests on it, and names an earlier incomplete line that records those moves.  The
-/// lines that claim otherwise are refused by both, naming the line.
+/// The incomplete line of a search that a limit or a signal stopped is checked by both verifiers as far as it goes: a
+/// file that ends with one passes when its moves score the `best_so_far` it records, and is refused, naming the line,
+/// when they do not.  A line with no moves in it (made by hand) is only counted.  Games 1 to 40, then the stop.
 #[test]
-fn games_built_on_unfinished_searches_are_checked_by_both_verifiers() {
-    let dir = TempDir::new("unfinished-prev");
-    // 598..602 stop at a time limit (of nothing, which stops a search before it starts), each on the best moves of the
-    // one before; 603 finishes on 602's.  The solver no longer goes on past a limit, so the lines are those of the games
-    // solved alone, each naming the best moves of the one before it as its `prev`, as the older `solve` wrote them.
-    let stopping = SolveOptions { time_limit: Some(Duration::ZERO), force_search: true, ..common::options(1) };
-    let built_on = |line: Json, before: &GameResult| {
-        let prev = Json::object([
-            ("n", Json::from(before.n)),
-            ("score", Json::from(before.score)),
-            ("source", Json::from("run")),
-            ("moves_digest", Json::from(moves_digest(&before.moves).as_str())),
-            ("proof", Json::Null),
-            ("assumes", Json::array(Vec::<u32>::new())),
-        ]);
-        with(&line, "prev", &prev)
-    };
-    let stopped: Vec<GameResult> = (598..=602).map(|n| solver::solve_game(n, None, &stopping).unwrap()).collect();
-    assert!(stopped.iter().all(|game| !game.completed), "every game stops at its limit");
-    let finished = solver::solve_game(603, None, &common::options(1)).unwrap();
-    let mut kept = vec![stopped[0].to_json()];
-    kept.extend(stopped.windows(2).map(|pair| built_on(pair[1].to_json(), &pair[0])));
-    kept.push(built_on(finished.to_json(), &stopped[4]));
-    assert_eq!(kept.len(), 6);
-    let (finished, s) = (&kept[5], |text: &str| Json::from(text));
-    assert_eq!(finished.get("prev").and_then(|p| p.get("proof")), Some(&Json::Null));
-
-    let none = Json::array(Vec::<u32>::new());
-    let zeros = s("0000000000000000");
-    let refused = |edits: &[(&str, Json)], expected: &'static str| {
-        let line = edits.iter().fold(finished.clone(), |line, (path, value)| with(&line, path, value));
-        let file: Vec<Json> = kept[..5].iter().cloned().chain([line]).collect();
-        (file, Verdict::Refused { line: 6, n: 603, expected })
-    };
-    let mut cases = vec![(kept.clone(), Verdict::Accepted)];
-    // A ceiling (the line says its search had one) needs a proven game of n − 1.
-    cases.push(refused(&[("setup.cap", Json::from(1_000_000u32))], "needs a proven game"));
-    // The game it names is not an earlier line's: another score, other moves.
-    let other_score = Json::from(finished.get("prev").and_then(|p| p.get("score")).and_then(Json::as_u64).unwrap() + 1);
-    cases.push(refused(&[("prev.score", other_score)], "no earlier line"));
-    cases.push(refused(&[("prev.moves_digest", zeros)], "no earlier line"));
-    // An unproven game assumes nothing.
-    cases.push(refused(&[("prev.assumes", Json::array(["a statement"]))], "does not match"));
-    // The incomplete line itself: its moves must score what it says.
-    let worse = Json::from(kept[2].get("best_so_far").and_then(Json::as_u64).unwrap() + 1);
-    let mut lying = kept.clone();
-    lying[2] = with(&kept[2], "best_so_far", &worse);
-    cases.push((lying, Verdict::Refused { line: 3, n: 600, expected: "best_so_far" }));
-    // The line the game names comes after it.
-    let mut swapped = kept.clone();
-    swapped.swap(4, 5);
-    cases.push((swapped, Verdict::Refused { line: 5, n: 603, expected: "no earlier line" }));
-    // An incomplete line with no moves in it (made by hand) is only counted.
+fn an_incomplete_line_is_checked_as_far_as_it_goes_by_both_verifiers() {
+    let games = solver::solve_range(1, 41, &common::options(1), None).unwrap();
+    let lines: Vec<Json> = games.iter().map(GameResult::to_json).collect();
+    let stopped: Vec<Json> = lines[..40].iter().cloned().chain([stopped_at(&lines[40])]).collect();
+    let worse = Json::from(stopped[40].get("best_so_far").and_then(Json::as_u64).unwrap() + 1);
+    let mut lying = stopped.clone();
+    lying[40] = with(&stopped[40], "best_so_far", &worse);
     let minimal = Json::object([
         ("schema", Json::from(taxman::results::SCHEMA)),
         ("n", Json::from(700u32)),
         ("completed", Json::Bool(false)),
         ("invocations", Json::from(1u32)),
     ]);
-    cases.push(([kept.clone(), vec![minimal]].concat(), Verdict::Accepted));
-    verifiers_agree(&dir, &cases);
-
-    // A proof that rests on the game of n − 1 cannot rest on an unfinished one: a prime game of a chain from 1, with the
-    // game before it made an unfinished line, and its record of that game made the unfinished game's.
-    let games = solver::solve_range(1, 90, &common::options(1), None).unwrap();
-    let lines: Vec<Json> = games.iter().map(GameResult::to_json).collect();
-    let i = games.iter().position(|g| g.method == Method::Prime && g.n > 40).expect("a prime game in 41..=90");
-    let unproven = [("prev.proof", Json::Null), ("prev.assumes", none)];
-    let built = unproven.iter().fold(lines[i].clone(), |line, (path, value)| with(&line, path, value));
-    let prime_on_unfinished: Vec<Json> =
-        lines[..i - 1].iter().cloned().chain([stopped_at(&lines[i - 1]), built]).collect();
-    let n = games[i].n;
-    verifiers_agree(
-        &dir,
-        &[(prime_on_unfinished, Verdict::Refused { line: i + 1, n, expected: "rests on the game of n − 1, which" })],
-    );
-    // And a game that rests on nothing of n − 1 stands on an unfinished one: the same game with the proof its
-    // search would have given needs a search, so only the file of the real run above shows it; here, the unfinished
-    // line alone, in a file whose games before it are complete, is a file with a hole.
-    let hole: Vec<Json> = lines[..i - 1].iter().cloned().chain([stopped_at(&lines[i - 1])]).collect();
-    verifiers_agree(&dir, &[(hole, Verdict::Accepted)]);
+    let cases = vec![
+        (stopped.clone(), Verdict::Accepted),
+        (lying, Verdict::Refused { line: 41, n: 41, expected: "best_so_far" }),
+        ([stopped, vec![minimal]].concat(), Verdict::Accepted),
+    ];
+    verifiers_agree(&TempDir::new("incomplete-line"), &cases);
 }
 
-/// A record of the proof `known` stands on the file's own line of the game before, whatever proof that line has.  A run
-/// with `--use-prev` records the committed chain's moves as `known`, so when its lines are appended to the committed
-/// file, its first line names the moves for n − 1 as `known` while the file's line of that game has the proof it was
-/// made with.  Both verifiers accept such a record when the score, the moves and the assumptions are the line's, and
-/// refuse it when any of them differs, when the game is not in the file, when it names another source, and a record of
-/// any other proof that is not the line's.  Games 1..90.
+/// A line's record of the moves for n − 1 it was built from is the file's own line of that game: both verifiers refuse
+/// a record whose score, moves, assumptions or proof are not the line's, and a line built on a game that the file does
+/// not hold.  Games 1..90.
 #[test]
-fn a_known_record_of_the_game_before_stands_on_the_files_own_line() {
+fn a_lines_record_of_the_game_before_is_the_files_own_line_of_it() {
     let games = solver::solve_range(1, 90, &common::options(1), None).unwrap();
     let lines: Vec<Json> = games.iter().map(GameResult::to_json).collect();
-    // The index of the first game built on a game of each proof (the game of n is `games[n - 1]`).
-    let after = |proof: Proof| {
-        (1..games.len())
-            .find(|&i| games[i - 1].proof == Some(proof))
-            .unwrap_or_else(|| panic!("no game after a game of proof {} in 1..=90", proof.as_str()))
-    };
-    let s = |text: &str| Json::from(text);
-    let known = || ("prev.proof", s("known"));
-    let proofs = [Proof::Exhausted, Proof::Cap, Proof::SameSearch, Proof::PrimeFormula];
-    let accepted: Vec<(usize, Vec<Edit>)> = proofs.iter().map(|&proof| (after(proof), vec![known()])).collect();
-
-    let i = after(Proof::Exhausted);
+    // The index of the first game built on a game with an exhausted search (the game of n is `games[n - 1]`).
+    let i = (1..games.len()).find(|&i| games[i - 1].proof == Some(Proof::Exhausted)).expect("an exhausted game");
     let before = &games[i - 1];
-    let optimal = Optimal::built_in();
-    let digest = moves_digest(optimal.moves(before.n).unwrap());
-    let from_optimal: Vec<Edit> = vec![
-        ("prev.source", s("optimal")),
-        ("prev.moves_digest", s(&digest)),
-        known(),
-        ("prev.assumes", Json::array([assumed_optimal(before.n)])),
-    ];
     let refused: Vec<(usize, Vec<Edit>, &str)> = vec![
-        (i, vec![known(), ("prev.score", Json::from(before.score + 1))], "does not match line"),
-        (i, vec![known(), ("prev.moves_digest", s("0000000000000000"))], "does not match line"),
-        (i, vec![known(), ("prev.assumes", Json::array(["a statement"]))], "does not match line"),
-        // Another proof than the line's, and than `known`.
-        (i, vec![("prev.proof", s("cap"))], "does not match line"),
-        // `known` is the record of the file's own game: the game of the table has no proof to leave out.
-        (i, from_optimal, "does not match the built-in table"),
+        (i, vec![("prev.score", Json::from(before.score + 1))], "does not match line"),
+        (i, vec![("prev.moves_digest", Json::from("0000000000000000"))], "does not match line"),
+        (i, vec![("prev.assumes", Json::array(["a statement"]))], "does not match line"),
+        (i, vec![("prev.proof", Json::from("cap"))], "does not match line"),
+        (i, vec![("prev.proof", Json::Null)], "does not match line"),
     ];
-    both_verifiers(&TempDir::new("known-record"), &lines, &accepted, &refused);
+    both_verifiers(&TempDir::new("prev-record"), &lines, &[(lines.len() - 1, vec![])], &refused);
 
     // The game named is not in the file.
-    let hole: Vec<Json> = lines[..i - 1].iter().cloned().chain([with(&lines[i], "prev.proof", &s("known"))]).collect();
+    let hole: Vec<Json> = lines[..i - 1].iter().cloned().chain([lines[i].clone()]).collect();
     let cases = vec![(hole, Verdict::Refused { line: i, n: games[i].n, expected: "which the file does not hold" })];
-    verifiers_agree(&TempDir::new("known-record-hole"), &cases);
+    verifiers_agree(&TempDir::new("prev-record-hole"), &cases);
 }
 
 /// The games of the committed chain that the quick check verifies: the first of them, which cost little to set up.
@@ -646,20 +532,18 @@ const QUICK_LAST: usize = 400;
 /// (`taxman verify-results results/optimal.jsonl.gz`), and no test fixes them.
 fn check_the_committed_results(last: Option<usize>) {
     // The verifier reads a file: all of the committed one is read through the gzip decoder, as it is by the command, and
-    // a prefix is written to a file of its own.  The games that cite the bounds store cite the committed chain, which is
-    // the file itself, so the sources of a whole file are the repository's; the start of the chain cites none.
+    // a prefix is written to a file of its own.
     let dir = TempDir::new("committed-prefix");
-    let (path, sources) = match last {
-        None => (common::committed_results(), KnownSources::in_repository().unwrap()),
+    let path = match last {
+        None => common::committed_results(),
         Some(last) => {
             let prefix = dir.join("committed-prefix.jsonl");
             fs::write(&prefix, common::committed_text(last)).unwrap();
-            (prefix, KnownSources::default())
+            prefix
         }
     };
     let optimal = Optimal::built_in();
-    let known = Known::load(optimal, &sources).unwrap_or_else(|e| panic!("{e}"));
-    let report = verify_files_with(std::slice::from_ref(&path), &known, 1).unwrap_or_else(|e| panic!("{e}"));
+    let report = verify_files(std::slice::from_ref(&path), optimal, 1).unwrap_or_else(|e| panic!("{e}"));
     println!("{report}");
     let [file] = &report.files[..] else { panic!("one file") };
     let games = &file.contents.games;

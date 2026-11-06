@@ -37,7 +37,7 @@ side of telling problems apart.  Equal forms are equal problems, with the same p
 results line records the form's 64-bit digest (`setup.digest`), but nothing rests on the digest alone ("Finding m",
 below).
 
-*Which proof kinds settle P\*.*  A repeat is only as good as the way the earlier game was proven.  Four proof kinds of
+*Which proof kinds settle P\*.*  A repeat is only as good as the way the earlier game was proven.  Three proof kinds of
 a game m establish P\*(Π_m):
 
 * `exhausted`: the search explored the whole tree of Π_m.  So the sum of m's promotions is P\*(Π_m), given that the
@@ -52,9 +52,6 @@ a game m establish P\*(Π_m):
   whatever tactics shaped the search.
 * `same_search`, by induction: m repeats a game k with Π_k = Π_m whose proof kind settles P\*(Π_k), and m's promotions
   are k's.
-* `known`, where an upper bound of the bounds store ended m's search: the search found a promotable set of the largest
-  sum the bound allows, so no set sums to more, given the bound, whose assumptions m's line records
-  (`Proof::settles_search`).  A game only taken from a known source, with no search, sets none up.
 
 No other proof kind settles P\*.  A trivial game has no candidates and sets no search up.  A prime game is the prime
 formula's and sets none up either.  Neither is ever repeated, and the verifiers refuse a repeat that names one.  An

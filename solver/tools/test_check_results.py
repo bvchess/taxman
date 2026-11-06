@@ -81,69 +81,53 @@ class ReadTextTest(FileCase):
 
 
 class TableTest(FileCase):
-    def test_the_table_is_the_completed_games_of_the_committed_file(self):
+    def test_the_table_is_the_scores_of_the_completed_games_of_a_file(self):
         incomplete = dict(line(4, 0, [], "search", "exhausted", None), completed=False)
         older = dict(THREE, n=9, schema=4)
-        sources = check_results.Sources(self.gz("committed.jsonl.gz", GAMES[:1], GAMES[1:] + [incomplete, older]))
-        self.assertEqual(sorted(sources.table), [1, 2, 3])
-        game = sources.table[3]
-        self.assertEqual((game.score, game.moves, game.proof, game.assumes), (3, [3], "prime_formula", set()))
+        table = check_results.read_table(self.gz("committed.jsonl.gz", GAMES[:1], GAMES[1:] + [incomplete, older]))
+        self.assertEqual(table, {1: 0, 2: 2, 3: 3})
 
-    def test_without_a_committed_file_the_table_is_empty(self):
-        self.assertEqual(check_results.Sources().table, {})
-
-    def test_a_table_of_its_own_is_the_games_of_its_file_and_the_committed_chain_stays_the_committed_file(self):
-        committed = self.gz("committed.jsonl.gz", GAMES[:2])
-        table = self.gz("table.jsonl.gz", GAMES)
-        sources = check_results.Sources(committed, table=table)
-        self.assertEqual((sorted(sources.table), sorted(sources.committed)), ([1, 2, 3], [1, 2]))
-        # By default the table is the committed file's lines, the same dict; a table that is not given is empty.
-        default = check_results.Sources(committed)
-        self.assertIs(default.table, default.committed)
-        self.assertEqual(check_results.Sources(committed, table=None).table, {})
-        self.assertEqual(sources.cite_problems(3, 3, {"source": "optimal"}), ({check_results.assumed_optimal(3)}, []))
-        self.assertEqual(
-            sources.cite_problems(3, 3, {"source": "strict"})[1],
-            ["it cites the committed chain, which has no line for 3 scoring 3"],
-        )
-
-    def test_a_game_of_the_table_is_assumed_optimal_in_the_words_of_the_committed_file(self):
-        self.assertEqual(
-            check_results.assumed_optimal(1300),
-            "the moves recorded for game 1300 in results/optimal.jsonl.gz are optimal",
-        )
-
-    def test_a_citation_of_the_table_holds_for_the_score_of_its_game_only(self):
-        sources = check_results.Sources(self.gz("committed.jsonl.gz", GAMES))
-        self.assertEqual(
-            sources.cite_problems(3, 3, {"source": "optimal"}), ({check_results.assumed_optimal(3)}, [])
-        )
-        assumes, problems = sources.cite_problems(3, 4, {"source": "optimal"})
-        self.assertIsNone(assumes)
-        self.assertEqual(problems, ["it cites the table, which has no line for 3 scoring 4"])
-        self.assertEqual(sources.cite_problems(3, 3, {"source": "strict"}), (set(), []))
+    def test_without_a_file_the_table_is_empty(self):
+        self.assertEqual(check_results.read_table(None), {})
 
 
 class CheckFileTest(FileCase):
-    def check(self, path, sources):
+    def check(self, path, table):
         problems = []
-        done, *_rest = check_results.check_file(path, {}, {}, check_results.Divisors(3), problems, sources)
+        done, *_rest = check_results.check_file(path, {}, {}, check_results.Divisors(3), problems, table)
         return done, problems
 
     def test_a_file_that_agrees_with_the_table_has_no_problem(self):
-        sources = check_results.Sources(self.gz("committed.jsonl.gz", GAMES))
-        done, problems = self.check(self.plain("results.jsonl", GAMES), sources)
+        table = check_results.read_table(self.gz("committed.jsonl.gz", GAMES))
+        done, problems = self.check(self.plain("results.jsonl", GAMES), table)
         self.assertEqual((sorted(done), problems), ([1, 2, 3], []))
 
     def test_a_score_that_the_table_does_not_give_is_a_problem(self):
-        table = self.gz("committed.jsonl.gz", GAMES[:2], [dict(THREE, score=5)])
-        _done, problems = self.check(self.plain("results.jsonl", GAMES), check_results.Sources(table))
+        table = check_results.read_table(self.gz("committed.jsonl.gz", GAMES[:2], [dict(THREE, score=5)]))
+        _done, problems = self.check(self.plain("results.jsonl", GAMES), table)
         self.assertEqual(problems, ["results.jsonl line 3 (n=3): scores 3, but the table has 5"])
 
     def test_the_committed_file_is_checked_as_a_gz_file_against_its_own_games(self):
         path = self.gz("committed.jsonl.gz", GAMES[:1], GAMES[1:])
-        done, problems = self.check(path, check_results.Sources(path))
+        done, problems = self.check(path, check_results.read_table(path))
         self.assertEqual((sorted(done), problems), ([1, 2, 3], []))
+
+    def test_an_incomplete_line_that_is_no_better_than_the_table_is_checked_as_far_as_it_goes(self):
+        table = check_results.read_table(self.gz("committed.jsonl.gz", GAMES))
+        stopped = dict(THREE, completed=False, score=None, best_so_far=3, proof=None, assumes=None)
+        better = dict(stopped, best_so_far=4)
+        for rows, expected in [
+            (GAMES[:2] + [stopped], []),
+            (
+                GAMES[:2] + [better],
+                [
+                    "results.jsonl line 3 (n=3): replays to 3, not the recorded best_so_far 4",
+                    "results.jsonl line 3 (n=3): best_so_far 4 is above the table's 3",
+                ],
+            ),
+        ]:
+            done, problems = self.check(self.plain("results.jsonl", rows), table)
+            self.assertEqual((sorted(done), problems), ([1, 2], expected))
 
 
 class MainTest(FileCase):
@@ -161,15 +145,15 @@ class MainTest(FileCase):
 
     def test_a_gz_file_on_the_command_line_is_checked(self):
         path = self.gz("committed.jsonl.gz", GAMES[:1], GAMES[1:])
-        code, out = self.run_main(path, "--committed", path, "--bounds", self.dir / "none.jsonl")
+        code, out = self.run_main(path, "--table", path)
         self.assertEqual(code, 0, out)
         self.assertIn("3 completed lines, n = 1..3 (0 missing)", out)
         self.assertIn("all checks passed", out)
 
     def test_a_gz_file_that_the_table_disagrees_with_fails(self):
-        committed = self.gz("committed.jsonl.gz", GAMES[:2], [dict(THREE, score=5)])
+        table = self.gz("committed.jsonl.gz", GAMES[:2], [dict(THREE, score=5)])
         path = self.gz("results.jsonl.gz", GAMES)
-        code, out = self.run_main(path, "--committed", committed, "--bounds", self.dir / "none.jsonl")
+        code, out = self.run_main(path, "--table", table)
         self.assertEqual(code, 1)
         self.assertIn("results.jsonl.gz line 3 (n=3): scores 3, but the table has 5", out)
 

@@ -55,7 +55,7 @@ Each file explains one part of the solver and the reasons for it, and defines ea
 | the GF(2) bound, prime exchanges | [gf2-bound.md](design/gf2-bound.md) | change the GF(2) bound, or the symmetries of the promotions that prime exchanges give |
 | the tactics | [tactics.md](design/tactics.md) | add, change or switch off a tactic, and see what each one is proven or sound by |
 | the engine, the per-game pipeline | [engine.md](design/engine.md) | change how the threads share a search, how one game goes from its board to its result, or the window of games in flight |
-| results and the trust model | [trust.md](design/trust.md) | see why a result can be trusted: what a window changes, files with holes, known moves, the ledger |
+| results and the trust model | [trust.md](design/trust.md) | see why a result can be trusted: what a window changes, files that do not start at game 1 |
 | same search | [same-search.md](design/same-search.md) | see why a game whose search problem an earlier game posed needs no search |
 | testing | [testing.md](design/testing.md) | test a change: why small games, the quick check and its limits, and the checklist before a merge |
 | the tests | [tests.md](design/tests.md) | find the tests that cover a part, and where a new test belongs |

@@ -5,7 +5,7 @@
 //! [`Lns`] keeps a random share of an incumbent's promotions fixed, searches the rest exactly as a unit of the engine
 //! ([`run_unit`]), takes any better set, and repeats.  It is not sound: it may miss optimal moves, and nothing it
 //! finds proves anything.  A lower bound needs only legal moves, so a caller offers what it finds as an incumbent,
-//! after the checks of [`offer_found`] (the ledger does).  The measurements that chose its defaults are in
+//! after the checks of [`offer_found`].  The measurements that chose its defaults are in
 //! solver/docs/design/trust.md.
 //!
 //! # Beside a long search
@@ -193,10 +193,9 @@ pub struct Plan<const W: usize> {
     pub after: u64,
     /// The thread's budget, from the moment it starts.
     pub budget: Duration,
-    /// The seeds the search starts from, if it has any (the bounds store's moves for the board, then the moves for
-    /// `n − 1`): the finder's odd rounds start from what survives of them, in turn (each seed's candidates that can
-    /// still be promoted, from the largest down, as a search seeded with it starts), a set that survives of
-    /// several seeds once.
+    /// The seeds the search starts from, if it has any (the moves for `n − 1`, say): the finder's odd rounds start from
+    /// what survives of them, in turn (each seed's candidates that can still be promoted, from the largest down, as a
+    /// search seeded with it starts), a set that survives of several seeds once.
     pub seeds: Vec<Bits<W>>,
 }
 

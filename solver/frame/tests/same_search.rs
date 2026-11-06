@@ -3,8 +3,8 @@
 //!
 //! The games that repeat an earlier search are found here from the setups alone ([`repeats_by_problem`]), and a
 //! chain must conclude exactly those without a search, with the scores of a chain that searches them: from n = 1, and
-//! from a results file that a run left.  A game with a checkpoint is resumed, never repeated, and a repeat rests on
-//! what the game it repeats rests on.  The forged repeats that both verifiers refuse are in `tests/results.rs`.
+//! from a results file that a run left.  A game with a checkpoint is resumed, never repeated.  The forged repeats that
+//! both verifiers refuse are in `tests/results.rs`.
 //! Small boards, one thread.
 
 mod common;
@@ -17,7 +17,7 @@ use std::time::Duration;
 use taxman::board::Board;
 use taxman::game::Optimal;
 use taxman::json::Json;
-use taxman::results::{assumed_optimal, verify_files, Assumptions, Proof};
+use taxman::results::{verify_files, Proof};
 use taxman::search::Problem;
 use taxman::solver::{self, GameResult, Method, SolveOptions, SAME_SEARCH_WINDOW};
 
@@ -211,29 +211,5 @@ fn a_game_with_a_checkpoint_is_resumed_not_repeated_from(first: u32, last: u32) 
     assert_eq!((games[0].invocations, games[0].proof), (2, Some(Proof::Exhausted)), "{first} was resumed");
     assert!(games.iter().all(|g| g.assumes.is_empty()));
     assert!(!checkpoints.join(format!("n{first:04}.ckpt")).exists());
-    verify_files(std::slice::from_ref(&path), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
-}
-
-/// A repeat assumes what the game it repeats assumes: 34 repeats 33, which, built on the table's 32 (`--use-prev`),
-/// reaches its ceiling and so assumes those moves optimal, and so does 34 then, though it ran no search.  Searched
-/// without the repeat and without the ceiling (a proof by `cap` would rest on 33 too), 34 is an exhausted search
-/// and assumes nothing.
-#[test]
-fn a_repeat_assumes_what_the_game_it_repeats_assumes() {
-    let dir = TempDir::new("same-search-assumes");
-    let use_prev = SolveOptions { use_prev: true, ..options(true) };
-    let games = solver::solve_range(33, 34, &use_prev, None).unwrap();
-    let table_assumed = Assumptions::from([assumed_optimal(32)]);
-    assert_eq!((games[0].proof, &games[0].assumes), (Some(Proof::Cap), &table_assumed));
-    assert_eq!(games[1].same_search.as_ref().map(|s| (s.n, &s.assumes)), Some((33, &table_assumed)));
-    assert_eq!(games[1].assumes, table_assumed);
-
-    let path = dir.join("r.jsonl");
-    solver::solve_range(33, 33, &use_prev, Some(&path)).unwrap();
-    let mut uncapped = options(false);
-    uncapped.tactics.prev_cap = false;
-    let next = solver::solve_range(33, 34, &uncapped, Some(&path)).unwrap().remove(0);
-    assert_eq!((next.n, next.method, next.proof), (34, Method::Search, Some(Proof::Exhausted)));
-    assert!(next.assumes.is_empty());
     verify_files(std::slice::from_ref(&path), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
 }

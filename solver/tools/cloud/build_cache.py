@@ -88,7 +88,7 @@ def say(message: str) -> None:
 
 # --- what is asked for ----------------------------------------------------------------------------------------------
 def parse_selectors(crate: str, text: str) -> FrozenSet[Selector]:
-    """The parts of a cargo build that `text` (`--bins --examples`, `--bin taxman --example ledger`) asks for.  A
+    """The parts of a cargo build that `text` (`--bins --examples`, `--bin taxman --example perf`) asks for.  A
     feature (`--features F`) is a part of its own: it makes the build another one, whose entry serves a request
     that does not name the feature but not the other way round."""
     found = set()

@@ -60,10 +60,9 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 
 **Solving.**
 
-13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/store.rs`, `src/known.rs`,
-    `src/paths.rs`: the switchable tactics, a board prepared for a search, the per-game pipeline,
-    provenance and verification, the bounds store's line and the relations between games, the known moves that
-    `--use-prev` draws on, and the default files.  The range driver is
+13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/paths.rs`: the switchable tactics, a
+    board prepared for a search, the per-game pipeline, provenance and verification, and the default files.  The range
+    driver is
     `src/solver/window.rs`, the window of games in flight, and its child `window/allot.rs` shares the threads among
     them.
 
@@ -80,8 +79,7 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 **Beside the library.**  `examples/` holds the programs that use the library but are not the solver:
 
 * built by `cargo build --examples`: the probe `perf` (the hot paths, replayed from fixtures and measured in cycles and
-  instructions), and `ledger` (bounds on opt(n) for many games at once, tightened by limited searches and the relations
-  between games; [The ledger](trust.md#the-ledger)).
+  instructions).
 
 `tests/` holds the integration tests ([testing.md](testing.md)), and `solver/tools/` the scripts around the programs:
 the second verifiers in Python, the quick check and the cloud scripts ([solver/README.md, "The

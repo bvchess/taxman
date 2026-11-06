@@ -71,16 +71,14 @@
 //! | | [`board`] | a board analyzed and prepared for a search: tables, frames, ceiling and seed |
 //! | | [`solver`] | the per-game pipeline, the options, the range driver |
 //! | | [`results`] | what a result line records about its proof kind, and the checks a results file passes |
-//! | | [`store`] | the bounds store: the line and the file the ledger keeps its bounds in, and the relations between boards |
-//! | | [`known`] | the known moves `solve --use-prev` draws on: the table, the committed chain, the bounds store |
 //! | | [`paths`] | where the default files are, found at run time |
 //! | studies | [`brute`] | exhaustive search without the frame model, to certify small boards |
 //! | | [`root_problem`] | the theory's root problem Π_n, built without the frames code, to check setup against |
 //!
 //! The command-line front end (`main.rs`, `cli.rs`, `commands.rs`) is the binary's, not the library's, and is read
 //! last.  `bounds` is two small functions that the Java solver has too (`max_additional` and the greedy incumbent),
-//! and `brute` and `root_problem` are studies that a first read can skip.  `examples/` holds the probe of the hot paths
-//! and the ledger; `tests/` the integration tests.
+//! and `brute` and `root_problem` are studies that a first read can skip.  `examples/` holds the probe of the hot paths;
+//! `tests/` the integration tests.
 
 pub mod accelerate;
 pub mod bits;
@@ -92,7 +90,6 @@ pub mod frames;
 pub mod game;
 pub mod gf2;
 pub mod json;
-pub mod known;
 pub mod matchbound;
 pub mod model;
 pub mod numtheory;
@@ -103,7 +100,6 @@ pub mod rng;
 pub mod root_problem;
 pub mod search;
 pub mod solver;
-pub mod store;
 pub mod tactics;
 pub mod utc;
 

@@ -204,14 +204,12 @@ changed"](https://github.com/bvchess/taxman-notebook/blob/main/terms-changed.md)
   ([solver/docs/design/search.md, "The starting incumbent, the ceiling and the
   seed"](../solver/docs/design/search.md#the-starting-incumbent-the-ceiling-and-the-seed)).  A game whose start reaches
   the ceiling takes no step of the search, and has the method `start`.
-* **seed**: a promotion set that a search starts from: the promotions of the moves for n − 1, and the moves of a lower
-  bound that the bounds store holds, when it has one.
+* **seed**: a promotion set that a search starts from: the promotions of the moves for n − 1.
 * **finder**: a large neighborhood search for good moves, which only offers sets: it fixes a random share of an
   incumbent's promotions, searches the rest exactly as a unit of the engine on one thread, and takes any better moves.
   It is not sound and proves nothing, but a lower bound needs only a legal game, so what it finds is offered to a search
   as an incumbent after the checks of a checkpoint's incumbent.  A search that has taken `--finder-after` steps (a
-  million by default) starts one beside it ([solver/docs/design/finder.md](../solver/docs/design/finder.md)); the ledger
-  runs it before its searches.
+  million by default) starts one beside it ([solver/docs/design/finder.md](../solver/docs/design/finder.md)).
 * **conflict**: a subset of a promotion set that cannot be promoted together from a node.  Every completion leaves out
   one of its members.
 * **nogood**: a conflict of the root, learned from a conflict found at a node.  It holds at every node, on any thread
@@ -277,32 +275,29 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   `in_the_bag` is fixed).  Unqualified, *the gap* is the root's: the root's GF(2) bound minus P\*.  The searched games
   of 2176 to 3312 have root gaps from 341 to 1,443, and a search's cost grows with its root gap ([the gap past
   2175](https://github.com/bvchess/taxman-notebook/blob/main/search/the-gap-past-2175-2026-10/README.md)).  The tools
-  also measure three related gaps, each named where it is used:
+  also measure two related gaps, each named where it is used:
   * a node's gap (the profile, `--profile`): the node's bound less its need, how far the bound must fall to cut the
     node;
-  * the standalone root gap (the ledger's map): the root's bound less the search's start incumbent, for a game solved
-    with no moves for n − 1;
-  * a game's gap in the ledger: its best upper bound less its best lower bound.
+  * the standalone root gap: the root's bound less the search's start incumbent, for a game solved with no moves for
+    n − 1.
 
   The prover's *parity gap* is the same idea on the whole board: the root's parity bound less opt(n), in points.
 * **matching bound** (`matchbound`): relaxes winnability to matchability.  It is the largest sum of promotions such
   that every move and every promoted number gets a distinct maximal factor in its frame.  It is a maximum-weight
   bipartite matching, which the search's start rounds to a promotion set (the dive).  It was the node bound before the
-  GF(2) bound, with its refinement (`match_refine`) and the Lagrangian bound below (`lagrange`): the *matching path*,
-  `gf2=off` in the lines of the builds that had it.
-* **GF(2) bound** (the node bound; `gf2` in the lines of the builds that had the matching path): the heaviest set of
+  GF(2) bound, with its refinement (`match_refine`) and the Lagrangian bound below (`lagrange`): the *matching path*.
+* **GF(2) bound** (the node bound): the heaviest set of
   candidates, with at most the promotion limit members, that is *independent in every frame* over GF(2): in each frame,
   the vectors of its moves together with those of the set are linearly independent ([the frame bound (B2)](theory/frame-bounds.md#the-frame-bound);
   [solver/docs/design/gf2-bound.md, "The GF(2) bound"](../solver/docs/design/gf2-bound.md#the-gf2-bound)).
 * **the Lagrangian bound over the nogoods**: an inner bound, either the matching bound or the GF(2) bound, with each
   candidate's weight lowered by multipliers on the live nogoods it is in.  Any multipliers give a valid bound.  Name the
-  inner bound when it matters.  It comes in three forms:
+  inner bound when it matters.  It comes in two forms:
   * the tactic `lagrange`, which is gone: the matching bound inside, with multipliers that each searcher fitted at the
     root to the nogoods it had learned ([a Lagrangian bound over the
     nogoods](https://github.com/bvchess/taxman-notebook/blob/main/search/a-lagrangian-bound-over-the-nogoods-2026-10/README.md));
   * refitted at a node: the GF(2) bound inside, with multipliers fitted again at the node (a form that a study
-    measured, whose example is removed).  The notebook's entries call it the "strong bound";
-  * in the bounds store: the GF(2) bound inside, over nogoods each checked to fail to promote (the rule `nogoods`).
+    measured, whose example is removed).  The notebook's entries call it the "strong bound".
 
   The prover has a Lagrangian bound over its own nogoods, with the Franklín–Moniot matching inside.
 * **the multi-field bound**: the bound of the agenda's avenue A1.  Every promotion set is independent in every frame
@@ -355,18 +350,10 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   near-repeat lemma (R7)](theory/search-rules.md#the-near-repeat-lemma); [solver/docs/design/search.md, "The
   near-repeat cut"](../solver/docs/design/search.md#the-near-repeat-cut)).
 * **proof kind** (the field `proof`): how a completed game was proven optimal: `trivial`, `exhausted`, `cap`,
-  `prime_formula`, `same_search` or `known` ([the frame solver's reference, "Proof
+  `prime_formula` or `same_search` ([the frame solver's reference, "Proof
   kinds"](../solver/docs/REFERENCE.md#proof-kinds)).
-* **assumes**: what the proof kind of a game rests on beyond the frame model, inherited down the chain.  The moves for n
-  − 1, or for n, taken from the built-in table are assumed optimal.  A bound of the bounds store assumes [statement
-  U](theory/exactness.md#statement-u) at the games it rests on.
-* **known moves**, **known source**: the moves that `taxman solve --use-prev` takes instead of searching for them, from
-  the built-in table, the committed chain, or a game that the bounds store has proven (`src/known.rs`).
-* **bounds store**: `results/bounds.jsonl`, the bounds on opt(n) that the ledger finds, one line each, kept for good
-  ([results/README.md](../results/README.md#boundsjsonl); `src/store.rs`).  A game is **proven** there when its best
-  lower bound equals its best upper bound.
-* **the ledger**: the example program `ledger` (`solver/frame/examples/ledger/`).  It works on a whole stretch of games
-  at once, raising lower bounds and lowering upper bounds until they meet.
+* **assumes**: what the proof kind of a game rests on beyond the frame model, inherited down the chain.  A chain from
+  game 1 assumes nothing.
 * **the built-in table**: the lines of `results/optimal.jsonl.gz` as of the build, which the binary holds as the
   compressed file and decodes as far as a game asks ([results/README.md](../results/README.md#optimaljsonlgz) says where
   the moves came from).  **optimal ok**: a score equals the table's.  That proves nothing, and above the table's last
@@ -374,9 +361,8 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **referee**: code that replays a sequence of moves and checks it: legal, over, opening with the largest prime, scoring
   what is recorded.  `game::replay` and `game::replay_finished` are the frame solver's.  Moves that fail after they were
   found are **rejected**, written to `<results>.rejected.jsonl`.
-* **verifier**: a program that checks a whole results file or bounds file without changing it.  Results files have two,
-  `taxman verify-results` and `solver/tools/check_results.py`; the bounds store has `ledger verify-bounds` and
-  `solver/tools/check_bounds.py`.  The two verifiers of a kind of file share no code.  Not "checker".
+* **verifier**: a program that checks a whole results file without changing it.  There are two, `taxman
+  verify-results` and `solver/tools/check_results.py`, and they share no code.  Not "checker".
 * **results line**: one line of a results file, the JSON object that `taxman solve --out` writes for a game, in schema
   5 ([the frame solver's reference](../solver/docs/REFERENCE.md#a-results-line---out-schema-5)).  Two old words survive
   only as field names there: `nodes` counts steps, and `prev.source` says where the moves for n − 1 came from.

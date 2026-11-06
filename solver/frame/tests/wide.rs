@@ -538,8 +538,9 @@ fn single_promotions_agree_with_the_peel_at_wide_widths() {
 /// default tactics, 30,000 nodes, one thread, from game 1214 of `results/optimal.jsonl.gz`): the levels of its depth-first
 /// stack, from the root to 34 promotions deep.  Returns the checkpoint's incumbent and the units.
 ///
-/// To make such a file again, run `taxman solve 1215 --use-prev --threads 1 --node-limit 30000 --out R
-/// --checkpoint-dir D` (`R` a new file) and list the
+/// To make such a file again, make `R` the first 1214 lines of the committed results (`gzip -dc
+/// results/optimal.jsonl.gz | head -n 1214 > R`), run `taxman solve 1215 --threads 1 --node-limit 30000 --out R
+/// --checkpoint-dir D` and list the
 /// members of each unit of `D/n1215.ckpt` (a unit is its promoted set then its candidates, `W` little-endian words
 /// each; the engine's layout is described in `engine.rs`).
 fn deep_units() -> (u64, Vec<TaxUnit<32>>) {

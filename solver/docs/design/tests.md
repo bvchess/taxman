@@ -209,33 +209,19 @@ every second line of the Java fixtures), and the comment on each says what the w
   named; the digests, promotions or promotion sum changed; the game repeated unfinished, after the repeat, or settling
   no search; its assumptions dropped), and `verify-results` refuses two more that only setting the problems up again can
   catch (the Python referee accepts them, as its docstring says).  A search that took no step is the method `start`:
-  `verify-results` still reads the `search` line of an older build, and the Python referee refuses it, and a `start`
-  line that took a node or did not finish.  The line of a search armed with the near-repeat cut counts the nodes it cut
+  `verify-results` reads a `search` line with no node, which the Python referee refuses, and a `start` line that took a
+  node or did not finish.  The line of a search armed with the near-repeat cut counts the nodes it cut
   (`stats.near_repeat_cut`: game 256 after 255 cuts one, game 21 after 20 is armed and cuts none, and the first game of
   a run and a run without the tactic have no such key), both verifiers accept the files and count the shortened search,
   and both refuse the key on a prime game or with a value that is no count.
-* **Files with holes** (`tests/results.rs`): both verifiers accept a file with holes and unfinished lines, and refuse a
-  ceiling, the proof kind `cap` or `prime_formula`, a changed score, moves or assumptions, or a later line, for a game
-  built on one.  The solver no longer writes such a file, so the test makes its lines from games solved alone.
+* **Incomplete lines and the record of the game before** (`tests/results.rs`): both verifiers accept a file that ends
+  with an incomplete line and refuse one whose moves do not score its `best_so_far`; a line's record of the game before
+  it (score, moves, proof, assumptions) must be the file's own line of that game, and a line that records an assumption
+  the rules do not give is refused.
 * **Repeats** (`tests/same_search.rs`): the games that repeat an earlier search are found from the setups alone, and a
   chain concludes exactly those, with the scores of a chain that searches them, from n = 1 (1..300) and from a results
-  file that a stopped run left; a game with a checkpoint is resumed, not repeated; a repeat assumes what the game it
-  repeats assumes.  A unit test of `board` checks that the problem set up again from n is the one the setup posed, and
-  the same at two set widths.
-* **Known moves** (`tests/known.rs`, with hand-made sources: a store of games 906..944 proven with the truth's moves, a
-  committed chain of lines 1..60, and the table):
-  * a chain over 900..960 records the store's proven games with no search, citing their lines and assuming U at the
-    games they rest on, and the others with the scores of a chain without the store (and fewer nodes in all); moves
-    carried from the moves of another line are played and recorded;
-  * the committed chain's and the table's moves are recorded with their own assumptions, and the moves for the game
-    before the range from each of the three has the source in `prev`;
-  * an open game's upper bound ends its search (proof kind `known`, citing the one line), and its lower bound's moves
-    seed it (fewer nodes); `force_search` leaves the games to their searches; a store game that does not play, or that
-    the chain bounds contradict, stops the run at its game;
-  * both verifiers accept those files, and refuse each of: an upper bound of the store worth another value, a missing
-    lower or upper line, a line by another rule or from another run, no store given, a citation of other lines,
-    assumptions dropped or added, no citation, a changed proof kind or score, a citation on a game that is not a known
-    one.  `tests/docs.rs` has `known` among the keys a line has.
+  file that a stopped run left; a game with a checkpoint is resumed, not repeated.  A unit test of `board` checks that
+  the problem set up again from n is the one the setup posed, and the same at two set widths.
 * **Large games** (`tests/wide.rs`): the Java stopped at 1000, and the sets that hold a game are 8 to 128 words wide,
   so these tests check the widths past 1023 against each other and against the committed results.
   * The same game at every width that holds it (128 included) has the same frames, candidates, greedy set,
@@ -273,7 +259,8 @@ the computations behind the statements that are not proved are in [evidence.md](
 | C1 to C3 | `heuristics/evaluation/fm_relation.py`, run in heuristics/ as `../.venv/bin/python -m evaluation.fm_relation`, 85 s on one thread.  On all 2,097,152 sets of moves from {2, …, 22}, playability by the rules alone, Franklín and Moniot's condition, per = 1 for some T and peel agree, and so do independence of the family of P10, independence at both parities and an odd per; 1,112 sets have a payment scheme and are dependent, the smallest {6, 10, 15}, and none is an odd core.  The heaviest sets of the three kinds give opt(n), the parity bound and the Franklín–Moniot bound, the prover's values on every board to 22.  On 18,200 random sets of the boards 30 to 120, grown around members of three or more primes, the same holds, with 500 odd cores and 570 dependent sets with a scheme.  Board 44 has no odd core of at most six members, and board 45 one, {12, 18, 20, 30, 45}. |
 | N1, N6 | The prover's enumeration of optimal sets (`solver/noframe/src/bin/optsets.rs`): the sets derived at the ceiling and at the primes equal those enumerated directly on every such game to 700, and to 260 in its tests; every optimal set found holds q(n) and no other prime. |
 | J3 | The prover's `solver/noframe/src/semiprime.rs`.  On every odd n to 300 with two prime factors, the values of opt(n) found by the prover's search from nothing (the search itself is checked against brute force over all sets to 20) satisfy opt(n) − opt(n − 1) = n − x exactly where n closes a cycle with U\*_2(n − 1); x taken as the largest member of the cycle instead of the smallest breaks the formula on every such game.  Every such n to 1300 that closes a cycle meets the formula in the committed chain, which `relation` checks (it stops, naming n, at a score off it), and the optimal sets derived by the exchange of x for n are the enumerated ones on every such game to 260. |
-| N3 to N5, R4, R6 | The ledger's tests (`examples/ledger/`): from proven games, its relations bracket opt(n) on 2..1300 with every game they make legal, a bound on the wrong side is refused, and runs prove 701..712 and 901..960.  The tests of `src/search/dual.rs`: a search stopped before its first node has the root's bound, the dual bound of game 999 brackets its promotion sum and falls as the node limit grows, and another game's checkpoint is refused. |
+| N3 to N5, R6 | The chain bounds `score(n − 1) ≤ score(n) ≤ n + score(n − 1)` and the prime formula, which both verifiers check on every line of the committed chain, and the repeats (`tests/same_search.rs`; `verify-results` sets both problems of every repeat up again). |
+| R4 | The tests of `src/search/dual.rs`: a search stopped before its first node has the root's bound, the dual bound of game 999 brackets its promotion sum and falls as the node limit grows, and another game's checkpoint is refused. |
 | Q1 | A search over the states of the pot that uses no theory (`heuristics/evaluation/certify.py`) finds the heaviest set of sources unique in every game to 62. |
 | Q3 | The prover's `src/moves.rs`: ℓ(n) and the heaviest longest game against brute force to 22, and ν(n) against the matching solver on every board to 400. |
 | W1 | The heuristics' check above, to 22.  The prover's parity bound is at least opt(n) on every game to 1300 (`solver/noframe/data/exact_parity_2_1300.jsonl`), and the recorded moves are independent at both parities on every game to 1300 that is not prime; the intersection agrees with brute force on 3,000 random pairs of matroids ([matroid intersection bounds](https://github.com/bvchess/taxman-notebook/blob/main/search/matroid-intersection-bounds-2026-10/README.md)). |

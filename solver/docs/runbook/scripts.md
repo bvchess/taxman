@@ -4,9 +4,8 @@ Part of the [runbook](../RUNBOOK.md).
 
 ## The scripts
 
-The scripts of `solver/tools/cloud/`; the ledger's are in `solver/tools/ledger/` ([ledger.md](ledger.md)).  The top of
-each says how to run it, and the long runs' scripts (`run.sh`, `chain.sh`, `prover.sh`) also give their
-variables, and `chain.sh` its exit statuses.
+The scripts of `solver/tools/cloud/`.  The top of each says how to run it, and the long runs' scripts (`run.sh`,
+`chain.sh`, `prover.sh`) also give their variables, and `chain.sh` its exit statuses.
 
 | file | what it does |
 |---|---|
@@ -28,7 +27,7 @@ variables, and `chain.sh` its exit statuses.
 The scripts that source `run.sh` keep their state in one directory, `$TAXMAN_WORK` (default `~/taxman-work`), among
 it `results/strict.jsonl` (and
 `exact_parity_A_B.jsonl` of `prover.sh`), `ckpt/` (the checkpoints, `taxman.lock`), `logs/`, `chain.pid` (`prover.pid`)
-and `deadline`; the ledger's `cloud.sh` keeps its files in `OUT`.  Nothing is written
+and `deadline`.  Nothing is written
 inside the checkout but `solver/frame/target` and `solver/noframe/target`.
 
 ## What has run where
@@ -48,7 +47,6 @@ on macOS cannot.
 | `prover.sh` | over a range, with a SIGTERM stop and a resume, on macOS and in the image | the run of [prover.md](prover.md) (2026-10-14 and 15, to the end) |
 | the instance-hours ledger of `run.sh` | against a stand-in for aws (`test/run.sh`) | [the run to 5000](https://github.com/bvchess/taxman-notebook/blob/main/the-run-to-5000-2026-10/README.md) |
 | `status.sh` | against a stand-in for ssh (`test/run.sh status`) | not run: it reads a chain on a machine reached by ssh |
-| `ledger/cloud.sh` | the laptop's dry run of 1301..1500, with the test profile's `ledger` | the ledger's launches of 2026-10-17 and 18 ([its entry](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/README.md)) |
 | the build cache and the release suite | against a directory for the bucket, the stand-in for aws and a stand-in for cargo; the runner, the whole suites of the solver and the prover in the test profile | the releases and the cache of 2026-10-18 ([What was tested](build-cache.md#what-was-tested)) |
 
 The [calibration](https://github.com/bvchess/taxman-notebook/blob/main/graviton-calibration-2026-10/README.md) ran the

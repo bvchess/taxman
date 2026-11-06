@@ -495,11 +495,11 @@ fn the_start_is_the_same_on_every_number_of_threads() {
     }
 }
 
-/// A search with two seeds starts from the better of their starts, not from the seed whose survivors weigh more.  The
-/// bounds store's lower-bound moves for the board are moves for it, so all of them survive; here it is the start with
-/// no seed, S0, a local optimum.  In game 187 S0 weighs 751 and what survives of the moves for 186 only 748, so the
-/// seed with more survivors is S0, but the start from the moves for 186 reaches 762.  Starting from S0 alone leaves the
-/// search at 751; the best of the two starts is 762.
+/// A search with two seeds starts from the better of their starts, not from the seed whose survivors weigh more.  Moves
+/// for the board itself survive whole; here that seed is the start with no seed, S0, a local optimum.  In game 187 S0
+/// weighs 751 and what survives of the moves for 186 only 748, so the seed with more survivors is S0, but the start
+/// from the moves for 186 reaches 762.  Starting from S0 alone leaves the search at 751; the best of the two starts is
+/// 762.
 #[test]
 fn the_start_is_the_best_of_the_starts_of_the_seeds() {
     let n = 187;

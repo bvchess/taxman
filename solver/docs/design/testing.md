@@ -38,8 +38,8 @@ allowed more.
 `#[cfg_attr(debug_assertions, ignore = "long: the quick check is quick_one")]` skips it in a non-release run, where
 debug assertions are on, and `--release` runs it.  `quick_one` is the quick test that checks the same property at a
 small size: a prefix of the range that the long test walks (which then takes the rest of it), a sample of the chain or
-of the golden games, fewer random draws, a smaller game.  Where several tests walk one path at different sizes (a ledger
-run for each of its features), the quick check keeps one small test of the path, and
+of the golden games, fewer random draws, a smaller game.  Where several tests walk one path at different sizes, the
+quick check keeps one small test of the path, and
 the `ignore` message of each long one names the test that stands in for it.
 
 **The budget.**  The target of 10 s on ten cores is a budget of about 80 CPU seconds for all the tests of the quick
@@ -57,7 +57,7 @@ test deterministic.
 The *full suite* is `cargo test --release`: every test, the long ones too, about 3 minutes of tests after a build of 6
 minutes.  It runs before a cloud run, after any change that changes search trees or results, and in the gates (the
 one-thread re-solve of 1301-2175).  A default build, and so every run above and the cloud setup, covers the library, the
-binary, the tests, and the examples `ledger` and `perf`.
+binary, the tests, and the example `perf`.
 
 **Before a change is merged** (what a reviewer of a change runs, besides reading it; the tests are described below, the
 probe in [performance.md](performance.md)):

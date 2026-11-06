@@ -66,15 +66,14 @@ the design in outline.
 
 ## Per-game pipeline (`solver`)
 
-Each game goes through six steps, from its board's tables to its line in the results file.  The shortcuts of steps
-1a and 2, and the repeat in step 4, conclude a game without a search when another game already gives its answer.
+Each game goes through six steps, from its board's tables to its line in the results file.  The shortcut of step 2, and
+the repeat in step 4, conclude a game without a search when another game already gives its answer.
 `solver::solve_game` runs the steps for one game and `solve_range` for a range; the module comment of `src/solver.rs`
 has the exact steps and checks.  The steps:
 
 | step | what |
 |---|---|
 | 1 | the board's tables, and the set width |
-| 1a | with `use_prev` and `known.boards` (`solve --use-prev`): a game that a known source has proven (the committed chain, the bounds store, the table, in that order) is taken with no search (method `known`; [Known moves](trust.md#known-moves)) |
 | 2 | the prime shortcut: a prime n plays the moves for n − 1 with its first move replaced by n (method `prime`) |
 | 3 | the frames, formed, simplified, numbered and merged; with no candidates the game with no promotions is the only one (method `trivial`) |
 | 4 | the search (method `search`, or `start` when its starting moves reach a ceiling before the search takes a step): the frame set and the greedy incumbent (`search::prepare`); a repeat of an earlier game's search (method `repeat`, tactic `same_search`; [same-search.md](same-search.md)); the starting incumbent, the ceiling and the seed; the engine; promotions → moves |
@@ -87,8 +86,8 @@ The steps again, with the functions that take them:
  taxman solve A-B --out FILE --checkpoint-dir DIR
    |  solver::solve_range_each        n = A..B, concluded in order (with --window K up to K games in flight, each set
    |                                  up and searched on threads of its own: solver/window.rs); the moves for n-1 come
-   |                                  from this run, FILE or (--use-prev) the known moves (known::Known),
-   |                                  and is checked (legal, over, opens with the largest prime) before anything uses it
+   |                                  from this run or FILE, and are checked (legal, over, opens with the largest prime)
+   |                                  before anything uses them
    v
  solver::set_up(n) -> set_up_with_width::<W>      W = 8 to 128 words of 64 bits (bits::WIDTHS), by n
    |
@@ -126,11 +125,7 @@ The steps again, with the functions that take them:
 ```
 
 *The shortcuts.*  Step 2 needs the moves for n − 1, and the repeat of step 4 an earlier game.  `force_search` skips
-both, and step 1a, and so does a checkpoint of the game: a search that was interrupted is resumed, never replaced by a
-derivation.  With `use_prev`, the search of step 4 takes two things from the bounds store for a game the store has not
-proven: the moves of its best lower bound, a seed beside the moves for n − 1 (the search starts from the better start of
-the two), and its best upper bound, a ceiling beside the one that the moves for n − 1 give (the lower of the two stops
-the search).  `force_search` leaves the store out.
+both, and so does a checkpoint of the game: a search that was interrupted is resumed, never replaced by a derivation.
 
 *The moves for n − 1* is checked before anything uses it: it must replay legally to its recorded score, be over, and
 open with the largest prime (`conclude` has already checked a game that this run made).  The results that rest on it
@@ -144,9 +139,8 @@ the file when it opens it: it replays every line, and checks the chain from n �
 provenance (the search problems that the checks of repeats set up again are set up first, on the run's threads).  A
 range skips the games the file completed.  It appends each result and syncs it as soon as the game is concluded, in the
 order of n, and only then deletes the game's checkpoint; a checkpoint left for a game that the file has completed is
-deleted when a range starts.  The moves for n − 1 come from, in order: this run, the results file, and with `use_prev`
-(`--use-prev`) the known moves ([Known moves](trust.md#known-moves): the committed chain's, the bounds store's,
-the built-in table's).  With none, the game is solved *standalone*, with no seed and no ceiling.
+deleted when a range starts.  The moves for n − 1 come from this run, else from the results file.  With neither, the
+game is solved *standalone*, with no seed and no ceiling.
 
 ### The window: games in flight
 
@@ -224,12 +218,11 @@ through [the gzip crate](../../gzip/README.md) in order, only as far as the game
 game the first time it is asked for.  A process that asks for no game decodes nothing, one that asks for a few decodes
 as far as the last of them, and one that goes over every game decodes the whole file.
 
-A results file given by a path that ends in `.gz` is read the same way where it is used as a source of games: the
-committed chain that `--use-prev` and `verify-results` draw on (`known::Known::load`).  Such a file must be one game a
-line, line n for game n, as the committed results are.  It is read into memory when it is opened, with its first member
-decoded (so that a file that is no gzip file is refused at once), and its other members are decoded as games are asked
-for, so a check that cites few of its lines reads a member or two of it.  A fault in a member that is decoded later stops the
-call that needs the game and names the file.  A plain file is read whole when it is opened.  The measurement tools take
+A results file given by a path that ends in `.gz` is read the same way where it is used as a source of games.  Such a
+file must be one game a line, line n for game n, as the committed results are.  It is read into memory when it is
+opened, with its first member decoded (so that a file that is no gzip file is refused at once), and its other members
+are decoded as games are asked for, so a tool that asks for few of its lines reads a member or two of it.  A fault in a
+member that is decoded later stops the call that needs the game and names the file.  A plain file is read whole when it is opened.  The measurement tools take
 their `--known` files through `Optimal::with_results_files`, which checks that a line of a file scores what the lines
 before it say: for a plain file when it is opened, for a gzip file when a line of it is looked up, where a difference
 stops the lookup and names the file, n and both scores.

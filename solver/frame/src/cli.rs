@@ -6,7 +6,7 @@
 //! ([`Args::parse`]), and any other `--flag` is a usage error.  The flags every solving command takes
 //! ([`SOLVER_FLAGS`]: `--threads`, `--tactic`) are turned into [`SolveOptions`] by [`solver_options`], and with the
 //! flag of the commands that solve a range ([`WINDOW_FLAG`]) by [`range_options`]; the others (`--out`,
-//! `--time-limit`, `--use-prev`, ...) are each command's own.  A usage error makes `main` print the usage and
+//! `--time-limit`, `--force-search`, ...) are each command's own.  A usage error makes `main` print the usage and
 //! exit with status 2; a command that ran and failed exits with status 1 ([`CliError`]).
 
 use std::fmt;

@@ -63,15 +63,12 @@
 //! # A range
 //!
 //! [`solve_range_each`] solves the games `lo..=hi` and concludes them in order.  The previous moves of each are
-//! those of the game before it; for `lo` they are the results file's line for `lo − 1`, else, with
-//! [`SolveOptions::use_prev`], the moves of the known sources ([`SolveOptions::known`]: the table's, assumed optimal,
-//! and the committed chain's and the bounds store's if it names them; the results that rest on known moves record what
-//! they assume), else there are none and the game is solved *standalone*, with no seed and no ceiling (and a note on
-//! stderr says so).  Every result is appended to the results file (one JSON object per line) as soon as it is
-//! concluded, so that a restarted run skips what is finished; the file is checked when it is opened
-//! ([`ResultsFile::open`]).  A game whose search a limit or a signal stopped is recorded as incomplete, keeps its
-//! checkpoint, and ends the range.  The games a game of the range may repeat the search of are the file's and the
-//! range's own (a single game solved with [`solve_game`] has none).
+//! those of the game before it; for `lo` they are the results file's line for `lo − 1`, else there are none and the
+//! game is solved *standalone*, with no seed and no ceiling (and a note on stderr says so).  Every result is appended to
+//! the results file (one JSON object per line) as soon as it is concluded, so that a restarted run skips what is
+//! finished; the file is checked when it is opened ([`ResultsFile::open`]).  A game whose search a limit or a signal
+//! stopped is recorded as incomplete, keeps its checkpoint, and ends the range.  The games a game of the range may
+//! repeat the search of are the file's and the range's own (a single game solved with [`solve_game`] has none).
 //!
 //! Up to [`SolveOptions::window`] consecutive games are in flight at once: game `n + 1` is set up while `n`
 //! searches, and searched from the best moves `n`'s search has found so far, so that a machine of many threads is kept
@@ -89,11 +86,9 @@ use crate::engine::{self, Control, Counters, EngineConfig, Spent, Stats};
 use crate::frames::BoardFrames;
 use crate::game::{replay, replay_finished, Optimal};
 use crate::json::Json;
-use crate::known::{Bound, Cite, Known, KnownGame, KnownSources, Open, Origin};
 use crate::numtheory::Tables;
 use crate::results::{
-    assumed_optimal, assumptions_json, assumptions_of, build_json, moves_digest, Assumptions, Proof, ResultsFile,
-    SCHEMA,
+    assumptions_json, assumptions_of, build_json, moves_digest, Assumptions, Proof, ResultsFile, SCHEMA,
 };
 use crate::search::{
     self, finder, gate_trial, stat, BranchSettings, Branching, NearRepeat, Prepared, Problem, ProblemSize, ProfilePlan,
@@ -141,16 +136,6 @@ pub struct SolveOptions {
     /// Search even where the previous moves or an earlier search would give the answer (skips `prime_shortcut` and
     /// `same_search`).
     pub force_search: bool,
-    /// Draw on the known moves ([`crate::known`]; `--use-prev`): take the moves for `n − 1` of a range's first game
-    /// from them when neither the run nor the results file has them (the table's, assumed optimal, which the results
-    /// whose proofs rest on it record; the committed chain's, the bounds store's, with what they assume), and let the
-    /// bounds store help the search of a board it has not proven (its lower bound's moves seed, its upper bound is a
-    /// ceiling).  Without it such a game is solved standalone.  [`known`](Self::known) says which files, and whether
-    /// the boards they prove are recorded without a search.
-    pub use_prev: bool,
-    /// The files [`use_prev`](Self::use_prev) draws on besides the table, and whether it goes as far as the boards of
-    /// the range (`solve --use-prev` does); none by default.
-    pub known: KnownSources,
     /// The games of a range in flight at once (`--window`, at least 1, 4 by default: the best measured at 64 threads,
     /// see `window`), which share the `threads`.  With one thread it is 1 whatever it says: there is no thread to run
     /// a second game on.
@@ -202,8 +187,6 @@ impl Default for SolveOptions {
             queue_mem_cap: engine.queue_mem_cap,
             spill_dir: None,
             force_search: false,
-            use_prev: false,
-            known: KnownSources::default(),
             window: 4,
             finder_after: 0,
             finder_budget: finder::BUDGET,
@@ -235,37 +218,24 @@ pub enum PrevSource {
     Run,
     /// Read from the results file.
     Results,
-    /// Read from the table.
-    Optimal,
-    /// Read from the committed chain, `results/optimal.jsonl.gz` (`--use-prev`).
-    Strict,
-    /// A board the bounds store has proven (`--use-prev`).
-    Bounds,
 }
 
 impl PrevSource {
-    pub const ALL: [PrevSource; 5] =
-        [PrevSource::Run, PrevSource::Results, PrevSource::Optimal, PrevSource::Strict, PrevSource::Bounds];
+    pub const ALL: [PrevSource; 2] = [PrevSource::Run, PrevSource::Results];
 
     /// The name in result lines.
     pub fn as_str(self) -> &'static str {
         match self {
             PrevSource::Run => "run",
             PrevSource::Results => "results",
-            PrevSource::Optimal => "optimal",
-            PrevSource::Strict => "strict",
-            PrevSource::Bounds => "bounds",
         }
     }
 
-    /// Where it came from, for a message: "this run", "the results file", "the built-in table", ...
+    /// Where it came from, for a message: "this run" or "the results file".
     pub fn whence(self) -> &'static str {
         match self {
             PrevSource::Run => "this run",
             PrevSource::Results => "the results file",
-            PrevSource::Optimal => Origin::Optimal.whence(),
-            PrevSource::Strict => Origin::Strict.whence(),
-            PrevSource::Bounds => Origin::Bounds.whence(),
         }
     }
 }
@@ -276,31 +246,13 @@ pub struct Prev {
     pub moves: Vec<u32>,
     pub score: u64,
     pub source: PrevSource,
-    /// How its optimality is established; `None` if that is not known (the table does not say).
+    /// How its optimality is established; `None` if that is not known (moves a caller gives).
     pub proof: Option<Proof>,
     /// What its proof assumes (see [`crate::results`]).
     pub assumes: Assumptions,
 }
 
 impl Prev {
-    /// The moves for `n` in `optimal`, if it has any.  The file records no proof kind, so the moves are assumed optimal
-    /// ([`assumed_optimal`]).
-    pub fn from_optimal(optimal: &Optimal, n: u32) -> Option<Prev> {
-        let (moves, score) = (optimal.moves(n)?, optimal.score(n)?);
-        let assumes = Assumptions::from([assumed_optimal(n)]);
-        Some(Prev { moves: moves.to_vec(), score, source: PrevSource::Optimal, proof: None, assumes })
-    }
-
-    /// The moves a known source holds ([`Known::game`]), with what they rest on.
-    pub fn from_known(game: &KnownGame) -> Prev {
-        let source = match game.origin {
-            Origin::Optimal => PrevSource::Optimal,
-            Origin::Strict => PrevSource::Strict,
-            Origin::Bounds => PrevSource::Bounds,
-        };
-        Prev { moves: game.moves.clone(), score: game.score, source, proof: game.proof, assumes: game.assumes.clone() }
-    }
-
     /// A completed result of this run.
     fn from_result(result: &GameResult) -> Prev {
         Prev {
@@ -380,13 +332,10 @@ pub enum Method {
     Start,
     /// The branch-and-bound search: its tree ran.
     Search,
-    /// Taken from a known source (`--use-prev`, [`crate::known`]): the moves, with no search.
-    Known,
 }
 
 impl Method {
-    pub const ALL: [Method; 6] =
-        [Method::Trivial, Method::Prime, Method::Repeat, Method::Start, Method::Search, Method::Known];
+    pub const ALL: [Method; 5] = [Method::Trivial, Method::Prime, Method::Repeat, Method::Start, Method::Search];
 
     pub fn as_str(self) -> &'static str {
         match self {
@@ -395,7 +344,6 @@ impl Method {
             Method::Repeat => "repeat",
             Method::Start => "start",
             Method::Search => "search",
-            Method::Known => "known",
         }
     }
 
@@ -438,14 +386,6 @@ impl SameSearch {
     }
 }
 
-/// The known source a result's game, or its proof, comes from (`known` of its line): the citation, and what the cited
-/// lines make the game assume.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Cited {
-    pub cite: Cite,
-    pub assumes: Assumptions,
-}
-
 /// A search problem's digest as a result line writes it: 16 hexadecimal digits.
 pub fn digest_text(digest: u64) -> String {
     format!("{digest:016x}")
@@ -466,8 +406,8 @@ pub struct Phases {
     /// What the game spent in this invocation (`window`, "The clock"): the CPU time of its search's workers, the wall
     /// time it was active (with a worker: its setup and its search) and the wall time it waited (in flight with none:
     /// for a thread, for the game before it, suspended for older games).  Active and waiting together are the game's
-    /// span, from the start of its setup to its line.  A game with no search to run (a prime, trivial, repeated or known
-    /// game) used no CPU time in workers.
+    /// span, from the start of its setup to its line.  A game with no search to run (a prime, trivial or repeated game)
+    /// used no CPU time in workers.
     pub spent: Spent,
     /// What the game spent in every invocation of a resumed search: this invocation's, and the earlier ones' as the
     /// clock they left beside the checkpoint says.
@@ -571,7 +511,6 @@ pub struct GameResult {
     pub time_limit: Option<Duration>,
     pub node_limit: Option<u64>,
     pub force_search: bool,
-    pub use_prev: bool,
     pub background: bool,
     /// The finder's settings (`--finder-after`, in steps, and `--finder-seconds`): 0 for none.
     pub finder_after: u64,
@@ -590,9 +529,6 @@ pub struct GameResult {
     pub prev: Option<PrevInfo>,
     /// For a repeat (method [`Method::Repeat`], proof `same_search`), the earlier game whose search it repeats.
     pub same_search: Option<SameSearch>,
-    /// For moves taken from a known source (method [`Method::Known`]), or found by a search that an upper bound of the
-    /// bounds store stopped (method [`Method::Search`] or [`Method::Start`]; both proof `known`), the source it cites.
-    pub known: Option<Cited>,
 }
 
 impl GameResult {
@@ -622,7 +558,6 @@ impl GameResult {
             time_limit: opts.time_limit,
             node_limit: opts.node_limit,
             force_search: opts.force_search,
-            use_prev: opts.use_prev,
             background: opts.background,
             finder_after: opts.finder_after,
             finder_budget: opts.finder_budget,
@@ -633,7 +568,6 @@ impl GameResult {
             optimal_match: None,
             prev: prev.map(|p| p.info(n)),
             same_search: None,
-            known: None,
         }
     }
 
@@ -724,7 +658,7 @@ impl GameResult {
         let trial_gates =
             self.gate_trial_gates.as_ref().map(|gates| ("gate_trial", Json::array(gates.iter().copied())));
         let options = Json::object(
-            [("force_search", Json::Bool(self.force_search)), ("use_prev", Json::Bool(self.use_prev))]
+            [("force_search", Json::Bool(self.force_search))]
                 .into_iter()
                 .chain(background)
                 .chain(finder_after)
@@ -732,8 +666,6 @@ impl GameResult {
                 .chain(gate)
                 .chain(trial_gates),
         );
-        // The citation of a known source is there only on a line that has one: the lines made before it do not.
-        let known = self.known.as_ref().map(|cited| ("known", cited.cite.to_json()));
         let fields = [("schema", Json::from(SCHEMA)), ("n", Json::from(self.n)), ("score", score)]
             .into_iter()
             .chain(best_so_far)
@@ -749,7 +681,6 @@ impl GameResult {
                 ("prev", self.prev.as_ref().map_or(Json::Null, PrevInfo::to_json)),
                 ("same_search", self.same_search.as_ref().map_or(Json::Null, SameSearch::to_json)),
             ])
-            .chain(known)
             .chain([
                 ("nodes", Json::from(self.nodes)),
                 ("stats", self.stats_json()),
@@ -780,11 +711,7 @@ impl GameResult {
             (true, Some(_)) => "optimal ok",
             (true, None) => "optimal unknown",
         };
-        let of = match (&self.same_search, &self.known) {
-            (Some(same), _) => format!(" of {}", same.n),
-            (None, Some(cited)) => format!(" from {}", cited.cite.origin().whence()),
-            (None, None) => String::new(),
-        };
+        let of = self.same_search.as_ref().map_or_else(String::new, |same| format!(" of {}", same.n));
         let proof = self.proof.map_or_else(String::new, |p| format!("  proof={}{of}", p.as_str()));
         let assumes = if self.assumes.is_empty() {
             String::new()
@@ -856,10 +783,9 @@ pub fn solve_game(n: u32, prev: Option<&Prev>, opts: &SolveOptions) -> Result<Ga
     solve_game_with(n, prev, opts, Optimal::built_in())
 }
 
-/// [`solve_game`] with the score confirmed against the table `optimal` instead: for tests, and for a table whose known
-/// moves extend the built-in one.  The checkpoint of a completed game is deleted once the game has passed its
-/// checks.  This is the driver of a range (`window`) over the one game `n`, from `prev`, with no results file and
-/// no earlier games to repeat.
+/// [`solve_game`] with the score confirmed against the table `optimal` instead: for tests.  The checkpoint of a
+/// completed game is deleted once the game has passed its checks.  This is the driver of a range (`window`) over the
+/// one game `n`, from `prev`, with no results file and no earlier games to repeat.
 pub fn solve_game_with(
     n: u32,
     prev: Option<&Prev>,
@@ -870,8 +796,7 @@ pub fn solve_game_with(
         return Err("n must be at least 1".into());
     }
     let before = prev.cloned().map_or(Before::None, Before::Given);
-    let known = Known::load(optimal, &opts.known)?;
-    let range = window::Range { lo: n, hi: n, before, known: &known, results: None };
+    let range = window::Range { lo: n, hi: n, before, optimal, results: None };
     let mut solved = None;
     window::solve(range, opts, &mut Earlier::default(), &mut |result| solved = Some(result.clone()))?;
     Ok(solved.expect("a range of one game that does not fail concludes it"))
@@ -880,8 +805,7 @@ pub fn solve_game_with(
 /// The moves for `n − 1` as the setup of game `n` knows them.
 #[derive(Clone, Debug)]
 enum Before {
-    /// Not made by this run (the results file's, the table's or a caller's): known from the start, and checked
-    /// by the setup.
+    /// Not made by this run (the results file's or a caller's): known from the start, and checked by the setup.
     Given(Prev),
     /// This run's: known once it is concluded, and refereed by `conclude` before that.
     Run,
@@ -904,18 +828,6 @@ enum Derived {
     Prime { candidates: Vec<u32> },
     /// No promotion candidates: the moves with no promotions.
     Trivial { plain: Vec<u32>, in_the_bag: u64, frames: Duration },
-    /// Moves a known source holds (`--use-prev`), and the promotion candidates of the board with no promotions,
-    /// ascending, which their promotions are taken from as the prime shortcut's are.
-    Known { game: Box<KnownGame>, candidates: Vec<u32> },
-}
-
-/// An upper bound of the bounds store on a board that a search is to find the moves for, which is a ceiling of the
-/// search besides the one its previous moves give: it stops when its incumbent reaches the bound, which proves those
-/// moves optimal given what the bound assumes.
-struct StoreCap {
-    /// The bound on the promotion sum: the store's bound less the board's `in_the_bag`.
-    sum: u64,
-    bound: Bound,
 }
 
 /// A game set up for a search.
@@ -924,8 +836,6 @@ struct SearchSetUp {
     /// What the search was set up with; its ceiling (`cap`) is filled in when the game is concluded.
     setup: SearchSetup,
     in_the_bag: u64,
-    /// The bounds store's upper bound of the board, if it has one and `--use-prev` is on.
-    store_cap: Option<StoreCap>,
     /// The setup's phases: forming the frames and the search model, and the greedy set.
     frames: Duration,
     greedy: Duration,
@@ -1020,10 +930,6 @@ struct SearchJob<const W: usize> {
     control: Arc<Control>,
     resuming: bool,
     seeds: bool,
-    /// The moves of the bounds store's best lower bound of the board, replayed by the referee, if `--use-prev` is on
-    /// and the search takes a seed: a seed beside the moves for `n − 1`, each with a start of its own and the better
-    /// start used ([`search::start_incumbent`]).
-    store_game: Option<Vec<u32>>,
     /// The branching settings the search starts with, which its gate trial may change ([`search::search_steered`]).
     branching: Arc<Branching>,
     /// The near-repeat cut, once it is armed ([`Job::arm`]): the search reads it from here.
@@ -1031,10 +937,9 @@ struct SearchJob<const W: usize> {
 }
 
 impl<const W: usize> SearchJob<W> {
-    /// The seeds of a search, in the order the search tries them: the store's moves for this board, then the moves
-    /// `prev` for `n − 1`, as the sets of their promotions, whichever of the two there is.
+    /// The seeds of a search: the moves `prev` for `n − 1` as the set of their promotions, if there are any.
     fn seeds_of(&self, prev: Option<&[u32]>) -> Vec<Bits<W>> {
-        [self.store_game.as_deref(), prev].into_iter().flatten().map(|moves| self.board.seed(moves)).collect()
+        prev.into_iter().map(|moves| self.board.seed(moves)).collect()
     }
 }
 
@@ -1080,9 +985,8 @@ impl<const W: usize> Job for SearchJob<W> {
 
     fn search(&self, go: Go, opts: &SolveOptions) -> Result<Outcome, String> {
         let n = self.board.n();
-        // The store's moves for `n` and the moves for `n − 1`: the search starts from the better start of the two.
         let seeds = self.seeds_of(go.seed.as_deref());
-        // The finder starts from the same seeds, or from the moves for `n − 1` alone when the search takes none.
+        // The finder starts from the same seed, or from the moves for `n − 1` when the search takes none.
         let finder = (opts.finder_after > 0).then(|| {
             let seeds = self.seeds_of(go.finder_seed.as_deref());
             finder::Plan { after: opts.finder_after, budget: opts.finder_budget, seeds }
@@ -1151,11 +1055,10 @@ impl<const W: usize> Job for SearchJob<W> {
 /// B, `prev`'s score less the `in_the_bag` of `n − 1`, bounds P\*(Π_M) where that score is opt(n − 1)
 /// (docs/theory/search-rules.md, the paragraph "What it rests on"): moves that assume nothing are optimal within the
 /// frame model, so the cut adds nothing to what the search's answer rests on, and a result that the cut helped assumes
-/// what it assumed without it.  Moves that assume something (one of the table's, or ones whose bound rests on
-/// statement U) would make the answer rest on that, which a result line has no way to say, so they carry no cut.  Nor
-/// do provisional moves for `n − 1`, the best of a search still running, which bound nothing: `window`'s driver
-/// gives a search the moves for `n − 1` only once they are concluded, with the search's go or, for a search started
-/// before, at the conclusion ([`Job::arm`]).
+/// what it assumed without it.  Moves that assume something would make the answer rest on that, which a result line
+/// has no way to say, so they carry no cut.  Nor do provisional moves for `n − 1`, the best of a search still
+/// running, which bound nothing: `window`'s driver gives a search the moves for `n − 1` only once they are concluded,
+/// with the search's go or, for a search started before, at the conclusion ([`Job::arm`]).
 fn near_repeat<const W: usize>(prepared: &Prepared<W>, prev: &Prev) -> Result<Option<NearRepeat<W>>, String> {
     if !prev.assumes.is_empty() {
         return Ok(None);
@@ -1163,24 +1066,19 @@ fn near_repeat<const W: usize>(prepared: &Prepared<W>, prev: &Prev) -> Result<Op
     crate::board::near_repeat(prepared, prev.score)
 }
 
-type SetUpWithWidth = fn(u32, &Before, &SolveOptions, &Known) -> Result<SetUp, Failure>;
+type SetUpWithWidth = fn(u32, &Before, &SolveOptions) -> Result<SetUp, Failure>;
 
 /// The setup of game `n` (its first phase, on the game's thread): the checks of previous moves not made by this run,
-/// the tables, and then the moves a known source holds, the prime shortcut, the trivial moves, or the search problem
-/// (steps 1 to 4 of the module documentation, up to the repeat), at the set width of the game.
-fn set_up(n: u32, before: &Before, opts: &SolveOptions, known: &Known) -> Result<SetUp, Failure> {
+/// the tables, and then the prime shortcut, the trivial moves, or the search problem (steps 1 to 4 of the module
+/// documentation, up to the repeat), at the set width of the game.
+fn set_up(n: u32, before: &Before, opts: &SolveOptions) -> Result<SetUp, Failure> {
     let words = words_for(n);
     let beyond = || Failure::Error(format!("n={n} is beyond the largest supported board, n={MAX_N}"));
     let set_up: SetUpWithWidth = crate::with_words!(words, W => set_up_with_width::<W>, else return Err(beyond()));
-    set_up(n, before, opts, known).map_err(|failure| at(n, failure))
+    set_up(n, before, opts).map_err(|failure| at(n, failure))
 }
 
-fn set_up_with_width<const W: usize>(
-    n: u32,
-    before: &Before,
-    opts: &SolveOptions,
-    known: &Known,
-) -> Result<SetUp, Failure> {
+fn set_up_with_width<const W: usize>(n: u32, before: &Before, opts: &SolveOptions) -> Result<SetUp, Failure> {
     if let Before::Given(prev) = before {
         // The prime shortcut and the ceiling trust the previous moves, so make sure they are what they say they are.
         // Not for moves this run made: `conclude` has refereed those already, with the same `replay_finished` and to
@@ -1193,14 +1091,6 @@ fn set_up_with_width<const W: usize>(
     // A search that was interrupted is resumed, whatever else could have produced the moves.
     let checkpoint = opts.checkpoint_file(n).filter(|path| path.exists());
     let derive = !opts.force_search && checkpoint.is_none();
-
-    // A board a known source holds proven moves for (`--use-prev`): those moves, with no search.
-    if derive && opts.use_prev && opts.known.boards {
-        if let Some(game) = known.game(n)? {
-            let candidates = BoardFrames::<W>::new(&tables, Bits::EMPTY).promotion_candidates();
-            return Ok(SetUp::Derived(Derived::Known { game: Box::new(game), candidates: candidates.to_vec() }));
-        }
-    }
 
     if derive && opts.tactics.prime_shortcut && tables.is_prime(n) && !matches!(before, Before::None) {
         let candidates = BoardFrames::<W>::new(&tables, Bits::EMPTY).promotion_candidates();
@@ -1240,33 +1130,18 @@ fn set_up_with_width<const W: usize>(
         (board.in_the_bag, board.frames_time + prepared.timings.build, prepared.timings.greedy);
     let resuming = checkpoint.is_some();
     let seeds = opts.tactics.seed_incumbent && !resuming;
-    // What the bounds store has of the board, if it is not to be searched on its own: its lower bound's moves seed the
-    // search, and its upper bound is a ceiling.  (`force_search` is a search with nothing but the chain's own help.)
-    let help = if opts.use_prev && !opts.force_search { known.open(n)? } else { Open::default() };
-    let store_cap = help.upper.map(|bound| StoreCap { sum: bound.value.saturating_sub(in_the_bag), bound });
-    let store_game = help.game.filter(|_| seeds);
     // The branching settings the searchers start with: the tactics' (checked above to be the game's), and the gate, which
     // is no tactic, the run's (`--gate`) if it has one, else the default.
     let branching = Arc::new(Branching::new(BranchSettings::of(&prepared.tactics).with_gate(opts.gate)));
     let (control, near) = (Control::new(), OnceLock::new());
-    let job = Arc::new(SearchJob { board, prepared, control, resuming, seeds, store_game, branching, near });
-    Ok(SetUp::Search(SearchSetUp { job, setup, in_the_bag, store_cap, frames, greedy }, problem))
+    let job = Arc::new(SearchJob { board, prepared, control, resuming, seeds, branching, near });
+    Ok(SetUp::Search(SearchSetUp { job, setup, in_the_bag, frames, greedy }, problem))
 }
 
 /// The ceiling on the promotion sum of game `n`, whose `in_the_bag` is given, from the score of the moves for
 /// `n − 1`, if there are any and `prev_cap` is on ([`promotion_cap`]).
 fn ceiling(n: u32, in_the_bag: u64, prev_score: Option<u64>, opts: &SolveOptions) -> Option<u64> {
     prev_score.filter(|_| opts.tactics.prev_cap).and_then(|score| promotion_cap(n, in_the_bag, score))
-}
-
-/// The ceiling a search of game `n` stops at: the lower of the one its previous moves give ([`ceiling`]) and the
-/// bounds store's upper bound of the board (`set.store_cap`), if it has either.
-fn search_cap(set: &SearchSetUp, n: u32, prev_score: Option<u64>, opts: &SolveOptions) -> Option<u64> {
-    let chain = ceiling(n, set.in_the_bag, prev_score, opts);
-    match (chain, set.store_cap.as_ref()) {
-        (Some(chain), Some(store)) => Some(chain.min(store.sum)),
-        (chain, store) => chain.or(store.map(|store| store.sum)),
-    }
 }
 
 /// How the moves were found, as the conclusion takes it.
@@ -1304,24 +1179,6 @@ fn conclude_game(
             result.phases.frames = *frames;
             conclude(result, plain.clone(), Vec::new(), context)
         }
-        Found::Derived(Derived::Known { game, candidates }) => {
-            result.method = Method::Known;
-            result.known = Some(Cited { cite: game.cite.clone(), assumes: game.assumes.clone() });
-            let played: BTreeSet<u32> = game.moves.iter().copied().collect();
-            let promotions = candidates.iter().copied().filter(|c| played.contains(c)).collect();
-            // The moves must score what the source gives for them, as well as pass the referee.
-            conclude(result, game.moves.clone(), promotions, context).and_then(|result| {
-                match result.score == game.score {
-                    true => Ok(result),
-                    false => {
-                        let (score, source) = (game.score, game.origin.whence());
-                        let reason =
-                            format!("the moves replay to {}, not the {score} that {source} gives them", result.score);
-                        reject(result, reason)
-                    }
-                }
-            })
-        }
         Found::Repeat(set, m) => {
             set.fill(&mut result);
             let Some((same, promotions)) = earlier.same_search(m, set.setup.digest) else {
@@ -1344,14 +1201,7 @@ fn conclude_game(
             // tree, or been stopped by a limit or a signal, with its best set at the ceiling: it is proven by the
             // ceiling all the same, as a search given the ceiling from the start would have stopped there.
             result.reached_cap = setup.cap == Some(sum);
-            // So is one that stopped at the bounds store's upper bound, when the ceiling is not what it reached: the
-            // store's bound is what the line cites.
-            if let Some(store) = set.store_cap.as_ref().filter(|store| !result.reached_cap && store.sum == sum) {
-                let upper = store.bound.line.clone();
-                let cite = Cite::Bounds { lower: None, upper };
-                result.known = Some(Cited { cite, assumes: store.bound.assumes.clone() });
-            }
-            result.completed = searched.completed || result.reached_cap || result.known.is_some();
+            result.completed = searched.completed || result.reached_cap;
             result.nodes = searched.stats.nodes;
             // A search that took no step (in any of its runs: the nodes are the total, the engine restores the stats
             // of a checkpoint) ran no tree: its starting moves reached a ceiling.
@@ -1367,20 +1217,7 @@ fn conclude_game(
                 // At least one invocation made the checkpoint, even if it left no line in a results file.
                 result.invocations = earlier_runs.max(1) + 1;
             }
-            let concluded = conclude(result, searched.moves.clone(), searched.promotions.clone(), context);
-            // Moves above the store's upper bound prove the store wrong, or statement U false at a board it rests on.
-            match set.store_cap.as_ref().filter(|store| sum > store.sum) {
-                Some(store) => concluded.and_then(|result| {
-                    let (bound, bag) = (store.bound.value, set.in_the_bag);
-                    let reason = format!(
-                        "the moves score {}, more than the {bound} that the bounds store's upper bound allows \
-                         (inTheBag {bag} + {}): the store is wrong, or statement U fails at a board it rests on",
-                        result.score, store.sum
-                    );
-                    reject(result, reason)
-                }),
-                None => concluded,
-            }
+            conclude(result, searched.moves.clone(), searched.promotions.clone(), context)
         }
     };
     concluded.map_err(|failure| at(n, failure))
@@ -1481,13 +1318,6 @@ fn conclude(
             return reject(result, format!("scored {score} but the table says {expected}"));
         }
         result.optimal_match = Some(true);
-    }
-    // Moves that cite a known source (taken from it, or found by a search that its upper bound stopped) are proven by
-    // it, and assume what the cited lines make them assume.
-    if let Some(cited) = &result.known {
-        result.proof = Some(Proof::Known);
-        result.assumes = cited.assumes.clone();
-        return Ok(result);
     }
     let proof = Proof::of(result.method, true, result.reached_cap).expect("a completed result has a proof kind");
     result.proof = Some(proof);
@@ -1718,37 +1548,23 @@ fn stored_prev(results: &ResultsFile, n: u32) -> Option<Prev> {
     })
 }
 
-/// The moves for `n − 1` from the results file, else, with `use_prev`, those the known sources hold
-/// ([`Known::game`]).
-fn previous_game(
-    n: u32,
-    results: Option<&ResultsFile>,
-    known: &Known,
-    opts: &SolveOptions,
-) -> Result<Option<Prev>, String> {
-    let Some(before) = n.checked_sub(1).filter(|&before| before >= 1) else { return Ok(None) };
-    let in_results = results.and_then(|r| stored_prev(r, before));
-    if in_results.is_some() || !opts.use_prev {
-        return Ok(in_results);
-    }
-    Ok(known.game(before)?.map(|game| Prev::from_known(&game)))
+/// The moves for `n − 1` from the results file, if it has them.
+fn previous_game(n: u32, results: Option<&ResultsFile>) -> Option<Prev> {
+    let before = n.checked_sub(1).filter(|&before| before >= 1)?;
+    results.and_then(|r| stored_prev(r, before))
 }
 
 /// Says on stderr that game `n` has no previous moves, so that it is solved standalone: correct, but without the seed
 /// and the ceiling that the moves for `n − 1` give, so it costs more
 /// (https://github.com/bvchess/taxman-notebook/blob/main/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md
-/// measures how much).  `in_table`: whether the table has the moves for `n − 1` (which `--use-prev` would take).
-fn note_standalone(n: u32, in_table: bool) {
+/// measures how much).
+fn note_standalone(n: u32) {
     let before = n - 1;
-    let how = if in_table {
-        format!("give --out with the earlier games, or --use-prev to take the known game of {before}")
-    } else {
-        "give --out with the earlier games, or --use-prev if the committed chain or the bounds store has it".to_owned()
-    };
     let _ = writeln!(
         std::io::stderr(),
         "note: no previous game for n={n} (the game of {before} is neither in this run nor in the results file): \
-         solving it standalone, with no seed and no ceiling, which costs more; to chain, {how}"
+         solving it standalone, with no seed and no ceiling, which costs more; to chain, give --out with the earlier \
+         games"
     );
 }
 
@@ -1766,9 +1582,8 @@ pub fn solve_range(
 
 /// Solves the games `lo..=hi`, each from the moves for the one before, and concludes them in order (with
 /// up to [`SolveOptions::window`] games in flight, see `window`).  The moves for `lo − 1` come from the results
-/// file, else, with [`SolveOptions::use_prev`], from the known sources ([`SolveOptions::known`]: the table and, if
-/// it names them, the committed chain and the bounds store).  The results file is checked when it is opened
-/// ([`ResultsFile::open`]); games already completed in it are skipped (and a checkpoint left for one is deleted).
+/// file, else there are none.  The results file is checked when it is opened ([`ResultsFile::open`]); games already
+/// completed in it are skipped (and a checkpoint left for one is deleted).
 /// Every other result is appended to the file (if there is one), then given to `on_game`, and only then is its
 /// checkpoint deleted.  A result whose moves fail a check after they were found goes to the file's
 /// [`rejected_path`](crate::results::rejected_path) instead, and the run fails.  The range stops at a game whose
@@ -1802,15 +1617,7 @@ pub fn solve_range_each_with(
             fs::create_dir_all(dir).map_err(|e| format!("cannot make the {what} folder {}: {e}", dir.display()))?;
         }
     }
-    let known = Known::load(optimal, &opts.known)?;
-    let open = |path: &Path| {
-        ResultsFile::open_with(path, &known, opts.threads).map_err(|e| match e.contains("not given to the check") {
-            // A file made with `--use-prev` has lines that cite the sources it drew on.
-            true => format!("{e} (a file with lines that cite a known source is opened with --use-prev)"),
-            false => e,
-        })
-    };
-    let mut results = results_path.map(open).transpose()?;
+    let mut results = results_path.map(|path| ResultsFile::open(path, optimal, opts.threads)).transpose()?;
     if let Some(file) = &results {
         // Left by a crash between saving a result and deleting its checkpoint.
         for n in (lo..=hi).filter(|&n| file.completed(n).is_some()) {
@@ -1819,14 +1626,14 @@ pub fn solve_range_each_with(
             }
         }
     }
-    let first = previous_game(lo, results.as_ref(), &known, opts)?;
+    let first = previous_game(lo, results.as_ref());
     // A first game the file settles is not solved standalone by this run.
     if lo > 1 && first.is_none() && !results.as_ref().is_some_and(|file| file.completed(lo).is_some()) {
-        note_standalone(lo, optimal.score(lo - 1).is_some());
+        note_standalone(lo);
     }
     let mut earlier = results.as_ref().map(Earlier::of_file).unwrap_or_default();
     let before = first.map_or(Before::None, Before::Given);
-    let range = window::Range { lo, hi, before, known: &known, results: results.as_mut() };
+    let range = window::Range { lo, hi, before, optimal, results: results.as_mut() };
     window::solve(range, opts, &mut earlier, &mut on_game)
 }
 
@@ -1854,11 +1661,7 @@ mod tests {
         assert_eq!(json.get("optimal_match").and_then(Json::as_bool), Some(true));
         assert_eq!(json.get("tactics").and_then(Json::as_str), Some("default"));
         assert_eq!((json.get("prev"), json.get("assumes")), (Some(&Json::Null), Some(&Json::array(Vec::<u32>::new()))));
-        let options = json.get("options").unwrap();
-        assert_eq!(
-            (options.get("force_search"), options.get("use_prev")),
-            (Some(&Json::Bool(false)), Some(&Json::Bool(false)))
-        );
+        assert_eq!(json.get("options").unwrap().get("force_search"), Some(&Json::Bool(false)));
         let contents = crate::results::read_results(&format!("{json}\n"), Optimal::built_in(), 1).unwrap();
         let stored = &contents.games[&10];
         assert_eq!((stored.score, &stored.moves, stored.proof), (r.score, &r.moves, Proof::Trivial));
@@ -1896,19 +1699,11 @@ mod tests {
     }
 
     #[test]
-    fn the_previous_game_comes_from_the_table_only_when_asked() {
-        // By default a range that starts late has no previous moves: its first game is solved standalone.
+    fn a_range_that_starts_late_has_no_previous_moves_and_its_first_game_is_solved_standalone() {
         let r = solve_range(50, 52, &one_thread(), None).unwrap();
         assert_eq!((r[0].prev_source(), r[1].prev_source()), (None, Some(PrevSource::Run)));
         assert!(r.iter().all(|g| g.assumes.is_empty()), "standalone, and chained from it, nothing is assumed");
-        // With `use_prev`, the table's moves for 49, assumed optimal as far as a proof rests on them.
-        let opts = SolveOptions { use_prev: true, ..one_thread() };
-        let r = solve_range(50, 52, &opts, None).unwrap();
-        assert_eq!((r[0].prev_source(), r[1].prev_source()), (Some(PrevSource::Optimal), Some(PrevSource::Run)));
-        let record = r[0].prev.as_ref().unwrap();
-        assert_eq!((record.n, record.proof, &record.assumes), (49, None, &Assumptions::from([assumed_optimal(49)])));
-        assert!(r[0].use_prev);
-        let first = solve_range(1, 1, &opts, None).unwrap();
+        let first = solve_range(1, 1, &one_thread(), None).unwrap();
         assert_eq!((first[0].prev_source(), first[0].score, first[0].moves.len()), (None, 0, 0));
     }
 
@@ -1935,13 +1730,12 @@ mod tests {
             assumes: Assumptions::new(),
         };
         // [5, 4, 6] are the moves for 6, scoring 15.
-        for source in [PrevSource::Results, PrevSource::Optimal] {
-            assert!(solve_game(7, Some(&prev(&[5, 4, 6], 15, source)), &opts).is_ok());
-            let err = solve_game(7, Some(&prev(&[5, 4, 6], 14, source)), &opts).unwrap_err();
-            assert!(err.contains("score 15, not the 14"), "{err}");
-            let err = solve_game(7, Some(&prev(&[5, 4, 4], 13, source)), &opts).unwrap_err();
-            assert!(err.contains("not legal for n=6"), "{err}");
-        }
+        let source = PrevSource::Results;
+        assert!(solve_game(7, Some(&prev(&[5, 4, 6], 15, source)), &opts).is_ok());
+        let err = solve_game(7, Some(&prev(&[5, 4, 6], 14, source)), &opts).unwrap_err();
+        assert!(err.contains("score 15, not the 14"), "{err}");
+        let err = solve_game(7, Some(&prev(&[5, 4, 4], 13, source)), &opts).unwrap_err();
+        assert!(err.contains("not legal for n=6"), "{err}");
         // Moves this run made were refereed by `conclude` before they became the previous moves, so they are not
         // checked again: a wrong score goes unnoticed (the moves for 7 built from it are still refereed), and moves
         // that are not legal fail only in the moves built from them.
@@ -1951,14 +1745,23 @@ mod tests {
     }
 
     /// Solves the games `lo..=hi` as a range does (its driver, [`window::solve`], on one thread, so one game after
-    /// the other), each from the one before (the first from the table's moves for the game before it), with the
-    /// `Earlier` that the run keeps; returns it and the results.
+    /// the other), each from the one before (the first from the table's moves for the game before it, given as a line
+    /// of a results file would give them), with the `Earlier` that the run keeps; returns it and the results.
     fn solved_with_earlier(lo: u32, hi: u32) -> (Earlier, Vec<GameResult>) {
         let (opts, optimal) = (one_thread(), Optimal::built_in());
         let mut earlier = Earlier::default();
-        let before = Prev::from_optimal(optimal, lo - 1).map_or(Before::None, Before::Given);
-        let known = Known::table(optimal);
-        let range = window::Range { lo, hi, before, known: &known, results: None };
+        let table_prev = |n: u32| {
+            let (moves, score) = (optimal.moves(n)?.to_vec(), optimal.score(n)?);
+            Some(Prev {
+                moves,
+                score,
+                source: PrevSource::Results,
+                proof: Some(Proof::Exhausted),
+                assumes: Assumptions::new(),
+            })
+        };
+        let before = table_prev(lo - 1).map_or(Before::None, Before::Given);
+        let range = window::Range { lo, hi, before, optimal, results: None };
         let mut results = Vec::new();
         window::solve(range, &opts, &mut earlier, &mut |result| results.push(result.clone())).unwrap();
         (earlier, results)

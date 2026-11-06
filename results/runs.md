@@ -2,18 +2,48 @@
 
 Part of [the results](README.md).
 
-It was made in six runs, each a continuation of the one before.  Each run wrote its results to a plain file of its own,
-`strict.jsonl` in its working directory, and the lines were brought home from there into the committed file, which was
-`results/strict.jsonl`, a plain file, in the commits that the table names:
+It was made in one run, from game 1 to game 5060 with one build.  On 2026-11-06 it replaced the file that six runs had
+made (`git show d05191a:results/optimal.jsonl.gz` has that file; "The earlier file" below records its runs):
+
+| games | where | build | what git has before it |
+|---|---|---|---|
+| 1–5060 | one run on a friend's machine of 88 threads (batmobile) | commit aaba59b, clean | `git show d05191a:results/optimal.jsonl.gz`, the earlier file, whose 5060 lines have the scores of this file's |
+
+**The run of 2026-11-01, games 1–5060.**  The command was `solver/tools/cloud/chain.sh 5060`, which runs `taxman solve
+1-5060 --window 4 --out strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 300 --progress 60`, with `--background
+--carried-dir carried --profile profile` added through `EXTRA_ARGS`, on all 88 threads of the machine: two Intel Xeon
+E5-2699 v4 (x86_64, Ubuntu).  It used the defaults of the build of commit aaba59b: a gate of conflict branching of 300
+and no gate trial (`CONFLICT_BRANCHING_GAP` is 300 there, and `--gate-trial` is off unless given), the tactics
+`price_reuse` and `warm_start` on, and a finder of 900 seconds after 1,000,000 steps; the workers ran at idle priority
+(`--background`), and each search read the nogoods of the games before it (`--carried-dir`, the tactic
+`carried_nogoods`).  It solved every game, from game 1, and took no game or moves from a file.  It started on
+2026-11-01 at 08:24 PST (16:24Z) and ended on 2026-11-06 at 05:00 PST (13:00Z), after 419,763 s, 116.6 hours, of wall
+time; the games overlap in the window of 4, and their `seconds.active_all_runs` add up to 118.8 hours.  Its two
+verifiers passed, and the file replaced the earlier one the same day.
+
+*Details.*  Every line records the build of commit aaba59b (`dirty` false), 88 threads, one invocation, no
+`--time-limit` or `--node-limit`, and the options `background`, `finder_after` and `finder_seconds`; no line records a
+gate or a gate trial, so every search kept the default gate.  The searches took 62.97 G nodes and 10,149 CPU hours.  The
+dearest, by the hours a game had a worker, were 4983 (12.5 hours, 6.89 G nodes), 4984 (11.4 hours, 6.25 G), 4992 (9.1
+hours, 4.98 G), 4991 (6.8 hours, 1.90 G) and 4995 (6.0 hours, 3.35 G).  [README.md](README.md#optimaljsonlgz) counts
+the games by proof kind, and says in which games the moves are other optimal sets than the earlier file's
+([README.md, "Games with several optimal sets"](README.md#games-with-several-optimal-sets)); the scores are the earlier
+file's in every game.
+
+## The earlier file
+
+The file that this one replaced was made in six runs, each a continuation of the one before.  Each run wrote its
+results to a plain file of its own, `strict.jsonl` in its working directory, and the lines were brought home from there
+into the committed file, which was `results/strict.jsonl`, a plain file, in the commits that the table names:
 
 | games | where | build | git has the file before the run as |
 |---|---|---|---|
 | 1–2175 | one invocation, which nothing stopped, on a laptop | commit feba6d0 | (the earlier files, below) |
-| 2176–3440 | appended to a copy of those lines on a cloud machine | commit 55287ff | `git show 4f1c35b:rust/results/strict.jsonl`, whose 2175 lines are this file's first 2175, byte for byte |
-| 3441–3914 | appended from a run on a cloud machine of the same kind | commit eb84a6f | `git show b23f497:rust/results/strict.jsonl`, whose 3440 lines are this file's first 3440, byte for byte |
-| 3915–4547 | appended from a run on a cloud machine of the same kind, which took the lines before from this file and the bounds store (`--use-prev`) | commit ca357bf | `git show c7d81c2:rust/results/strict.jsonl`, whose 3914 lines are this file's first 3914, byte for byte |
-| 4548–4874 | appended from a run on a cloud machine of the same kind, which took the lines before from this file and the bounds store (`--use-prev`) | commit 4974a71 | `git show f48df13:results/strict.jsonl`, whose 4547 lines are this file's first 4547, byte for byte |
-| 4875–5060 | appended from a run on a friend's machine of 88 threads, which took the lines before from this file and the bounds store (`--use-prev`) | commits a88dc7f, bcfde26, 551f883, 9b4b308, d45a513, afbc256, d10e27a, c3357cd, 88b1228, 947946a, 29aa8ba, 7140548, ee9d945, 1b59354 and 85dd216 | `git show 18232de:results/strict.jsonl`, whose 4874 lines are this file's first 4874, byte for byte |
+| 2176–3440 | appended to a copy of those lines on a cloud machine | commit 55287ff | `git show 4f1c35b:rust/results/strict.jsonl`, whose 2175 lines are the earlier file's first 2175, byte for byte |
+| 3441–3914 | appended from a run on a cloud machine of the same kind | commit eb84a6f | `git show b23f497:rust/results/strict.jsonl`, whose 3440 lines are the earlier file's first 3440, byte for byte |
+| 3915–4547 | appended from a run on a cloud machine of the same kind, which took the lines before from the earlier file and the bounds store (`--use-prev`) | commit ca357bf | `git show c7d81c2:rust/results/strict.jsonl`, whose 3914 lines are the earlier file's first 3914, byte for byte |
+| 4548–4874 | appended from a run on a cloud machine of the same kind, which took the lines before from the earlier file and the bounds store (`--use-prev`) | commit 4974a71 | `git show f48df13:results/strict.jsonl`, whose 4547 lines are the earlier file's first 4547, byte for byte |
+| 4875–5060 | appended from a run on a friend's machine of 88 threads, which took the lines before from the earlier file and the bounds store (`--use-prev`) | commits a88dc7f, bcfde26, 551f883, 9b4b308, d45a513, afbc256, d10e27a, c3357cd, 88b1228, 947946a, 29aa8ba, 7140548, ee9d945, 1b59354 and 85dd216 | `git show 18232de:results/strict.jsonl`, whose 4874 lines are the earlier file's first 4874, byte for byte |
 
 Each build was of a clean tree, which every line records.  Every line records the `default` tactics: no tactic is
 unproven any more, so none is switched off.  The sixth run's lines come from fifteen builds, one for each stretch of its
@@ -84,9 +114,9 @@ the deadline.  The run cost about $16.46 in all.
 **The third run, games 3441–3914.**  The command was `taxman solve` from n = 1, with a window of 4 games in flight on
 64 threads of one `c8g.16xlarge` at spot, with the build of commit eb84a6f.  It was launched on 2026-10-17 at 00:15 PDT
 and stopped on request on 2026-10-18 at 18:58Z, in the middle of game 3915, which has no line.  It solved games 1–3440
-again first, with this file's scores in all (checked), and only its lines from 3441 on went into this file.  So the
-lines before them are the second run's, unchanged, and the moves for 3440 that line 3441 names (`prev`, by digest) is
-this file's.  Every kept line records that build (`dirty` false), 64 threads, one invocation, no `--time-limit` or
+again first, with the earlier file's scores in all (checked), and only its lines from 3441 on went into that file.  So
+the lines before them are the second run's, unchanged, and the moves for 3440 that line 3441 names (`prev`, by digest)
+is that file's.  Every kept line records that build (`dirty` false), 64 threads, one invocation, no `--time-limit` or
 `--node-limit`, the `default` tactics, and a `prev.source` of `run`, 3441's too.  The [entry on the
 run](https://github.com/bvchess/taxman-notebook/blob/main/the-run-to-the-wall-2026-10/README.md) has its story.
 
@@ -99,12 +129,12 @@ never held more than 5,815, and none spilled to disk.
 **The fourth run, games 3915–4547.**  The command was `taxman solve 1-8191 --use-prev`, with a window of 4 games in
 flight on 64 threads of one `c8g.16xlarge` at spot, with the build of commit ca357bf; `solver/tools/cloud/wall.sh`
 launched it ([its runbook](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/runbook/wall.md), as of 3ca11bf).
-With `--use-prev` it took the lines for 1–3914 from this file and each game the bounds store had proven from the store,
+With `--use-prev` it took the lines for 1–3914 from the earlier file and each game the bounds store had proven from the store,
 with no search, and searched the others, from 3915 on.  Its own file started with `known` copies of the lines for
-1–3914.  The lines for games 3915–4547 were appended to this file, byte for byte; those copies and the run's three
+1–3914.  The lines for games 3915–4547 were appended to the earlier file, byte for byte; those copies and the run's three
 incomplete lines (of games 3940, 4340 and 4548) were left out. Every kept line records that build (`dirty` false), 64
 threads, no `--time-limit` or `--node-limit`, the `default` tactics and the option `use_prev`.  The first line, 3915,
-records its moves for 3914 as `known`, the run's copy of this file's line; both verifiers accept that record, because
+records its moves for 3914 as `known`, the run's copy of that file's line; both verifiers accepted that record, because
 the score, the moves and the assumptions are the line's ([solver/docs/runbook/chain.md, "Verifying, and bringing the
 results home"](../solver/docs/runbook/chain.md#verifying-and-bringing-the-results-home)).
 
@@ -130,9 +160,9 @@ entry](https://github.com/bvchess/taxman-notebook/blob/main/the-run-to-5000-2026
 
 **The fifth run, games 4548–4874.**  The command was `taxman solve 1-8191 --use-prev`, with a window of 4 games in
 flight on 64 threads of one `c8g.16xlarge` at spot, with the build of commit 4974a71, launched by
-`solver/tools/cloud/wall.sh`.  It took the lines for 1–4547 from this file and each game the bounds store had proven
+`solver/tools/cloud/wall.sh`.  It took the lines for 1–4547 from the earlier file and each game the bounds store had proven
 from the store, with no search, and searched the others, from 4548 on.  Its own file started with `known` copies of the
-lines for 1–4547.  The lines for games 4548–4874 were appended to this file, byte for byte, but for 14 lines of method
+lines for 1–4547.  The lines for games 4548–4874 were appended to the earlier file, byte for byte, but for 14 lines of method
 `search` with no node (4644, 4785, 4794, 4797, 4810, 4816, 4818, 4824, 4833, 4842, 4844, 4845, 4850 and 4869), which the
 rule of commit 7987c86 names `start`, as for every line of a build before it.  Those copies and the run's incomplete
 line (of game 4875) were left out.  Every kept line records that build (`dirty` false), 64 threads, one invocation, no
@@ -160,7 +190,7 @@ the wall changed), on a friend's machine of 88 threads: two Intel
 Xeon E5-2699 v4 (x86_64, Ubuntu).  It continued the fifth run's results file and its checkpoints, which were copied from
 the cloud machine.  It took the lines for 1–4874 from the file and each game the bounds store had proven from the store,
 with no search, and searched the others, from 4875 on.  Its own file started with `known` copies of the lines for
-1–4874.  The lines for games 4875–5060 were appended to this file, byte for byte.  Those copies and the run's incomplete
+1–4874.  The lines for games 4875–5060 were appended to the earlier file, byte for byte.  Those copies and the run's incomplete
 lines (two of game 4875, one each of 4879, 4880, 4895, 4899, 4914, 4921, 4944, 4950, 4953, 4956 and 4960, three of 4984,
 one each of 4991, 4992, 5037 and 5047, two of 5049, and one each of 5054 and 5061) were left out.  No line was
 relabeled: every build is after commit 7987c86, so a search that took no step already says `start`.  Every kept line
@@ -171,8 +201,8 @@ them.  The lines of 4953 on, made by builds in which `conflict_look` is on by de
 and those of 4960 on record `price_reuse=on`, which the command switched on.  The lines of 4984 on record
 `carried_nogoods=on` and `warm_start=on` too, and `conflict_branching=off` in all but 4991, 4992, 4995, 4998, 5000 and
 the 30 searched games of 5001–5060, whose searches the lab switched to conflict branching at a gate of 1200 (below).
-The first line, 4875, records its moves for 4874 as the line of this file, with its proof kind, `same_search`, which
-both verifiers accept.
+The first line, 4875, records its moves for 4874 as the line of the earlier file, with its proof kind, `same_search`, which
+both verifiers accepted.
 
 *Details.*  `chain.sh` ran twenty-three times, from 2026-10-21 to 30 (times UTC).  Each stop was a SIGTERM to
 `chain.sh`: the solver wrote a final checkpoint, and the next invocation resumed from it; the last stop ended the run.
@@ -294,7 +324,8 @@ searched 5049 and wrote only an incomplete line):
   the game's root before the search uses it, and the warm start changes only which of several heaviest sets the GF(2)
   bound finds, so both verifiers accept the lines.
 
-**The earlier chains.**  This is the fourth chain committed.  The earlier three were chains to 1300, and git has them:
+**The earlier chains.**  The file of 2026-11-06 is the fifth chain committed.  The earlier three were chains to 1300,
+and git has them:
 
 * the first, of commit bd9bb5d, in schema 3: `git show cd3d32f:rust/results/strict.jsonl`;
 * the second, of commit 243af9b, in schema 4: `git show 2487671:rust/results/strict.jsonl`;
@@ -319,5 +350,4 @@ file's in a few games ([README.md, "Games with several optimal sets"](README.md#
   [taxman-notebook/search/the-gf2-bound-in-the-search-2026-10/chain.jsonl](https://github.com/bvchess/taxman-notebook/blob/main/search/the-gf2-bound-in-the-search-2026-10/chain.jsonl)
   (1301–2175, schema 5, commit 716ebd9, 2 threads), a chain from the table's moves for 1300.
 
-The two chains stay as their studies' data.  The verifiers read the second beside this file, and no longer read
-the first.
+The two chains of the notebook stay as their studies' data, in formats that the verifiers no longer read.

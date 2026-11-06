@@ -15,39 +15,32 @@ each line's proof kind and assumptions again, so that a hand edit cannot change 
   files agree.  It checks that a line's fields agree with each other as the solver writes them, so that a hand edit
   cannot drop an assumption or change a proof kind.  It counts the games by proof kind and by what they assume, and the
   searches that the near-repeat cut shortened (`stats.near_repeat_cut` above 0) by proof kind.  For a repeat it sets the
-  search problems of both games up again and compares them.  For a `known` line it checks the citation against the
-  sources ([the reference, "Citing a known source"](REFERENCE.md#citing-a-known-source)): the built-in table, the
-  committed chain and the bounds store of the repository, read as they are, since their own verifiers check them.
-  Opening a results file for `--out` runs the same checks, with the sources that `--use-prev` draws on.
-* **Both verifiers accept a file with holes**, such as one an older `solve` wrote when it went on past limits, whose
-  games may have no line or only incomplete ones.  They check each line against what it rests on in the same file:
+  search problems of both games up again and compares them.  Opening a results file for `--out` runs the same checks.
+* **Both verifiers accept a file that starts above game 1, has a gap, or ends with a stopped search**: a run that began
+  with a standalone game (its first line has no `prev`), or that a limit or a signal stopped.  They check each line
+  against what it rests on in the same file:
   * a ceiling (`setup.cap`), or the proof kind `cap` or `prime_formula`, needs the moves for n − 1 completed in the
     file;
   * a repeat needs the game it repeats completed on an earlier line;
   * an exhausted search needs nothing of n − 1;
-  * a line built on the best moves of an unfinished search names an earlier incomplete line of n − 1 with that score and
-    those moves, scores no less than it, and has no ceiling and no such proof kind;
   * an incomplete line that records its moves (`best_so_far`) is checked to be legal, to score the
     `best_so_far`, and to be no better than the built-in table's score.
 
   The report names the games that only an unfinished search is recorded for.  A line whose moves for n − 1 are not in
-  the file at all is still refused.  `tests/results.rs` shows each case with both verifiers.
+  the file at all is still refused, unless it names none.  `tests/results.rs` shows each case with both verifiers.
 * **`python3 solver/tools/check_results.py [FILE...]`** is an independent verifier in Python: standard library only, and
   no code shared with the solver.  It derives every proof kind and assumption again, and also checks each score against
   the lines of `results/optimal.jsonl.gz`, the Franklín–Moniot upper bound and the best-known heuristic chain in
   `heuristics/results`.  It reads a path ending in `.gz` through Python's `gzip` module.  With no arguments it checks
-  `results/*.jsonl` and `results/*.jsonl.gz` but the store, `bounds.jsonl`, which is not a file of results.  It cannot
-  rebuild the frame model, so it takes an `exhausted` line at its word.  Of a repeat it checks only what the lines show:
-  the game repeated is earlier in the file and settles its search, and the recorded digests and promotions agree.  It
-  checks a `known` line against the sources (`--committed FILE` and `--bounds FILE`, by default the committed chain and
-  the store of `results/`), from the lines of the files alone.  It cannot play the store's promotion sets, so it does
-  not check the digest of the moves for n − 1 taken from the store.  It also asks that the method fits the nodes: a
-  `start` line is completed with `nodes` 0 and a completed `search` line has more, which refuses a line of a build that
-  called a `start` game a `search`.
+  `results/*.jsonl` and `results/*.jsonl.gz`.  The table it compares scores with is the committed file, or the file that
+  `--table FILE` names.  It cannot rebuild the frame model, so it takes an `exhausted` line at its word.  Of a repeat it
+  checks only what the lines show: the game repeated is earlier in the file and settles its search, and the recorded
+  digests and promotions agree.  It also asks that the method fits the nodes: a `start` line is completed with `nodes` 0
+  and a completed `search` line has more.
 * **Both verifiers read `stats.near_repeat_cut` as a count and not as a proof kind.**  A search that the near-repeat cut
   shortened is `exhausted` all the same, so the key changes no proof kind and no assumption.  Both refuse a value that
-  is no count, and the key on a line that ran no search.  Neither refuses a line for lacking the key, as every line made
-  before the cut does.
+  is no count, and the key on a line that ran no search.  Neither refuses a line for lacking the key, which a search
+  that was not armed with the cut does not write.
 
 The report of `taxman verify-results results/optimal.jsonl.gz` gives the completed games and the range n = 1..last with
 the number missing, the incomplete lines, the games by proof kind and by what they assume, the scores at a proven

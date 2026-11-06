@@ -21,21 +21,13 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use taxman::engine;
 use taxman::game::Optimal;
-use taxman::known::{Known, KnownSources};
 use taxman::numtheory::Tables;
-use taxman::results::verify_files_with;
+use taxman::results::verify_files;
 use taxman::search::{finder, gate_trial, MAX_GATE};
 use taxman::solver::{self, GameResult, Method, SolveOptions};
 
 fn failed(message: String) -> CliError {
     CliError::Failed(message)
-}
-
-/// The known sources of the repository (the committed chain and the bounds store in `results`) with `optimal` as
-/// the table, for checking results that cite them; the table alone if there is no repository.
-fn known_in_repository(optimal: &Optimal) -> Result<Known<'_>, CliError> {
-    let sources = KnownSources::in_repository().unwrap_or_default();
-    Known::load(optimal, &sources).map_err(failed)
 }
 
 /// Flags that take a value: the solver's and the command's own.
@@ -165,21 +157,13 @@ const SOLVE_FLAGS: [&str; 10] = [
 pub fn solve(args: &[String]) -> CliResult {
     let usage = || CliError::Usage("usage: solve N|A-B [options]".into());
     let flags = [&SOLVE_FLAGS[..], &SEARCH_FLAGS[..]].concat();
-    let switches = [&["--force-search", "--use-prev", "--show"][..], &SEARCH_SWITCHES[..]].concat();
+    let switches = [&["--force-search", "--show"][..], &SEARCH_SWITCHES[..]].concat();
     let args = Args::parse(args, &flags_with(&flags), &switches)?;
     let [range] = args.positional() else { return Err(usage()) };
     let (lo, hi) = parse_range(range)?;
 
     let mut opts = range_options(&args)?;
     opts.force_search = args.has("--force-search");
-    opts.use_prev = args.has("--use-prev");
-    if opts.use_prev {
-        // The known moves: the table's, and the committed chain's and the bounds store's in the repository.
-        opts.known = KnownSources::in_repository().unwrap_or_else(|e| {
-            errln!("note: {e}; --use-prev draws on the built-in table alone");
-            KnownSources { boards: true, ..KnownSources::default() }
-        });
-    }
     opts.finder_after = args.parsed("--finder-after")?.unwrap_or(finder::AFTER);
     if let Some(budget) = args.positive_seconds("--finder-seconds")? {
         opts.finder_budget = budget;
@@ -227,17 +211,16 @@ pub fn solve(args: &[String]) -> CliResult {
 // ---------------------------------------------------------------------------------------------------------
 // regress
 
-/// `regress [--from A] [--to N] [--window K] [--use-prev]`: solves A..N in memory and checks every score against
-/// the table of optimal moves (the first that differs is an error, as in any run).
+/// `regress [--from A] [--to N] [--window K]`: solves A..N in memory and checks every score against the table of
+/// optimal moves (the first that differs is an error, as in any run).
 pub fn regress(args: &[String]) -> CliResult {
-    let args = Args::parse(args, &flags_with(&["--to", "--from", WINDOW_FLAG]), &["--use-prev"])?;
+    let args = Args::parse(args, &flags_with(&["--to", "--from", WINDOW_FLAG]), &[])?;
     if !args.positional().is_empty() {
         return Err(CliError::Usage("regress takes no positional arguments".into()));
     }
     let from = args.parsed::<u32>("--from")?.unwrap_or(1);
     let to = args.parsed::<u32>("--to")?.unwrap_or(400);
-    let mut opts: SolveOptions = range_options(&args)?;
-    opts.use_prev = args.has("--use-prev");
+    let opts: SolveOptions = range_options(&args)?;
 
     let start = Instant::now();
     let mut results: Vec<GameResult> = Vec::new();
@@ -276,9 +259,7 @@ fn millis(since: Instant) -> f64 {
 /// `verify-results [--threads K] FILE...`: checks results files without changing them (`results::verify_files`), their
 /// scores against the built-in table; a file whose name ends in `.gz`, the committed results `results/optimal.jsonl.gz`
 /// among them, is read through the gzip decoder.  The check sets up the search problems of the repeats on K threads,
-/// as many as `solve` takes by default (the CPUs) unless `--threads` says.  A line that cites a known source (proof
-/// `known`) is checked against it: the table, the committed chain and the bounds store of the repository's
-/// `results` (as `solve --use-prev` draws on them).
+/// as many as `solve` takes by default (the CPUs) unless `--threads` says.
 pub fn verify_results(args: &[String]) -> CliResult {
     let args = Args::parse(args, &["--threads"], &[])?;
     if args.positional().is_empty() {
@@ -287,8 +268,7 @@ pub fn verify_results(args: &[String]) -> CliResult {
     let paths: Vec<PathBuf> = args.positional().iter().map(PathBuf::from).collect();
     let threads = solver_options(&args)?.threads;
     let start = Instant::now();
-    let known = known_in_repository(Optimal::built_in())?;
-    let report = verify_files_with(&paths, &known, threads).map_err(CliError::Failed)?;
+    let report = verify_files(&paths, Optimal::built_in(), threads).map_err(CliError::Failed)?;
     outln!("{report}");
     outln!("checked in {:.1} ms", millis(start));
     Ok(())

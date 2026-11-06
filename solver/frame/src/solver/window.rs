@@ -115,7 +115,7 @@
 //! so that the two add up to its span.  A game is active in its setup, which holds one thread, and in a search that has
 //! live workers or is in its start (the dive and the local search, which run on the search's own thread).  It waits for
 //! a thread to set up on; as a search set up and not started (deferred, or waiting for a seed or for threads), a
-//! repeat, or a prime, trivial or known game, until the head concludes it; as a search suspended for older games, with
+//! repeat, or a prime or trivial game, until the head concludes it; as a search suspended for older games, with
 //! no worker left; and as a search done, until it is the head.  The workers' CPU time is the engine's count
 //! ([`Counters::cpu`](crate::engine::Counters::cpu)), which the driver reads as it samples the search and takes whole
 //! when the search ends.  So what a game cost is its CPU time, whichever game is the head: a younger game that shares
@@ -150,14 +150,12 @@
 mod allot;
 
 use super::{
-    ceiling, clock, conclude_game, discard_checkpoint, search_cap, set_up, shared_spill_dir, stored_prev, Before,
-    Context, Derived, Earlier, Failure, Found, GameResult, Go, Job, Outcome, Prev, RangeSummary, SearchSetUp, SetUp,
-    SolveOptions,
+    ceiling, clock, conclude_game, discard_checkpoint, set_up, shared_spill_dir, stored_prev, Before, Context, Derived,
+    Earlier, Failure, Found, GameResult, Go, Job, Outcome, Prev, RangeSummary, SearchSetUp, SetUp, SolveOptions,
 };
 use crate::accelerate::prime_shortcut;
 use crate::engine::{self, Spent, Status, WORKER_STACK_SIZE};
 use crate::game::Optimal;
-use crate::known::Known as KnownGames;
 use crate::results::ResultsFile;
 use crate::search::Problem;
 use allot::{allot, Grant, Load, Need, TICK};
@@ -176,8 +174,8 @@ pub(super) struct Range<'a> {
     pub(super) hi: u32,
     /// The moves for `lo − 1`.
     pub(super) before: Before,
-    /// The known sources: the table the scores are confirmed against, and, with `--use-prev`, what the games draw on.
-    pub(super) known: &'a KnownGames<'a>,
+    /// The table the scores are confirmed against.
+    pub(super) optimal: &'a Optimal,
     /// The results file: its completed games are skipped, and the others appended to it.
     pub(super) results: Option<&'a mut ResultsFile>,
 }
@@ -216,10 +214,10 @@ enum Event {
 
 /// A game's thread: its setup, then, for a search, its search once the driver says go, unless the game is canceled
 /// first (the driver drops the sender of the go).
-fn play(n: u32, before: &Before, opts: &SolveOptions, known: &KnownGames, events: &Sender<Event>, go: &Receiver<Go>) {
+fn play(n: u32, before: &Before, opts: &SolveOptions, events: &Sender<Event>, go: &Receiver<Go>) {
     let _unwinding = Unwinding { n, events };
     let start = Instant::now();
-    let set_up = set_up(n, before, opts, known).map_err(Failure::message);
+    let set_up = set_up(n, before, opts).map_err(Failure::message);
     let job = match &set_up {
         Ok(SetUp::Search(set, _)) => Some(Arc::clone(&set.job)),
         _ => None,
@@ -513,7 +511,6 @@ fn sum(numbers: &[u32]) -> u64 {
 struct Window<'a> {
     opts: &'a SolveOptions,
     optimal: &'a Optimal,
-    known: &'a KnownGames<'a>,
     results: Option<&'a mut ResultsFile>,
     earlier: &'a mut Earlier,
     lo: u32,
@@ -547,8 +544,7 @@ impl<'a> Window<'a> {
         };
         Window {
             opts,
-            optimal: range.known.optimal(),
-            known: range.known,
+            optimal: range.optimal,
             results: range.results,
             earlier,
             lo: range.lo,
@@ -786,7 +782,6 @@ impl<'a> Window<'a> {
                 Known::NotYet | Known::None => None,
             },
             Stage::Derived(Derived::Trivial { plain, .. }) => Some(Seed::Moves(plain)),
-            Stage::Derived(Derived::Known { game, .. }) => Some(Seed::Moves(&game.moves)),
             Stage::Search(_, Plan::Search(Search::Done(outcome))) => Some(Seed::Moves(&outcome.moves)),
             Stage::Search(set, _) => self.provisional_promotions(g).map(|promotions| Seed::On(&*set.job, promotions)),
             Stage::Waiting | Stage::SettingUp | Stage::Failed(_) => None,
@@ -949,13 +944,13 @@ impl<'a> Window<'a> {
     {
         let Some(game) = self.games.get_mut(&n) else { return };
         let (go, waits) = mpsc::channel();
-        let (before, opts, known, events) = (game.before.clone(), self.opts, self.known, self.events.clone());
+        let (before, opts, events) = (game.before.clone(), self.opts, self.events.clone());
         // The setup and the search's start ran on the main thread when games were solved one at a time; the stack is
         // reserved address space, committed only as touched.
         let spawned = thread::Builder::new()
             .name(format!("game-{n}"))
             .stack_size(WORKER_STACK_SIZE)
-            .spawn_scoped(scope, move || play(n, &before, opts, known, &events, &waits));
+            .spawn_scoped(scope, move || play(n, &before, opts, &events, &waits));
         match spawned {
             Ok(_) => {
                 game.stage = Stage::SettingUp;
@@ -974,17 +969,17 @@ impl<'a> Window<'a> {
     fn start_search(&mut self, n: u32, threads: usize, now: Instant) {
         let Some(Game { stage: Stage::Search(set, _), .. }) = self.games.get(&n) else { return };
         let seeds = set.job.seeds();
-        // The ceiling is the one that a concluded game before it gives, or the bounds store's upper bound of the board.
+        // The ceiling is the one that a concluded game before it gives.
         let (seed, cap, given) = match self.known_before(n) {
             Known::Final(prev) => {
-                (seeds.then(|| prev.moves.clone()), search_cap(set, n, Some(prev.score), self.opts), None)
+                (seeds.then(|| prev.moves.clone()), ceiling(n, set.in_the_bag, Some(prev.score), self.opts), None)
             }
             Known::Provisional(before) if seeds => {
                 let moves = before.moves();
                 let given = Given { value: before.value(), score: sum(&moves) };
-                (Some(moves), search_cap(set, n, None, self.opts), Some(given))
+                (Some(moves), None, Some(given))
             }
-            Known::Provisional(_) | Known::NotYet | Known::None => (None, search_cap(set, n, None, self.opts), None),
+            Known::Provisional(_) | Known::NotYet | Known::None => (None, None, None),
         };
         // The finder's seed is the moves for the game before it as the search takes them, and for a search that takes
         // none (a resumed one) those moves all the same, if there are any.
@@ -1123,12 +1118,12 @@ impl<'a> Window<'a> {
 }
 
 /// What the conclusion of game `n − 1`, as `prev`, gives the search of game `n`, set up as `set`, whether it runs or
-/// waits for its go (step 5 of the module docs): its ceiling ([`search_cap`]), the seed of the final moves as a hint
+/// waits for its go (step 5 of the module docs): its ceiling ([`ceiling`]), the seed of the final moves as a hint
 /// ([`Job::hint`]), and the near-repeat cut by `prev`, where the search has the tactic and `prev` assumes
 /// nothing ([`Job::arm`]).  Returns the ceiling given, if any, and the cut's bound if this armed the cut, or why it
 /// could not be set up.
 fn told(set: &SearchSetUp, n: u32, prev: &Prev, opts: &SolveOptions) -> (Option<u64>, Result<Option<u64>, String>) {
-    let cap = search_cap(set, n, Some(prev.score), opts);
+    let cap = ceiling(n, set.in_the_bag, Some(prev.score), opts);
     if let Some(cap) = cap {
         set.job.control().set_ceiling(cap);
     }
@@ -1183,8 +1178,7 @@ mod tests {
 
     /// Game `n` set up for its search as the window sets it up, with the game before it `prev`, under `opts`.
     fn search_set_up(n: u32, prev: &Prev, opts: &SolveOptions) -> SearchSetUp {
-        let known = KnownGames::table(Optimal::built_in());
-        match set_up(n, &Before::Given(prev.clone()), opts, &known) {
+        match set_up(n, &Before::Given(prev.clone()), opts) {
             Ok(SetUp::Search(set, _)) => set,
             Ok(SetUp::Derived(_)) => panic!("n={n} needs no search"),
             Err(failure) => panic!("n={n}: {}", failure.message()),
@@ -1246,14 +1240,14 @@ mod tests {
     }
 
     /// The near-repeat cut is armed only by moves that assume nothing, only with the tactic, and only once: not by
-    /// moves assumed optimal; a search armed with its go is not armed again by a conclusion.
+    /// moves that assume something; a search armed with its go is not armed again by a conclusion.
     #[test]
     fn the_near_repeat_cut_is_armed_once_by_a_game_that_assumes_nothing() {
         let prev = concluded(NEAR - 1);
         let bound = prev.score - crate::board::search_problem(NEAR - 1).unwrap().1;
         let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
         let set = search_set_up(NEAR, &prev, &opts);
-        let assumed = Prev { assumes: [crate::results::assumed_optimal(NEAR - 1)].into(), ..prev.clone() };
+        let assumed = Prev { assumes: ["the moves for game 1082 are optimal".to_owned()].into(), ..prev.clone() };
         assert_eq!(set.job.arm(&assumed), Ok(None));
         assert_eq!(set.job.arm(&prev), Ok(Some(bound)));
         assert_eq!(set.job.arm(&prev), Ok(None));

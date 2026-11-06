@@ -18,7 +18,8 @@ re-run, which compared 1000, 800 and 600 against a starting gate of 1,200, is `-
 
 *Why the trial is off by default.*  The trial measures the wrong place.  A study on 2026-10-31 and 2026-11-01, with the
 build of the chain's re-run (commit 3ca11bf), searched whole games on all 88 threads of a machine, with the same flags
-for both policies (`--use-prev --force-search`):
+for both policies (`--force-search`, and `--use-prev`, a flag that build had, for the moves for n − 1 from the committed
+chain):
 
 | game | fixed gate of 300 | gate of 1,200, then the trial over 1000, 800 and 600 |
 |---|---|---|

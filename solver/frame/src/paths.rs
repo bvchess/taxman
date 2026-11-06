@@ -12,9 +12,6 @@ use std::path::{Path, PathBuf};
 /// a directory the repository.
 pub const RESULTS_IN_REPOSITORY: &str = "results/optimal.jsonl.gz";
 
-/// The bounds store, the bounds on opt(n) that the ledger finds, relative to the repository.
-pub const BOUNDS_STORE_IN_REPOSITORY: &str = "results/bounds.jsonl";
-
 /// The nearest directory at or above one of `starts`, tried in order, that contains `marker`.
 fn find_above(starts: &[PathBuf], marker: &str) -> Option<PathBuf> {
     starts.iter().find_map(|start| start.ancestors().find(|dir| dir.join(marker).is_file())).map(Path::to_path_buf)

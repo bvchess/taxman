@@ -65,9 +65,10 @@ fn bad_command_lines_are_usage_errors() {
     assert_usage_error(&["solve", "12", "--nope"], "unknown option --nope");
     assert_usage_error(&["solve", "12", "--time-limit", "-1"], "not a number of seconds");
     assert_usage_error(&["solve", "12", "--node-limit", "many"], "cannot read");
-    for removed in ["--keep-going", "--retry", "--retry-improved", "--pass", "--game-hours"] {
+    for removed in ["--keep-going", "--retry", "--retry-improved", "--pass", "--game-hours", "--use-prev"] {
         assert_usage_error(&["solve", "12", removed], &format!("unknown option {removed}"));
     }
+    assert_usage_error(&["regress", "--use-prev"], "unknown option --use-prev");
     assert_usage_error(&["solve", "12", "--finder-after", "soon"], "--finder-after: cannot read");
     assert_usage_error(&["solve", "12", "--finder-after", "-1"], "--finder-after: cannot read");
     assert_usage_error(&["solve", "12", "--finder-seconds", "0"], "--finder-seconds must be more than 0 seconds");
@@ -372,13 +373,12 @@ fn a_game_with_no_previous_game_says_it_is_solved_standalone() {
     let standalone = |args: &[&str]| taxman(&[&["solve", "--threads", "1", "--progress", "0"][..], args].concat());
     let run = standalone(&["40"]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    for text in ["note: no previous game for n=40", "standalone", "--use-prev to take the known game of 39"] {
+    for text in ["note: no previous game for n=40", "standalone", "give --out with the earlier games"] {
         assert!(run.stderr.contains(text), "{text}: {}", run.stderr);
     }
     assert!(run.stdout.contains("n=40") && !run.stdout.contains("assumes"), "{}", run.stdout);
-    // With a previous game (the table's 39, which the game then assumes optimal), or for n = 1, which has none to
-    // have, there is nothing to say.
-    for args in [&["40", "--use-prev"][..], &["1"], &["1-5"]] {
+    // For n = 1, which has no previous game to have, there is nothing to say.
+    for args in [&["1"][..], &["1-5"]] {
         let run = standalone(args);
         assert_eq!(run.code, Some(0), "{args:?}: {}", run.stderr);
         assert_eq!(run.stderr, "", "{args:?}");

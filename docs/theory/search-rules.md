@@ -426,5 +426,5 @@ So a game whose bounds meet is proven within the frame model, given U at the gam
 lower bound above an upper bound would be a bug, or a counterexample to U at one of those games: the lower bound is the
 score of a real game, so only the upper side can fail.
 
-The solver's ledger keeps such bounds ([solver/docs/design/trust.md, "The
-ledger"](../../solver/docs/design/trust.md#the-ledger)).
+A ledger of such bounds was kept by an experiment that is gone from the tree ([the
+ledger](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/README.md)).

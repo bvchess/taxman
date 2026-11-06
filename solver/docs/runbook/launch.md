@@ -22,7 +22,7 @@ calibration.  The jobs link here instead of repeating them.
   `shutdown -h +MINUTES` in the user data, with MINUTES a little past the run's own deadline (`DEADLINE_HOURS`, [Cost
   guardrails](#cost-guardrails)).  Any shutdown (the timer, `POWEROFF`, the spot service) then terminates the instance,
   so a forgotten instance ends by itself.  The timer is the backstop that depends on no script.
-* **Tag everything.**  Put `Project=taxman` and `Purpose=...` (`trial`, `prover`, `chain`, `ledger`) on everything the launch creates that takes a tag: the instance, its volumes and spot request, a key pair,
+* **Tag everything.**  Put `Project=taxman` and `Purpose=...` (`trial`, `prover`, `chain`) on everything the launch creates that takes a tag: the instance, its volumes and spot request, a key pair,
   a security group.  The check at the end finds them by `Project`.
 * **Take the binaries from the build cache.**  A machine does not build what a machine has already built and tested.
   `setup.sh` takes the commit's release binaries from S3 ([build-cache.md](build-cache.md)) and, when the cache has
@@ -123,7 +123,7 @@ I=$(aws ec2 run-instances --instance-type $INSTANCE_TYPE --placement Availabilit
 ```
 
 The instance requires IMDSv2 (`HttpTokens=required`), which `spot-watch.sh` uses.  A job that starts itself adds its
-steps to the user data, as [the ledger's experiment](ledger.md) does.  To launch from the console, set the same fields: the
+steps to the user data.  To launch from the console, set the same fields: the
 image, the volume, no inbound rule, the instance profile, shutdown behavior "terminate", the timer in the user data,
 and the tags with a `Name`.  For SSH access, see [Steps through SSM, or SSH](#steps-through-ssm-or-ssh).
 
@@ -173,7 +173,7 @@ run `setup.sh` from inside it; it then works on that tree and does not pull, and
 * installs packages, and installs Rust with rustup if there is none (stable, at least 1.89);
 * looks first, in a clean checkout at a commit, for that commit's tested binaries in the build cache, and builds nothing
   when it finds them ([build-cache.md](build-cache.md)); otherwise builds with `RUSTFLAGS="-C target-cpu=native"` the
-  solver, its examples `ledger` and `perf`, and the prover (`solver/noframe`);
+  solver, its example `perf`, and the prover (`solver/noframe`);
 * runs both result verifiers on the committed file, and runs `taxman regress --to 400`;
 * runs `cargo test -- --test-threads=4`, and the prover's `cargo test --release`.
 

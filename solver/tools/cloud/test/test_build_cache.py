@@ -69,9 +69,9 @@ class Cache(unittest.TestCase):
         release = root / "solver" / "frame" / "target" / "release"
         make_binary(release / "taxman", "taxman")
         make_binary(release / "examples" / "perf", "perf")
-        make_binary(release / "examples" / "ledger", "ledger")
-        make_binary(release / "examples" / "ledger-0123456789abcdef", "ledger copy")
-        (release / "examples" / "ledger.d").write_text("deps\n")
+        make_binary(release / "examples" / "scratch", "scratch")
+        make_binary(release / "examples" / "scratch-0123456789abcdef", "scratch copy")
+        (release / "examples" / "scratch.d").write_text("deps\n")
         (release / "libtaxman.rlib").write_text("library\n")
         make_binary(root / "solver" / "noframe" / "target" / "release" / "exact", "exact")
         make_binary(root / "solver" / "noframe" / "target" / "release" / "examples" / "inspect", "inspect")
@@ -155,15 +155,15 @@ class Cache(unittest.TestCase):
         machine = self.fresh_checkout()
         done = self.fetch("--bins --examples", "--bins --examples", root=machine)
         self.assertEqual(done.returncode, 0, done.stderr)
-        for relative in ("solver/frame/target/release/taxman", "solver/frame/target/release/examples/ledger",
+        for relative in ("solver/frame/target/release/taxman", "solver/frame/target/release/examples/scratch",
                          "solver/noframe/target/release/exact", "solver/noframe/target/release/examples/inspect"):
             path = machine / relative
             self.assertTrue(os.access(path, os.X_OK), relative)
             self.assertEqual(subprocess.run([str(path)], capture_output=True, text=True).stdout.strip(), path.name)
         # not what cargo keeps for itself:
         self.assertFalse((machine / "solver/frame/target/release/libtaxman.rlib").exists())
-        self.assertFalse((machine / "solver/frame/target/release/examples/ledger-0123456789abcdef").exists())
-        self.assertFalse((machine / "solver/frame/target/release/examples/ledger.d").exists())
+        self.assertFalse((machine / "solver/frame/target/release/examples/scratch-0123456789abcdef").exists())
+        self.assertFalse((machine / "solver/frame/target/release/examples/scratch.d").exists())
 
     def test_the_entry_says_what_it_holds_and_that_the_suite_passed(self):
         self.store()
@@ -179,10 +179,10 @@ class Cache(unittest.TestCase):
         return "aarch64" if os.uname().machine == "arm64" else os.uname().machine
 
     def test_an_entry_serves_what_it_covers_and_nothing_else(self):
-        self.assertEqual(self.store(solver="--bin taxman --example ledger", prover="").returncode, 0)
+        self.assertEqual(self.store(solver="--bin taxman --example scratch", prover="").returncode, 0)
         machine = self.fresh_checkout()
         self.assertEqual(self.fetch("--bin taxman", root=machine).returncode, 0)
-        self.assertEqual(self.fetch("--example ledger --bin taxman", root=machine).returncode, 0)
+        self.assertEqual(self.fetch("--example scratch --bin taxman", root=machine).returncode, 0)
         self.assertEqual(self.fetch("--example perf", root=machine).returncode, 1)  # not in it
         self.assertEqual(self.fetch("--bins", root=machine).returncode, 1)  # all of them is more than one
         self.assertEqual(self.fetch("--bin taxman", prover="--bin exact", root=machine).returncode, 1)  # no prover
@@ -308,7 +308,7 @@ class Cache(unittest.TestCase):
         self.env.update(fake)
         self.assertEqual(self.store().returncode, 0)
         machine = self.fresh_checkout()
-        done = self.fetch("--bin taxman --example ledger", "--bin exact", root=machine)
+        done = self.fetch("--bin taxman --example scratch", "--bin exact", root=machine)
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertTrue(os.access(machine / "solver/frame/target/release/taxman", os.X_OK))
         stored = Path(fake["FAKE_S3"]) / "bucket" / "builds" / f"{self.commit}-{self._arch()}-cortex-a76"
@@ -324,7 +324,7 @@ class Selectors(unittest.TestCase):
         module = load()
         parse = module.parse_selectors
         everything = parse("solver", "--bins --examples") | parse("prover", "--bins")
-        self.assertTrue(module.covers(everything, parse("solver", "--bin taxman --example ledger")))
+        self.assertTrue(module.covers(everything, parse("solver", "--bin taxman --example scratch")))
         self.assertTrue(module.covers(everything, parse("prover", "--bin exact")))
         self.assertFalse(module.covers(everything, parse("prover", "--example inspect")))
         self.assertTrue(module.covers(parse("solver", "--bin=taxman"), parse("solver", "--bin taxman")))
