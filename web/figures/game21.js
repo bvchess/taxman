@@ -166,13 +166,13 @@ function buildStates(f) {
 
   // The pot.
   S.pot = { potName: { x: CENTER_X, y: 50 } };
-  for (const x of numbers) S.pot[x] = { ...pos(potAt(x)), shape: shapeOf(x) };
+  for (const x of numbers) S.pot[x] = { ...pos(potAt(x)), shape: SHAPE.plain };
 
   // Layers: each number in the column of its layer, joined to its maximal factors; 12 and its two are named.
   const layers = { _duration: 1300 };
   for (const x of numbers) {
     const k = M.omega(x);
-    layers[x] = { ...pos(layerAt[x]), shape: shapeOf(x), halo: [12, 6, 4].includes(x) ? 1 : 0, at: [0.06 * k, 0.06 * k + 0.55] };
+    layers[x] = { ...pos(layerAt[x]), shape: SHAPE.plain, halo: [12, 6, 4].includes(x) ? 1 : 0, at: [0.06 * k, 0.06 * k + 0.55] };
   }
   for (const [a, b] of allEdges) layers[`e${a}-${b}`] = { halo: a === 12 ? 1 : 0, at: [0.55, 1] };
   for (let k = 0; k <= 4; k++) layers[`layer${k}`] = { x: COLUMN_X[k], y: NAME_Y, at: [0.5, 1] };
@@ -347,7 +347,7 @@ function captions(f) {
   const payer = f.turns.find((t) => t.move === f.promoted[0]).tax[0];
   const f1 = f.frames.find((fr) => fr.layer === 1);
   return {
-    pot: `The pot holds the numbers 1 to ${N}. The circles are the numbers above n/2, the squares the rest.`,
+    pot: `The pot holds the numbers 1 to ${N}.`,
     layers: 'Each number stands in the column of its layer, its count of prime factors, with layer 1 at the right. A line runs rightward from each number to each of its maximal factors: 12 to 6 and 4.',
     sources: `Each column cut at n/2. Below the line are the sources, ${M.sources(N)[0]} to ${N}: they divide no other number on the board, so each is a move or nothing. Above it are the factors, 1 to ${half}.`,
     greedy: `From ${N} down, descending greedy keeps ${listWords(f.keptDown)}, each still playable with those kept before it. It rejects ${listWords(f.rejectedDown)}: their one maximal factor, 1, already pays for ${f1.kept[0]}. U* scores ${f.inTheBag}.`,

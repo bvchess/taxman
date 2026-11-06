@@ -33,8 +33,9 @@ export function el(name, attrs = {}, parent = null) {
  *  the gap from an outline to the end of a line, a move's tag, an arrowhead, and the edge of a raised token. */
 export const SIZE = { circle: 15, square: 13, ring: 4.5, gap: 2, tag: 8.5, head: 8, depth: 3 };
 
-/** The shape axis of a number: 0 a square, 1 a circle.  A promotion moves a number from 0 to 1. */
-export const SHAPE = { square: 0, circle: 1 };
+/** The shape axis of a number: 0 a square, 1 a circle, halfway a plain number, one the story has not yet sorted into
+ *  source or factor.  A promotion moves a number from 0 to 1. */
+export const SHAPE = { square: 0, plain: 0.5, circle: 1 };
 
 // ---------------------------------------------------------------------------------------------------------------
 // Motion
@@ -73,7 +74,7 @@ export function reducedMotion() {
 // ---------------------------------------------------------------------------------------------------------------
 
 /** The look of a number, the same in both renderings.  The axes run from 0 to 1 and blend from state to state:
- *    shape   0 a square (a factor), 1 a circle (a move or a source)
+ *    shape   0 a square (a factor), 1 a circle (a move or a source), halfway a plain number (not yet sorted)
  *    kept    the gray fill of a number kept, or played
  *    dashed  hollow, with a dashed outline: rejected, or not played
  *    ring    the double outline of a candidate
@@ -92,6 +93,7 @@ export const LOOKS = {
   source: { shape: SHAPE.circle },
   move: { shape: SHAPE.circle },
   factor: { shape: SHAPE.square },
+  plain: { shape: SHAPE.plain }, // a number the story has not yet sorted into source or factor
   kept: { kept: 1 },
   rejected: { dashed: 1 },
   candidate: { ring: 1 },
@@ -261,11 +263,22 @@ export function installDefs() {
   document.body.prepend(svg);
 }
 
-function shapeParts(group, shape) {
+/** The three faces of a raised token, by the shape axis: a tile below 1/4, plain from 1/4 to 3/4, a coin from 3/4.
+ *  Each gives the half side of its square and the corner radius of its parts; the coin is a circle. */
+const FACES = ['tile', 'plain', 'coin'];
+const CORNER = {
+  tile: { side: 4.5, halo: 6, inner: 2.5, ring: 7.5 },
+  plain: { side: 8, halo: 9.5, inner: 5, ring: 11 },
+};
+
+/** The face a shape shows. */
+export const faceOf = (shape) => (shape < 0.25 ? 'tile' : shape < 0.75 ? 'plain' : 'coin');
+
+function shapeParts(group, face) {
   const r = SIZE.circle;
-  const h = SIZE.square;
+  const h = face === 'plain' ? lerp(SIZE.square, SIZE.circle, SHAPE.plain) : SIZE.square;
   const parts = {};
-  if (shape === 'coin') {
+  if (face === 'coin') {
     parts.halo = el('circle', { r: r + 1.5, fill: 'none' }, group);
     parts.side = el('circle', { r }, group);
     parts.face = el('circle', { r, class: 'tk-face' }, group);
@@ -273,11 +286,12 @@ function shapeParts(group, shape) {
     parts.ring = el('circle', { r: r + SIZE.ring, fill: 'none' }, group);
   } else {
     const rect = (s, rx) => ({ x: -s, y: -s, width: 2 * s, height: 2 * s, rx });
-    parts.halo = el('rect', { ...rect(h + 1.5, 6), fill: 'none' }, group);
-    parts.side = el('rect', rect(h, 4.5), group);
-    parts.face = el('rect', { ...rect(h, 4.5), class: 'tk-face' }, group);
-    parts.inner = el('rect', { ...rect(h - 3.2, 2.5), fill: 'none', 'stroke-width': 0.9 }, group);
-    parts.ring = el('rect', { ...rect(h + SIZE.ring, 7.5), fill: 'none' }, group);
+    const c = CORNER[face];
+    parts.halo = el('rect', { ...rect(h + 1.5, c.halo), fill: 'none' }, group);
+    parts.side = el('rect', rect(h, c.side), group);
+    parts.face = el('rect', { ...rect(h, c.side), class: 'tk-face' }, group);
+    parts.inner = el('rect', { ...rect(h - 3.2, c.inner), fill: 'none', 'stroke-width': 0.9 }, group);
+    parts.ring = el('rect', { ...rect(h + SIZE.ring, c.ring), fill: 'none' }, group);
   }
   return parts;
 }
@@ -290,13 +304,16 @@ export function token(n) {
   const shadow = el('ellipse', { rx: SIZE.circle * 0.92, ry: SIZE.circle * 0.48, fill: '#000', filter: 'url(#tm-soft)' }, root);
   const hover = el('g', { class: 'tk-hover' }, root);
   const body = el('g', { class: 'tk-body' }, hover);
-  const coin = el('g', {}, body);
-  const tile = el('g', {}, body);
-  const parts = { coin: shapeParts(coin, 'coin'), tile: shapeParts(tile, 'tile') };
+  const groups = {};
+  const parts = {};
+  for (const face of FACES) {
+    groups[face] = el('g', {}, body);
+    parts[face] = shapeParts(groups[face], face);
+  }
   const label = el('text', { 'text-anchor': 'middle', dy: '0.35em', class: 'tk-num' }, body);
   label.textContent = String(n);
   label.style.fontSize = `${labelSize(n)}px`;
-  root._tk = { n, shadow, hover, body, coin, tile, parts, label, shape: null };
+  root._tk = { n, shadow, hover, body, groups, parts, label, face: null };
   return root;
 }
 
@@ -305,21 +322,20 @@ export function token(n) {
 export function setToken(node, p) {
   const t = node._tk;
   const s = p.scale ?? 1;
-  const shape = p.shape >= 0.5 ? 'coin' : 'tile';
+  const face = faceOf(p.shape);
   node.setAttribute('transform', `translate(${round(p.x)} ${round(p.y)}) scale(${round(s, 3)})`);
   node.style.opacity = round(p.opacity, 3);
   node.style.display = p.opacity < 0.002 ? 'none' : '';
-  if (t.shape !== shape) {
-    t.shape = shape;
-    t.coin.style.display = shape === 'coin' ? '' : 'none';
-    t.tile.style.display = shape === 'tile' ? '' : 'none';
+  if (t.face !== face) {
+    t.face = face;
+    for (const f of FACES) t.groups[f].style.display = f === face ? '' : 'none';
   }
   const lift = (p.lift ?? 0) + (p.hop ?? 0);
   const flip = Math.max(0.04, p.flip ?? 1);
   t.body.setAttribute('transform', `translate(0 ${round(-lift)}) scale(${round(flip, 3)} 1)`);
   const depth = SIZE.depth * (p.depth ?? 1);
   const c = raisedColors(p);
-  const parts = t.parts[shape];
+  const parts = t.parts[face];
   // The halo of ink round the face, as a flat number wears it.
   parts.halo.style.stroke = v('--ink');
   parts.halo.style.strokeWidth = 8;

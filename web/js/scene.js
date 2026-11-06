@@ -68,9 +68,9 @@ function blendRaised(a, b, t, through) {
   const travel = Math.hypot(b.x - a.x, b.y - a.y);
   let hop = (a.hop ?? 0) * (1 - MOTION.smooth(t)) + Math.min(MOTION.lift, travel / 18) * Math.sin(Math.PI * t);
   out.flip = 1;
-  if ((a.shape >= 0.5) !== (b.shape >= 0.5)) {
+  if (v.faceOf(a.shape) !== v.faceOf(b.shape)) {
     out.flip = Math.abs(Math.cos(Math.PI * t));
-    out.shape = t < 0.5 ? a.shape : b.shape;
+    out.shape = t < 0.5 ? a.shape : b.shape; // the face changes at the halfway point, edge on
     hop += MOTION.flipLift * Math.sin(Math.PI * t);
   }
   out.hop = hop;

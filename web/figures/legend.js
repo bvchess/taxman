@@ -103,6 +103,7 @@ function columnsSample(r) {
 export const ENTRIES = [
   { key: 'move', name: 'Circle', words: 'a source, a number above n/2, or a move', use: 'Every number that is or could be a move.', draw: one(21, 'move'), core: true },
   { key: 'factor', name: 'Square', words: 'a factor: a number up to n/2', use: 'Every number up to n/2 that is not being played.', draw: one(7, 'factor'), core: true },
+  { key: 'plain', name: 'Rounded square', words: 'a plain number: one the story has not yet sorted into source or factor', use: 'Before a figure or a game tells sources from factors: the pot, the layers, the front page’s game.', draw: one(14, 'plain') },
   { key: 'kept', name: 'Gray fill', words: 'kept: a source descending greedy keeps, or a move that is played', use: 'Once a figure has decided a number is in the set.', draw: one(19, 'move', 'kept'), core: true },
   { key: 'rejected', name: 'Hollow and dashed', words: 'rejected: a source that is not played', use: 'A source descending greedy drops, or a move left out.', draw: one(17, 'move', 'rejected'), core: true },
   { key: 'candidate', name: 'Double outline', words: 'a candidate: a factor that could be promoted', use: 'A factor whose frame can spare it and whose frame in front can take it on.', draw: one(9, 'factor', 'candidate'), core: true },
