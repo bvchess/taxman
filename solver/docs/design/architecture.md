@@ -11,7 +11,7 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 
 **Foundations.**
 
-1. `src/game.rs`: the rules as a referee, and the built-in table of optimal games, the games of
+1. `src/game.rs`: the rules as a referee, and the built-in table of optimal moves, the lines of
    `results/optimal.jsonl.gz` as of the build, decoded through [the gzip crate](../../gzip/README.md).
 2. `src/numtheory.rs`: maximal factors and composites; and `src/playable.rs`, whether a set of numbers can all be played
    on the whole board, with nothing of the frame model (the oracle of the model's tests, and the referee of
@@ -30,8 +30,8 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 6. `src/model/`: the search state.  `mod.rs` says what is where: `Frame` and `FrameSet` (`frame.rs`), `FrameGraph`,
    winnability and reduction (`peel.rs`), promotion (`promote.rs`), then conflicts (`conflict.rs`), nogoods
    (`nogoods.rs`) and the nogoods carried from another search (`carried.rs`, [carried-nogoods.md](carried-nogoods.md)).
-7. `src/accelerate.rs`: the shortcuts from the game of n − 1 (the comment of `prime_shortcut` proves the prime formula),
-   and the last step, from promotions to moves.
+7. `src/accelerate.rs`: the shortcuts from the moves for n − 1 (the comment of `prime_shortcut` proves the prime
+   formula), and the last step, from promotions to moves.
 
 **The search.**
 
@@ -63,7 +63,7 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 
 13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/store.rs`, `src/known.rs`,
     `src/certify.rs`, `src/paths.rs`: the switchable tactics, a board prepared for a search, the per-game pipeline,
-    provenance and verification, the bounds store's line and the relations between games, the known games that
+    provenance and verification, the bounds store's line and the relations between games, the known moves that
     `--use-prev` draws on, the certificates of `taxman certify`, and the default files.  The range driver is
     `src/solver/window.rs`, the window of games in flight, and its child `window/allot.rs` shares the threads among
     them.

@@ -17,9 +17,9 @@ every second line of the Java fixtures), and the comment on each says what the w
   departs from them.  The searched golden games (94, up to 760) give the Java's promotion sums with the default tactics,
   and the tactic variants give the same answers on those up to 400.  Past 760 the Java's structure is fixed in
   `testdata/golden_wide/` (n = 511, 512, 1000, 1001, 1023, 1024, 1025, 1100, 1231, 2047 and 2048, checked at the width
-  `with_width!` picks) and `games_java.txt` (the Java's game of the board's frames, move for move, for 171 sets of
+  `with_width!` picks) and `games_java.txt` (the Java's moves on the board's frames, move for move, for 171 sets of
   promotions at 511–2049).
-* **The board layer against the chain** (`tests/board_layer.rs`): for every 25th searched game of
+* **The board layer against the chain** (`tests/board_layer.rs`): for every 25th searched line of
   `results/optimal.jsonl.gz`, and the last, the moves that the game's promotions make and the digest of the board's search
   problem are the line's, which the golden data (up to 2049) cannot say of the games that matter.  The unit tests of
   `frames` check what the frames remember (which numbers each can take on, which sources `removeImpossible` has been
@@ -37,8 +37,8 @@ every second line of the Java fixtures), and the comment on each says what the w
     every game to 80 (to 60 with every such source open) and on random sets to 1300 (to 4095 ignored).  It checks that
     with none open the promotion sets are the frame model's, and catches a mutant that skips the check of E4.
   * `tests/bottom_layers.rs` checks F4 on every game of the committed chain and another run of
-    its games 2176–2276 (`testdata/c8g.chain-2176.jsonl`), every optimal set the prover enumerated, and every optimal
-    set of the games to 48.
+    its lines for 2176–2276 (`testdata/c8g.chain-2176.jsonl`), every optimal set the prover enumerated, and every
+    optimal set of the games to 48.
   * The unit tests of `frames` check that `unzip`'s claims are its mandatory pairs, that `numbering` is what
     `build_frames` uses, that the frames lie in layers (F1), and that the numbering by layer is the Java's
     breadth-first numbering on every game to 400 and a sample to 8191.
@@ -126,7 +126,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   and 1133 under a gate of 0, 1000 under 300), with the look and the reuse of prices off in turn, and the game 775
   under a gate of 1,200 with and without the warm start.  The
   table `NEAR_REPEATS` counts the trees of the games 768, 1083 and 1101, solved as the solver solves them from the
-  committed game of n − 1, with the near-repeat cut and without it, and checks that the line of each counts the nodes
+  committed moves for n − 1, with the near-repeat cut and without it, and checks that the line of each counts the nodes
   the cut cut (`stats.near_repeat_cut`) if it was armed, and has no such key if it was not.  The rows `symmetry=off`
   are the default's trees before the rule of symmetric pairs.  The table `EXTENDED` does the same for the extended
   problem with nothing open, Π⁺(∅), without the claims of `unzip`, whose search must also be the default engine's on
@@ -203,7 +203,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   a folder that cannot be made fails the run before its first game (`tests/solver.rs`).
 * **The window** (`tests/window.rs`; the policy's unit tests in `src/solver/window/allot.rs`):
   * chains 1..600 with windows of 1, 2, 4 and 8 on 4 threads have the scores, methods, proof kinds, ceilings,
-    assumptions, repeats and previous games of the committed chain (a game at its ceiling is `start` or `search` in a
+    assumptions, repeats and previous lines of the committed chain (a game at its ceiling is `start` or `search` in a
     window, by whether its search took a step), and pass `verify_files`; with one thread any window gives the lines of a
     window of one, but for the times and the build;
   * a repeat of a game still in flight (301 of 300) names it, on a later line;
@@ -238,7 +238,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   on a chain on another machine, against stand-ins for the aws CLI and ssh), and the build cache
   and the release suite that runs on EC2 before binaries are stored (`solver/tools/cloud/test/test_build_cache.py`,
   `test_run_tests.py` and `test_setup.py`, run with `python3 -I`; [runbook/build-cache.md](../runbook/build-cache.md)).
-* **Integrity of results** (`tests/integrity.rs`, `tests/results.rs`, `tests/solver.rs`): a previous game that is not
+* **Integrity of results** (`tests/integrity.rs`, `tests/results.rs`, `tests/solver.rs`): previous moves that are not
   what it says is refused; an assumption travels down a chain; a score that is not the table's is a hard error; a
   tampered results file, or one whose line contradicts itself or is of another schema, is refused by both verifiers,
   naming the line; a torn last line is dropped; the committed results pass the verifier and the built-in table holds
@@ -261,15 +261,15 @@ every second line of the Java fixtures), and the comment on each says what the w
   file that a stopped run left; a game with a checkpoint is resumed, not repeated; a repeat assumes what the game it
   repeats assumes.  A unit test of `board` checks that the problem set up again from n is the one the setup posed, and
   the same at two set widths.
-* **Known games** (`tests/known.rs`, with hand-made sources: a store of games 906..944 proven with the truth's games, a
-  committed chain of games 1..60, and the table):
+* **Known moves** (`tests/known.rs`, with hand-made sources: a store of games 906..944 proven with the truth's moves, a
+  committed chain of lines 1..60, and the table):
   * a chain over 900..960 records the store's proven games with no search, citing their lines and assuming U at the
-    games they rest on, and the others with the scores of a chain without the store (and fewer nodes in all); a game
-    carried from the game of another line is played and recorded;
-  * the committed chain's and the table's games are recorded with their own assumptions, and the game before the range
-    from each of the three has the source in `prev`;
-  * an open game's upper bound ends its search (proof kind `known`, citing the one line), and its lower bound's game
-    seeds it (fewer nodes); `force_search` leaves the games to their searches; a store game that does not play, or that
+    games they rest on, and the others with the scores of a chain without the store (and fewer nodes in all); moves
+    carried from the moves of another line are played and recorded;
+  * the committed chain's and the table's moves are recorded with their own assumptions, and the moves for the game
+    before the range from each of the three has the source in `prev`;
+  * an open game's upper bound ends its search (proof kind `known`, citing the one line), and its lower bound's moves
+    seed it (fewer nodes); `force_search` leaves the games to their searches; a store game that does not play, or that
     the chain bounds contradict, stops the run at its game;
   * both verifiers accept those files, and refuse each of: an upper bound of the store worth another value, a missing
     lower or upper line, a line by another rule or from another run, no store given, a citation of other lines,
@@ -315,7 +315,7 @@ the computations behind the statements that are not proved are in [evidence.md](
 | N3 to N5, R4, R6 | The ledger's tests (`examples/ledger/`): from proven games, its relations bracket opt(n) on 2..1300 with every game they make legal, a bound on the wrong side is refused, and runs prove 701..712 and 901..960.  The tests of `src/search/dual.rs`: a search stopped before its first node has the root's bound, the dual bound of game 999 brackets its promotion sum and falls as the node limit grows, and another game's checkpoint is refused. |
 | Q1 | A search over the states of the pot that uses no theory (`heuristics/evaluation/certify.py`) finds the heaviest set of sources unique in every game to 62. |
 | Q3 | The prover's `src/moves.rs`: ℓ(n) and the heaviest longest game against brute force to 22, and ν(n) against the matching solver on every board to 400. |
-| W1 | The heuristics' check above, to 22.  The prover's parity bound is at least opt(n) on every game to 1300 (`solver/noframe/data/exact_parity_2_1300.jsonl`), and the recorded game is independent at both parities on every game to 1300 that is not prime; the intersection agrees with brute force on 3,000 random pairs of matroids ([matroid intersection bounds](https://github.com/bvchess/taxman-notebook/blob/main/search/matroid-intersection-bounds-2026-10/README.md)). |
+| W1 | The heuristics' check above, to 22.  The prover's parity bound is at least opt(n) on every game to 1300 (`solver/noframe/data/exact_parity_2_1300.jsonl`), and the recorded moves are independent at both parities on every game to 1300 that is not prime; the intersection agrees with brute force on 3,000 random pairs of matroids ([matroid intersection bounds](https://github.com/bvchess/taxman-notebook/blob/main/search/matroid-intersection-bounds-2026-10/README.md)). |
 | F1, F3, F6 | The census of every board 2..8191 (above): its check A, that each frame lies in one layer and the frames in front of it one layer down, and its check C, clean numbering; the unit tests of `frames` (above). |
 | F4 | `tests/bottom_layers.rs` (above). |
 | X1 to X7 | `tests/model_exact.rs` (above), and the census's checks D to G: no candidate has a back claim's factor among its maximal factors (X5), none is a factor of a frame numbered 0 and every one has a home (X3, X6), and the sources played are the U\* of `src/root_problem.rs` (X1); check I and `tests/canonical_root.rs` (above), that setup builds Π_n. |

@@ -5,7 +5,7 @@ Part of [the theory](../THEORY.md).
 The *extended problem* Π⁺(O) is the frame model with a set O of the sources of U\* left optional instead of fixed.  It
 is exact as the frame model is: [the extended exactness theorem (E1)](#the-extended-exactness-theorem).  So a search of
 it that finds nothing better than a recorded score proves the score optimal, once the other members of U\* in layers 3
-and up are certified: [the certificate theorem (E2)](#the-certificate-theorem).  When the recorded game plays U\*, this
+and up are certified: [the certificate theorem (E2)](#the-certificate-theorem).  When the recorded moves play U\*, this
 proves [statement U](exactness.md#statement-u) at that game.  That is how a certificate of U is made, game by game.
 
 *Words.*  [Sources](../GLOSSARY.md#the-frame-model) are the glossary's, and [U\*](sources.md#descending-greedy) is what
@@ -143,7 +143,7 @@ the set is optimal, and by E1 every promotion set (K′, L′) is a playable set
 opt(n) − ΣΦ.  ∎
 
 So a certificate that stops at the ceiling proves opt(n) without the certified members, but it also rests on the
-recorded game of n − 1 being optimal: the score of a game of n − 1 is at most opt(n − 1), and the stop needs equality.
+recorded moves for n − 1 being optimal: the score of a game of n − 1 is at most opt(n − 1), and the stop needs equality.
 
 ## The kept-claims lemma
 

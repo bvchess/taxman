@@ -5,7 +5,7 @@ results through [gzip/](gzip/README.md), a decoder whose CRC-32 check makes a de
 both programs the same wrong game.  This page maps them and their documents.
 
 * **The frame solver**, [frame/](frame/README.md) (the crate `taxman`), finds the games.  It searches the promotions
-  of a board's frames, and can run on many CPUs; its long runs can be resumed after an interruption.  Its games are
+  of a board's frames, and can run on many CPUs; its long runs can be resumed after an interruption.  Its results are
   optimal within the *frame model*, which is exact given one open statement about the game, called U.
 * **The prover**, [noframe/](noframe/README.md) (the crate `taxman-prover`), proves games optimal on the whole board,
   without the frame model, from the theorems of [docs/THEORY.md](../docs/THEORY.md) alone.  Where it has proven a

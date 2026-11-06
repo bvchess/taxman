@@ -23,9 +23,12 @@ changed"](https://github.com/bvchess/taxman-notebook/blob/main/terms-changed.md)
 
 ## The game
 
-* **game** **(overloaded)**: (1) the instance.  *Game n*, or *the game of n*, is Taxman played on the numbers 1 to n:
-  game 21 is Taxman on 1 to 21.  (2) A play of it: a legal sequence of moves, as in "an optimal game of 21".  Where a
-  run has solved game n, "the game of n" also names the optimal game it recorded.  Say "game n", never "board size".
+* **game** **(overloaded)**: (1) the instance.  *Game n* is Taxman played on the numbers 1 to n: game 21 is Taxman on 1
+  to 21.  (2) A play of it: a legal sequence of moves, as in "an optimal game of 21".  Say "game n", never "board
+  size".
+* **the moves for n**: the sequence of moves that a run found and recorded for game n, with its score.  A game is the
+  puzzle or a play of it, never the record: a file, a table or a run holds moves, and a line of a results file names
+  how they were proven.  "The line for n" is their record in a file.
 * **board**: the numbers 1 to n of game n.  On the board of 21 the sources are 11 to 21.  In the code, `board::Board`
   is a board analyzed for the search: its tables, frames, candidates and `in_the_bag`.
 * **pot**: the numbers still in play during a game.  It starts as the whole board.
@@ -71,11 +74,11 @@ changed"](https://github.com/bvchess/taxman-notebook/blob/main/terms-changed.md)
   A minimal *exclusion set*, members whose removal leaves the rest playable, lies in the residual ([the exclusion
   theorem (P8)](theory/playability.md#the-exclusion-theorem)).  An *odd core* is a core whose lists are linearly
   independent over GF(2) ([odd cores](theory/playability.md#odd-cores)).
-* **finished game**: a game of n that opens with the largest prime q(n) and is over, with no move left.  Every optimal
-  game is one ([the finished-game lemma (N2)](theory/neighbors.md#finished-games)).
-* **ceiling**: n + opt(n − 1), which no game of n can exceed: deleting the move n from an optimal game of n leaves a
-  game of n − 1.  The solver uses n + score(n − 1), with the recorded score of n − 1.  A game *at its ceiling* scores
-  exactly that, and needs no search to prove (`results::CeilingProof`; the bound is [the ceiling lemma
+* **finished game**: a play of game n that opens with the largest prime q(n) and is over, with no move left.  Every
+  optimal game is one ([the finished-game lemma (N2)](theory/neighbors.md#finished-games)).
+* **ceiling**: n + opt(n − 1), which no play of game n can exceed: deleting the move n from an optimal play of game n
+  leaves a play of game n − 1.  The solver uses n + score(n − 1), with the recorded score of n − 1.  A game *at its
+  ceiling* scores exactly that, and needs no search to prove (`results::CeilingProof`; the bound is [the ceiling lemma
   (N4)](theory/neighbors.md#the-ceiling-lemma), and [the step theorem (N6)](theory/neighbors.md#the-step-theorem) gives
   the optimal sets there).  As a bound on the promotion sum, the ceiling is n + score(n − 1) − `in_the_bag`, which the
   results lines and a tactic call `cap`: the proof kind `cap`, the fields `reached_cap` and `setup.cap`, the tactic
@@ -200,10 +203,10 @@ changed"](https://github.com/bvchess/taxman-notebook/blob/main/terms-changed.md)
   ([solver/docs/design/search.md, "The starting incumbent, the ceiling and the
   seed"](../solver/docs/design/search.md#the-starting-incumbent-the-ceiling-and-the-seed)).  A game whose start reaches
   the ceiling takes no step of the search, and has the method `start`.
-* **seed**: a promotion set that a search starts from: the promotions of the game of n − 1, and the game of a lower
+* **seed**: a promotion set that a search starts from: the promotions of the moves for n − 1, and the moves of a lower
   bound that the bounds store holds, when it has one.
-* **finder**: a large neighborhood search for a good game, which only offers sets: it fixes a random share of an
-  incumbent's promotions, searches the rest exactly as a unit of the engine on one thread, and takes any better game.
+* **finder**: a large neighborhood search for good moves, which only offers sets: it fixes a random share of an
+  incumbent's promotions, searches the rest exactly as a unit of the engine on one thread, and takes any better moves.
   It is not sound and proves nothing, but a lower bound needs only a legal game, so what it finds is offered to a search
   as an incumbent after the checks of a checkpoint's incumbent.  A search that has taken `--finder-after` steps (a
   million by default) starts one beside it ([solver/docs/design/finder.md](../solver/docs/design/finder.md)); the ledger
@@ -236,10 +239,10 @@ changed"](https://github.com/bvchess/taxman-notebook/blob/main/terms-changed.md)
   With the tactic `symmetry` the search cuts a node
   none of whose completions can keep them, and drops the candidates that no completion keeping them holds ([the
   exchange-pruning lemma (R3)](theory/search-rules.md#pruning-by-prime-exchanges)).
-* **window** **(overloaded)**: (1) the games of a range in flight at once (`--window K`, `solver::window`; [the frame
-  solver's README, "Games in flight"](../solver/frame/README.md#games-in-flight)).  A search started before the game
-  before it is proven is *speculative*; it is seeded from that game's *provisional game*, its best so far.  A
-  speculative search may be *deferred*, not started while the ceiling its provisional game gives would settle it, or
+* **window** **(overloaded)**: (1) the searches for a range of games in flight at once (`--window K`, `solver::window`;
+  [the frame solver's README, "Games in flight"](../solver/frame/README.md#games-in-flight)).  A search started before
+  the game before it is proven is *speculative*; it is seeded from that game's *provisional moves*, its best so far.  A
+  speculative search may be *deferred*, not started while the ceiling its provisional moves give would settle it, or
   *suspended*, its workers taken for the oldest game and its units kept.  (2) The eight games before game n, among
   which the frame solver looks for one whose search n repeats (`SAME_SEARCH_WINDOW`).  (3) The probe's windows: a
   checkpoint resumed for 50,000 steps ([solver/docs/design/performance.md](../solver/docs/design/performance.md)).
@@ -277,7 +280,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   * a node's gap (the profile, `--profile`): the node's bound less its need, how far the bound must fall to cut the
     node;
   * the standalone root gap (the ledger's map): the root's bound less the search's start incumbent, for a game solved
-    with no game of n − 1;
+    with no moves for n − 1;
   * a game's gap in the ledger: its best upper bound less its best lower bound.
 
   The prover's *parity gap* is the same idea on the whole board: the root's parity bound less opt(n), in points.
@@ -336,9 +339,9 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 
 ## Results and trust
 
-* **chain**: games each built from the one before (n = 1, 2, 3, ...).  A game's search starts from the previous game's
-  promotions and stops at its ceiling.  A game solved with no game of n − 1 is **standalone**.
-* **the committed chain**: the chain in the file `results/optimal.jsonl.gz`, from n = 1.  Every game in it is proven
+* **chain**: the moves for n = 1, 2, 3, ..., each found from the one before.  A game's search starts from the previous
+  game's promotions and stops at its ceiling.  A game solved with no moves for n − 1 is **standalone**.
+* **the committed chain**: the chain in the file `results/optimal.jsonl.gz`, from n = 1.  Every line in it is proven
   within the frame model.  [results/README.md](../results/README.md#optimaljsonlgz) gives its range.  The **end of the
   chain** is its last game.
 * **repeat**: a game that poses the same search problem as an earlier game, which settled it.  The frame solver
@@ -353,33 +356,33 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **proof kind** (the field `proof`): how a completed game was proven optimal: `trivial`, `exhausted`, `cap`,
   `prime_formula`, `same_search` or `known` ([the frame solver's reference, "Proof
   kinds"](../solver/docs/REFERENCE.md#proof-kinds)).
-* **assumes**: what the proof kind of a game rests on beyond the frame model, inherited down the chain.  A game of n −
-  1, or of n, taken from the built-in table is assumed optimal.  A bound of the bounds store assumes [statement
+* **assumes**: what the proof kind of a game rests on beyond the frame model, inherited down the chain.  The moves for n
+  − 1, or for n, taken from the built-in table are assumed optimal.  A bound of the bounds store assumes [statement
   U](theory/exactness.md#statement-u) at the games it rests on.
-* **known game**, **known source**: a game that `taxman solve --use-prev` takes instead of searching for it, from the
-  built-in table, the committed chain, or a game that the bounds store has proven (`src/known.rs`).
+* **known moves**, **known source**: the moves that `taxman solve --use-prev` takes instead of searching for them, from
+  the built-in table, the committed chain, or a game that the bounds store has proven (`src/known.rs`).
 * **bounds store**: `results/bounds.jsonl`, the bounds on opt(n) that the ledger finds, one line each, kept for good
   ([results/README.md](../results/README.md#boundsjsonl); `src/store.rs`).  A game is **proven** there when its best
   lower bound equals its best upper bound.
 * **the ledger**: the example program `ledger` (`solver/frame/examples/ledger/`).  It works on a whole stretch of games
   at once, raising lower bounds and lowering upper bounds until they meet.
 * **certificate of U**: a line of `taxman certify` that proves statement U at one game.  The extended problem with the
-  game's open members optional, searched from the recorded game, ends `certified` when nothing beats the recorded
+  game's open members optional, searched from the recorded moves, ends `certified` when nothing beats the recorded
   score ([solver/docs/design/certificates.md](../solver/docs/design/certificates.md)).
-* **the built-in table**: the games of `results/optimal.jsonl.gz` as of the build, which the binary holds as the
+* **the built-in table**: the lines of `results/optimal.jsonl.gz` as of the build, which the binary holds as the
   compressed file and decodes as far as a game asks ([results/README.md](../results/README.md#optimaljsonlgz) says where
-  the games came from).  **optimal ok**: a score equals the table's.  That proves nothing, and above the table's last
-  game there is no table to match; a score that differs is a hard error.
-* **referee**: code that replays one game and checks it: legal, over, opening with the largest prime, scoring what is
-  recorded.  `game::replay` and `game::replay_finished` are the frame solver's.  A game that fails after it was found
-  is **rejected**, written to `<results>.rejected.jsonl`.
+  the moves came from).  **optimal ok**: a score equals the table's.  That proves nothing, and above the table's last
+  line there is no table to match; a score that differs is a hard error.
+* **referee**: code that replays a sequence of moves and checks it: legal, over, opening with the largest prime, scoring
+  what is recorded.  `game::replay` and `game::replay_finished` are the frame solver's.  Moves that fail after they were
+  found are **rejected**, written to `<results>.rejected.jsonl`.
 * **verifier**: a program that checks a whole results file or bounds file without changing it.  Results files have two,
   `taxman verify-results` and `solver/tools/check_results.py`; the bounds store has `ledger verify-bounds` and
   `solver/tools/check_bounds.py`; certificates have `taxman verify-certificates`.  The two verifiers of a kind of file
   share no code.  Not "checker".
 * **results line**: one line of a results file, the JSON object that `taxman solve --out` writes for a game, in schema
   5 ([the frame solver's reference](../solver/docs/REFERENCE.md#a-results-line---out-schema-5)).  Two old words survive
-  only as field names there: `nodes` counts steps, and `prev.source` says where the game of n − 1 came from.
+  only as field names there: `nodes` counts steps, and `prev.source` says where the moves for n − 1 came from.
 
 ## Programs, files and documents
 

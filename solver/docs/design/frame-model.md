@@ -123,7 +123,7 @@ forward, a freedom spent, the frames reduced.
 ## What "optimal" means
 
 The solver's answer for n rests on up to three premises: the frame model is exact at n, the search's pruning is exact,
-and the game of n − 1 is optimal.
+and the moves for n − 1 are optimal.
 
 **Within the frame model.**  The search finds [P\*](../../../docs/GLOSSARY.md#the-frame-model)(Π_n), the largest sum of
 a promotion set of the root problem Π_n ([same-search.md](same-search.md), defines the [search
@@ -152,7 +152,7 @@ board; [results/README.md](../../../results/README.md#what-supports-the-scores) 
 chain reach.  The prover ([its README](../../noframe/README.md)) is a separate program that uses nothing of frames;
 [the section on its proofs](../../noframe/docs/proofs.md) lists the facts that they use.
 
-Past the prover's proofs, the committed games are proven within the frame model, so each is opt(n) wherever U holds at
+Past the prover's proofs, the committed lines are proven within the frame model, so each is opt(n) wherever U holds at
 n.  Proving U at such an n takes two steps, which the command `taxman certify` combines game by game
 ([certificates.md](certificates.md)); [results/README.md](../../../results/README.md#certificates) says which games have
 certificates.
@@ -206,13 +206,13 @@ The tests tie the theorems to the code:
 them ([which tactics earn their
 keep](https://github.com/bvchess/taxman-notebook/blob/main/search/which-tactics-earn-their-keep-2026-10/README.md)).
 
-**Given the previous game is optimal.**  The game of n is built from the game of n − 1, using the
+**Given the previous game is optimal.**  The moves for n are built from the moves for n − 1, using the
 [ceiling](../../../docs/GLOSSARY.md#the-game) and the [prime formula](../../../docs/GLOSSARY.md#the-game).  So a chain
-of games from n = 1 is proven game by game ([trust.md](trust.md)).
+of moves from n = 1 is proven game by game ([trust.md](trust.md)).
 
-Optimal games need not be unique, though, and that matters to any step that reuses the game of n − 1.  From n = 425 on,
-some games have two or three [optimal sets](../../../docs/GLOSSARY.md#the-game).  In all of them the members above n/2
-are U\*; they differ below n/2.  For example, the recorded game of 685 plus the move 686 is unplayable, although
+Optimal games need not be unique, though, and that matters to any step that reuses the moves for n − 1.  From n = 425
+on, some games have two or three [optimal sets](../../../docs/GLOSSARY.md#the-game).  In all of them the members above
+n/2 are U\*; they differ below n/2.  For example, the recorded moves for 685 plus the move 686 is unplayable, although
 opt(686) = 686 + opt(685): the equality holds through another optimal set of 685.  So a chain step is decided by the
 complete list of the optimal sets of n − 1, not by one of them
 ([solver/noframe/docs/uniqueness.md](../../noframe/docs/uniqueness.md)).

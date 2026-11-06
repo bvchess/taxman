@@ -57,7 +57,7 @@ COUNTEREXAMPLE, and 4 for UNFINISHED: a game has no verdict yet.
   the same search, and the lines of one list should come from one build, so a list never changes build; a list that is
   to run on another build starts with its checkpoint directory deleted.  The build is `setup.sh` with the tests skipped
   (they run on the laptop), which builds the solver and the prover for the CPU of the machine and runs its smoke checks.
-* **Inputs,** all committed: `results/optimal.jsonl.gz` (the recorded games), `solver/noframe/data/upper_*.jsonl` (the
+* **Inputs,** all committed: `results/optimal.jsonl.gz` (the recorded moves), `solver/noframe/data/upper_*.jsonl` (the
   prover's barred bounds), `solver/tools/certify/plan.jsonl` and [`plan.md`](../../tools/certify/plan.md), and the lists
   in `solver/tools/certify/lists/`.  `certify.sh` takes them from the checkout.
 
@@ -144,7 +144,7 @@ as the last save (about 10 minutes), hold the same files under `$D/logs/` and th
   ~/taxman-work/logs`), or the new machine's first save overwrites the old ones.  Then run the same command with
   `DEADLINE_HOURS` set to the hours that remain, since the deadline is not saved ([Surviving a spot
   interruption](launch.md#surviving-a-spot-interruption)).
-* **An error stop** (status 1): a game failed a check (a recorded game that does not replay, a certificate that
+* **An error stop** (status 1): a game failed a check (recorded moves that do not replay, a certificate that
   contradicts another, a checkpoint of another build).  Nothing is retried; read `certify_LIST.err`.
 * **A counterexample** (status 2, `COUNTEREXAMPLE` in the log): a game scores more than its recorded score.  The
   processes stopped with their checkpoints, and the script saved to S3.  The game is in

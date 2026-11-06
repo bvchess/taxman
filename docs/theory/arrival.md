@@ -266,7 +266,7 @@ the primes below p and q, which [an earlier
 study](https://github.com/bvchess/taxman-notebook/blob/main/the-wikis-open-questions-2026-10/README.md#7-which-n) had
 found.
 
-The law has a form for U\* that reads no recorded game.
+The law has a form for U\* that reads no recorded moves.
 
 *The shadow law for U\** (measured).  Let n ≥ 3 be odd.  If game n has the root problem of game n − 1, then
 U\*(n) = U\*(n − 1) + n − x, with x the shadow of n.
@@ -279,9 +279,9 @@ freedoms, yet poses the root problem of game n − 1 and gives up the shadow.  T
 a prime factor 13, 17 or 19.
 
 The law says which move an exchange gives up, not when the exchange happens.  It covers only the recorded optimal sets,
-and a game may have others.  That a recorded game is optimal is proved on the whole board for the games the prover has
-proved, and for the rest given [statement U](exactness.md#statement-u).  [evidence.md](evidence.md#observations) gives
-the range and what one must trust, and [the notebook entry on the corner of a near
+and a game may have others.  That the recorded moves are optimal is proved on the whole board for the games the prover
+has proved, and for the rest given [statement U](exactness.md#statement-u).  [evidence.md](evidence.md#observations)
+gives the range and what one must trust, and [the notebook entry on the corner of a near
 repeat](https://github.com/bvchess/taxman-notebook/blob/main/search/the-corner-of-a-near-repeat-2026-10/README.md#how-often-it-happens)
 the count.  A proof would say why the shadow is the one move of game n − 1 that n displaces.
 

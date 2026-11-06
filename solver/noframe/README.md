@@ -1,6 +1,6 @@
 # The prover
 
-The prover proves the frame solver's games optimal on the whole board, without the [frame
+The prover proves the frame solver's results optimal on the whole board, without the [frame
 model](../../docs/GLOSSARY.md#the-frame-model); [proofs.md](docs/proofs.md) says how far its proofs reach.  It is
 a branch and bound over sets of moves, which takes the recorded score of game n as its target and proves that no set of
 moves beats it.  It shares no proof code with the frame solver or with the heuristics, so the frame solver's answers are

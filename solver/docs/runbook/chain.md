@@ -1,11 +1,11 @@
-# The chain of optimal games (`chain.sh`)
+# The chain of optimal moves (`chain.sh`)
 
 Part of the [runbook](../RUNBOOK.md).
 
 ## What is being computed
 
-`chain.sh N` runs `taxman solve 1-N` into one results file: every game from n = 1, each built from the one before.
-Nothing comes from the built-in table, which the run only compares with, so the chain assumes nothing.  The
+`chain.sh N` runs `taxman solve 1-N` into one results file: the moves for every game from n = 1, each found from the one
+before. Nothing comes from the built-in table, which the run only compares with, so the chain assumes nothing.  The
 committed `results/optimal.jsonl.gz` is exactly such a file, compressed
 ([results/README.md](../../../results/README.md#optimaljsonlgz) has its range, and
 [results/runs.md](../../../results/runs.md) how each part was made).  A run from n = 1 reproduces its scores, and
@@ -59,7 +59,7 @@ rest is quiet.  Such a machine keeps the chain's checkout and data in [the machi
 and `chain.sh` runs there with `TAXMAN_WORK` set to the chain's data folder instead of `~/taxman-work`.
 
 `WINDOW` is the number of consecutive games kept in flight at once (`taxman solve --window`).  While the solver still
-proves game n, it sets up and searches game n + 1 from n's best game so far, and the threads move to the searches that
+proves game n, it sets up and searches game n + 1 from n's best moves so far, and the threads move to the searches that
 keep them busy, so one game's search does not leave a machine of many threads idle.  Games still conclude and record in
 order, with the scores, proof kinds and repeats of a window of 1, which solves them one after the other ([the
 README](../../frame/README.md#games-in-flight); [DESIGN.md](../design/engine.md#the-window-games-in-flight)).  The
@@ -77,7 +77,7 @@ run](https://github.com/bvchess/taxman-notebook/blob/main/scaling-to-192-threads
   solver/tools/cloud/chain.sh 8191                    # skips the games it holds and solves the next on
   ```
 
-  `chain.sh` checks the file when it opens it.  The file holds no incomplete line, its `known` games assume [statement
+  `chain.sh` checks the file when it opens it.  The file holds no incomplete line, its `known` lines assume [statement
   U](../../../docs/theory/exactness.md#statement-u), and its lines keep the builds that made them
   ([results/README.md](../../../results/README.md) names them), as the lines added will keep the cloud's.  The
   comparison of `verify.sh` with the committed file is then trivial for the games it holds, so the referees alone check
@@ -229,14 +229,14 @@ For a chain from 1, the report says `assumptions: none in N of N games`.  Any as
 is not what it should be: stop and read the line.  (A count of incomplete lines is not a problem: every search that
 stopped and resumed left one.)
 
-A run with `--use-prev` holds the committed chain's games as `known` lines at the start of its own file, so its file does not continue the committed file as it
-stands.  Bring the games of any run home by appending the games past the committed file's end to it as one gzip member,
-which leaves every earlier byte of the file as it was.  In the run's own file (the plain JSONL that the run wrote, not
-in the repository), find the numbers of the lines that are the first completed line of each game past the committed
-file's last game, leaving out the run's `known` copies of the committed games and its incomplete lines (the committed
-file has none).  A is the number of the first of those lines and B of the last.  Where an incomplete line sits between
-two games, give the sed address of each stretch of consecutive lines (`A,Bp;C,Dp`).  Then run both verifiers on the
-file:
+A run with `--use-prev` holds the committed chain's lines as `known` lines at the start of its own file, so its file
+does not continue the committed file as it stands.  Bring the lines of any run home by appending the lines past the
+committed file's end to it as one gzip member, which leaves every earlier byte of the file as it was.  In the run's own
+file (the plain JSONL that the run wrote, not in the repository), find the numbers of the lines that are the first
+completed line of each game past the committed file's last game, leaving out the run's `known` copies of the committed
+lines and its incomplete lines (the committed file has none).  A is the number of the first of those lines and B of the
+last.  Where an incomplete line sits between two games, give the sed address of each stretch of consecutive lines
+(`A,Bp;C,Dp`).  Then run both verifiers on the file:
 
 ```
 grep -n '"completed":true' FILE | cut -c1-40         # each completed line's number, and its first characters
@@ -245,9 +245,9 @@ taxman verify-results results/optimal.jsonl.gz
 python3 solver/tools/check_results.py results/optimal.jsonl.gz
 ```
 
-The first appended line records its game of n − 1 with the proof kind `known`, as the run's own line, while the
+The first appended line records its moves for n − 1 with the proof kind `known`, as the run's own line, while the
 committed file's line has the proof kind it was made with.  Both referees accept that record, because the score, the
-moves and the assumptions are the line's.  The built-in table takes the appended games at the next build, because the
+moves and the assumptions are the line's.  The built-in table takes the appended lines at the next build, because the
 binary carries the file as it was when it was built.
 
 Then decide what to keep.  [Storage](machine.md#storage) gives the file's size.  Scripts must not overwrite the
@@ -258,5 +258,5 @@ measurement needs go to its notebook entry.
 ## Examples
 
 [The chain to 3440](https://github.com/bvchess/taxman-notebook/blob/main/the-frontier-chain-to-3440-2026-10/README.md)
-ran `chain.sh 4095` on one `c8g.16xlarge` for a day, from a copy of the committed games to 2175;
+ran `chain.sh 4095` on one `c8g.16xlarge` for a day, from a copy of the committed lines to 2175;
 [results/runs.md](../../../results/runs.md) records each run that made the committed chain.

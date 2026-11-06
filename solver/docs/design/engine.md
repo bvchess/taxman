@@ -74,10 +74,10 @@ has the exact steps and checks.  The steps:
 | step | what |
 |---|---|
 | 1 | the board's tables, and the set width |
-| 1a | with `use_prev` and `known.boards` (`solve --use-prev`): a game that a known source has proven (the committed chain, the bounds store, the table, in that order) is taken with no search (method `known`; [Known games](trust.md#known-games)) |
-| 2 | the prime shortcut: a prime n plays the game of n − 1 with its first move replaced by n (method `prime`) |
+| 1a | with `use_prev` and `known.boards` (`solve --use-prev`): a game that a known source has proven (the committed chain, the bounds store, the table, in that order) is taken with no search (method `known`; [Known moves](trust.md#known-moves)) |
+| 2 | the prime shortcut: a prime n plays the moves for n − 1 with its first move replaced by n (method `prime`) |
 | 3 | the frames, formed, simplified, numbered and merged; with no candidates the game with no promotions is the only one (method `trivial`) |
-| 4 | the search (method `search`, or `start` when its starting game reaches a ceiling before the search takes a step): the frame set and the greedy incumbent (`search::prepare`); a repeat of an earlier game's search (method `repeat`, tactic `same_search`; [same-search.md](same-search.md)); the starting incumbent, the ceiling and the seed; the engine; promotions → moves |
+| 4 | the search (method `search`, or `start` when its starting moves reach a ceiling before the search takes a step): the frame set and the greedy incumbent (`search::prepare`); a repeat of an earlier game's search (method `repeat`, tactic `same_search`; [same-search.md](same-search.md)); the starting incumbent, the ceiling and the seed; the engine; promotions → moves |
 | 5 | `conclude`: replay and check the game, confirm its score against the built-in table, assign its proof kind and what it assumes |
 | 6 | record the result (a range) |
 
@@ -86,14 +86,14 @@ The steps again, with the functions that take them:
 ```
  taxman solve A-B --out FILE --checkpoint-dir DIR
    |  solver::solve_range_each        n = A..B, concluded in order (with --window K up to K games in flight, each set
-   |                                  up and searched on threads of its own: solver/window.rs); the game of n-1 comes
-   |                                  from this run, FILE or (--use-prev) the known games (known::Known),
+   |                                  up and searched on threads of its own: solver/window.rs); the moves for n-1 come
+   |                                  from this run, FILE or (--use-prev) the known moves (known::Known),
    |                                  and is checked (legal, over, opens with the largest prime) before anything uses it
    v
  solver::set_up(n) -> set_up_with_width::<W>      W = 8 to 128 words of 64 bits (bits::WIDTHS), by n
    |
    |  [1] numtheory::Tables            maximal factors and maximal composites of 1..=n; the set width W
-   |  [2] n prime ............ accelerate::prime_shortcut   the game of n-1 with its first move replaced by n
+   |  [2] n prime ............ accelerate::prime_shortcut   the moves for n-1 with its first move replaced by n
    |                                                         method=prime        proof=prime_formula
    |  [3] board::Board::new            frames::BoardFrames: sources (never tax) + factors -> frames; unzip,
    |                                   removeImpossible
@@ -122,30 +122,30 @@ The steps again, with the functions that take them:
    |                                 confirm the score against the built-in table; the proof kind and what it assumes
    v
  [6] results::ResultsFile::append    the JSON line, synced; only then is the game's checkpoint deleted;
-                                     the game becomes the previous game of n+1
+                                     the moves become the previous moves of n+1
 ```
 
-*The shortcuts.*  Step 2 needs the game of n − 1, and the repeat of step 4 an earlier game.  `force_search` skips both,
-and step 1a, and so does a checkpoint of the game: a search that was interrupted is resumed, never replaced by a
+*The shortcuts.*  Step 2 needs the moves for n − 1, and the repeat of step 4 an earlier game.  `force_search` skips
+both, and step 1a, and so does a checkpoint of the game: a search that was interrupted is resumed, never replaced by a
 derivation.  With `use_prev`, the search of step 4 takes two things from the bounds store for a game the store has not
-proven: the game of its best lower bound, a seed beside the game of n − 1 (the search starts from the better start of
-the two), and its best upper bound, a ceiling beside the one that the game of n − 1 gives (the lower of the two stops
+proven: the moves of its best lower bound, a seed beside the moves for n − 1 (the search starts from the better start of
+the two), and its best upper bound, a ceiling beside the one that the moves for n − 1 give (the lower of the two stops
 the search).  `force_search` leaves the store out.
 
-*The game of n − 1* is checked before anything uses it: it must replay legally to its recorded score, be over, and open
-with the largest prime (`conclude` has already checked a game that this run made).  The results that rest on it
+*The moves for n − 1* is checked before anything uses it: it must replay legally to its recorded score, be over, and
+open with the largest prime (`conclude` has already checked a game that this run made).  The results that rest on it
 assume what it assumes ([trust.md](trust.md)).
 
 *Limits.*  A search that a time or node limit stops gives an incomplete result (`completed` false, `best_so_far` the
-best game so far) and keeps its checkpoint, and a range stops there.
+best moves so far) and keeps its checkpoint, and a range stops there.
 
-*Range runs* pass each game on to the next as its game of n − 1, and resume from the results file.  The solver checks
-the file when it opens it: it replays every game, and checks the chain from n − 1 and each line's arithmetic and
+*Range runs* pass each game on to the next as its moves for n − 1, and resume from the results file.  The solver checks
+the file when it opens it: it replays every line, and checks the chain from n − 1 and each line's arithmetic and
 provenance (the search problems that the checks of repeats set up again are set up first, on the run's threads).  A
 range skips the games the file completed.  It appends each result and syncs it as soon as the game is concluded, in the
 order of n, and only then deletes the game's checkpoint; a checkpoint left for a game that the file has completed is
-deleted when a range starts.  The game of n − 1 comes from, in order: this run, the results file, and with `use_prev`
-(`--use-prev`) the known games ([Known games](trust.md#known-games): the committed chain's, the bounds store's,
+deleted when a range starts.  The moves for n − 1 come from, in order: this run, the results file, and with `use_prev`
+(`--use-prev`) the known moves ([Known moves](trust.md#known-moves): the committed chain's, the bounds store's,
 the built-in table's).  With none, the game is solved *standalone*, with no seed and no ceiling.
 
 ### The window: games in flight
@@ -156,8 +156,8 @@ score, for the ceiling.  Everything else (its board, its frames, its search prob
 that problem) is its own, and the ceiling only stops a search early.  So a range keeps a *window* of K consecutive games
 in flight (`--window K`, `SolveOptions::window`; 4 by default, as in `solver/tools/cloud/chain.sh`, and always 1 with
 one thread).  Game n + 1 is set up while n searches.  Its search may start before n is proven, *speculatively*, seeded
-from n's best game so far and without a ceiling, and it takes n's ceiling and the seed of n's final game the moment n is
-concluded, through its engine's control ([Engine](#engine)).  `solver::window` is the driver.  With K = 1 it is the
+from n's best moves so far and without a ceiling, and it takes n's ceiling and the seed of n's final moves the moment n
+is concluded, through its engine's control ([Engine](#engine)).  `solver::window` is the driver.  With K = 1 it is the
 range solved in order, line for line: a game enters the window only once the game before it is concluded, so its search
 starts with the final seed and the ceiling, on every thread.
 
@@ -166,11 +166,11 @@ starts with the final seed and the ceiling, on every thread.
   ([trust.md](trust.md)).  The game's search runs on its own thread.  The driver concludes the game when it is the
   oldest game of the window and the game before it is concluded: it builds and checks the result (`conclude`), appends
   and syncs it, and only then tells the next game its ceiling.  A repeat waits for the game it repeats.
-* *Seeds.*  A speculative search starts once the game before it has a game to seed it with: the concluded game, its
+* *Seeds.*  A speculative search starts once the game before it has moves to seed it with: the concluded moves, its
   search's best so far (a search offers its start to its control as the start is made; [search.md](search.md)), or what
   that gives through a repeat or the prime formula.  Every 5 ms the driver offers it the survivors of that game again
   whenever its score has improved, and at the conclusion those of the final game.
-* *Deferring.*  A search whose seed's survivors reach the *provisional ceiling*, n plus the score of the best game so
+* *Deferring.*  A search whose seed's survivors reach the *provisional ceiling*, n plus the score of the best moves so
   far of the game before, less `in_the_bag`, waits for that game's conclusion: if that best is final, the ceiling
   settles the game at once, and a speculative search of it would be wasted.
 * *Threads.*  `--threads T` is a budget that the window shares (`solver::window::allot`, a pure policy, unit-tested).
@@ -211,8 +211,8 @@ starts with the final seed and the ceiling, on every thread.
 [Round B](https://github.com/bvchess/taxman-notebook/blob/main/round-b-the-chain-on-many-threads-2026-10/README.md) has
 what the window buys and what was tried on the way.
 
-**The table of optimal games is built into the binary** (`results/optimal.jsonl.gz`, through `include_bytes!` and
-`game::Optimal::built_in`): the games of the file as it was when the crate was compiled, which a rebuild picks up when
+**The table of optimal moves is built into the binary** (`results/optimal.jsonl.gz`, through `include_bytes!` and
+`game::Optimal::built_in`): the lines of the file as it was when the crate was compiled, which a rebuild picks up when
 the file changes.  The solver confirms every completed game's score against it, and a score that differs is a hard error
 that names the game.  No option of `solve`, `regress` or `certify` names another table, so their runs cannot be checked
 against anything else; the library takes another table where a test needs one (`solver::solve_range_each_with`,
@@ -229,10 +229,10 @@ committed chain that `--use-prev` and `verify-results` draw on (`known::Known::l
 `verify-certificates`.  Such a file must be one game a line, line n
 for game n, as the committed results are.  It is read into memory when it is opened, with its first member decoded (so
 that a file that is no gzip file is refused at once), and its other members are decoded as games are asked for, so a
-check that cites few of its games reads a member or two of it.  A fault in a member that is decoded later stops the
+check that cites few of its lines reads a member or two of it.  A fault in a member that is decoded later stops the
 call that needs the game and names the file.  A plain file is read whole when it is opened.  The measurement tools take
-their `--known` files through `Optimal::with_results_files`, which checks that a game of a file scores what the games
-before it say: for a plain file when it is opened, for a gzip file when a game of it is looked up, where a difference
+their `--known` files through `Optimal::with_results_files`, which checks that a line of a file scores what the lines
+before it say: for a plain file when it is opened, for a gzip file when a line of it is looked up, where a difference
 stops the lookup and names the file, n and both scores.
 
 ## The profile of a search

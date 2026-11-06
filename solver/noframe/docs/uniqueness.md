@@ -5,7 +5,7 @@ Part of [the prover's README](../README.md).
 The optimal set is unique for every n ≤ 424, but not at 425: from there some games have two or three, which differ by an
 exchange of numbers below n/2 of equal sum.  Many move orders play the same set of picks; the question is whether
 different *sets* can be optimal.  If the optimal set were unique, or unique up to a well-described exchange, a solver
-could lean on it: to reuse the game of n − 1 when solving n, to justify shortcuts, or to break symmetry.
+could lean on it: to reuse the moves for n − 1 when solving n, to justify shortcuts, or to break symmetry.
 
 ## What is proven
 
@@ -120,10 +120,10 @@ What the data shows, observed and not proven:
   canonical(n − 1) + n at a ceiling, or − p + n at a prime.  The prime part is a theorem, since the bijection preserves
   the lexicographic order.  The committed chain records the canonical set in 18 of the 30 games with several sets, not
   at 539 and 684–685, where it records the third of three, or at 770–773 and 775–779, the second of two
-  (`tools/summarize.py optsets` lists them).  The table of optimal games that it replaced, optimal.json, recorded the
+  (`tools/summarize.py optsets` lists them).  The table of optimal moves that it replaced, optimal.json, recorded the
   canonical set at 539 and 770–773 too, so in 23 of the 30.
-* **The recorded game of n − 1 is not always extendable.**  At 686, a game at its ceiling, the recorded optimal game of
-  685 plus 686 is unplayable.  The equality opt(686) = 686 + opt(685) holds through another optimal set of 685, the
+* **The recorded moves for n − 1 are not always extendable.**  At 686, a game at its ceiling, the recorded optimal moves
+  for 685 plus 686 is unplayable.  The equality opt(686) = 686 + opt(685) holds through another optimal set of 685, the
   canonical one.
 
 ## What it buys a solver

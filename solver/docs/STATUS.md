@@ -15,7 +15,7 @@ The hunt for a larger n ended on 2026-10-29: the project's owner ended it at 17:
 run of the full chain, 1 to 5060, with one build and the one policy that makes the whole run the fastest; other work
 (the last cleanup step, the prover's run to 2530, the unsound mode) waits until it ends.
 Certifying [statement U](../../docs/theory/exactness.md#statement-u), for particular games or in general, is not a
-priority.  The committed chain is also the table built into the frame solver: the chain's games are appended to it
+priority.  The committed chain is also the table built into the frame solver: the chain's lines are appended to it
 ([the runbook](runbook/chain.md)), and a rebuild takes them into the table.
 
 ## In flight

@@ -24,7 +24,7 @@ launch.md, and ends with the campaigns that used it, whose notebook entries hold
 
 | topic | file | read it to |
 |---|---|---|
-| the chain (`chain.sh`) | [chain.md](runbook/chain.md) | run the chain of optimal games, watch it, verify it and commit it |
+| the chain (`chain.sh`) | [chain.md](runbook/chain.md) | run the chain, watch it, verify it and commit it |
 | the ledger (`ledger/cloud.sh`) | [ledger.md](runbook/ledger.md) | run the ledger over a stretch of games for a budget of CPU |
 | the prover (`prover.sh`) | [prover.md](runbook/prover.md) | prove opt(n) on the whole board with the prover |
 | certificates of U (`certify.sh`) | [certify.md](runbook/certify.md) | certify [statement U](../../docs/theory/exactness.md#statement-u) game by game |

@@ -82,7 +82,7 @@ The search:
   it ever had ([A game on several threads](#a-game-on-several-threads)).
 
 The target is the recorded score V(n).  The search proves that no playable set beats it, or, from the roles of F4, none
-that obeys them, which is as good.  The recorded game replays by the rules to V(n), so opt(n) = V(n).
+that obeys them, which is as good.  The recorded moves replay by the rules to V(n), so opt(n) = V(n).
 
 Every rule above is tested against brute force or against the recorded score.  The search must still reach the
 committed chain's score from one below it, with each rule on, on every seventh game to 420, and from the roles of F4 on
@@ -92,7 +92,7 @@ random pairs of matroids.
 **From the roles of F4** (the default since 2026-10; the committed proofs below are from the plain root).  Over
 the games of 2..999, the 391 searches took 588,026 nodes and 357 s from the roles, against 614,900 nodes and 712 s from
 the plain root (`data/exact_parity_2_1300.jsonl`).  The nodes are within 5%, and the time of a node is halved, since the
-parity solves have the primes and the numbers of layer 2 settled.  Every game of 2..2175 has the recorded game obey the
+parity solves have the primes and the numbers of layer 2 settled.  Every game of 2..2175 has the recorded moves obey the
 roles, and the roles' parity bound is at least its score; `exact --budget 1` checks both for every game before any
 search.  The frames of layer 2 are closed on every board from 187 on, and on most below it.  The roles bar the numbers
 of layer 2 up to n/2 where the frames are closed, and leave them free on the 80 boards of 2..1300 where they are not,
@@ -104,7 +104,7 @@ An odd game n with two prime factors, counted with multiplicity, is proven from 
 V(n) = V(n − 1) + n − x and V(n − 1) is proven.  [The semiprime formula
 (J3)](../../../docs/theory/arrival.md#the-semiprime-formula) says that opt(n) = opt(n − 1) + n − x where n closes a
 cycle with the numbers of layer 2 in U\*(n − 1), and x is the smallest number of the cycle other than n.  The prover
-needs only the bound from above: opt(n) ≤ opt(n − 1) + n − x = V(n), and the recorded game, which replays by the rules,
+needs only the bound from above: opt(n) ≤ opt(n − 1) + n − x = V(n), and the recorded moves, which replay by the rules,
 gives opt(n) ≥ V(n).
 
 The cycle lies in a graph with the primes up to n/2 and one ground vertex as its vertices, where pq is the edge p–q and
@@ -116,10 +116,10 @@ So x = 22, and V(39) = V(38) + 39 − 22 = 503.
 The prover uses it as one more relation, beside `chain` and `prime`:
 
 * `src/semiprime.rs` finds x from the board's own U\*(n − 1), descending greedy (`src/peel.rs`), not from the recorded
-  game.  `relation` in `src/game.rs` asks for it only for an odd n with two prime factors whose score is not at its
+  moves.  `relation` in `src/game.rs` asks for it only for an odd n with two prime factors whose score is not at its
   ceiling, and names the game `semiprime` when V(n) = V(n − 1) + n − x.
 * A score off the formula stops the program, naming n.  Above it, the recorded scores contradict a theorem; below it,
-  the recorded game of n is not optimal.  Where V(n − 1) is not recorded, the relation is `none`.
+  the recorded moves for n are not optimal.  Where V(n − 1) is not recorded, the relation is `none`.
 * `exact` does not search a `semiprime` game (unless `--all 1`) and writes `"relation":"semiprime"`.  `upper` writes
   `"needs":0` for it, and `optsets` derives its optimal sets from those of n − 1 by exchanging x for n (part 3 of J3).
 * `tools/summarize.py` counts the game as proven when n − 1 is, in `exact` and `check`, so that
@@ -337,14 +337,14 @@ The tests check the certificates against every playable set that obeys F4, on bo
 * a deliberately wrong rule, which certifies a member also when its bound is at most T + 10, is caught by the same
   check (12 false certifications over the boards and claims, 15 (set, member) misses on 12 boards), so that the test
   can see the failure it guards against;
-* F4's roles are checked against every optimal set there and every recorded game to 1300.
+* F4's roles are checked against every optimal set there and the recorded moves to 1300.
 
 Four files, each made on one thread of the laptop:
 
 | file | games | needing it | time | what for |
 |---|---|---|---|---|
-| `data/upper_2_1300.jsonl` | the table's games 2..1300, 1,299 | 665 (417 of them with nothing open; 1.0% of the members open) | 65 s | the tests of `taxman certify` |
-| `data/upper_1301_2175.jsonl` | the committed chain's games 1301–2175, 875 | 490 | 300 s | |
+| `data/upper_2_1300.jsonl` | the table's lines for 2..1300, 1,299 | 665 (417 of them with nothing open; 1.0% of the members open) | 65 s | the tests of `taxman certify` |
+| `data/upper_1301_2175.jsonl` | the committed chain's lines for 1301–2175, 875 | 490 | 300 s | |
 | `data/upper_2176_3314.jsonl` | the copy of the cloud chain's results taken on 2026-10-15, games that the committed chain also holds, which [the gap past 2175](https://github.com/bvchess/taxman-notebook/blob/main/search/the-gap-past-2175-2026-10/README.md) measured; 1,139 | 635 | 1,272 s, 4.1 s for the slowest game | |
 | `data/upper_3315_3440.jsonl` | the rest of the committed chain as it stood then, 126 | 73, 3424, 3425 and 3440 among them | 277 s, 4.3 s for the slowest game | the input of the certificates of 2176-3440 (`../tools/certify/`) |
 

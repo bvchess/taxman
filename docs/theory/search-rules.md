@@ -380,7 +380,7 @@ fails.
 * *It pays for no kept move.*  Take n = 54, m = 51, P = ∅ and C = {20, 21}.  Root frame 1 holds the factor 15 in game 54
   only, and 15 pays for 30, a move of that frame in both games.  The completion {20, 21}, worth 41, is a promotion set
   of Π_54 but not of Π_51.
-* *A proven Z.*  A provisional game of m may be worth less than P\*(Π_m), and ending nodes at its value could give up a
+* *A proven Z.*  Provisional moves for m may be worth less than P\*(Π_m), and ending nodes at its value could give up a
   heavier set.
 
 *What is not needed.*  The freedoms, which winnability keeps at least 0; the maximal-factor relation, which is the same

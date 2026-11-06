@@ -13,7 +13,7 @@ of a game whose proof kind uses the frame model (`exhausted`, `trivial`, `same_s
 (`solver/noframe/data/upper_*.jsonl`) say they need a certificate.  For such a game it takes the line's open members O,
 and sets up the extended problem Π⁺(O) in extended mode ([extended-mode.md, "Extended mode: one-sided
 candidates"](extended-mode.md)), with the other members of U\*_{≥3} fixed.  It searches that
-problem from the recorded game, as the promotion set (O, its moves up to n/2), with the ceiling n + score(n − 1) −
+problem from the recorded moves, as the promotion set (O, its moves up to n/2), with the ceiling n + score(n − 1) −
 in_the_bag⁺.  Before the search it checks that the game replays to its score, plays U\* above n/2, and is a promotion
 set of Π⁺(O) worth the score ([the extended exactness theorem
 (E1)](../../../docs/theory/extended-problem.md#the-extended-exactness-theorem) says that a playable one is).  The search
@@ -39,9 +39,9 @@ line with no such field reads as false.
 *The same problem.*  Consecutive games often pose the same Π⁺(O) (the same `search::Problem`, which has no n in it:
 "Same search"), and then an earlier game's certificate settles the later one with no search.  If game m is certified,
 by a search or by this rule, and Π⁺(n) equals Π⁺(m), then the heaviest promotion set of Π⁺(n) is worth best(m) =
-score(m) − in_the_bag⁺(m), which m's certificate proved, and a recorded game of n worth as much has nothing above it.
+score(m) − in_the_bag⁺(m), which m's certificate proved, and recorded moves for n worth as much have nothing above it.
 
-* *Where it looks.*  After the checks of n's recorded game and before its search (a checkpoint of n, if there is one,
+* *Where it looks.*  After the checks of n's recorded moves and before its search (a checkpoint of n, if there is one,
   changes nothing), `certify` looks at the certified games of the `SAME_SEARCH_WINDOW` = 8 games before n, those of the
   file `--out` and those of the run, latest first, and never further.
 * *What it compares.*  It compares the problems in the run's formulation, whatever formulation m's certificate was made
@@ -57,17 +57,17 @@ score(m) − in_the_bag⁺(m), which m's certificate proved, and a recorded game
 * *What it concludes*, with worth(n) = score(n) − in_the_bag⁺(n):
   * worth(n) = best(m): n is *certified*, with `nodes` 0 and `"same_problem": {"n": m, "digest": ..., "best": ...,
     "worth": ...}` in its line;
-  * worth(n) < best(m): the recorded game is not optimal, so the rule is not used and n is searched (the search finds
+  * worth(n) < best(m): the recorded moves are not optimal, so the rule is not used and n is searched (the search finds
     the better set and says *beaten*);
-  * worth(n) > best(m): impossible with genuine data (the recorded game of n is a promotion set of a problem that m's
+  * worth(n) > best(m): impossible with genuine data (the recorded moves for n are a promotion set of a problem that m's
     certificate says nothing beats), so the run fails, naming n, m and both values, and certifies nothing.
 
 The rule is sound ([the same-problem corollary
 (E6)](../../../docs/theory/extended-problem.md#the-same-problem-corollary)) because equal problems have equal heaviest
 promotion sets: the form holds the frames, the candidates, `max_total` and the graph's lists, and nothing of n.  The
 heaviest promotion set of a problem does not depend on the formulation it was certified in, so nothing beats n's
-recorded game, and n's own barred bounds then give opt(n) = score(n) by E2, exactly as after a search.  The refusal of a
-line of the bounds that was found against a higher score applies to a game the rule settles too.
+recorded moves, and n's own barred bounds then give opt(n) = score(n) by E2, exactly as after a search.  The refusal of
+a line of the bounds that was found against a higher score applies to a game the rule settles too.
 
 *The line.*  `--out` gets one line a game: the game, the score, the open members, how many sources greedy rejected
 beside them, the frames and candidates of Π⁺(O), the nodes and seconds of the search, the threads and set width, the
@@ -105,7 +105,7 @@ error.  It counts and skips an `incomplete` line, and checks a line with a final
 
 1. the barred bounds have a line for the game, which says it needs a certificate, and whose open members and score
    are the line's;
-2. the results have a game of n with the line's score, the game passes the checks that `certify` makes of it (it
+2. the results have a line for n with the line's score, whose moves pass the checks that `certify` makes of it (it
    replays to its score, plays U\* above n/2 and is a promotion set of Π⁺(O) worth the score: `check_recorded_game`,
    shared by the two), and the line's `width` is the one `certificate_width` gives; both are set up in the line's own
    formulation (`claims`);
@@ -133,14 +133,14 @@ certified; the counterexamples (the game, the recorded score, the score of the g
 wrote the lines (commit, `dirty`, lines); and the proven end of the chain.
 
 *How far the proofs reach.*  A game n, from 1 to the largest game of the results, is *proven* when n = 1, or the prover
-proved it, or it has a certificate that passed, or its score reaches a proven ceiling and the game of n − 1 is proven:
+proved it, or it has a certificate that passed, or its score reaches a proven ceiling and game n − 1 is proven:
 
 * the prover's proofs are the lines of `--exact` (by default every `solver/noframe/data/exact_*.jsonl`, by name; a
   later file's line for a game replaces an earlier file's, and the lines with `fix_upper` set are measurements, and
   skipped).  Their score must be the results' (a line with another score is an error naming the game and both
   scores).  A line proves its game by the rule of `exact_proofs` in `solver/noframe/tools/summarize.py`: its
   Franklín–Moniot bound or its parity bound is the score, or its search is `proven` (a search that used the segment
-  cuts counts only if every smaller game is proven), or its relation is `chain` or `prime` and the game of n − 1 is
+  cuts counts only if every smaller game is proven), or its relation is `chain` or `prime` and game n − 1 is
   proven;
 * a ceiling is `results::CeilingProof`: the score n + score(n − 1), or the prime formula.
 

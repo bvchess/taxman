@@ -47,9 +47,9 @@ a game m establish P\*(Π_m):
   in_the_bag(m) + sum(T).  This is the soundness of the frame model ([the exactness theorem
   (X7)](../../../docs/theory/exactness.md#the-exactness-theorem)).  Every search relies on it each time it offers an
   incumbent, and the referee replays every game built from one; none has ever failed.  So in_the_bag(m) + P\*(Π_m) ≤
-  opt(m) ≤ m + opt(m − 1) = m + score(m − 1).  The last step needs the game of m − 1 to be optimal: a game proven by the
-  ceiling rests on that, and m's assumptions record it.  So P\*(Π_m) = ceiling(m), the sum of m's promotions, whatever
-  tactics shaped the search.
+  opt(m) ≤ m + opt(m − 1) = m + score(m − 1).  The last step needs the moves for m − 1 to be optimal: a game proven by
+  the ceiling rests on that, and m's assumptions record it.  So P\*(Π_m) = ceiling(m), the sum of m's promotions,
+  whatever tactics shaped the search.
 * `same_search`, by induction: m repeats a game k with Π_k = Π_m whose proof kind settles P\*(Π_k), and m's promotions
   are k's.
 * `known`, where an upper bound of the bounds store ended m's search: the search found a promotable set of the largest
@@ -61,14 +61,14 @@ formula's and sets none up either.  Neither is ever repeated, and the verifiers 
 unfinished search settles nothing.
 
 *The repeat.*  Suppose game n poses Π_n = Π_m, and m's proof kind settles it.  Then P\*(Π_n) = P\*(Π_m) = P, the sum of
-m's promotions S, and S is promotable in Π_n.  The game of n is S played on the board of n (`solution_for_promotions`).
-It goes through `conclude` like any game.  It must replay legally, be over, and open with the largest prime.  It must
-score in_the_bag(n) + P, stay within `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`, and match the built-in table where it
-has n.
+m's promotions S, and S is promotable in Π_n.  The moves for n are S played on the board of n
+(`solution_for_promotions`). It goes through `conclude` like any game.  It must replay legally, be over, and open with
+the largest prime.  It must score in_the_bag(n) + P, stay within `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`, and match
+the built-in table where it has n.
 
-The game is optimal on the premise of an exhausted search of n: that the best game of n scores in_the_bag(n) + P\*(Π_n),
+The play is optimal on the premise of an exhausted search of n: that the best game of n scores in_the_bag(n) + P\*(Π_n),
 which is U at n ([frame-model.md](frame-model.md)).  Only P\*(Π_n) is established differently, from m instead of a
-search.  So the proof kind `same_search` rests on m, not on the game of n − 1, and it assumes what m assumes.
+search.  So the proof kind `same_search` rests on m, not on the moves for n − 1, and it assumes what m assumes.
 
 *Finding m.*  Before it searches game n, the solver looks for an earlier game whose problem is Π_n.  It looks among the
 completed games of the results file and of the run, in the `SAME_SEARCH_WINDOW` = 8 games before n, latest first, for

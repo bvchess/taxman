@@ -33,8 +33,8 @@ How-to lives in the docs listed at the end.
   read the committed results through **solver/gzip/**, a gzip decoder whose CRC-32 check makes a decoding error fail
   loudly.  Their docs and tools are in **solver/**; its rules, and the map of its documents, are in
   [solver/CLAUDE.md](solver/CLAUDE.md).
-* **results/**: the committed chain of proven games (optimal.jsonl.gz, built into the Rust frame solver), the bounds
-  store and the certificates.
+* **results/**: the committed chain, the moves and score of every game, each proven (optimal.jsonl.gz, built into the
+  Rust frame solver), the bounds store and the certificates.
 * **[docs/THEORY.md](docs/THEORY.md)**: the theorems both programs rest on, the index of docs/theory/;
   **[docs/GLOSSARY.md](docs/GLOSSARY.md)**: the terms; **[docs/WRITING.md](docs/WRITING.md)**: how docs are written.
 * **A long document is a folder with an index** (docs/WRITING.md, rule 8): the old file, such as

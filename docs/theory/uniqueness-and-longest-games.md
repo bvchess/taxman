@@ -180,11 +180,11 @@ of [the frame model](frame-model.md#the-frame-model), the optimal game of 833 pr
 game 49, so a search of the frame model cannot prune a promotion set for having fewer promotions than the freedoms
 allow.
 
-*How far an optimal game falls short* (measured).  In every game checked, the recorded optimal game is a longest game,
+*How far an optimal game falls short* (measured).  In every game checked, the recorded optimal moves are a longest game,
 except in games 833, 834 and 835, where it is one move short.  In all but a few games the certificate of the length
-lemma (Q3) shows it: the recorded game has ν(n) moves and replays by the rules, whether or not [statement
-U](exactness.md#statement-u) holds.  That the recorded game is optimal is proved on the whole board for the games the
-prover has proved, and for the rest given U.  Only the recorded game is measured, and a game may have other optimal
+lemma (Q3) shows it: the recorded moves have ν(n) moves and replay by the rules, whether or not [statement
+U](exactness.md#statement-u) holds.  That the recorded moves are optimal is proved on the whole board for the games the
+prover has proved, and for the rest given U.  Only the recorded moves are measured, and a game may have other optimal
 games.  [evidence.md](evidence.md) gives the range and what one must trust, and [a notebook
 entry](https://github.com/bvchess/taxman-notebook/blob/main/how-far-an-optimal-game-falls-short-of-a-longest-one-2026-10/README.md)
 the run.  Whether the shortfall is bounded in general is open.

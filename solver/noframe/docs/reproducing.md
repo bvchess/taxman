@@ -59,11 +59,11 @@ entry](https://github.com/bvchess/taxman-notebook/blob/main/the-upper-part-game-
 ## The recorded games
 
 `exact`, `upper`, `optsets`, `moves` and the examples `parityroot` and `paritycheck` check games against the recorded
-games of the committed chain, the file `results/optimal.jsonl.gz` ([what it holds](../../../results/README.md)).  They
+moves of the committed chain, the file `results/optimal.jsonl.gz` ([what it holds](../../../results/README.md)).  They
 read it through [the gzip decoder](../../gzip/README.md), so the commands run from `solver/noframe` need nothing but
 the file.
 
-The four programs take two flags for other files of recorded games.  `--optimal FILE` names a file in place of the
+The four programs take two flags for other files of recorded moves.  `--optimal FILE` names a file in place of the
 committed chain, and each `--results FILE` adds one, such as the output of a chain run that reaches past the committed
 chain.  The committed chain, or the `--optimal` file, comes first, then the `--results` files in the order given, and
 the earliest file that has game n gives it.  A path that ends in `.gz` is gzip, and any other is plain result lines.

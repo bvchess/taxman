@@ -55,15 +55,15 @@ its section of the entry:
 
 * **The climbs** ([wedge and
   climb](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-wedge-and-climb)):
-  from each board it proves, the scheduler searches the board above and the board below at once, seeded with its game.
+  from each board it proves, the scheduler searches the board above and the board below at once, seeded with its moves.
   `CLIMB` is their ways (`up`, `down`, `both` or `off`; unset, the program's `both`), and `CLIMB_LIMIT` their limit in
   seconds (unset, the program's 60).  `CLIMB=off` or `CLIMB_LIMIT=0` runs without climbs.  The events and the report say
   what each way cost and proved.
 * **The finder**, large neighborhood search ([the finder in the
   ledger](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-the-finder-in-the-ledger)),
   runs on a worker after a board's map and before a search whose best seed has changed.  It finds a legal game, not a
-  proof, and its game is a lower bound once the referee has replayed it.  `LNS_SECONDS` is the seconds of one thread it
-  gets (unset, the program's 1; 0 runs without it).  Its events (`lns_s`, `lns_from`, `lns_found`, `seed_from`,
+  proof, and its moves are a lower bound once the referee has replayed them.  `LNS_SECONDS` is the seconds of one thread
+  it gets (unset, the program's 1; 0 runs without it).  Its events (`lns_s`, `lns_from`, `lns_found`, `seed_from`,
   `below_proven`, `above_proven`, on the maps and the searches) and the report's `finder:` line say what it did.
 * **The floor steps** ([floor-guided
   drilling](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-18-floor-guided-drilling)):

@@ -35,5 +35,5 @@ the docs listed at the end.  Paths here are from the top of the repository; Carg
   research avenues.
 * **[solver/docs/RUNBOOK.md](docs/RUNBOOK.md)**: the guide to running on EC2, the index of solver/docs/runbook/, a file
   a job ([launch.md](docs/runbook/launch.md) has the rules for every launch).
-* **results/**: the committed chain of proven games.
+* **results/**: the committed chain, the moves and score of every game, each proven.
 * **solver/noframe/**: the prover ([solver/noframe/README.md](noframe/README.md)).

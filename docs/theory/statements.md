@@ -131,7 +131,7 @@ reach.
 | | [the strong form of U](uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board) | every optimal set contains all of U\* | open; measured on every game whose optimal sets were all enumerated |
 | Q3 | [the length lemma](uniqueness-and-longest-games.md#the-length-lemma) | ℓ(n) ≤ ν(n); ℓ(n − 1) ≤ ℓ(n) ≤ ℓ(n − 1) + 1, with ℓ(n) = ℓ(n − 1) at a prime n ≥ 3; a playable set has at most \|U\*\| members above n/2 | proved; the last part given (★) |
 | Q4 | [the length proposition](uniqueness-and-longest-games.md#the-length-proposition) | in game 833 every optimal game has 362 moves and ℓ(833) = 363, and a heaviest longest game scores 29 less than opt(833) | proved by computation |
-| | [how far an optimal game falls short](uniqueness-and-longest-games.md#the-length-proposition) | in every game the prover has checked, the recorded optimal game is a longest game, but in games 833, 834 and 835, where it is one move short | measured |
+| | [how far an optimal game falls short](uniqueness-and-longest-games.md#the-length-proposition) | in every game the prover has checked, the recorded optimal moves are a longest game, but in games 833, 834 and 835, where it is one move short | measured |
 
 ### Frames and the frame model
 

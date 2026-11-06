@@ -299,9 +299,9 @@ they hold at every node (fact 4 of [the default step's](#the-default-step) exact
 ## The starting incumbent, the ceiling and the seed
 
 The search starts from the best start of its seeds, and stops as soon as it reaches a proven ceiling. A *seed* is a game
-to start from: the game of n − 1, and with `--use-prev` the bounds store's lower-bound game of n, if it has one. A
+to start from: the moves for n − 1, and with `--use-prev` the bounds store's lower-bound moves for n, if it has them. A
 seed's *survivors* are its promotions that are candidates here and still promotable, taken one by one from the largest
-down (all of the store's game survives, being a game of n). A seed's *start* is the best of three promotable sets:
+down (all of the store's moves survive, being a play of game n). A seed's *start* is the best of three promotable sets:
 
 * the *greedy* set: promote every candidate that can be, from the largest down;
 * the seed's survivors;
@@ -310,10 +310,10 @@ down (all of the store's game survives, being a game of n). A seed's *start* is 
 
 improved by a local search, which fills the set greedily, then drops one or two members and refills, until nothing
 improves. The greedy set and the dive are made once, and the local search runs once from each distinct set the seeds'
-starts have reached. The search starts from the heaviest result (of equals, the store's game or else the game of n − 1),
-or from the greedy set or the dive alone with no seed. A seed needs its own start because a local search climbs only as
-far as its start leads: the store's game can outweigh the survivors of the game of n − 1 and still be a local optimum,
-while those survivors climb higher.
+starts have reached. The search starts from the heaviest result (of equals, the store's moves or else the moves for n −
+1), or from the greedy set or the dive alone with no seed. A seed needs its own start because a local search climbs only
+as far as its start leads: the store's moves can outweigh the survivors of the moves for n − 1 and still be a local
+optimum, while those survivors climb higher.
 
 The *ceiling* on the promotion sum, `n + score(n − 1) − in_the_bag`, is proven, and reaching it ends the search (tactic
 `prev_cap`). Nothing can beat a set at the ceiling, so the dive, the local search and the starts not yet made are
@@ -350,17 +350,17 @@ incumbent reaches a proven bound Z of P\*(Π_m).  [The near-repeat lemma
 (R7)](../../../docs/theory/search-rules.md#the-near-repeat-lemma) proves it under three conditions, which the search
 checks (tactic `near_repeat`, on by default; `search::NearRepeat`).
 
-* **Setup.**  The solver takes as m the game of n − 1, once that game is concluded, if it is proven and assumes nothing
-  (`solver::near_repeat`; [what a game assumes](../REFERENCE.md#assumptions)).  Π_m is set up as Π_n is, Z is
+* **Setup.**  The solver takes as m game n − 1, once it is concluded, if it is proven and assumes
+  nothing (`solver::near_repeat`; [what a game assumes](../REFERENCE.md#assumptions)).  Π_m is set up as Π_n is, Z is
   score(n − 1) less its `in_the_bag`, and the candidates of Π_n that are candidates of Π_m are marked, and among them
   those with the same home in both.
-* **Arming.**  A search that starts after the game of n − 1 is concluded is armed with its go; one that starts while
+* **Arming.**  A search that starts after game n − 1 is concluded is armed with its go; one that starts while
   that game is in the window is armed when it is concluded, beside its ceiling (`Job::arm`).  The cut sits in a lock
-  set once, so it is armed at most once, and never by a provisional game.  Each searcher picks it up at its next unit,
+  set once, so it is armed at most once, and never by provisional moves.  Each searcher picks it up at its next unit,
   and the nodes searched before are only not cut.
 * **The incumbent.**  A node is cut only where the incumbent, as its step read it, reaches Z, as it then does at every
   later node.  A search armed late,
-  seeded with a provisional game of n − 1 that the final game improved on, waits for its incumbent to reach Z: through
+  seeded with provisional moves for n − 1 that the final moves improved on, waits for its incumbent to reach Z: through
   the final game's seed, offered with its ceiling, or its own finds.
 * **At a node,** after the rule of symmetric pairs and before the bound: (1) every promotion is marked, and every
   candidate left is marked as having the same home; (2) the promotions are promotable in Π_m, which gives their state

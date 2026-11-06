@@ -16,7 +16,7 @@ The two main strategies:
    [statement U](../docs/GLOSSARY.md#the-frame-model) holds.
 2. **The continuation solver**, which builds each game from its own game of n − 1, scores **99.97% of all optimal
    points**, starting from nothing at n = 2.  It extends to n = 1001..2000, within 0.35% of the Franklín–Moniot upper
-   bound in aggregate.  The optimal games of those n are in `results/optimal.jsonl.gz`, and
+   bound in aggregate.  The moves of an optimal game for each of those n are in `results/optimal.jsonl.gz`, and
    [results/README.md](../results/README.md) says how they are proven.
 
 This chart shows the player's share of the pot under each strategy.  Solvent and continuation stay close to the optimal
@@ -82,7 +82,7 @@ What is proven, measured or conjectured:
 | peel's assignment is always schedulable | **theorem** (the soundness half of [the peel theorem (P4)](../docs/theory/playability.md#the-peel-theorem)): the peel rules cannot emit a cyclic assignment.  Still asserted at runtime, as a defense in depth |
 | peel's failure means the set is unplayable | **theorem** (the completeness half of P4) — not reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; opt(21) is 144) and peel provably rejects exactly the unplayable.  With soundness, peel is a proven playability oracle |
 | opt delta = U\* delta (the upper-delta certificate) | conjecture, holds on 70.4% of transitions where it applies, zero contradictions |
-| the games of `results/optimal.jsonl.gz` | independently certified to n=62 by brute force over pot states (`certify.py`); **proven on the whole board** for the games the prover has reached ([results/README.md](../results/README.md#what-supports-the-scores) says how far), by the prover (`solver/noframe`), an exact branch and bound on the whole board that uses only the playability theorems, the Franklín–Moniot bound, [the parity bound (W1)](../docs/theory/parity-bound.md#the-parity-bound), the ceiling and the prime formula |
+| the lines of `results/optimal.jsonl.gz` | independently certified to n=62 by brute force over pot states (`certify.py`); **proven on the whole board** for the games the prover has reached ([results/README.md](../results/README.md#what-supports-the-scores) says how far), by the prover (`solver/noframe`), an exact branch and bound on the whole board that uses only the playability theorems, the Franklín–Moniot bound, [the parity bound (W1)](../docs/theory/parity-bound.md#the-parity-bound), the ceiling and the prime formula |
 
 ### The proofs
 
@@ -192,13 +192,13 @@ previous game's own output:
 
 **The main result** (`results/chain_cold_1000.json`): started cold from n=2, with no game of
 `results/optimal.jsonl.gz` anywhere in the loop, the chain scores **99.972% of all optimal points over 2..1000**
-(502/999 exact, worst game 99.52%).  It never scores below solvent, and it beats the chain seeded with optimal games on
-points: by mid-range a perfect seed makes no difference.  **Past n = 1000** (`results/chain_1001_2000.json`): seeded once from the optimal game of 1000, the chain
-solved 1001..2000 at a mean 99.64% of the F–M bound (worst 99.40%), the level the optimal scores reach below 1000,
-where the bound's own looseness averages 0.29%.  It beats solvent in 894 of those games and ties the other 106.  Each
-of the 1000 games has a certified gap, its distance to the bound, which bounds its distance to opt(n) too.  The optimal
-games to compare them with are in `results/optimal.jsonl.gz` ([results/README.md](../results/README.md) says how they
-are proven).
+(502/999 exact, worst game 99.52%).  It never scores below solvent, and it beats the chain seeded with optimal moves on
+points: by mid-range a perfect seed makes no difference.  **Past n = 1000** (`results/chain_1001_2000.json`): seeded
+once from the optimal moves for 1000, the chain solved 1001..2000 at a mean 99.64% of the F–M bound (worst 99.40%), the
+level the optimal scores reach below 1000, where the bound's own looseness averages 0.29%.  It beats solvent in 894 of
+those games and ties the other 106.  Each of the 1000 games has a certified gap, its distance to the bound, which bounds
+its distance to opt(n) too.  The optimal games to compare them with are in `results/optimal.jsonl.gz`
+([results/README.md](../results/README.md) says how they are proven).
 
 ### Certificates
 
@@ -249,7 +249,7 @@ ones that must run regardless).
 Taxman](https://arxiv.org/abs/2211.00461), *Discrete Applied Mathematics*, 339, 166–171, (2023): the max-weight
 matching over maximal-factor edges, what optimal play would score if payments needed no schedule and sweeps took only
 the paid factor.  The same paper proves a Taxman variant NP-hard via graph matching.  The bound is the matching
-relaxation of the game, and our claims past n=1000 are measured against it, as well as against the optimal games noted
+relaxation of the game, and our claims past n=1000 are measured against it, as well as against the optimal scores noted
 above.  It is tight only through n=122.  Over 500..1000, opt(n) averages 99.71% of it (never below 99.57%), so most of
 the band between the bound and the chain on the charts is the bound's looseness, not the strategy's error.  At n=1000
 the gap of 1168 is 257 points of upper-half slack (the matching counts 4 picks no legal order can deliver) and 911 in
@@ -274,7 +274,7 @@ those two games by hand, so only a blanket claim of a win for every
 N > 3 overstates it), and the descending order over x, though the paper
 specifies it, has no effect on the result.
 
-**Theory-free certification** (`evaluation/certify.py`): the games of `results/optimal.jsonl.gz` were produced by the
+**Theory-free certification** (`evaluation/certify.py`): the lines of `results/optimal.jsonl.gz` were produced by the
 same theory this project tests, so the audit uses none of it.  It uses an exhaustive bitmask search, the naive
 all-divisors matching bound, and chains of opt(n) ≤ n + opt(n−1).  The search confirms the unique optimal upper sets
 through n=62, and enumerates the whole optimal pick sets too, which `solver/noframe/tools/crosscheck_optsets.py`
@@ -367,7 +367,7 @@ resumes with `--resume`, so an interruption costs at most a few games.
 | `evaluation/bound.py` | the Franklín–Moniot upper bound |
 | `evaluation/bornfree.py` | the Franklín–Moniot born-free matching: their constructive lower bound |
 | `evaluation/certify.py` | theory-free certification of `results/optimal.jsonl.gz` (uses `evaluation/bitpot.py` bitmask primitives) |
-| `evaluation/wiki_questions.py` | the wiki's two open questions, the tax of a move and reusing the game of n − 1 (`tax`, `adapt`; the results are in [taxman-notebook/the-wikis-open-questions-2026-10/README.md](https://github.com/bvchess/taxman-notebook/blob/main/the-wikis-open-questions-2026-10/README.md)) |
+| `evaluation/wiki_questions.py` | the wiki's two open questions, the tax of a move and reusing the moves for n − 1 (`tax`, `adapt`; the results are in [taxman-notebook/the-wikis-open-questions-2026-10/README.md](https://github.com/bvchess/taxman-notebook/blob/main/the-wikis-open-questions-2026-10/README.md)) |
 | `evaluation/bench.py` | timings and scaling exponents |
 | `evaluation/test_taxman.py` | the test suite |
 | `results/solvent_1000.json`, `results/strategies_1000.json` | per-game scores vs. optimal, n=1..1000 |

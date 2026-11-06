@@ -28,7 +28,7 @@ most moves of a game of n, the size of the largest playable set of picks (ℓ(n)
 
 `src/moves.rs` and `src/bin/moves.rs` work the games in increasing order.  The number M(n) lies between two bounds:
 
-* below, the longer of the recorded optimal game and the longest game of n − 1;
+* below, the longer of the recorded optimal moves and the longest game of n − 1;
 * above, the smaller of ν(n), computed for every board at once by augmenting paths, and what M(n − 1) allows.
 
 Where the bounds meet, M(n) is settled.  Elsewhere the branch and bound of [proofs.md](proofs.md) decides it, with every
@@ -36,18 +36,18 @@ pick weighing 1 ([`Prover::weighted`](../src/game.rs)), in a mode that raises it
 ([`Prover::optimize`](../src/game.rs)), with segment cuts from the smaller games' bounds.  Where a game longer than the
 recorded one exists, the heaviest longest game comes from the same search with the pick of c weighing K + c, where K is
 above every sum, so that a set's weight orders by moves, then by sum.  That search starts from the heaviest longest game
-with the recorded game's upper part, found with the sources fixed, which is cheap.  Every longest game written is
+with the recorded moves' upper part, found with the sources fixed, which is cheap.  Every longest game written is
 replayed by the rules, in the order [P2](../../../docs/theory/playability.md#the-playability-theorem) gives from peel's
 payments (`play_order`).
 
 The checks: M(n) and the heaviest longest game against brute force for n <= 22, ν(n) against the matching solver for
-every board to 400, and `play_order` against the recorded games to 400.  For every game to 4949, [an independent
+every board to 400, and `play_order` against the recorded moves to 400.  For every game to 4949, [an independent
 check](https://github.com/bvchess/taxman-notebook/blob/main/how-far-an-optimal-game-falls-short-of-a-longest-one-2026-10/crosscheck.py)
-in Python replays the recorded game and computes ν(n) from scratch by Hopcroft-Karp.
+in Python replays the recorded moves and computes ν(n) from scratch by Hopcroft-Karp.
 
 Each game reads its predecessor's line in the output file, so a run that continues an earlier one starts from a copy of
-its output.  The recorded games are the committed chain's, and `--results` adds a file of them ([the recorded
-games](reproducing.md#the-recorded-games)).
+its output.  The recorded moves are the committed chain's, and `--results` adds a file of them ([the recorded
+moves](reproducing.md#the-recorded-games)).
 
 ## Results
 
@@ -60,9 +60,9 @@ entry](https://github.com/bvchess/taxman-notebook/blob/main/how-far-an-optimal-g
 
 | | games 2..1300 | games 1301..4949 |
 |---|---|---|
-| the recorded optimal game has ν(n) moves: a longest game by the certificate | 1,293 | 3,649 |
-| ν(n) = M(n) + 1, the recorded game a longest one by a search (51, 182, 183; at most 173 nodes) | 3 | 0 |
-| **the recorded game one move short of M(n) = ν(n)** (833, 834, 835) | **3** | **0** |
+| the recorded optimal moves have ν(n) moves: a longest game by the certificate | 1,293 | 3,649 |
+| ν(n) = M(n) + 1, the recorded moves a longest one by a search (51, 182, 183; at most 173 nodes) | 3 | 0 |
+| **the recorded moves one move short of M(n) = ν(n)** (833, 834, 835) | **3** | **0** |
 
 | n | optimal game: moves (above n/2) | M(n) | heaviest longest game | short of the optimal game by | its exchange of the optimal game's moves below n/2 |
 |---|---|---|---|---|---|
@@ -89,12 +89,12 @@ What the data shows:
   ([uniqueness.md](uniqueness.md)) and has 362 members, and a legal game has 363.  The heaviest 363-move game keeps the
   optimal game's upper part, U\*, and exchanges four of its picks below n/2 for five smaller ones, 29 points for one
   move.  That needs nothing of the frame model: the longer game replays by the rules, ν(833) = 363 bounds every game,
-  and the search proves no 363-move game worth more than 218,197, less than the recorded game's 218,226.
-* **The difference is at most one move to 4949, and one only at 833-835.**  Every other recorded optimal game is a
+  and the search proves no 363-move game worth more than 218,197, less than the recorded moves' 218,226.
+* **The difference is at most one move to 4949, and one only at 833-835.**  In every other game the recorded moves are a
   longest game, 4,942 of them by the matching certificate alone.  At 836 the optimal game reaches ν again, and stays at
   ν through 4949.  Since a game's optimal sets all have the same size wherever they were enumerated
   ([uniqueness.md](uniqueness.md)), "the optimal game's moves" is well defined there; at 833-835 the optimal set is
-  unique.  Past 989 the sets are not enumerated, so the claim there is about the recorded game.
+  unique.  Past 989 the sets are not enumerated, so the claim there is about the recorded moves.
 * **The mechanism is a trade of weight for moves below n/2.**  A pick above n/2 uses one number up to n/2, its payment;
   a pick below uses two, itself and its payment.  At 833 the optimal game's 48 picks below n/2 and 362 payments use 410
   of the 416 numbers up to n/2, and the longest game's 49 and 363 use 412.  Four large picks below n/2 (1,196)

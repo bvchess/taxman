@@ -10,11 +10,11 @@ results line shows them, [frame-model.md](frame-model.md) says what each proof k
 [results/README.md](../../../results/README.md#what-supports-the-scores) says what supports each committed score.  This
 file is the design behind them; `src/results.rs` has the full rules and the checks.
 
-**What a game assumes** is inherited down the chain: a game whose proof kind rests on the game of n − 1, a repeat and a
-`known` game each assume what the game they rest on assumes.  Only two sources add an assumption, a game taken from the
+**What a game assumes** is inherited down the chain: a game whose proof kind rests on the moves for n − 1, a repeat and
+a `known` game each assume what the game they rest on assumes.  Only two sources add an assumption, moves taken from the
 built-in table and a bound of the bounds store ([REFERENCE.md, "Assumptions"](../REFERENCE.md#assumptions) words them).
-So a chain from n = 1 that takes no game from the built-in table or the bounds store assumes nothing: it is proven
-within the frame model, given that the solver is right.  The solver refuses no game for what it assumes: the line says
+So a chain from n = 1 that takes no moves from the built-in table or the bounds store assumes nothing: it is proven
+within the frame model, given that the solver is right.  The solver refuses no line for what it assumes: the line says
 it, and the verifiers count it.
 
 **Checks and referees.**  `game::replay_finished` replays every game before it counts, the solver checks its arithmetic
@@ -24,7 +24,7 @@ and the ceilings `score(n−1) ≤ score(n) ≤ n + score(n−1)`, and two verif
 proof kind and the assumptions again from a line's fields, so both refuse a line whose fields contradict each other (say
 a sum at the ceiling without `reached_cap`).  A line that cites a known source is checked against the sources, which
 both read as they are (`known::Known::check_cite`; the Python referee from the lines of the files).  No check can catch
-a game that is legal, finished and within the ceilings but not optimal, when the game of n − 1 is not optimal either:
+a game that is legal, finished and within the ceilings but not optimal, when the moves for n − 1 are not optimal either:
 that is what the proof kinds and the assumptions track, and why a chain from n = 1 matters.
 
 **Result lines** are one JSON object per line ([REFERENCE.md, "A results line
@@ -75,10 +75,10 @@ records what the range solved in order records, but for what a multi-threaded se
   and `reached_cap`, the weaker of the two proof kinds it has, as the verifiers' rule wants (a line reaches the ceiling
   exactly when its promotions sum to it).  One stopped by a signal or a limit with its best at the ceiling is complete
   by the ceiling, as it would have stopped there given the ceiling from the start.
-* A seed from a provisional game, a hint offered while a search runs, a ceiling given late, a deferral and a suspension
+* A seed from provisional moves, a hint offered while a search runs, a ceiling given late, a deferral and a suspension
   change how a search runs, never what it proves.  Every set offered is promotable (the survivors of a seed), a deferral
-  only delays a search, a suspended search keeps every unit, and the ceiling is proven given the game of n − 1 optimal,
-  which a game of proof kind `cap` rests on.
+  only delays a search, a suspended search keeps every unit, and the ceiling is proven given the moves for n − 1
+  optimal, which a game of proof kind `cap` rests on.
 * What may differ: the moves and promotions where a problem has several optimal sets (as between thread counts), and
   with them the next line's `prev.moves_digest`; the nodes, the search's counters, the engine's, and the times.  The
   nodes decide the method of a game at its ceiling: `start` when its search took no step, as in order, `search` when it
@@ -87,62 +87,62 @@ records what the range solved in order records, but for what a multi-threaded se
 ## Files with holes
 
 A results file may have holes: games with no line, or only incomplete ones.  A `solve` that went on past limits wrote
-such files: a game whose search a limit stopped was recorded as an unfinished line (its best game so far, no proof
+such files: a game whose search a limit stopped was recorded as an unfinished line (its best moves so far, no proof
 kind), and the next game was built on it.  The solver no longer does this, and the verifiers still read these files.  A
 game may take from an unfinished game only what does not rest on its being optimal.  A *seed* is any promotable set the
 board can use, offered as an incumbent, so it cannot change what a search proves.  Three things do rest on opt(n − 1):
 the ceiling `n + opt(n − 1)` (proof kind `cap`), the prime formula (proved at `accelerate::prime_shortcut`), and the
-tripwire that a score above that ceiling proves the game before it not optimal.  A repeat rests on the earlier game it
-repeats, which is a completed game of the file, never an unfinished one.  The check that a completed game scores no less
-than the game before it stays, since a game of n − 1 is a game of n, optimal or not.
+tripwire that a score above that ceiling proves the moves for the game before it not optimal.  A repeat rests on the
+earlier game it repeats, which is a completed line of the file, never an unfinished one.  The check that a completed
+game scores no less than the game before it stays, since a game of n − 1 is a game of n, optimal or not.
 
 The lines say what a game had: a game built on an unfinished one has `prev` with no proof kind, `setup.cap` null and no
 `cap` or `prime_formula` line, and both verifiers refuse a line that claims one of these on it ([REFERENCE.md, "What a
 game had from n - 1"](../REFERENCE.md#what-a-game-had-from-n---1)).
 
-## Known games
+## Known moves
 
-`--use-prev` draws on the games that other work has made (`src/known.rs`): the built-in table, the committed chain, and
-the proven games of the bounds store `results/bounds.jsonl` (`src/store.rs`; the ledger writes it).  The table and the
-committed chain are one file, `results/optimal.jsonl.gz`, read twice: the table is the file as of the build, its games
+`--use-prev` draws on the moves that other work has made (`src/known.rs`): the built-in table, the committed chain, and
+the proven lines of the bounds store `results/bounds.jsonl` (`src/store.rs`; the ledger writes it).  The table and the
+committed chain are one file, `results/optimal.jsonl.gz`, read twice: the table is the file as of the build, its moves
 assumed optimal, and the committed chain is the file of the checkout, read with its proof kinds.  The chain and the
-store are the repository's `results` (`paths`), and no option names another.  `Known::game(n)` is the game of n from the
-best source that holds one: the committed chain's, which is as proven as its line and assumes what the line does, then
-the store's, then the table's.  A game of the store is *proven* when its best lower bound equals its best upper bound.
-Its game is the lower bound's, played by the referee at the value (a line that cites the game of another line is carried
-from it, `store::carried`), and what it rests on is the upper line's `rests_on`.  In the options,
+store are the repository's `results` (`paths`), and no option names another.  `Known::game(n)` is the moves for n from
+the best source that holds them: the committed chain's, which is as proven as its line and assumes what the line does,
+then the store's, then the table's.  A game of the store is *proven* when its best lower bound equals its best upper
+bound. Its moves are the lower bound's, played by the referee at the value (a line that cites the moves of another line
+is carried from it, `store::carried`), and what it rests on is the upper line's `rests_on`.  In the options,
 `SolveOptions::use_prev` turns it on and `SolveOptions::known` names the files and how far it goes; `regress` sets only
-the first, so that it takes just the game before its range, from the table.
+the first, so that it takes just the moves for the game before its range, from the table.
 
-* *The game before the range* (`previous_game`) is the results file's, else the known one.  It gives the ceiling, the
-  seed and the prime formula as any proven game of n − 1 does, and a line built on it says where it came from in
-  `prev.source` (`optimal`, `strict` or `bounds`), with that game's proof kind and assumptions.
-* *A known game* (`Derived::Known`, step 1a of the pipeline, `known.boards`) is recorded without a search.  Its line has
+* *The moves for the game before the range* (`previous_game`) are the results file's, else the known ones.  They give
+  the ceiling, the seed and the prime formula as any proven moves for n − 1 do, and a line built on it says where it
+  came from in `prev.source` (`optimal`, `strict` or `bounds`), with those moves' proof kind and assumptions.
+* *Known moves* (`Derived::Known`, step 1a of the pipeline, `known.boards`) is recorded without a search.  Its line has
   the method `known`, the proof kind `known`, no `setup` and no `in_the_bag` (it set no board up), and `known`: the
-  citation.  Its promotions are the board's promotion candidates that the game plays, as a prime game's are.  `conclude`
+  citation.  Its promotions are the board's promotion candidates that the moves play, as a prime game's are.  `conclude`
   checks it like any game (the replay, the score the source gave, the chain bounds against n − 1, the table), and it
-  becomes the game of n − 1 of the next game, whose games that rest on n − 1 inherit its assumptions.  It sets up no
+  becomes the moves for n − 1 of the next game, whose games that rest on n − 1 inherit its assumptions.  It sets up no
   search problem, so no later game repeats it, unless its proof kind is the store's bound reached by a search (below).
-* *An open game of the store* lends its lower bound's game as a seed, and its upper bound as a second ceiling
+* *An open game of the store* lends its lower bound's moves as a seed, and its upper bound as a second ceiling
   (`StoreCap`, `search_cap`: the engine is given the lower of it and the ceiling of the game before, at the start and
   when the game before is concluded).  A search whose best promotion sum reaches the store's bound, when it is not the
   chain's ceiling that it reached, is proven by the bound: proof kind `known`, method `search` (or `start`, if the
-  starting game reached the bound before a step), `known` citing the upper line alone, `reached_cap` false and
+  starting moves reached the bound before a step), `known` citing the upper line alone, `reached_cap` false and
   `setup.cap` as for any search.  Such a game settles its search problem, as an exhausted search or one at the ceiling
   does: its promotions are a promotable set of that sum, and no promotable set weighs more than the bound allows (a game
   of the frame model is a game of the board, so it scores at most opt(n), which the bound bounds).  So a later game that
-  poses the same problem repeats it, and assumes what the bound does.  A search that finds a game above the store's
+  poses the same problem repeats it, and assumes what the bound does.  A search that finds moves above the store's
   bound fails the run at that game: the store is wrong, or [statement U](../../../docs/theory/exactness.md#statement-u)
   fails at a game that its bound rests on.
-* *`force_search`* leaves out the known games and the store's help, since a forced search is the chain's own.  A game
+* *`force_search`* leaves out the known moves and the store's help, since a forced search is the chain's own.  A game
   with a checkpoint is resumed, never replaced.
 
 The referees (`Known::check_cite`, and its Python counterpart in `solver/tools/check_results.py`) check a citation: the
-table has a game of n with the line's score; so has the committed chain; the store has a lower line and an upper line of
-game n worth the score, of the rule and from the run that the citation names (a store has one line of a game, side and
-value).  They take the sources as they are: the referees of results files check the committed chain, and `ledger
+table has a line for n with the line's score; so has the committed chain; the store has a lower line and an upper line
+of game n worth the score, of the rule and from the run that the citation names (a store has one line of a game, side
+and value).  They take the sources as they are: the referees of results files check the committed chain, and `ledger
 verify-bounds` and `solver/tools/check_bounds.py` check the store.  What the citation lets them conclude is that the
-game, a finished game of that score, is optimal where the source's bounds hold; they do not compare which game the line
+game, a finished play of that score, is optimal where the source's bounds hold; they do not compare which moves the line
 plays with the source's.  The assumptions are those of the cited lines (`assumed_optimal`, the committed line's, and
 `assumed_u` for each game of the upper line's `rests_on`), and the referees refuse a line that records others.  Results
 lines stay in schema 5: `known` is a key that only such a line has, a method and a proof kind, and `strict` and `bounds`
@@ -160,7 +160,7 @@ reads nothing of the truth (the built-in table, the results files) unless it is 
 
 * the *map* of each game: a search stopped before its first node, which gives the start incumbent and the root's GF(2)
   bound;
-* limited one-thread searches, each resumed from its checkpoint, seeded with the games of n − 1, n and n + 1, and with
+* limited one-thread searches, each resumed from its checkpoint, seeded with the moves for n − 1, n and n + 1, and with
   U(n) as its ceiling.  A stopped search's upper bound is its *dual bound* (`search::dual_bound`): the largest of its
   incumbent and the bounds of the open units of its final checkpoint, each the GF(2) bound of the node as the search
   computes it when it starts the unit (`search::NodeBound`);
@@ -177,7 +177,7 @@ reads nothing of the truth (the built-in table, the results files) unless it is 
   sound](https://github.com/bvchess/taxman-notebook/blob/main/search/finders-for-good-games-that-are-not-sound-2026-10/README.md)).
   It is not sound and proves nothing, but a lower bound needs only a legal game.  It runs for `--lns-seconds` seconds of
   a worker, after a game's map and before a search whose best seed has changed since it last ran on the game (a climb's
-  always has).  Its game, which the referee replays like every lower bound, is offered as the game's L, and seeds the
+  always has).  Its moves, which the referee replays like every lower bound, are offered as the game's L, and seeds the
   search if it is better.
 
 *Its order.*  The maps of all the games come first, on the workers, and the relations carry their bounds once, when the
@@ -208,13 +208,13 @@ its upper bound came through.  The ledger is not a results file, and nothing of 
 **The bounds store** keeps the bounds that a run finds for good: `results/bounds.jsonl`, one JSON line a bound, in
 schema 1, appended and never changed.  A line is added only when it improves the file's best bound of its game and side,
 and none for a game that the chain has proven.  `src/store.rs` has the format and the relations between games, which
-`taxman solve --use-prev` reads too ("Known games", above); `examples/ledger/store.rs` has the ledger's checks of a line
+`taxman solve --use-prev` reads too ("Known moves", above); `examples/ledger/store.rs` has the ledger's checks of a line
 against the lines before it; and [results/README.md, "bounds.jsonl"](../../../results/README.md#boundsjsonl) has the
 format, the commands and the referees.
 
-* A lower bound is a game that the referee replays at the line's value: its promotions where it was made from them,
+* A lower bound is a play that the referee replays at the line's value: its promotions where it was made from them,
   which `solution_for_promotions` turns into moves; cited (`from` and `from_value`) where a relation made it from the
-  game of another line; else its moves.
+  moves of another line; else its moves.
 * An upper bound has its rule, the bound and game it was derived from (`from`, `from_value`, and for a repeat the two
   bags), and `rests_on`, the games at which it assumes [statement U](../../../docs/theory/exactness.md#statement-u): its
   own game for a bound of the frame model, what the bound it comes from rests on for a relation, and its own game added
@@ -226,4 +226,4 @@ format, the commands and the referees.
   cites.  `solver/tools/check_bounds.py` is the Python one: it replays the games, the cited ones rebuilt by its own
   constructions and promotion sets from the moves that `ledger games` writes, and checks the arithmetic.
 
-The store holds only bounds that hold: the finder's games are in it because the referee has replayed them.
+The store holds only bounds that hold: the finder's moves are in it because the referee has replayed them.

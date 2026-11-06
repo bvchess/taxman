@@ -6,13 +6,13 @@ What a certificate is and what it proves: [solver/docs/design/certificates.md](.
 past
 2175"](https://github.com/bvchess/taxman-notebook/blob/main/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md).
 Everything ran on the M1 Max, one thread, `nice -n 10`, on the code of commit 35c614b, from the top of the repository,
-against the committed chain (`results/optimal.jsonl.gz`, its games 1..3440) and the prover's barred bounds
+against the committed chain (`results/optimal.jsonl.gz`, its lines for 1..3440) and the prover's barred bounds
 (`solver/noframe/data/upper_*.jsonl`).  `U` stands for the four `--upper` files (2..1300, 1301..2175, 2176..3314,
 3315..3440).
 
 | file | command | what it is |
 |---|---|---|
-| `problems_600_3440.jsonl` | `extended problems 600 3440 U --known results/optimal.jsonl.gz --out problems_600_3440.jsonl` (the example `extended`, removed since: `cargo build --release --features studies --example extended` at commit 3ca11bf; 79 s) | one line per game of 600..3440 that needs a certificate (1,575): its extended problem Π⁺(O) set up without a search (frames, two-sided and one-sided candidates, rejected sources, in_the_bag⁺, the recorded game's worth, the GF(2) block words, the set width `certify` takes, the digest) and `same_as`, the latest of the 8 games before it with the same problem (340, every one of equal worth: the games `certify` settles with no search) |
+| `problems_600_3440.jsonl` | `extended problems 600 3440 U --known results/optimal.jsonl.gz --out problems_600_3440.jsonl` (the example `extended`, removed since: `cargo build --release --features studies --example extended` at commit 3ca11bf; 79 s) | one line per game of 600..3440 that needs a certificate (1,575): its extended problem Π⁺(O) set up without a search (frames, two-sided and one-sided candidates, rejected sources, in_the_bag⁺, the recorded moves's worth, the GF(2) block words, the set width `certify` takes, the digest) and `same_as`, the latest of the 8 games before it with the same problem (340, every one of equal worth: the games `certify` settles with no search) |
 | `plan.jsonl`, [`plan.md`](plan.md), `lists/*.txt` | `solver/tools/certify_plan.py --results results/optimal.jsonl.gz --upper solver/noframe/data/upper_2176_3314.jsonl solver/noframe/data/upper_3315_3440.jsonl --problems solver/tools/certify/problems_600_3440.jsonl --gaps solver/notebook/search/the-gap-past-2175-2026-10/gaps_chain.jsonl solver/notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/gaps_chain_3313_3440.jsonl --from 2176 --to 3440 --era 2176-3310:6.396 --era 3311-3440:16.57 --out-dir solver/tools/certify` | the work list of the campaign and its estimate: per game of 2176..3440 whether it needs a certificate, why it costs what it is expected to cost, and the list files `taxman certify --list` takes (`plan.md` is the summary that an approval reads) |
 
 The certificates of 600..1300, `certificates_600_1300.jsonl`, are in

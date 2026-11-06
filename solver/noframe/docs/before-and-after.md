@@ -35,7 +35,7 @@ Before the prover, this was the state of the evidence.
 * **The frame model** ([solver/docs/design/frame-model.md](../../docs/design/frame-model.md)).  Its assumptions (the
   greedy removal of impossible sources, `unzip`'s mandatory moves, freedoms = factors − sources, closed frames inert,
   promotions one frame forward) were validated end to end:
-  * the committed chain reproduces the Java solver's table of optimal games to 1000, score for score; the same model
+  * the committed chain reproduces the Java solver's table of results to 1000, score for score; the same model
     made that table, so the agreement is not independent;
   * `src/brute.rs` matches it to 40 in its tests, and once to 52, by the example `sacrifice`, removed from master;
   * `heuristics/evaluation/certify.py`'s brute force over pot states confirms it to n = 62.
@@ -61,7 +61,7 @@ Before the prover, this was the state of the evidence.
   (F4)](../../../docs/theory/frame-model.md#the-bottom-layers-theorem) and [the exactness theorem
   (X7)](../../../docs/theory/exactness.md#the-exactness-theorem)).  What the model's answers rest on is one statement,
   U: some optimal game plays every source of three or more prime factors that setup keeps.  The prover's proofs
-  establish U at every n ≤ 2175.  Beyond, the committed games past 2175 that rest on U, by an exhausted search or a
+  establish U at every n ≤ 2175.  Beyond, the committed lines past 2175 that rest on U, by an exhausted search or a
   repeat, have it uncertified.  The barred parity bounds certify about 85% of those sources per game on 2176–3314 and
   80% on 3315–3440, but close no game alone ([proofs.md](proofs.md#the-upper-part-game-by-game)).  The rest needs a
   search that leaves the open sources optional: the certificates of U

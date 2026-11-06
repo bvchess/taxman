@@ -21,7 +21,7 @@ A section, and each paragraph, opens with its point in plain words.  Then it say
 details: the code names, the cases, the proofs.  Provenance (commits, runs, dates, timings) comes last, or behind a
 link.
 
-Not "Of the 2946 games of the committed chain 1..3440 that need a search, 1457 pose the problem of the game before them"
+Not "Of the 2946 lines of the committed chain 1..3440 that need a search, 1457 pose the problem of the game before them"
 but "Moving from one board to the next often leaves the search untouched."
 
 ## 3. End each sentence with the new point
@@ -101,7 +101,7 @@ Say what the reader needs in plain words, and no more:
 
 Not "This project finds optimal games of Taxman, a number game, and proves that they are optimal" but "This project
 finds optimal games of Taxman, a number game."  Not "The committed chain, `results/optimal.jsonl.gz`, holds an optimal
-game for every n" but "The file `results/optimal.jsonl.gz` holds a chain of optimal games for every n."
+game for every n" but "The file `results/optimal.jsonl.gz` holds the moves of an optimal game for every n."
 
 ## 10. Spell the American way
 

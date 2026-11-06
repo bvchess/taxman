@@ -20,9 +20,9 @@ The other documents:
 
 ## Goals and constraints
 
-* **Go past n = 1000**, where the Java solver's table of optimal games stopped, as far as the machines at hand reach: a
+* **Go past n = 1000**, where the Java solver's table of results stopped, as far as the machines at hand reach: a
   laptop (an Apple M1 Max: 10 CPUs, 32 GB of RAM, a fast SSD) and a cloud machine of many CPUs ([RUNBOOK](RUNBOOK.md)).
-  [results/README.md](../../results/README.md#optimaljsonlgz) says how far the committed chain of games reaches, and
+  [results/README.md](../../results/README.md#optimaljsonlgz) says how far the committed chain reaches, and
   [results/runs.md](../../results/runs.md) which machine made each part of it.
 * **Be right before being fast.**  A game counts only once an independent
   [referee](../../docs/GLOSSARY.md#results-and-trust) has replayed it.  Every result names how its game was
@@ -56,7 +56,7 @@ Each file explains one part of the solver and the reasons for it, and defines ea
 | the GF(2) bound, prime exchanges | [gf2-bound.md](design/gf2-bound.md) | change the GF(2) bound, or the symmetries of the promotions that prime exchanges give |
 | the tactics | [tactics.md](design/tactics.md) | add, change or switch off a tactic, and see what each one is proven or sound by |
 | the engine, the per-game pipeline | [engine.md](design/engine.md) | change how the threads share a search, how one game goes from its board to its result, or the window of games in flight |
-| results and the trust model | [trust.md](design/trust.md) | see why a result can be trusted: what a window changes, files with holes, known games, the ledger |
+| results and the trust model | [trust.md](design/trust.md) | see why a result can be trusted: what a window changes, files with holes, known moves, the ledger |
 | same search | [same-search.md](design/same-search.md) | see why a game whose search problem an earlier game posed needs no search |
 | certificates of U | [certificates.md](design/certificates.md) | make or check a certificate of [statement U](../../docs/theory/exactness.md#statement-u) |
 | testing | [testing.md](design/testing.md) | test a change: why small games, the quick check and its limits, and the checklist before a merge |

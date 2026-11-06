@@ -16,7 +16,7 @@ with a seed of its own, and the generator is seeded, so the same game and seed m
 and every odd one starts from what survives of a seed of the search, the seeds in turn (the survivors are offered as
 they are, being a game of their own); the others start from the search's incumbent as it is, and go on from a better one
 the search finds meanwhile.  A search without a seed has the second kind of round only.  A resumed search has no seed in
-its start, but its finder has the game of n − 1 all the same.
+its start, but its finder has the moves for n − 1 all the same.
 
 *Why it cannot make an answer wrong.*  The finder only offers sets.  A set it offers is checked as a checkpoint's
 incumbent is on resuming ([trust.md](trust.md), the paragraph "What identifies a checkpoint"): a set of candidates that
