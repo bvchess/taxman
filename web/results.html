@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The results · Taxman</title>
-<meta name="description" content="Every optimal game of the chain, with its score and its proof; the player's share of the board against Hensley's bounds; what the games show, what is still open, and how to check the data.">
+<meta name="description" content="For every game of the chain, its best score, moves that reach it and how it was proven; the player's share of the board against Hensley's bounds; what the scores show, what is still open, and how to check the data.">
 <meta name="author" content="Brian Chess">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <script src="js/tone.js"></script>
@@ -20,19 +20,20 @@
 <header class="essay-head para">
   <p class="kicker">Chapter 7</p>
   <h1>The results</h1>
-  <p class="lede">An optimal game for each of games 1 to <span data-last-n>the end of the chain</span>, each with its
-  proof.  Here is every one of them, what they show together, and what is still open.</p>
+  <p class="lede">For each of games 1 to <span data-last-n>the end of the chain</span>, moves that reach the best
+  score, and how we know no moves score more.  Here is every one of them, what they show together, and what is still
+  open.</p>
 </header>
 
 <section class="chapter" id="explorer" data-toc="explorer" aria-labelledby="h-explorer">
   <h2 id="h-explorer">Every game</h2>
   <div class="para">
     <p>Choose any game of the <a class="gloss" href="glossary.html#chain">chain</a>.  The explorer shows what the chain
-    records for it: what the player and the taxman each collect in its
-    <a class="gloss" href="glossary.html#optimal-game">optimal game</a>, how the game was proven, how many
-    <a class="gloss" href="glossary.html#promote">promotions</a> the optimal game makes, and what its
-    <a class="gloss" href="glossary.html#search">search</a> cost.  For the games up to 100 it draws the optimal game itself, on
-    its <a class="gloss" href="glossary.html#board">board</a>.</p>
+    records for it: what the player and the taxman each collect in its <a class="gloss"
+    href="glossary.html#optimal-game">optimal game</a>, how the game was proven, how many <a class="gloss"
+    href="glossary.html#promote">promotions</a> the optimal game makes, and what its <a class="gloss"
+    href="glossary.html#search">search</a> cost.  For games up to 100 it also draws the moves on the game's <a
+    class="gloss" href="glossary.html#board">board</a>.</p>
   </div>
 
   <figure class="fig wide explorer" id="explorer-fig" aria-label="The explorer: choose a game of the chain to see its record and, up to game 100, its optimal game."></figure>
@@ -207,9 +208,9 @@
   <div class="para">
     <aside class="note tech" aria-label="A line of the file">
       <div class="note-head"><span class="note-name">A line of the file</span></div>
-      <p>One JSON line a game, in order of n: n, score, moves in the order played, promotions, proof, method,
-      <code>in_the_bag</code>, <code>setup</code>, <code>nodes</code>, <code>seconds</code>, and
-      <code>assumes</code>, what the proof rests on beyond the frame model
+      <p>One JSON line for each game, in order of n: n, score, moves in the order played, promotions, proof (how the
+      score was proven), method, <code>in_the_bag</code>, <code>setup</code>, <code>nodes</code>, <code>seconds</code>,
+      and <code>assumes</code>, what that rests on beyond the frame model
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#a-results-line---out-schema-5">a
       results line</a>; <a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#proof-kinds">the
       proof kinds</a>).</p>
@@ -220,11 +221,11 @@
       compares them.  The verifier in Python also checks each score against Franklín and Moniot’s upper bound
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/verifiers.md">the verifiers</a>).</p>
     </aside>
-    <p>Every game of the <a class="gloss" href="glossary.html#chain">chain</a> is one line of one file,
-    <a href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a>: its
-    moves in the order played, its score and promotions, how it was proven, and what that proof rests on.  Two programs
-    that share no code check every line, from the top of the
-    <a href="https://github.com/bvchess/taxman">repository</a>:</p>
+    <p>One file, <a
+    href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a>, has a
+    line for each game of the <a class="gloss" href="glossary.html#chain">chain</a>: its best score, the moves that
+    reach it in the order played, its promotions, how the score was proven, and what that rests on.  Two programs that
+    share no code check every line, from the top of the <a href="https://github.com/bvchess/taxman">repository</a>:</p>
   </div>
   <dl class="commands">
     <dt>Print the line of game 21</dt>
@@ -238,14 +239,14 @@
   </dl>
   <p>Both verifiers replay each game: every <a class="gloss" href="glossary.html#move">move</a> legal, the largest
   prime first, no move left at the end, and the score as recorded.  They check each score against the game before it,
-  which it can beat by n at most, and they work out each line’s proof and what it rests on again, so that an edit to
-  the file cannot change either.</p>
-  <p>A replay shows that a game is legal and scores what it says, but not that no game scores more.  That is what the
-  proofs are for, and each line names its own.  The <a class="gloss" href="glossary.html#prover">prover</a> proves the
-  scores from game 2 to game 2,175 again, on the whole board, and
-  <a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/reproducing.md">its guide</a> gives the
-  commands.  The scores alone are also in the format of the OEIS, in
-  <a href="https://github.com/bvchess/taxman/blob/master/results/b019312.txt">results/b019312.txt</a>.</p>
+  which it can beat by n at most, and they work out again how each score was proven and what that rests on, so that an
+  edit to the file cannot change either.</p>
+  <p>A replay shows that the moves are legal and score what the line says, but not that no moves score more.  That takes
+  the rule or the search that proved the score, which each line names.  The <a class="gloss"
+  href="glossary.html#prover">prover</a> proves the scores from game 2 to game 2,175 again, on the whole board, and <a
+  href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/reproducing.md">its guide</a> gives the
+  commands.  The scores alone are also in the format of the OEIS, in <a
+  href="https://github.com/bvchess/taxman/blob/master/results/b019312.txt">results/b019312.txt</a>.</p>
 </section>
 
 <nav class="chapter-nav" aria-label="Pages"></nav>

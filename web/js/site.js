@@ -14,7 +14,9 @@ export const STORY = [
   { n: 4, title: 'Frames', line: 'What is left splits into frames, and only the promotions are left to choose.', href: 'frames.html' },
   { n: 5, title: 'The search', line: 'A search tries promotion sets, and a bound proves when nothing better is left.', href: 'search.html' },
   { n: 6, title: 'Trust', line: 'Every score is checked, and every score says what it rests on.', href: 'trust.html' },
-  { n: 7, title: 'The results', line: 'The games, how each was proven, and what they show.', href: 'results.html' },
+  {
+    n: 7, title: 'The results', line: 'The best scores, how each was proven, and what they show.', href: 'results.html',
+  },
   { n: 8, title: 'In Summary', line: 'The optimal games in brief, and the whole method on game 21.', href: 'summary.html' },
 ];
 

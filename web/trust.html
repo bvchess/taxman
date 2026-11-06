@@ -39,7 +39,7 @@
     <p>Two verifiers then replay the whole file, each on its own: the
     <a class="gloss" href="glossary.html#frame-solver">frame solver</a>'s, and a second one, in Python, that shares no
     code with it.  They also check that the scores never fall from one game to the next and never rise by more than n,
-    and they work out each game's proof again from its record, so that no edit by hand can change one.</p>
+    and they work out again from each line how its score was proven, so that no edit by hand can change it.</p>
     <p>A replay shows that a game can be played, not that it is the best.  That takes a proof.</p>
   </div>
 </section>
@@ -202,10 +202,10 @@
   </figure>
 
   <div class="para">
-    <aside class="note tech" aria-label="Proofs and assumptions">
-      <div class="note-head"><span class="note-name">Proofs and assumptions</span></div>
-      <p>Each line of <code>results/optimal.jsonl.gz</code> has a <code>proof</code> and an <code>assumes</code>.  What
-      a game assumes is what its proof rests on beyond the frame model; the verifiers derive both again
+    <aside class="note tech" aria-label="Proof kinds and assumptions">
+      <div class="note-head"><span class="note-name">Proof kinds and assumptions</span></div>
+      <p>Each line of <code>results/optimal.jsonl.gz</code> has a <code>proof</code>, which names how its score was
+      proven, and an <code>assumes</code>.  What a game assumes is what that rests on beyond the frame model; the verifiers derive both again
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#proof-kinds">proof kinds</a>,
       <a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#assumptions">assumptions</a>;
       <a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what
@@ -219,8 +219,8 @@
     <span data-rests="known">382</span> games from game <span data-rests="knownFrom">3,984</span> to
     game <span data-rests="knownTo">4,783</span> meet an upper bound that an earlier run of the solver proved, so they
     rest on the frame model of the games that bound came from.</p>
-    <p>Each game's line in the file says this itself: it names its proof and lists what the proof assumes.  A line
-    that assumes nothing is proved within the frame model, given that the solver is right.  The lines of those
+    <p>Each game's line in the file says this itself: it names how the score was proven and lists what that assumes.  A
+    line that assumes nothing is proved within the frame model, given that the solver is right.  The lines of those
     <span data-rests="known">382</span> games list statement U at each game their bound came from, their own game or
     others.</p>
   </div>

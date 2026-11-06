@@ -109,7 +109,7 @@ check.
 **Right column.**  The lifting lemma (P1), the playability theorem (P2), Franklín and Moniot's Theorem 1, which says P2
 in the language of matchings, the peel theorem (P4), the two-factor proposition (P11).
 
-**Asides.**  *Three factors of tax:* game 40 has an optimal game in which one move pays 6, 10 and 15, yet no game to
+**Asides.**  *Three factors of tax:* in game 40, one move of an optimal game pays 6, 10 and 15, yet no game to
 2175 needs one (its home in the repository is to be written; the wiki's Questions page has it).  *More moves, fewer
 points:* in game 833 every optimal game makes 362 moves, but a game can make 363 (the length proposition, Q4).
 
@@ -230,7 +230,7 @@ opt(n).
 
 **Point.**  Here are the games, how each was proven, and what they show.
 
-* The explorer: choose n, see its optimal game, its frames, its promotions and its proof.
+* The explorer: choose n, see the moves of an optimal game, its frames, its promotions and how its score was proven.
 * The player's share: Hensley proved it tends to a constant between 1/2 and 35/48; our games put it near 0.63
   (measured).
 * What is open: statement U, the sources conjecture, the complexity of Taxman.
@@ -267,7 +267,7 @@ page, a guide for those who build the site, is not linked.
 
 ## About
 
-* What this work adds, where "to our knowledge" appears once: the chain of optimal games, its proofs and its trust
+* What this work adds, where "to our knowledge" appears once: the chain, how each score was proven and its trust
   model, the frame model and its exactness, the peel theorem, the bottom-layers theorem, the counting theorem and the
   parity bound, and the findings above.
 * Prior work: the Taxman sequence's earlier terms on OEIS, Hensley, Franklín and Moniot, the published heuristics,

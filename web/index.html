@@ -126,9 +126,10 @@
       <p>The share is the player’s score, opt(n), divided by the total of the board,
       1&nbsp;+&nbsp;2&nbsp;+&nbsp;⋯&nbsp;+&nbsp;n.</p>
       <p>In 1988 Hensley proved that as n grows, the share settles toward one value, somewhere between 50% and about
-      73%.  The chain’s games put it near 63%.  That is a measurement, not a proof.</p>
+      73%.  The chain’s best scores put it near 63%.  That is a measurement, not a proof.</p>
     </aside>
-    <p>We found the games in order, from game 1 up, each one built from an <a class="gloss" href="glossary.html#optimal-game">optimal game</a> of the one before,
+    <p>We solved the games in order, from game 1 up, each from an
+    <a class="gloss" href="glossary.html#optimal-game">optimal game</a> of the one before,
     so they form a <a class="gloss" href="glossary.html#chain">chain</a>.  The chart shows every game of it: the share of the
     <a class="gloss" href="glossary.html#board">board</a> that the player wins, how each game was proven, and how
     long a search took.</p>
@@ -141,22 +142,22 @@
 
 <section class="chapter front-along" id="along" data-toc="along" aria-labelledby="h-along">
   <h2 id="h-along">Along the way</h2>
-  <p>Finding the games turned up some surprises.  Each one is told in the chapter that explains it.</p>
+  <p>Solving the games turned up some surprises.  Each one is told in the chapter that explains it.</p>
   <ul class="finding-cards"></ul>
 </section>
 
 <section class="chapter front-check" id="check" data-toc="check" aria-labelledby="h-check">
   <h2 id="h-check">Check it yourself</h2>
   <div class="para">
-    <p>Every game, with its score and its proof, is in one file, and two programs check it.  The code, the theory
-    and the record of what we tried are on GitHub.</p>
+    <p>One file has a line for every game: its best score, moves that reach it, and how we know no moves score more.
+    Two programs check every line.  The code, the theory and the record of what we tried are on GitHub.</p>
   </div>
   <ul class="source-list">
     <li><a href="https://github.com/bvchess/taxman">The repository</a><span>the frame solver, the prover, the theory
     and the results</span></li>
-    <li><a href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">The chain of
-    games</a><span>one line a game, and <a href="https://github.com/bvchess/taxman/blob/master/results/README.md">what
-    supports each score</a></span></li>
+    <li><a href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">The results file</a><span>a
+    line for each game, and <a href="https://github.com/bvchess/taxman/blob/master/results/README.md">what supports each
+    score</a></span></li>
     <li><a href="https://github.com/bvchess/taxman/blob/master/docs/THEORY.md">The theory</a><span>every result the
     programs rest on, with its proof and its standing</span></li>
     <li><a href="https://github.com/bvchess/taxman/blob/master/solver/frame/README.md">The frame solver</a><span>how
