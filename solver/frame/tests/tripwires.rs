@@ -149,7 +149,7 @@ fn gated_tree(n: u32, assignments: &str) -> (u64, u64) {
         let branching = Arc::new(Branching::new(BranchSettings::of(&p.tactics).with_gate(Some(gate))));
         let near = OnceLock::new();
         let cfg = common::config(1);
-        let r = search_steered(&p, &cfg, &[], None, false, None, &branching, &near, None, None, None).unwrap();
+        let r = search_steered(&p, &cfg, None, None, false, None, &branching, &near, None, None, None).unwrap();
         assert!(r.completed);
         (r.sum, r.stats.nodes)
     })

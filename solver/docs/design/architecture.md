@@ -42,8 +42,8 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
    weight split).  [The frame bound (B2)](../../../docs/theory/frame-bounds.md#the-frame-bound) is the proof.
 10. `src/search/`: the searcher.  `mod.rs` explains the step and says what is where: `searcher.rs` (`TaxSearcher` and
     `Stepper::step`, whose phases are `check_node`, `choose_branch`, `make_child` and `check_child`), `seek.rs`
-    (`Seek`: where a node's conflicts come from), `symmetry.rs` (the rule of symmetric pairs), `dual.rs` (the dual bound of
-    a stopped search), `setup.rs` (`prepare`), `tactics.rs`, `branching.rs` (the branching settings, whose gate the
+    (`Seek`: where a node's conflicts come from), `symmetry.rs` (the rule of symmetric pairs), `node_bound.rs` (the bound of
+    a unit's node), `setup.rs` (`prepare`), `tactics.rs`, `branching.rs` (the branching settings, whose gate the
     gate trial may change while a search runs), `price_memo.rs` (the prices of conflict branching kept from one check to
     the next, [price-reuse.md](price-reuse.md)), `incumbent.rs`, `header.rs` (the checkpoint header), `near_repeat.rs`
     (the near-repeat cut), `finder.rs` (the thread beside a long search, [finder.md](finder.md)), `gate_trial.rs` (the

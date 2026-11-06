@@ -15,7 +15,7 @@
 //!   arms the search's cut, which the searchers pick up as each starts a unit).
 //! * Π_M is set up as Π_N is.  The candidates of Π_N that are candidates of Π_M are marked, and among them those with
 //!   the same home in both.
-//! * The incumbent, or the floor, is worth at least B.  A search armed below it, from provisional moves for n − 1 that
+//! * The incumbent is worth at least B.  A search armed below it, from provisional moves for n − 1 that
 //!   the search improved on, say, cuts nothing until the incumbent reaches B: the searcher compares the incumbent its
 //!   step read with B before it checks a node.  The incumbent only rises, so this holds at every later node.
 //!
@@ -106,8 +106,8 @@ impl<const W: usize> NearRepeat<W> {
         self.bound
     }
 
-    /// Whether a search whose incumbent or floor is worth `incumbent` may cut by this: the incumbent is worth at least
-    /// B (the setup's third check).  Until it is, the search cuts nothing.
+    /// Whether a search whose incumbent is worth `incumbent` may cut by this: the incumbent is worth at least B (the
+    /// setup's third check).  Until it is, the search cuts nothing.
     #[inline]
     pub fn reached(&self, incumbent: u64) -> bool {
         incumbent >= self.bound

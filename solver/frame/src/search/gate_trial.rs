@@ -509,7 +509,7 @@ mod tests {
         let plan = Plan { gates: vec![0], after: 0, units: 4, steps: 2000, threads: 1, least_gap: 0 };
         let branching = Arc::new(Branching::new(BranchSettings::of(&p.tactics)));
         let near = OnceLock::new();
-        let with = search_steered(&p, &cfg, &[], None, false, None, &branching, &near, None, None, Some(&plan));
+        let with = search_steered(&p, &cfg, None, None, false, None, &branching, &near, None, None, Some(&plan));
         let with = with.expect("the search with a trial");
         let without = search(&p, &EngineConfig { threads: 1, ..EngineConfig::default() }, None, None, false);
         assert!(with.completed);

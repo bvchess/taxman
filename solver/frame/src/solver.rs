@@ -888,7 +888,7 @@ struct Outcome {
 
 /// A game set up for a search, whatever its set width: what the game's thread and the driver of the range need of it.
 /// The thread runs the search ([`search`](Job::search)); the driver, meanwhile, reads the best promotions so far for
-/// the games that follow, weighs what a seed would give the search, and gives the search its ceiling and seeds through
+/// the games that follow, weighs what a seed would give the search, and gives the search its ceiling and seed through
 /// its control.
 trait Job: Send + Sync {
     /// The moves that `promotions` (a promotable set of the board's candidates) make on the board.
@@ -937,9 +937,9 @@ struct SearchJob<const W: usize> {
 }
 
 impl<const W: usize> SearchJob<W> {
-    /// The seeds of a search: the moves `prev` for `n − 1` as the set of their promotions, if there are any.
-    fn seeds_of(&self, prev: Option<&[u32]>) -> Vec<Bits<W>> {
-        prev.into_iter().map(|moves| self.board.seed(moves)).collect()
+    /// The seed of a search: the moves `prev` for `n − 1` as the set of their promotions, if there are any.
+    fn seed_of(&self, prev: Option<&[u32]>) -> Option<Bits<W>> {
+        prev.map(|moves| self.board.seed(moves))
     }
 }
 
@@ -985,11 +985,11 @@ impl<const W: usize> Job for SearchJob<W> {
 
     fn search(&self, go: Go, opts: &SolveOptions) -> Result<Outcome, String> {
         let n = self.board.n();
-        let seeds = self.seeds_of(go.seed.as_deref());
+        let seed = self.seed_of(go.seed.as_deref());
         // The finder starts from the same seed, or from the moves for `n − 1` when the search takes none.
         let finder = (opts.finder_after > 0).then(|| {
-            let seeds = self.seeds_of(go.finder_seed.as_deref());
-            finder::Plan { after: opts.finder_after, budget: opts.finder_budget, seeds }
+            let seed = self.seed_of(go.finder_seed.as_deref());
+            finder::Plan { after: opts.finder_after, budget: opts.finder_budget, seed }
         });
         let (spill_dir, own) = spill_dir(opts, n);
         let cfg = EngineConfig {
@@ -1020,7 +1020,7 @@ impl<const W: usize> Job for SearchJob<W> {
         let found = search::search_steered(
             prepared,
             &cfg,
-            &seeds,
+            seed.as_ref(),
             go.cap,
             resuming,
             plan,

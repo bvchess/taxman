@@ -15,8 +15,8 @@ The thread runs *rounds* of large neighborhood search ([glossary](../../../docs/
 `search::finder`).  A round fixes a random share of a set's promotions (70 to 90%), searches the rest exactly as a unit
 of the engine on one thread for at most 1,024 steps, takes a better set, and repeats; a round lasts 15 seconds and draws
 with a seed of its own, and the generator is seeded, so the same game and seed make the same rounds.  The first round
-and every odd one starts from what survives of a seed of the search, the seeds in turn (the survivors are offered as
-they are, being a game of their own); the others start from the search's incumbent as it is, and go on from a better one
+and every odd one starts from what survives of the search's seed (the survivors are offered as they are, being a game of
+their own); the others start from the search's incumbent as it is, and go on from a better one
 the search finds meanwhile.  A search without a seed has the second kind of round only.  A resumed search has no seed in
 its start, but its finder has the moves for n − 1 all the same.
 

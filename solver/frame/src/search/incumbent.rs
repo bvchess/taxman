@@ -27,17 +27,6 @@ pub(super) fn surviving<const W: usize>(prepared: &Prepared<W>, seed: &Bits<W>) 
     kept
 }
 
-/// `sets` in their order, each distinct set once.
-pub(super) fn distinct<const W: usize>(sets: impl IntoIterator<Item = Bits<W>>) -> Vec<Bits<W>> {
-    let mut kept: Vec<Bits<W>> = Vec::new();
-    for set in sets {
-        if !kept.contains(&set) {
-            kept.push(set);
-        }
-    }
-    kept
-}
-
 /// Where a local search for better promotion sets works: the search's model, root and candidates.
 #[derive(Clone, Copy)]
 pub struct Neighborhood<'a, const W: usize> {

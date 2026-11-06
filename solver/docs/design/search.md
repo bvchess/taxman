@@ -298,10 +298,9 @@ they hold at every node (fact 4 of [the default step's](#the-default-step) exact
 
 ## The starting incumbent, the ceiling and the seed
 
-The search starts from the best start of its seeds, and stops as soon as it reaches a proven ceiling. A *seed* is a game
-to start from: the solver gives the search the moves for n − 1, and the search takes any number of seeds. A seed's
-*survivors* are its promotions that are candidates here and still promotable, taken one by one from the largest down. A
-seed's *start* is the best of three promotable sets:
+The search starts from a start incumbent, and stops as soon as it reaches a proven ceiling. A *seed* is a game to start
+from: the solver gives the search the moves for n − 1. The seed's *survivors* are its promotions that are candidates here
+and still promotable, taken one by one from the largest down. The *start* is the best of three promotable sets:
 
 * the *greedy* set: promote every candidate that can be, from the largest down;
 * the seed's survivors;
@@ -309,14 +308,11 @@ seed's *start* is the best of three promotable sets:
   promoted;
 
 improved by a local search, which fills the set greedily, then drops one or two members and refills, until nothing
-improves. The greedy set and the dive are made once, and the local search runs once from each distinct set the seeds'
-starts have reached. The search starts from the heaviest result (of equals, the first seed's), or from the greedy set or
-the dive alone with no seed. A seed needs its own start because a local search climbs only as far as its start leads: a
-seed can outweigh the survivors of another and still be a local optimum, while those survivors climb higher.
+improves. The search starts from the result, which with no seed comes from the greedy set or the dive alone.
 
 The *ceiling* on the promotion sum, `n + score(n − 1) − in_the_bag`, is proven, and reaching it ends the search (tactic
-`prev_cap`). Nothing can beat a set at the ceiling, so the dive, the local search and the starts not yet made are
-skipped once a set reaches it, and the result is the same.
+`prev_cap`). Nothing can beat a set at the ceiling, so the dive and the local search are skipped once a set reaches it,
+and the result is the same.
 
 *Why the start cannot make an answer wrong.* It only chooses the incumbent, a promotable set: the greedy set, the
 survivors, the dive and every move of the local search promote their members one after another ([trust.md](trust.md),
@@ -328,18 +324,8 @@ prunes only subtrees that cannot beat a set already held. A start at the ceiling
 improvement in the order of the sequential pass, so neither it nor the start depends on the thread count. It reads the
 ceiling before each pass, so a ceiling given while it runs (through the control, [Engine](engine.md#engine)) ends it as
 soon as its set reaches it. The start is offered to the run's control as it is made, so a caller sees the best so far
-before the engine starts, and the engine's start is unchanged. With one seed, or seeds that give the same start, the
-start and tree are that seed's alone. `board::Board` is the one place that knows the path from the tables to the
-frames, the prepared search, the ceiling and the seeds.
-
-*A floor.*  A search can start instead from a *floor* (`search::search_above`): an incumbent worth a given promotion
-sum, with no set and no start made.  The search prunes nodes against the floor as against a set of that weight, and a
-set it finds heavier becomes the incumbent as usual.  A search that completes with none found has proven that nothing is
-heavier than the floor ([the floor lemma (R5)](../../../docs/theory/search-rules.md#the-floor-lemma)), which
-`SearchResult::floor_held` says.  Its tree is that of a search from an incumbent of that worth: at P\*
-the proof's tree, node for node, as a search seeded with an optimal set makes it; above P\* a smaller one, by a factor
-of about 27 for each quarter of the gap between the root's bound and P\*, on the games measured ([searches under a
-floor](https://github.com/bvchess/taxman-notebook/blob/main/search/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/README.md)).
+before the engine starts, and the engine's start is unchanged. `board::Board` is the one place that knows the path from
+the tables to the frames, the prepared search, the ceiling and the seed.
 
 ## The near-repeat cut
 

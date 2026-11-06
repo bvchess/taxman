@@ -105,13 +105,6 @@ every second line of the Java fixtures), and the comment on each says what the w
   A search below the root with the rule of symmetric pairs is held to the best completion that keeps their
   inequalities (an exhaustive oracle of its own, which prunes by the same bound but shares no code with the rule), which
   it must reach; at the root that is P\* ([R2](../../../docs/theory/search-rules.md#the-prime-exchange-theorem)).
-* **The floor** (`src/search/tests.rs`): on every game of the Java's that needs a search, to 400, a floor below P\*
-  finds an optimal set, a floor at P\* or above completes with nothing found, and a floor at the root's bound or above
-  ends at the first check; with the default tactics and (every ninth game) on four threads, without the rule of
-  symmetric pairs, and without it, forced members and nogoods.  The floor at P\* searches the tree of the search seeded with an optimal set,
-  step for step, on games 300 to 1000; a floor at the ceiling ends the search before it starts; a stopped floor search
-  resumes under its floor, and is refused under another floor or none.  With no floor nothing moves: the tripwires and
-  the probe's fingerprints are the same.
 * **Node-count tripwires** (`tests/tripwires.rs`): a pruning tactic that stops working changes no answer, so no
   assertion on answers sees it (a mutant that ignored the result of `Nogoods::ruled_out` takes 27 to 67% more nodes).
   With one thread the tree is deterministic, so the test asserts the exact node count of a fixed game under fixed
@@ -260,7 +253,8 @@ the computations behind the statements that are not proved are in [evidence.md](
 | N1, N6 | The prover's enumeration of optimal sets (`solver/noframe/src/bin/optsets.rs`): the sets derived at the ceiling and at the primes equal those enumerated directly on every such game to 700, and to 260 in its tests; every optimal set found holds q(n) and no other prime. |
 | J3 | The prover's `solver/noframe/src/semiprime.rs`.  On every odd n to 300 with two prime factors, the values of opt(n) found by the prover's search from nothing (the search itself is checked against brute force over all sets to 20) satisfy opt(n) − opt(n − 1) = n − x exactly where n closes a cycle with U\*_2(n − 1); x taken as the largest member of the cycle instead of the smallest breaks the formula on every such game.  Every such n to 1300 that closes a cycle meets the formula in the committed chain, which `relation` checks (it stops, naming n, at a score off it), and the optimal sets derived by the exchange of x for n are the enumerated ones on every such game to 260. |
 | N3 to N5, R6 | The chain bounds `score(n − 1) ≤ score(n) ≤ n + score(n − 1)` and the prime formula, which both verifiers check on every line of the committed chain, and the repeats (`tests/same_search.rs`; `verify-results` sets both problems of every repeat up again). |
-| R4 | The tests of `src/search/dual.rs`: a search stopped before its first node has the root's bound, the dual bound of game 999 brackets its promotion sum and falls as the node limit grows, and another game's checkpoint is refused. |
+| R4 | The test of `src/search/node_bound.rs`: the bound of the root's node is the root's GF(2) bound and not below P\*.  The rest is the exactness of the searches, which equal the Java's optima and the brute force (above). |
+| R5 | No check: no code starts a search from a floor. |
 | Q1 | A search over the states of the pot that uses no theory (`heuristics/evaluation/certify.py`) finds the heaviest set of sources unique in every game to 62. |
 | Q3 | The prover's `src/moves.rs`: ℓ(n) and the heaviest longest game against brute force to 22, and ν(n) against the matching solver on every board to 400. |
 | W1 | The heuristics' check above, to 22.  The prover's parity bound is at least opt(n) on every game to 1300 (`solver/noframe/data/exact_parity_2_1300.jsonl`), and the recorded moves are independent at both parities on every game to 1300 that is not prime; the intersection agrees with brute force on 3,000 random pairs of matroids ([matroid intersection bounds](https://github.com/bvchess/taxman-notebook/blob/main/search/matroid-intersection-bounds-2026-10/README.md)). |
@@ -270,4 +264,4 @@ the computations behind the statements that are not proved are in [evidence.md](
 | E5 | The census's check H (above): Π⁺(∅) with the claims is Π_n. |
 | B1, B4 | The study of the multi-field bound ([its entry](https://github.com/bvchess/taxman-notebook/blob/main/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md); its programs build at commit 8753189): every promotion set of the boards with at most 22 candidates, and sampled ones of the boards 137..400, independent under the plain signing and five random signings over GF(3) of every frame, 6.4 million pairs, and 14,472 of every 25th board of 400..2175 in 4,320 signed frames; the decomposition bound never below P\* under random multipliers at 309 roots of 2..400 and at 400..2175. |
 | B2 | The GF(2) bound under bound soundness (above).  At every root of 2..1300 that is not prime the bound is at least P\*, and every promotion set of the 90 roots with at most 22 candidates is independent in every frame ([matroid intersection bounds](https://github.com/bvchess/taxman-notebook/blob/main/search/matroid-intersection-bounds-2026-10/README.md)). |
-| R2, R3, R5, R7 | The prime exchanges and the near-repeat cut under bound soundness, the soundness harness, the floor, and the tripwires (above). |
+| R2, R3, R7 | The prime exchanges and the near-repeat cut under bound soundness, the soundness harness, and the tripwires (above). |

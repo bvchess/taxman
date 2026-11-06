@@ -199,8 +199,8 @@ changed"](https://github.com/bvchess/taxman-notebook/blob/main/terms-changed.md)
   **exact** when each completion it gives up is no heavier than the incumbent or breaks an inequality that every heaviest
   set keeps; a completed exact search proves P\* ([exact searches](theory/search-rules.md#exact-searches)).  Its *open
   units* are the nodes it has still to explore.
-* **greedy**: promote every candidate that can be, from the largest down.  The search starts from the best start of its
-  seeds, each the best of the greedy set, the seed and a rounding of the root's matching, which a local search improves
+* **greedy**: promote every candidate that can be, from the largest down.  The search starts from the best of the
+  greedy set, the seed and a rounding of the root's matching, which a local search improves
   ([solver/docs/design/search.md, "The starting incumbent, the ceiling and the
   seed"](../solver/docs/design/search.md#the-starting-incumbent-the-ceiling-and-the-seed)).  A game whose start reaches
   the ceiling takes no step of the search, and has the method `start`.
@@ -313,8 +313,8 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   avenues"](https://github.com/bvchess/taxman-notebook/blob/main/agenda/AGENDA.md#3-ranked-avenues)).  The notebook's
   entries call it the "fields bound" or the "A1 bound".
 * **dual bound**: what a search that a limit stopped proves from above.  It is the largest of the incumbent and, over
-  the open units of the final checkpoint, each node's promotions plus its GF(2) bound (`search::dual_bound`;
-  [the dual-bound lemma (R4)](theory/search-rules.md#the-dual-bound-lemma)).  A search stopped before its first node has
+  the open units of the final checkpoint, each node's promotions plus its GF(2) bound ([the dual-bound lemma
+  (R4)](theory/search-rules.md#the-dual-bound-lemma)).  A search stopped before its first node has
   the root's bound as its dual bound.
 * **floor**: a search from a floor F starts from an incumbent worth F that has no set.  If it ends having found
   nothing, no promotion set weighs more than F ([the floor lemma (R5)](theory/search-rules.md#the-floor-lemma)).

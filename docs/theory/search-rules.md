@@ -248,7 +248,7 @@ answer: those no heavier than the incumbent, and those that a heavier mirror ima
 
 A search stopped before its first step has the dual bound max(V, the root's frame bound).  R4 and [R5](#the-floor-lemma)
 use nothing of Π but its candidates, promotion sets and weights, which is why they hold in Π⁺(O), with the second kind
-left out since R2 is not proved there.  The solver reads the dual bound from a stopped search's last checkpoint.
+left out since R2 is not proved there.
 
 ## The floor lemma
 

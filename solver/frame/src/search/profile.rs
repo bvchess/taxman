@@ -18,7 +18,7 @@
 //! * The phases.  Each searcher times one step in [`PHASE_EVERY`] phase by phase ([`Phases`], read by the searcher as
 //!   each phase ends), and a `steps` line has the time of each phase in its interval.
 
-use super::dual::NodeBound;
+use super::node_bound::NodeBound;
 use super::setup::Prepared;
 use super::TaxUnit;
 use crate::bits::Bits;
@@ -1047,7 +1047,7 @@ mod tests {
             ..EngineConfig::default()
         };
         let branching = Arc::new(Branching::new(BranchSettings::of(&p.tactics)));
-        search_steered(p, &cfg, &[], None, resume, None, &branching, &OnceLock::new(), plan, None, None)
+        search_steered(p, &cfg, None, None, resume, None, &branching, &OnceLock::new(), plan, None, None)
             .expect("the search")
     }
 
@@ -1189,7 +1189,7 @@ mod tests {
         let cfg =
             EngineConfig { threads: 1, progress: None, node_limit, time_limit, checkpoint, ..EngineConfig::default() };
         let branching = Arc::new(Branching::new(BranchSettings::of(&p.tactics)));
-        let r = search_steered(p, &cfg, &[], None, resume, None, &branching, &OnceLock::new(), Some(plan), None, None);
+        let r = search_steered(p, &cfg, None, None, resume, None, &branching, &OnceLock::new(), Some(plan), None, None);
         let r = r.expect("the search");
         assert!(!r.completed, "the limit stops the search");
         r.stats.nodes
