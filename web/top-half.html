@@ -154,12 +154,13 @@
       one piece with a square.  The proof checks the boards of games 187 to 2,499, and primes in short intervals, by
       computation.</p>
     </aside>
-    <p>Layer 2 holds the numbers with two prime factors, and there chapter 1's
-    <a class="gloss" href="glossary.html#loop">loop</a> does the work.  A source such as
-    <span class="n" data-n="95">95</span> = 5 · 19 is an edge between its two primes, as 10, 14, 15 and 21 were the
+    <p>Layer 2 holds the numbers with two prime factors, and there chapter 1's <a class="gloss"
+    href="glossary.html#loop">loop</a> does the work.  Drawn as a graph, a source such as <span class="n"
+    data-n="95">95</span> is an edge between its two maximal factors, the primes 5 and 19, as 10, 14, 15 and 21 were the
     edges of <a href="sets.html#loop-section">a square on 2, 5, 3 and 7</a>.  Numbers like these can all be played
     exactly when their edges contain no loop.  So greedy keeps a source of layer 2 exactly when it closes no loop with
-    the ones it kept.  Here it is on game 100, whose 17 sources with two prime factors lie on the 15 primes up to 50.</p>
+    the ones it kept.  Here it is on game 100, whose 17 sources with two prime factors lie on the 15 primes up to
+    50.</p>
   </div>
 
   <figure class="fig forest-fig" id="forest">
@@ -182,9 +183,10 @@
 
 <section class="chapter" id="above-layer-two" data-toc="above-layer-two" aria-labelledby="h-above">
   <h2 id="h-above">Above layer 2</h2>
-  <p>From <a class="gloss" href="glossary.html#layer">layer</a> 3 up, a number can have more than two
-  <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a>: 30 has three, 15, 10 and 6.  It is no
-  longer an edge between two numbers, and the reason greedy is safe in layer 2 is gone.</p>
+  <p>From <a class="gloss" href="glossary.html#layer">layer</a> 3 up, a number can have more than two <a class="gloss"
+  href="glossary.html#maximal-factor">maximal factors</a>: 30 has three, 15, 10 and 6.  An edge has only two ends, so a
+  number like 30 cannot be drawn as an edge between its maximal factors, as the sources of layer 2 were, and the reason
+  greedy is safe in layer 2 is gone.</p>
 
   <div class="para">
     <aside class="note card" aria-label="Where exchange breaks, proved">
@@ -196,10 +198,10 @@
       member of Y′ fits into Y: the playable subsets of the six lack the exchange property.  That exactly 48 orders
       trap <a class="gloss" href="glossary.html#descending-greedy">descending greedy</a> is proved by computation, which the figure repeats.</p>
     </aside>
-    <p>Here is why greedy is safe in layer 2.  There, a set of <a class="gloss" href="glossary.html#source">sources</a>
-    that can be played and has no room for another is a <a class="gloss" href="glossary.html#forest">forest</a> on the
-    primes, and every such forest has the same number of edges.  So once nothing more fits, greedy has as many sources
-    as any playable set can have: it is never stuck with too few.</p>
+    <p>Here is why greedy is safe in layer 2: with only 2 layers, a set of <a class="gloss"
+    href="glossary.html#source">sources</a> that can be played and has no room for another is a <a class="gloss"
+    href="glossary.html#forest">forest</a> on the primes, and every such forest has the same number of edges.  So once
+    nothing more fits, greedy has as many sources as any playable set can have: it is never stuck with too few.</p>
     <p>With more than two maximal factors, that can fail, and game 2,873 shows it with six of its sources, built from
     the primes 11, 13 and 17.  Taken in some orders, greedy keeps four of them, and then neither of the other two fits,
     though five of the six can be played together.  Taken in other orders, it keeps five.  No smaller game is known
@@ -227,10 +229,10 @@
       theorem</a>; <a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/README.md">the prover's
       record</a>).</p>
     </aside>
-    <p>Greedy has never been caught.  In every game up to 100,000, a computation certifies that no set of sources that
-    can be played outweighs <a class="gloss" href="glossary.html#u-star">U*</a>.  It is linear algebra: for each source
-    that greedy rejects, its list of maximal factors is shown to be a sum of the lists of sources it kept above it, in
-    the arithmetic where 1 + 1 = 0.</p>
+    <p>Greedy has never been caught producing a suboptimal set of choices.  In every game up to 100,000, a computation
+    proves that no set of sources that can be played outweighs <a class="gloss" href="glossary.html#u-star">U*</a>.  It
+    is linear algebra: for each source that greedy rejects, its list of maximal factors is shown to be a sum of the
+    lists of sources it kept above it, in the arithmetic where 1 + 1 = 0.</p>
   </div>
 </section>
 
@@ -244,11 +246,12 @@
       <p class="precise"><span class="run">Precisely.</span>Given (★), every <a class="gloss" href="glossary.html#playable">playable</a> set S of sources has
       |S ∩ [t, n]| ≤ |U* ∩ [t, n]| for every t.  The check of (♦) proves (★) wherever it passes.</p>
     </aside>
-    <p>So wherever the certificate holds, <a class="gloss" href="glossary.html#u-star">U*</a> is the heaviest set of sources, and the only one.  That does not yet
-    make it the top half of an optimal game.  A game that gives up a source frees the factor that paid for it, and
-    that factor can then be played as a <a class="gloss" href="glossary.html#move">move</a> itself.  An
-    <a class="gloss" href="glossary.html#optimal-game">optimal game</a> might, for all we can prove, play a lighter set
-    of sources and win the points back below n/2.</p>
+    <p>So wherever that computation succeeds, as it does in every game up to 100,000, <a class="gloss"
+    href="glossary.html#u-star">U*</a> is the heaviest set of sources, and the only one.  That does not yet make it the
+    top half of an optimal game.  A game that gives up a source frees the factor that paid for it, and that factor can
+    then be played as a <a class="gloss" href="glossary.html#move">move</a> itself.  An <a class="gloss"
+    href="glossary.html#optimal-game">optimal game</a> might, for all we can prove, play a lighter set of sources and
+    win the points back below n/2.</p>
   </div>
 
   <div class="para">
@@ -263,13 +266,14 @@
       (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what
       supports the scores</a>).</p>
     </aside>
-    <p><a class="gloss" href="glossary.html#statement-u"><em>Statement U</em></a> says it never has to.  It says that
-    in every game, some optimal game plays every source that descending greedy keeps.  In <a class="gloss" href="glossary.html#layer">layers</a> 1 and 2 that is
-    proved, so U is a statement about the sources with three or more prime factors.  It is open in general.</p>
-    <p>It is proven in every game up to 2,175.  There a second program, the
-    <a class="gloss" href="glossary.html#prover">prover</a>, proves the best score on the whole board without assuming
-    U, and the best score is that of a game that plays all of U*.  Past game 2,175 our scores rest on U: each is the
-    best score of a game that plays U*, and that is the best score of the game wherever U holds.</p>
+    <p><a class="gloss" href="glossary.html#statement-u"><em>Statement U</em></a> says it never has to.  It says that in
+    every game, some optimal set of moves plays every source that descending greedy keeps.  In <a class="gloss"
+    href="glossary.html#layer">layers</a> 1 and 2 that is proved, so U is a statement about the sources with three or
+    more prime factors.  While we have evidence in support of U, we do not have proof it always holds.</p>
+    <p>It is proven in every game up to 2,175.  There a second program, the <a class="gloss"
+    href="glossary.html#prover">prover</a>, has found the best score on the whole board without assuming U, and the best
+    score has always been a game that plays all of U*.  Past game 2,175 our scores rest on U: each is the best score of
+    a game that plays U*, and that is the best possible score assuming U holds.</p>
   </div>
 </section>
 

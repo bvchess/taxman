@@ -5,12 +5,17 @@
 // breaks"); everything said of them is computed here with js/model.js: which sets can be played, the payments, the
 // orders that trap greedy and the sets that can take no more.
 //
-// URL parameter: trap=k opens state k, from 1.
+// The same six can be seen in their layers instead (figures/layer-view.js): the six sources, all of layer 3, in a
+// column at the left, the five maximal factors, all of layer 2, in a column at the right, and a line from each source
+// to each of its factors.  A switch above the figure moves every number and line from one layout to the other.
+//
+// URL parameters: trap=k opens state k, from 1; trap-view=layers opens the figure in layers.
 
 import * as M from '../js/model.js';
 import { SHAPE, fmt, listWords } from '../js/vocab.js';
 import { scene, timeline } from '../js/scene.js';
 import { holdHeight } from './hold-height.js';
+import { layerColumns, mountViewSwitch, viewFromUrl } from './layer-view.js';
 
 const N = 2873;
 const SIX = [1573, 1859, 2057, 2197, 2431, 2873];
@@ -22,6 +27,10 @@ const SCALE = 1.2;
 const FACTOR_AT = { 143: [205, 40], 169: [300, 104], 221: [262, 214], 187: [148, 214], 121: [110, 104] };
 const SOURCE_AT = { 2431: [205, 152], 2197: [392, 62] };
 const SCORE_Y = 262;
+const VIEW_PARAM = 'trap-view';
+// The layers view: the pitch of the sources in their column, and the room under the columns for the score.
+const PITCH = 46;
+const FOOTER = 36;
 
 const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 const COUNT = { 4: 'four', 5: 'five' };
@@ -80,9 +89,22 @@ export function mountTrap(host) {
     const [a, b] = M.maximalFactors(s).map((x) => FACTOR_AT[x]);
     return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
   };
+  const layers = layerColumns({
+    sources: [...SIX].sort((a, b) => b - a), factors, factorsOf: M.maximalFactors, width: W, pitch: PITCH,
+    footer: FOOTER, maxScale: SCALE,
+  });
+  const graphPlaces = { ...Object.fromEntries(factors.map((x) => [x, { x: FACTOR_AT[x][0], y: FACTOR_AT[x][1] }])),
+    ...Object.fromEntries(SIX.map((src) => [src, { x: placeOf(src)[0], y: placeOf(src)[1] }])) };
+  const boxes = { graph: { width: W, height: H }, layers: { width: W, height: layers.height } };
+  const spots = {
+    graph: { places: graphPlaces, scale: SCALE, scoreY: SCORE_Y },
+    layers: { places: layers.places, scale: SCALE, scoreY: layers.height - 20 },
+  };
+  const view = viewFromUrl(VIEW_PARAM);
   const s = scene(host.querySelector('svg'), {
-    width: W, height: H,
-    label: `Six sources of game ${N} and their maximal factors, and the sets that descending greedy keeps in two orders. The current state is described under the figure.`,
+    ...boxes[view],
+    label: 'Six sources of game 2,873 and their maximal factors, and the sets that descending greedy keeps in two '
+      + 'orders. The current state is described under the figure.',
   });
   for (const src of SIX) for (const x of M.maximalFactors(src)) s.line(`e${src}-${x}`, src, x, 'thin');
   for (const src of SIX) for (const x of M.maximalFactors(src)) s.line(`p${src}-${x}`, src, x, 'pay');
@@ -90,19 +112,18 @@ export function mountTrap(host) {
   for (const src of SIX) s.number(src, src);
   s.text('score', (pos) => (Math.round(pos) === 1 ? `${f.trap.kept.length} kept: ${fmt(sum(f.trap.kept))}` : `${f.best.length} kept: ${fmt(sum(f.best))}`), { kind: 'score', anchor: 'middle' });
 
-  const base = () => {
+  const base = (spot) => {
     const st = {};
-    for (const x of factors) st[x] = { x: FACTOR_AT[x][0], y: FACTOR_AT[x][1], shape: SHAPE.square, scale: SCALE };
+    for (const x of factors) st[x] = { ...spot.places[x], shape: SHAPE.square, scale: SCALE };
     for (const src of SIX) {
-      const [x, y] = placeOf(src);
-      st[src] = { x, y, shape: SHAPE.circle, scale: SCALE };
+      st[src] = { ...spot.places[src], shape: SHAPE.circle, scale: SCALE };
       for (const fx of M.maximalFactors(src)) st[`e${src}-${fx}`] = {};
     }
     return st;
   };
   // A set kept: gray, each paid for by the factor a run of peel gives it; the others dashed, their lines faded.
-  const keeping = (kept) => {
-    const st = base();
+  const keeping = (spot, kept) => {
+    const st = base(spot);
     const run = M.peel(kept);
     for (const src of SIX) {
       if (kept.includes(src)) st[src].kept = 1;
@@ -112,14 +133,18 @@ export function mountTrap(host) {
       }
     }
     for (const step of run.steps) st[`p${step.member}-${step.factor}`] = {};
-    st.score = { x: W / 2, y: SCORE_Y };
+    st.score = { x: W / 2, y: spot.scoreY };
     return st;
   };
-  s.states([base(), keeping(f.trap.kept), keeping(f.best)]);
+  const lists = Object.fromEntries(Object.entries(spots)
+    .map(([name, spot]) => [name, [base(spot), keeping(spot, f.trap.kept), keeping(spot, f.best)]]));
+  s.states(lists[view]);
 
+  const threeFactors = listWords([...M.maximalFactors(2431)].sort((a, b) => a - b));
   const refusedIn = (kept) => SIX.filter((x) => !kept.includes(x)).sort((a, b) => b - a);
   const words = [
-    `Six sources of game ${N}, each joined to its maximal factors. Most have two; 2431 = 11 · 13 · 17 has three, and 2197 = 13 · 13 · 13 has one.`,
+    `Six sources of game 2,873, each joined to its maximal factors. Most have two; 2431 has three, ${threeFactors}, `
+      + `and 2197 has one, ${M.maximalFactors(2197)[0]}.`,
     `Taken in the order ${listWords(f.trap.order)}, greedy keeps the first ${COUNT[f.trap.kept.length]}, and then neither ${f.trapLast[0]} nor ${f.trapLast[1]} fits: ${COUNT[f.trap.kept.length]} sources, ${fmt(sum(f.trap.kept))}. Every order that puts those two last does the same.`,
     `From the largest down, greedy keeps ${listWords(f.best)} and refuses ${listWords(refusedIn(f.best))}: ${COUNT[f.best.length]} sources, ${fmt(sum(f.best))}, the heaviest set of the six that can be played.`,
   ];
@@ -134,8 +159,9 @@ export function mountTrap(host) {
     title: (k) => {
       caption.textContent = words[k];
     },
-    label: `Six sources of game ${N}: state`,
+    label: 'Six sources of game 2,873: state',
   });
+  mountViewSwitch(host, s, { view, lists, boxes, param: VIEW_PARAM });
   return {
     facts: f,
     stopName: (k) => ['the six', 'a trap', 'from the largest'][Number(k) - 1],
