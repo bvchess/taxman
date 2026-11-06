@@ -245,8 +245,10 @@ fn say(label: Option<&str>, what: fmt::Arguments<'_>) {
 
 /// The finder of `plan`, beside the search of `prepared` that `control` steers: waits until the search has taken
 /// `plan.after` steps (`before` of them in the runs before this one), then runs rounds of LNS ([`rounds`]) until the
-/// budget is spent or `ended` (its sender gone) says the search is over.  Returns what it did, or `None` if the search
-/// ended first.
+/// budget is spent or `ended` (its sender gone) says the search is over.  The finder of a resumed search whose runs
+/// before this one took the steps starts at once, before the engine runs; any other looks at the steps the engine
+/// reports every [`POLL`].  Returns what it did, or `None` if the search ended before the finder saw its steps, as one
+/// that ends within a poll of reaching them may.
 pub(super) fn beside<const W: usize>(
     prepared: &Prepared<W>,
     control: &Control,
@@ -257,11 +259,12 @@ pub(super) fn beside<const W: usize>(
 ) -> Option<Report> {
     // The engine reports its steps once the run is attached to the control, and in blocks of 1,024 per worker.
     let at_nodes = loop {
+        let nodes = before + control.status().map_or(0, |status| status.nodes);
+        if nodes >= plan.after {
+            break nodes;
+        }
         if !matches!(ended.recv_timeout(POLL), Err(RecvTimeoutError::Timeout)) {
             return None;
-        }
-        if let Some(status) = control.status().filter(|status| before + status.nodes >= plan.after) {
-            break before + status.nodes;
         }
     };
     Some(rounds(prepared, control, plan, at_nodes, ended, label))

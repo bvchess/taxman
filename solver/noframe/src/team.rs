@@ -695,6 +695,7 @@ mod tests {
     use crate::game::prime_below;
     use crate::jsonl::{committed_chain, recorded_games_to};
     use crate::primes::smallest_prime_factors;
+    use std::cell::RefCell;
 
     /// How a test makes a thread's prover: from the board, the target and the budget.
     type Make = for<'b> fn(&'b Board, u64, u64) -> Prover<'b>;
@@ -724,9 +725,18 @@ mod tests {
     }
 
     /// One run of a campaign over game n alone, with the provers `make` makes, on `threads` threads for `seconds`, in
-    /// `dir`: its tally.  The search resumes the checkpoint in `dir` if there is one, else starts from `units` (saved
-    /// as a checkpoint), else from the root.
-    fn run(n: u32, target: u64, units: &[Vec<Role>], threads: usize, seconds: f64, dir: &Path, make: Make) -> Tally {
+    /// `dir`: its tally, or None if no thread looked for a job before the run's end, when the game does not start.  The
+    /// search resumes the checkpoint in `dir` if there is one, else starts from `units` (saved as a checkpoint), else
+    /// from the root.
+    fn run(
+        n: u32,
+        target: u64,
+        units: &[Vec<Role>],
+        threads: usize,
+        seconds: f64,
+        dir: &Path,
+        make: Make,
+    ) -> Option<Tally> {
         let checkpoint = dir.join("game.ckpt");
         if !units.is_empty() && !checkpoint.exists() {
             let mut cp = Checkpoint::new(target);
@@ -760,7 +770,7 @@ mod tests {
                 }),
             )
         });
-        let tally = tallies.lock().unwrap().pop().expect("the game's tally");
+        let tally = tallies.lock().unwrap().pop();
         tally
     }
 
@@ -780,10 +790,10 @@ mod tests {
         let v = opt(n);
         let dir = scratch("verdict");
         for threads in [1, 3] {
-            let tally = run(n, v, &[], threads, 1e9, &dir, with_parity);
+            let tally = run(n, v, &[], threads, 1e9, &dir, with_parity).expect("the game's tally");
             assert_eq!(tally.verdict, Verdict::Proven, "{threads} threads");
             assert_eq!(tally.given > 0, threads > 1, "{threads} threads: {tally:?}");
-            match run(n, v - 1, &[], threads, 1e9, &dir, with_parity).verdict {
+            match run(n, v - 1, &[], threads, 1e9, &dir, with_parity).expect("the game's tally").verdict {
                 Verdict::Beaten(picks) => assert!(worth(n, &picks, v), "{threads} threads: {picks:?}"),
                 other => panic!("{threads} threads: {other:?} below opt(n)"),
             }
@@ -791,11 +801,9 @@ mod tests {
         fs::remove_dir_all(&dir).unwrap();
     }
 
-    /// A search paused on several threads, and resumed on another number of threads again and again, loses no unit
-    /// and runs none twice: listing every playable set that beats a target below opt(n), it finds each set that one
-    /// thread without a pause finds, once.  Game 350 has 20 sets worth opt(n) − 9 or more, in 3,571 nodes.
-    #[test]
-    fn pauses_and_resumes_on_other_numbers_of_threads_lose_no_unit() {
+    /// The sets that beat a target below opt(n) on game 350, as one prover lists them without a pause: 20 sets worth
+    /// opt(n) − 9 or more, in 3,571 nodes.  Returns the target and the sets, sorted.
+    fn listed_350() -> (u64, Vec<Vec<u32>>) {
         let (n, below) = (350, 10);
         let target = opt(n) - below;
         let board = Board::new(n, &smallest_prime_factors(n as usize));
@@ -803,24 +811,93 @@ mod tests {
         assert_eq!(straight.run(), Verdict::Proven);
         let mut expected = straight.found;
         expected.sort();
+        assert!(expected.len() > 10, "{} sets", expected.len());
+        (target, expected)
+    }
+
+    /// A worker's team as a script: an idle thread asks for a unit at every `ask`-th poll, and the search pauses at
+    /// poll `pause`; it keeps the units it is given.  The prover's side of a campaign, with no clock and no other
+    /// thread.
+    struct Script {
+        polls: Cell<u64>,
+        ask: u64,
+        pause: u64,
+        given: RefCell<Vec<Vec<Role>>>,
+    }
+
+    impl Team for Script {
+        /// The prover asks this first at each poll, so it counts the polls.
+        fn halted(&self) -> bool {
+            self.polls.set(self.polls.get() + 1);
+            self.polls.get() >= self.pause
+        }
+
+        fn asked(&self) -> bool {
+            self.polls.get().is_multiple_of(self.ask)
+        }
+
+        fn give(&self, unit: Option<Vec<Role>>) {
+            self.given.borrow_mut().extend(unit);
+        }
+
+        fn offer(&self, _: f64) {}
+
+        fn trade(&self, _: &[Vec<u32>]) -> Vec<Vec<u32>> {
+            Vec::new()
+        }
+    }
+
+    /// A unit that a worker gives away when asked, and the units its pause leaves open, are each searched once, by
+    /// whoever takes them: listing the sets that beat a target below opt(n), a worker that gives a unit away at every
+    /// 7th poll and pauses at its 40th, and one prover with no team on every unit it leaves, find each set that one
+    /// prover without a pause finds, once.
+    #[test]
+    fn units_given_away_and_left_at_a_pause_are_each_searched_once() {
+        let n = 350;
+        let (target, expected) = listed_350();
+        let board = Board::new(n, &smallest_prime_factors(n as usize));
+        let script = Script { polls: Cell::new(0), ask: 7, pause: 40, given: Default::default() };
+        let mut worker = listing(&board, target, u64::MAX).team(&script, Vec::new());
+        assert_eq!(worker.run(), Verdict::Paused);
+        let mut units = worker.open_units().to_vec();
+        let mut found = std::mem::take(&mut worker.found);
+        drop(worker);
+        let given = script.given.into_inner();
+        assert!(!units.is_empty() && !given.is_empty(), "{} units left open, {} given away", units.len(), given.len());
+        units.extend(given);
+        let mut rest = listing(&board, target, u64::MAX);
+        assert_eq!(rest.run_units(units), Verdict::Proven);
+        found.append(&mut rest.found);
+        found.sort();
+        assert!(found == expected, "the sets found differ from one prover's: {found:?}");
+    }
+
+    /// A search paused on several threads, and resumed on another number of threads again and again, loses no unit
+    /// and runs none twice: listing the sets that beat a target below opt(n), it finds each set that one thread without
+    /// a pause finds, once.  Each run lasts 0.05 s, so the clock decides where the pauses fall, how many there are and
+    /// which units move between threads ([`units_given_away_and_left_at_a_pause_are_each_searched_once`] has a pause
+    /// and units given away in any case); the runs go on until the search ends.  A worker reads the clock only 256
+    /// nodes into a run, so every run that starts the game takes its search further.
+    #[test]
+    fn pauses_and_resumes_on_other_numbers_of_threads_lose_no_unit() {
+        let n = 350;
+        let (target, expected) = listed_350();
         let dir = scratch("resume");
-        let (mut found, mut pauses, mut given) = (Vec::new(), 0, 0);
-        for threads in [3, 1, 2, 4].into_iter().cycle().take(100) {
-            let mut tally = run(n, target, &[], threads, 0.05, &dir, listing);
+        let (mut found, mut nodes) = (Vec::new(), 0);
+        for threads in [3, 1, 2, 4].into_iter().cycle() {
+            // A run whose threads all look for a job after its end starts nothing, and changes nothing.
+            let Some(mut tally) = run(n, target, &[], threads, 0.05, &dir, listing) else { continue };
+            assert!(tally.nodes > nodes, "a run that took the search no further: {tally:?}");
+            nodes = tally.nodes;
             found.append(&mut tally.found);
-            given += tally.given;
             if tally.verdict != Verdict::Paused {
                 assert_eq!(tally.verdict, Verdict::Proven);
-                assert!(tally.threads > 1, "{tally:?}");
                 break;
             }
-            pauses += 1;
         }
         found.sort();
-        assert!(expected.len() > 10, "{} sets", expected.len());
         assert_eq!(found.len(), expected.len(), "sets found, against one thread's");
         assert!(found == expected, "the sets found differ from one thread's");
-        assert!(pauses >= 3 && given > 0, "{pauses} pauses, {given} units given");
         fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -838,7 +915,7 @@ mod tests {
         units[0][p] = Role::Pick;
         units[1..].iter_mut().for_each(|u| u[p] = Role::Barred);
         let dir = scratch("beaten");
-        let tally = run(n, v - 1, &units, 2, 1e9, &dir, with_parity);
+        let tally = run(n, v - 1, &units, 2, 1e9, &dir, with_parity).expect("the game's tally");
         match &tally.verdict {
             Verdict::Beaten(picks) => assert!(worth(n, picks, v), "{picks:?}"),
             other => panic!("{other:?} below opt(n)"),

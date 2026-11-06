@@ -229,7 +229,8 @@ pub struct SearchResult<const W: usize> {
 ///
 /// With `resume`, the search continues from the checkpoint configured in `cfg` (the `prepared` game must have been
 /// set up by [`prepare_for_resume`] or identically): its header must be this game's, and its incumbent a promotable
-/// set of candidates worth what the checkpoint says.  Otherwise it starts fresh.
+/// set of candidates worth what the checkpoint says.  That incumbent, unless the start beats it, is offered to the
+/// control before the engine runs, as the start is.  Otherwise it starts fresh.
 ///
 /// # Errors
 ///
@@ -413,6 +414,13 @@ fn search_forgetting<const W: usize>(
             gate_trial: None,
             start: incumbent,
         });
+    }
+    // A resumed search's incumbent goes to the control before the engine runs, as a fresh start's does
+    // ([`start_incumbent`]), so that whatever reads the control meanwhile has it: the finder, which a resumed search may
+    // start at once, and the window's driver.  The engine, offered the incumbent its checkpoint holds, keeps its own.  (A
+    // floor that nothing beat is no set, and is not offered.)
+    if resumed.is_some() && best.0.sum() == best.1 {
+        control.offer(best.1, &payload_of(&best.0));
     }
 
     // The near-repeat cut, with the tactic: a node is cut only where the incumbent reaches its bound (the setup's last

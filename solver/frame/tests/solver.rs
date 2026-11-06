@@ -268,39 +268,56 @@ fn a_finder_started_early_changes_no_score() {
 }
 
 /// [`a_finder_started_early_changes_no_score`] for game 800 alone on one thread, whose search from nothing takes some
-/// 1,400 steps, more than the 1,024 of a searcher after which the finder can look.
+/// 1,400 steps, more than the 1,024 after which a node limit stops a search on one thread.
 #[test]
 fn a_finder_started_early_changes_no_score_of_one_game() {
     a_finder_started_early_changes_no_score_of(800, 800, 1);
 }
 
-/// The games `lo..=hi` on `threads` threads, with the finder as early as it can be and without it.
+/// The games `lo..=hi` on `threads` threads, with the finder as early as it can be and without it.  A search from
+/// nothing starts its finder only if it lasts until the finder sees its first steps, which the clock decides, so the
+/// lines are those of a range whose first game a node limit stops on one thread, at the first steps its engine reports
+/// (1,024: the search of `lo` from nothing must take more), and that runs again with the finder: `lo` resumes past
+/// the finder's one step, and starts its finder at once.
 fn a_finder_started_early_changes_no_score_of(lo: u32, hi: u32, threads: usize) {
     let optimal = Optimal::built_in();
     let dir = TempDir::new("finder-scores");
     let mut base = SolveOptions { force_search: true, ..options(threads) };
     base.tactics.prev_cap = false;
     let without = solve_all(lo, hi, &base);
-    let finder = SolveOptions { finder_after: 1, finder_budget: Duration::from_secs(1), ..base };
-    let results = dir.join("results.jsonl");
-    let with = solve_all(lo, hi, &SolveOptions { checkpoint_dir: None, ..finder.clone() });
-    let written = solver::solve_range(lo, hi, &finder, Some(&results)).unwrap_or_else(|e| panic!("{e}"));
-    for ((a, b), c) in without.iter().zip(&with).zip(&written) {
-        assert!(a.completed && b.completed && c.completed, "n={}", a.n);
+    let finder = SolveOptions { finder_after: 1, finder_budget: Duration::from_secs(1), ..base.clone() };
+    let with = solve_all(lo, hi, &finder);
+    for (a, b) in without.iter().zip(&with) {
+        assert!(a.completed && b.completed, "n={}", a.n);
         assert_eq!(Some(a.score), optimal.score(a.n), "n={}", a.n);
-        assert_eq!((b.score, c.score), (a.score, a.score), "n={}: the finder changed the score", a.n);
+        assert_eq!(b.score, a.score, "n={}: the finder changed the score", a.n);
         assert!(a.finder.is_none(), "n={}: no finder was asked for", a.n);
     }
-    // A search that ends before the finder looks reports nothing, but of thousands of steps some do start it.
-    let started: Vec<_> = written.iter().filter_map(|r| r.finder.map(|f| (r.n, f))).collect();
-    assert!(!started.is_empty(), "no game started its finder");
-    for (n, f) in &started {
-        assert!(f.best >= f.from && f.refused == 0 && f.seconds <= 1.5, "n={n}: {f:?}");
+    let results = dir.join("results.jsonl");
+    let stopped = SolveOptions { threads: 1, checkpoint_dir: Some(dir.join("ckpt")), node_limit: Some(1), ..base };
+    let first = solver::solve_range_each(lo, hi, &stopped, Some(&results), |_| {}).unwrap();
+    assert_eq!(first.stopped_at, Some(lo), "the node limit stops the first game");
+    let finder = SolveOptions { checkpoint_dir: stopped.checkpoint_dir, ..finder };
+    let written = solver::solve_range(lo, hi, &finder, Some(&results)).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(written.len(), without.len());
+    assert_eq!((written[0].n, written[0].invocations), (lo, 2), "the stopped game resumed");
+    for c in &written {
+        assert!(c.completed, "n={}", c.n);
+        assert_eq!(Some(c.score), optimal.score(c.n), "n={}: the finder changed the score", c.n);
     }
-    // The lines say what the finder did, where it did something, and what it was asked for.
+    // The resumed game starts its finder at once; a game searched from nothing may end before its finder looks.
+    let started: Vec<_> = written.iter().filter_map(|r| r.finder.map(|f| (r, f))).collect();
+    assert_eq!(started.first().map(|(r, _)| r.n), Some(lo), "the resumed game started its finder");
+    for (r, f) in &started {
+        // The finder ends with the search, so within the game's time.
+        assert!(f.best >= f.from && f.refused == 0 && f.seconds <= r.phases.total.as_secs_f64(), "n={}: {f:?}", r.n);
+    }
+    // The lines say what the finder did, where it did something, and what it was asked for: the second run's lines,
+    // after the first's.
     let lines: Vec<Json> =
         fs::read_to_string(&results).unwrap().lines().map(|line| Json::parse(line).unwrap()).collect();
-    for (line, game) in lines.iter().zip(&written) {
+    for (line, game) in lines[lines.len() - written.len()..].iter().zip(&written) {
+        assert_eq!(line.get("n").and_then(Json::as_u32), Some(game.n));
         let options = line.get("options").unwrap();
         assert_eq!(options.get("finder_after").and_then(Json::as_u64), Some(1), "n={}", game.n);
         assert_eq!(options.get("finder_seconds").and_then(Json::as_f64), Some(1.0), "n={}", game.n);

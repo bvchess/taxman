@@ -7,7 +7,9 @@ catches it up sooner.  A search that ends within a few seconds has little to gai
 has taken some steps: with `--finder-after NODES` (default 1000000, a few seconds on many threads; 0 starts none),
 when a game's search has taken NODES steps (over every run of it, a resumed search counting the runs before), one
 thread of its own starts beside the workers, for the seconds of `--finder-seconds` (default 900), and ends sooner if
-the search does.  Each game of a window decides for itself.
+the search does.  Each game of a window decides for itself.  A resumed search whose earlier runs took the steps starts
+its finder at once.  Any other has it when the thread, looking at the steps the engine reports every few hundredths of
+a second (`POLL` in `search::finder`), sees them, so a search that ends just after reaching them may have none.
 
 The thread runs *rounds* of large neighborhood search ([glossary](../../../docs/GLOSSARY.md), the finder;
 `search::finder`).  A round fixes a random share of a set's promotions (70 to 90%), searches the rest exactly as a unit

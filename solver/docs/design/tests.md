@@ -225,6 +225,8 @@ every second line of the Java fixtures), and the comment on each says what the w
   * the policy: claims served oldest first, a lone ready search takes every free thread, a busy one doubles, idle
     workers go back only to another claim and after the last grant has settled, the oldest search reclaims from the
     youngest first and suspends them if need be, and a suspended search claims one thread.
+* **The finder** (`tests/solver.rs`): one started after a step changes no score; a game stopped by a node limit and
+  resumed with one starts it at once, whatever the clock, and records it in its line.
 * **The gate** (`tests/solver.rs`, `tests/soundness.rs`, `tests/cli.rs` and the unit tests of
   `src/search/branching.rs`): the run's `--gate` reaches the searchers of game 780, which takes the steps of conflict
   branching off under a gate wider than every gap and other steps under a gate of 0, and ends with the score of the
