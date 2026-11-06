@@ -5,12 +5,12 @@
 //! [`search`]).  The per-game pipeline ([`crate::solver`]), the probe and the tests all take it, so that the facts
 //! that join the pieces are written once:
 //!
-//! * the score of a game of the frame model is `in_the_bag` plus the sum of its promotions, where `in_the_bag`
-//!   is what the game with no promotions scores ([`Board::in_the_bag`]);
-//! * no game of `n` scores more than `n + opt(n − 1)` (deleting the move `n` from an optimal game leaves a game of
+//! * the score of the moves of a promotion set of the frame model is `in_the_bag` plus the sum of its promotions,
+//!   where `in_the_bag` is what the moves with no promotions score ([`Board::in_the_bag`]);
+//! * no moves for `n` score more than `n + opt(n − 1)` (deleting the move `n` from optimal moves leaves moves for
 //!   `n − 1`), so no promotion set sums to more than `n + opt(n − 1) − in_the_bag`: the search's *ceiling*, at which
 //!   it can stop ([`Board::promotion_cap`]);
-//! * the promotions of the previous game that are candidates of this board are a good, usually near-optimal, first
+//! * the promotions of the previous moves that are candidates of this board are a good, usually near-optimal, first
 //!   incumbent: the search's *seed* ([`Board::seed`]);
 //! * the previous game's problem, with a proven bound of its best promotion sum, cuts the nodes of this game's search
 //!   whose completions are promotion sets of it: the *near-repeat cut* ([`near_repeat`]).
@@ -36,7 +36,7 @@ pub struct Board<const W: usize> {
     /// The board's frames as the search takes them (numbered from the front, those with one number merged), with
     /// the promotion candidates.
     pub frames: SearchFrames<W>,
-    /// The game with no promotions, in play order.
+    /// The moves with no promotions, in play order.
     pub plain: Vec<u32>,
     /// What [`plain`](Self::plain) scores: the part of every score that no promotion changes.
     pub in_the_bag: u64,
@@ -45,7 +45,7 @@ pub struct Board<const W: usize> {
 }
 
 impl<const W: usize> Board<W> {
-    /// The board of `tables`: its frames are formed, numbered from the front and merged, and the game with no
+    /// The board of `tables`: its frames are formed, numbered from the front and merged, and the moves with no
     /// promotions is played.
     pub fn new(tables: Tables) -> Self {
         let start = Instant::now();
@@ -71,7 +71,7 @@ impl<const W: usize> Board<W> {
         self.frames.candidates
     }
 
-    /// Whether nothing can be promoted, so the game with no promotions is the only game ([`plain`](Self::plain)).
+    /// Whether nothing can be promoted, so the moves with no promotions are the only moves ([`plain`](Self::plain)).
     pub fn is_trivial(&self) -> bool {
         self.frames.candidates.is_empty()
     }
@@ -177,13 +177,13 @@ impl<const W: usize> Board<W> {
         search::prepare_for_resume(&self.tables, &self.frames.columns(), &self.frames.candidates, checkpoint)
     }
 
-    /// The ceiling on the promotion sum, given that the game of `n − 1` scores `prev_score` and is optimal; see
+    /// The ceiling on the promotion sum, given that the moves for `n − 1` score `prev_score` and are optimal; see
     /// [`promotion_cap`].
     pub fn promotion_cap(&self, prev_score: u64) -> Option<u64> {
         promotion_cap(self.n(), self.in_the_bag, prev_score)
     }
 
-    /// The part of a game's moves that is a seed for the search: those that are promotion candidates here.  The game
+    /// The part of some moves that is a seed for the search: those that are promotion candidates here.  The moves
     /// may be another board's, such as `n + 1`'s, so a move beyond this board is dropped before the set is made (it can
     /// also lie beyond the set's width).
     pub fn seed(&self, moves: &[u32]) -> Bits<W> {
@@ -217,24 +217,24 @@ impl<const W: usize> Board<W> {
     }
 }
 
-/// The ceiling on the promotion sum of the board `1..=n`, whose `in_the_bag` is given, given that the game of `n − 1`
-/// scores `prev_score` and is optimal: `n + prev_score − in_the_bag`.  `None` if that is negative, which proves the
-/// game of `n − 1` was not optimal (no game scores less than `in_the_bag`).  A free function, for code that knows a
+/// The ceiling on the promotion sum of the board `1..=n`, whose `in_the_bag` is given, given that the moves for `n − 1`
+/// score `prev_score` and are optimal: `n + prev_score − in_the_bag`.  `None` if that is negative, which proves the
+/// moves for `n − 1` were not optimal (no moves score less than `in_the_bag`).  A free function, for code that knows a
 /// board only by its `in_the_bag`.
 pub fn promotion_cap(n: u32, in_the_bag: u64, prev_score: u64) -> Option<u64> {
     (prev_score + u64::from(n)).checked_sub(in_the_bag)
 }
 
-/// The near-repeat cut ([`NearRepeat`]) of the search that `prepared` sets up for the board `1..=n`, by the game of
-/// n − 1, which scores `prev_score` and is optimal.  M is n − 1, whose problem Π_M is set up as `prepared` was (the
+/// The near-repeat cut ([`NearRepeat`]) of the search that `prepared` sets up for the board `1..=n`, by the moves for
+/// n − 1, which score `prev_score` and are optimal.  M is n − 1, whose problem Π_M is set up as `prepared` was (the
 /// same set width and tactics), and B is `prev_score` less the `in_the_bag` of n − 1.  B bounds P\*(Π_M), since every
-/// promotion set of Π_M is a game of n − 1 worth that `in_the_bag` plus its sum (the near-repeat lemma (R7),
+/// promotion set of Π_M is a set of moves for n − 1 worth that `in_the_bag` plus its sum (the near-repeat lemma (R7),
 /// docs/theory/search-rules.md, the paragraph "What it rests on").  `None` if the board of n − 1 has no candidates (no
 /// member of a node could be marked).
 ///
 /// # Errors
 ///
-/// If `prev_score` is less than the `in_the_bag` of `n − 1`, which proves the game was not optimal, or the problem of
+/// If `prev_score` is less than the `in_the_bag` of `n − 1`, which proves the moves were not optimal, or the problem of
 /// `n − 1` cannot be set up.
 pub fn near_repeat<const W: usize>(prepared: &Prepared<W>, prev_score: u64) -> Result<Option<NearRepeat<W>>, String> {
     let Some(m) = prepared.n.checked_sub(1).filter(|&m| m > 0) else { return Ok(None) };
@@ -244,7 +244,7 @@ pub fn near_repeat<const W: usize>(prepared: &Prepared<W>, prev_score: u64) -> R
     }
     let problem = board.prepare(prepared.tactics).map_err(|e| format!("the near-repeat cut's game {m}: {e}"))?;
     let bound = prev_score.checked_sub(board.in_the_bag).ok_or_else(|| {
-        format!("the game of {m} scores {prev_score}, less than its game with no promotions, {}", board.in_the_bag)
+        format!("the moves for {m} score {prev_score}, less than the moves with no promotions, {}", board.in_the_bag)
     })?;
     NearRepeat::new(prepared, &problem, bound).map(Some)
 }
@@ -279,7 +279,7 @@ mod tests {
         assert!(!board.is_trivial());
         assert_eq!(replay(85, &board.plain), Ok(board.in_the_bag));
 
-        // A board without candidates has one game, which is the one with no promotions.
+        // A board without candidates has one set of moves, the one with no promotions.
         let trivial = Board::<8>::for_n(10);
         assert!(trivial.is_trivial());
         assert_eq!(Some(trivial.in_the_bag), Optimal::built_in().score(10));
@@ -290,17 +290,17 @@ mod tests {
         let optimal = Optimal::built_in();
         let board = Board::<8>::for_n(85);
         let (prev_score, prev_moves) = (optimal.score(84).unwrap(), optimal.moves(84).unwrap());
-        // No game of 85 scores above 85 + opt(84), and every game scores in_the_bag + its promotions.
+        // No moves for 85 score above 85 + opt(84), and all moves score in_the_bag + its promotions.
         assert_eq!(board.promotion_cap(prev_score), Some(85 + prev_score - board.in_the_bag));
         assert!(optimal.score(85).unwrap() - board.in_the_bag <= board.promotion_cap(prev_score).unwrap());
-        // A previous game that scores less than the game with no promotions cannot have been optimal.
+        // Previous moves that score less than the moves with no promotions cannot have been optimal.
         assert_eq!(board.promotion_cap(0), (85u64).checked_sub(board.in_the_bag));
         let seed = board.seed(prev_moves);
         assert!(seed.is_subset(&board.candidates()) && seed.iter().all(|x| prev_moves.contains(&x)));
     }
 
-    /// The ledger seeds `n` with the game of `n + 1`, whose move `n + 1` can be past the set's width: on boards 511
-    /// and 1023 it is exactly the capacity.  A move beyond the board is dropped, so the seed is the game's own, with
+    /// The ledger seeds `n` with the moves for `n + 1`, whose move `n + 1` can be past the set's width: on boards 511
+    /// and 1023 it is exactly the capacity.  A move beyond the board is dropped, so the seed is the moves' own, with
     /// `n + 1` or a number far beyond appended.
     #[test]
     fn the_seed_drops_the_moves_beyond_the_board() {

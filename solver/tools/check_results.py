@@ -5,79 +5,81 @@ Standard library only, and it shares no code with the Rust crate: the rules, the
 are written out again here, so that a bug in the solver cannot vouch for itself.  A file whose name ends in .gz is
 read through gzip, every member of it, as the committed file results/optimal.jsonl.gz is.
 
-The table is the games of the committed file (results/optimal.jsonl.gz, `--committed`) unless `--table` names another
-file: the games that a file's lines are compared with, and that a line can cite.  A game of the table is assumed
-optimal.  The committed file is checked as any other file is; its comparison with the table is then each game with
-itself.
+The table is the lines of the committed file (results/optimal.jsonl.gz, `--committed`) unless `--table` names another
+file: the lines that a file's lines are compared with, and that a line can cite.  The moves of a line of the table are
+assumed optimal.  The committed file is checked as any other file is; its comparison with the table is then each line
+with itself.
 
-For every completed game:
+For every completed line:
   legal       the moves replay under the rules: a move is a number still in the pot with a proper divisor still in
               the pot, and it takes the number and all of its divisors out of the pot
   score       the replayed score is the recorded one
   over        no legal move is left at the end (one more move would only add to the score)
-  first       the first move is the largest prime <= n (every optimal game opens with it)
+  first       the first move is the largest prime <= n (every optimal sequence of moves opens with it)
   promoted    the promotions are moves, in ascending order
   fields      the fields the proof and the assumptions come from agree with each other, as the solver writes them: a
-              searched or repeat game, and only such a game, has a setup, which records the digest of its search
-              problem; every game but a prime or a known one records in_the_bag; only a search reaches its ceiling;
-              a prime game's n is prime; a trivial game promotes nothing; a repeat, and only a repeat, records the
-              game it repeats (same_search), and its setup has no `cap`; a known game, and a search that the bounds
+              searched or repeat line, and only such a line, has a setup, which records the digest of its search
+              problem; every line but a prime or a known one records in_the_bag; only a search reaches its ceiling;
+              a prime line's n is prime; a trivial line promotes nothing; a repeat, and only a repeat, records the
+              line it repeats (same_search), and its setup has no `cap`; a known line, and a search that the bounds
               store's upper bound ended, and only those, cite a source (`known`); only a search counts the nodes its
-              near-repeat cut cut (`stats.near_repeat_cut`, a count the proof does not rest on); a start game (a
-              search whose starting game reached a ceiling, so that it took no step) is completed with nodes 0, and a
-              completed search has nodes above 0, so a line of an older build, which called a start game a search,
+              near-repeat cut cut (`stats.near_repeat_cut`, a count the proof does not rest on); a start line (a
+              search whose start reached a ceiling, so that it took no step) is completed with nodes 0, and a
+              completed search has nodes above 0, so a line of an older build, which called a start line a search,
               is a problem
-  optimal     the score is the table's, where the table has the game
+  optimal     the score is the table's, where the table has a line for n
   chain       score(n-1) <= score(n) <= n + score(n-1), with n-1 from the same file, else from the table
-              (both are theorems about optimal games: a game of n-1 is a game of n, and deleting the move n from
-              a game of n leaves a game of n-1)
+              (both are theorems about optimal scores: the moves for n-1 are legal for n, and deleting the move n from
+              the moves for n leaves legal moves for n-1)
   bound       score <= the Franklin-Moniot upper bound (heuristics/results/fm_bound_2000.json)
   heuristic   score >= the best-known heuristic chain (heuristics/results/chain_1001_2000.json)
-  arithmetic  a searched game: in_the_bag + promotions = score, the ceiling (`setup.cap`) is
-              n + score(n-1) - in_the_bag, the promotions do not exceed it, and a game records reaching the ceiling
-              exactly when its promotions sum to it (where the search stops); a prime game scores n + score(n-1) - P,
+  arithmetic  a searched line: in_the_bag + promotions = score, the ceiling (`setup.cap`) is
+              n + score(n-1) - in_the_bag, the promotions do not exceed it, and a line records reaching the ceiling
+              exactly when its promotions sum to it (where the search stops); a prime line scores n + score(n-1) - P,
               P the largest prime below n
-  provenance  the game of n-1 a line names (prev) is the file's game of n-1 (source run or results), the table's
-              (source optimal), the committed chain's (strict) or a board the bounds store has proven (bounds), and
-              the line's record of it matches that game (score, FNV-1a digest of the moves, proof, assumptions; not
-              the digest of a store's game, which only the Rust program can play; a record of the proof known, of
-              the file's own game, needs no more than the same score, moves and assumptions); the recorded proof
-              and assumptions are the ones the rules below give
+  provenance  the moves for n-1 a line names (prev) are those of the file's line of n-1 (source run or results), the
+              table's (source optimal), the committed chain's (strict) or a board the bounds store has proven (bounds),
+              and the line's record of them matches (score, FNV-1a digest of the moves, proof kind, assumptions; not
+              the digest of a store's moves, which only the Rust program can play; a record of the proof kind known,
+              of the file's own line, needs no more than the same score, moves and assumptions); the recorded proof
+              kind and assumptions are the ones the rules below give
   known       a line that cites a known source (`known`: optimal, strict, or bounds with the rule and run of its lower
               and upper lines) has its citation checked: the table or the committed chain (--committed) holds a
-              game of n that scores the line's score, or the bounds store (--bounds) has a lower line (if cited) and
+              line of n that scores the line's score, or the bounds store (--bounds) has a lower line (if cited) and
               an upper line of board n worth the score, of that rule and from that run.  The assumptions are those
-              of the cited lines: the table's game assumed optimal, the committed line's own, and statement U at
+              of the cited lines: the table's moves assumed optimal, the committed line's own, and statement U at
               each board the upper line rests on.  The sources are read as they are; their own referees check them
-  unfinished  an incomplete line that records its game (best_so_far, moves, promotions) is legal, scores the
+  unfinished  an incomplete line that records its moves (best_so_far, moves, promotions) is legal, scores the
               best_so_far, has ascending promotions that are moves, and is no better than the table's score; it need
-              not be over.  A line whose prev has source run or results and no proof was built on such a game
+              not be over.  A line whose prev has source run or results and no proof kind was built on such moves
               (as an older `solve` went on past limits): an earlier incomplete line of n-1 has that score and those
-              moves.  That game seeded the line and proves nothing, so the line has no ceiling (setup.cap), no cap or
-              prime_formula proof, and scores no less than it.  A file may have holes (games with no line, or only
-              incomplete lines)
-  repeat      a repeat (method "repeat", proof same_search) names a game m that is a completed game of the same file
-              on an earlier line, whose proof is exhausted, cap, known or same_search; the record's proof and
+              moves.  Those moves seeded the line and prove nothing, so the line has no ceiling (setup.cap), no cap or
+              prime_formula proof, and scores no less than it.  A file may have holes (boards with no completed line,
+              or only incomplete lines)
+  repeat      a repeat (method "repeat", proof same_search) names a board m whose line in the same file is completed
+              and earlier, whose proof is exhausted, cap, known or same_search; the record's proof and
               assumptions are m's; the repeat's setup.digest, its record's digest and m's setup.digest agree, and so do
               the two setups' frames, candidates and max_total; the promotions are m's, and promotion_sum is their sum;
               score(n) - in_the_bag(n) = score(m) - in_the_bag(m)
-and across files: every game that two files share has the same score in both.
+and across files: every board that two files share has the same score in both.
 
 What this referee cannot check, because it does not rebuild the frame model: that an exhausted search explored its
 whole tree (it trusts the line's proof kind, as the Rust verifier must too), and that a repeat's search problem is
 m's.  The digests a line records are hashes of the problems, which only the solver can compute; this referee checks
-that they agree and that the two games are consistent with sharing one problem, and `taxman verify-results` sets
+that they agree and that the two lines are consistent with sharing one problem, and `taxman verify-results` sets
 both problems up again and compares them.
 
 Proof kinds (solver/frame/src/results.rs explains them): trivial, exhausted, cap, prime_formula, same_search, known.
-The assumptions of a game are what its proof takes as given beyond the frame model: a proof by the ceiling (`cap`) or
-by the prime formula rests on the game of n-1, so it assumes what that game's proof assumes, and for a game of n-1
-taken from the table, that "the game of n-1 in results/optimal.jsonl.gz is optimal"; a repeat assumes what the game it
-repeats assumes; a known proof assumes what its source's game does; other proofs assume nothing.  A line of another
+The assumptions of a line are what its proof kind takes as given beyond the frame model: a proof by the ceiling (`cap`)
+or by the prime formula rests on the moves for n-1, so it assumes what the proof kind of their line assumes, and for
+moves for n-1 taken from the table, that "the moves recorded for game n-1 in results/optimal.jsonl.gz are optimal";
+a repeat assumes what the line it repeats assumes; a known proof kind assumes what its source's line does; other
+proof kinds assume nothing.  A line of another
 schema than this referee reads is a problem.
 
-The report counts games by proof kind and by assumption, and the arithmetic certificates: scores equal to
-n + score(n-1) or to the prime formula, which certify a game whatever found it, given that the game of n-1 is optimal.
+The report counts lines by proof kind and by assumption, and the arithmetic certificates: scores equal to
+n + score(n-1) or to the prime formula, which certify a score whatever found it, given that the moves for n-1 are
+optimal.
 It also counts, by proof kind, the searches that the near-repeat cut shortened: those with a stats.near_repeat_cut
 above 0.
 
@@ -95,7 +97,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 RESULTS = REPO / "results"
-COMMITTED = RESULTS / "optimal.jsonl.gz"  # the committed file: the table of optimal games and the committed chain
+COMMITTED = RESULTS / "optimal.jsonl.gz"  # the committed file: the table of optimal moves and the committed chain
 BOUNDS = RESULTS / "bounds.jsonl"  # the bounds store, the other (it is not a results file)
 FM_BOUND = REPO / "heuristics" / "results" / "fm_bound_2000.json"
 HEURISTIC_CHAIN = REPO / "heuristics" / "results" / "chain_1001_2000.json"
@@ -104,13 +106,13 @@ SCHEMA = 5  # the only format of a result line this referee reads
 RESTS_ON_PREV = {"prime_formula", "cap"}
 SETTLES_SEARCH = {"exhausted", "cap", "same_search", "known"}  # the proofs a repeat can repeat
 SETS_UP = {"start", "search", "repeat"}  # the methods whose lines have a setup
-SEARCHED = {"start", "search"}  # the methods of a game that set a search up to find its game
+SEARCHED = {"start", "search"}  # the methods of a line that set a search up to find its moves
 NO_BAG = {"prime", "known"}  # the methods whose lines have no in_the_bag: they set no board up
 DIGEST = re.compile("[0-9a-f]{16}")
 PREV_SOURCES = {"run", "results", "optimal", "strict", "bounds"}
 
 
-Game = namedtuple("Game", "score moves proof assumes")  # a completed game of the committed file; assumes is a set
+Game = namedtuple("Game", "score moves proof assumes")  # a completed line of the committed file; assumes is a set
 
 
 def read_text(path):
@@ -123,8 +125,8 @@ def read_text(path):
 
 
 def assumed_optimal(n):
-    """What a proof that rests on the table's game of n assumes."""
-    return f"the game of {n} in results/optimal.jsonl.gz is optimal"
+    """What a proof that rests on the table's moves for n assumes."""
+    return f"the moves recorded for game {n} in results/optimal.jsonl.gz are optimal"
 
 
 U_STATEMENT = "statement U holds at n="
@@ -167,7 +169,7 @@ class Divisors:
 
 
 def referee(n, moves, divisors):
-    """(score, legal moves left) of the game, or raises ValueError naming the first illegal move."""
+    """(score, legal moves left) of the moves, or raises ValueError naming the first illegal move."""
     pot = [False] + [True] * n
     score = 0
     for turn, m in enumerate(moves, 1):
@@ -185,7 +187,7 @@ def referee(n, moves, divisors):
 
 
 def finished_problems(n, moves, divisors):
-    """(score, problems) of a game that claims to be finished: the replayed score (None if the game is illegal, and
+    """(score, problems) of a line that claims to be finished: the replayed score (None if the moves are illegal, and
     then the one problem says why) and what else is wrong with it: not over, or not opening with the largest prime."""
     try:
         score, left = referee(n, moves, divisors)
@@ -206,8 +208,8 @@ class Sources:
     once.  A source that was not given is empty, and a line that cites it is a problem."""
 
     def __init__(self, committed=None, bounds=None, table="committed"):
-        self.committed = self._games(committed)  # n -> the Game of each completed game of the committed file
-        # The table is the committed file's games, unless a file of its own is given (the Rust program's built-in table
+        self.committed = self._games(committed)  # n -> the Game of each completed line of the committed file
+        # The table is the committed file's lines, unless a file of its own is given (the Rust program's built-in table
         # is the file as of its build, which a test or a newer checkout can make differ from the committed file).
         self.table = self.committed if table == "committed" else self._games(table)
         self.lines = {}  # (n, side, value) -> the store's first line of that board, side and value
@@ -225,7 +227,7 @@ class Sources:
 
     @classmethod
     def _games(cls, path):
-        """The Game of each completed game of the results file `path` by n (none, if there is no file)."""
+        """The Game of each completed line of the results file `path` by n (none, if there is no file)."""
         return {
             line["n"]: Game(line["score"], line["moves"], line["proof"], set(line["assumes"]))
             for line in cls._rows(path)
@@ -244,8 +246,8 @@ class Sources:
         return upper if lower and upper and lower["value"] == upper["value"] else None
 
     def prev_game(self, source, n):
-        """(score, moves or None, proof, assumptions) of the game of n that `source` ("strict" or "bounds") holds, as
-        the game of n-1 of a line is recorded: None if it holds none.  The store's moves are a game the Rust program
+        """(score, moves or None, proof, assumptions) of the line of n that `source` ("strict" or "bounds") holds, as
+        the moves for n-1 of a line are recorded: None if it holds none.  The store's moves are ones the Rust program
         rebuilds from promotions, which this script cannot, so they are not known (their digest is not checked)."""
         if source == "strict":
             return self.committed.get(n)
@@ -255,9 +257,9 @@ class Sources:
         return (upper["value"], None, "known", {assumed_u(board) for board in upper.get("rests_on", [])})
 
     def cite_problems(self, n, score, cite):
-        """(assumptions, problems) of a line that cites a source: the source holds a game of n that scores `score`, or
+        """(assumptions, problems) of a line that cites a source: the source holds a line of n that scores `score`, or
         lines of the store with that value as their bound of n, by the rules and from the runs cited.  The assumptions
-        are what the cited lines make the game assume."""
+        are what the cited lines make the line assume."""
         allowed = {"optimal": {"source"}, "strict": {"source"}, "bounds": {"source", "lower", "upper"}}
         source = cite.get("source")
         if source not in allowed:
@@ -268,12 +270,12 @@ class Sources:
         if source == "optimal":
             entry = self.table.get(n)
             if entry is None or entry.score != score:
-                return None, [f"it cites the table, which has no game of {n} scoring {score}"]
+                return None, [f"it cites the table, which has no line for {n} scoring {score}"]
             return {assumed_optimal(n)}, []
         if source == "strict":
             game = self.committed.get(n)
             if game is None or game.score != score:
-                return None, [f"it cites the committed chain, which has no game of {n} scoring {score}"]
+                return None, [f"it cites the committed chain, which has no line for {n} scoring {score}"]
             return set(game.assumes), []
         if not self.have_store:
             return None, ["it cites the bounds store, which was not given to the check"]
@@ -351,7 +353,7 @@ def contradictions(n, row, reached):
         found.append(f"stats.near_repeat_cut {cut!r} is not a count")
     elif cut is not None and method not in SEARCHED:
         found.append(f'a {method} game with "stats.near_repeat_cut", which only a search has')
-    # A start game is a completed search that took no step: its starting game reached a ceiling.  A search with nodes
+    # A start game is a completed search that took no step: its start reached a ceiling.  A search with nodes
     # 0 is a line of an older build, which called it a search.
     nodes = row.get("nodes")
     if method == "start" and nodes != 0:
@@ -371,7 +373,7 @@ def contradictions(n, row, reached):
     elif method in SEARCHED and known is not None and reached:
         found.append("a searched game that reached its cap and cites the store's bound as well")
     elif method == "known" and kind == "bounds" and known.get("lower") is None:
-        found.append("a known game that cites the store without the lower bound whose game it plays")
+        found.append("a known game that cites the store without the lower bound whose moves it plays")
     if method == "prime" and not is_prime(n):
         found.append(f"a prime game, but {n} is not prime")
     if method == "trivial" and row["promotions"]:
@@ -394,12 +396,12 @@ def proof_of(row):
 
 
 def repeat_problems(n, number, row, done):
-    """What is wrong with a repeat's line against the game m it repeats (done[m] if the file completed it), as far as
-    the lines tell: the two search problems themselves only the solver can compare."""
+    """What is wrong with a repeat's line against the line of game m it repeats (done[m], if the file completed it), as
+    far as the lines tell: the two search problems themselves only the solver can compare."""
     record = row["same_search"]
     m = record.get("n")
     if not isinstance(m, int) or m >= n or m not in done:
-        return [f"it repeats the search of game {m}, which is not a completed game of the file below it"]
+        return [f"it repeats the search of game {m}, which has no completed line in the file below it"]
     _score, _moves, proof, assumes, line, earlier = done[m]
     if line > number:
         return [f"it repeats the search of game {m}, whose line ({line}) comes after it"]
@@ -418,7 +420,7 @@ def repeat_problems(n, number, row, done):
         found.append(f"its promotions are not those of game {m} (line {line})")
     if record.get("promotion_sum") != sum(row["promotions"]):
         found.append(f"its promotions sum to {sum(row['promotions'])}, not the promotion_sum it records")
-    # (A game without in_the_bag is flagged by its own line's checks.)
+    # (A line without in_the_bag is flagged by its own line's checks.)
     bags = [r.get("in_the_bag") for r in (row, earlier)]
     if None not in bags and row["score"] - bags[0] != earlier["score"] - bags[1]:
         found.append(f"score - in_the_bag is not that of game {m} (line {line})")
@@ -426,12 +428,12 @@ def repeat_problems(n, number, row, done):
 
 
 def check_unfinished(path, number, row, table, divisors, unfinished, problems):
-    """An incomplete line that records its game (best_so_far, moves, promotions): the game is legal, scores the
+    """An incomplete line that records its moves (best_so_far, moves, promotions): the moves are legal, score the
     best_so_far, has ascending promotions that are moves, and is no better than the table's score.  It need not be
-    over, which only a completed game claims.  The line is kept for the games built on it."""
+    over, which only a completed line claims.  The line is kept for the lines built on it."""
     best = row.get("best_so_far")
     if best is None:
-        return  # a line made by hand, with no game: it counts and seeds nothing
+        return  # a line made by hand, with no moves: it counts and seeds nothing
 
     def fail(message):
         problems.append(f"{path.name} line {number} (n={n}): {message}")
@@ -455,14 +457,14 @@ def check_unfinished(path, number, row, table, divisors, unfinished, problems):
 
 
 def check_file(path, fm, heuristic, divisors, problems, sources):
-    """Checks one file; returns {n: (score, moves, proof, assumptions, line, row)} of its completed games, the
-    report's counters (including the searches the near-repeat cut shortened, by proof), and the games that only an
+    """Checks one file; returns {n: (score, moves, proof, assumptions, line, row)} of its completed lines, the
+    report's counters (including the searches the near-repeat cut shortened, by proof), and the boards that only an
     unfinished search is recorded for."""
     table = sources.table
     rows = read_lines(path, problems)
     games = {}
-    unfinished = {}  # n -> [(line, best_so_far, digest of the moves)] of the incomplete lines that record their game
-    stopped = set()  # the games with an incomplete line
+    unfinished = {}  # n -> [(line, best_so_far, digest of the moves)] of the incomplete lines that record their moves
+    stopped = set()  # the boards with an incomplete line
     for number, row in rows:
         if row.get("schema") != SCHEMA:
             problems.append(
@@ -478,7 +480,7 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
             continue
         n = row["n"]
         if n in games:
-            problems.append(f"lines {games[n][0]} and {number}: two completed games of n={n}")
+            problems.append(f"lines {games[n][0]} and {number}: two completed lines for n={n}")
             continue
         games[n] = (number, row)
 
@@ -514,7 +516,7 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
         if n in heuristic and score < heuristic[n]:
             fail(f"scores {score}, below the heuristic chain's {heuristic[n]}")
 
-        # The chain against whichever game of n-1 there is.
+        # The chain against whichever moves for n-1 there are.
         below = done.get(n - 1)
         listed = table.get(n - 1)
         before = below[0] if below else (listed.score if listed else None)
@@ -528,9 +530,9 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
         record = row["prev"]
         source = record["source"] if record is not None else None
         prev = None  # (score, moves, proof, assumptions)
-        proven = True  # whether the game of n-1 is optimal (given its assumptions); not the best game of a stopped search
+        proven = True  # whether the moves for n-1 are optimal (given their assumptions); not a stopped search's best
         if source in ("run", "results") and record["proof"] is None:
-            # The best game of an unfinished search of n-1 (an older `solve` went on past limits): an earlier
+            # The best moves of an unfinished search of n-1 (an older `solve` went on past limits): an earlier
             # incomplete line of n-1 with that score and those moves.
             found = [
                 u
@@ -538,8 +540,8 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
                 if u[0] < number and u[1] == record["score"] and u[2] == record["moves_digest"]
             ]
             if not found:
-                fail("built on the best game of an unfinished search of n-1, and no earlier line records one with that "
-                     "score and those moves")
+                fail("built on the best moves of an unfinished search of n-1, and no earlier line records one with "
+                     "that score and those moves")
                 continue
             prev = (found[0][1], found[0][3], None, set())
             proven = False
@@ -551,25 +553,25 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
                 continue
             prev = below[:4]
         elif source == "optimal":
-            # A game of the table is assumed optimal; the table at hand may lack it (a line made with a longer one).
+            # The moves of the table are assumed optimal; the table at hand may lack it (a line made with a longer one).
             entry = table.get(n - 1)
             score_before = entry.score if entry is not None else record["score"]
             moves_before = entry.moves if entry is not None else None
             prev = (score_before, moves_before, None, {assumed_optimal(n - 1)})
         elif source in ("strict", "bounds"):
-            # The committed chain's game, or a board the store has proven.
+            # The committed chain's moves, or a board the store has proven.
             prev = sources.prev_game(source, n - 1)
             if prev is None:
-                fail(f"it was built on the game of n-1 of the {source} source, which holds none")
+                fail(f"it was built on the moves for n-1 of the {source} source, which holds none")
                 continue
         elif record is not None:
             fail(f"unknown prev.source {source!r}")
         if prev is not None:
-            # A record of the proof `known` says where the run got its copy of the game of n-1 (a known source,
-            # `--use-prev`), not how that game is proven.  When the lines of such a run are appended to the file it
-            # drew on, the game of n-1 is the file's own line, which carries and checks its own proof, and this
-            # line's search depends only on that game's score and moves, which must still match, and on what it
-            # assumes, which must too.  So the record's proof need not be the line's, if the line is the file's.
+            # A record of the proof `known` says where the run got its copy of the moves for n-1 (a known source,
+            # `--use-prev`), not how they are proven.  When the lines of such a run are appended to the file it
+            # drew on, the moves for n-1 are the file's own line, which carries and checks its own proof kind, and this
+            # line's search depends only on those moves' score and moves, which must still match, and on what it
+            # assumes, which must too.  So the record's proof kind need not be the line's, if the line is the file's.
             known_copy = record["proof"] == "known" and source in ("run", "results")
             same = (
                 record["n"] == n - 1
@@ -579,9 +581,9 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
                 and set(record["assumes"]) == prev[3]
             )
             if not same:
-                fail("its record of the game of n-1 does not match that game")
+                fail("its record of the moves for n-1 does not match them")
 
-        # Arithmetic.  What rests on the game of n-1 (the ceiling, the prime formula) needs it proven.
+        # Arithmetic.  What rests on the moves for n-1 (the ceiling, the prime formula) needs them proven.
         prev_score = prev[0] if prev and proven else None
         total = sum(promotions)
         setup = row.get("setup") or {}
@@ -590,7 +592,7 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
         if bag is not None and score != bag + total:
             fail(f"scores {score}, not in_the_bag {bag} + promotions {total}")
         if cap is not None and prev_score is None:
-            fail("it has a ceiling (a cap in its setup), which needs a proven game of n-1 it names")
+            fail("it has a ceiling (a cap in its setup), which needs proven moves for n-1 it names")
         if cap is not None:
             if total > cap:
                 fail(f"promotions {total} exceed the cap {cap}")
@@ -606,7 +608,7 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
         if row["method"] == "prime" and prev_score is not None and score != prev_score + n - replaced:
             fail(f"a prime game must score n + score(n-1) - {replaced}")
 
-        # The game a repeat repeats.
+        # The line a repeat repeats.
         repeated = None
         if row["method"] == "repeat" and isinstance(row.get("same_search"), dict):
             for message in repeat_problems(n, number, row, done):
@@ -616,11 +618,11 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
 
         # Proof and assumptions.
         if proof in RESTS_ON_PREV and prev is None:
-            fail(f"its proof ({proof}) rests on a game of n-1 it does not name")
+            fail(f"its proof ({proof}) rests on moves for n-1 it does not name")
         elif proof in RESTS_ON_PREV and not proven:
-            fail(f"its proof ({proof}) rests on the game of n-1, which it records as the best game of an unfinished "
+            fail(f"its proof ({proof}) rests on the moves for n-1, which it records as the best moves of an unfinished "
                  "search")
-        cited = None  # what the cited source makes the game assume
+        cited = None  # what the cited source makes the line assume
         if isinstance(row.get("known"), dict):
             cited, messages = sources.cite_problems(n, score, row["known"])
             for message in messages:
@@ -641,7 +643,7 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
         cut = near_repeat_cut(row)
         if is_count(cut) and cut > 0:
             shortened[proof] += 1
-        # (Statement U at a board is one assumption of many: counted together, a game once.)
+        # (Statement U at a board is one assumption of many: counted together, a line once.)
         assumed.update({s for s in assumes if not s.startswith(U_STATEMENT)})
         if any(s.startswith(U_STATEMENT) for s in assumes):
             assumed["statement U at some boards"] += 1
@@ -669,9 +671,9 @@ def main():
     ap.add_argument("files", nargs="*", type=Path)
     ap.add_argument("--fm", type=Path, default=FM_BOUND)
     ap.add_argument("--chain", type=Path, default=HEURISTIC_CHAIN)
-    ap.add_argument("--committed", type=Path, default=COMMITTED, help="the committed file, a source of known games")
-    ap.add_argument("--table", type=Path, help="the file of the table of optimal games (default: the committed file)")
-    ap.add_argument("--bounds", type=Path, default=BOUNDS, help="the bounds store, the other source of known games")
+    ap.add_argument("--committed", type=Path, default=COMMITTED, help="the committed file, a source of known moves")
+    ap.add_argument("--table", type=Path, help="the file of the table of optimal moves (default: the committed file)")
+    ap.add_argument("--bounds", type=Path, default=BOUNDS, help="the bounds store, the other source of known moves")
     args = ap.parse_args()
     # (The bounds store is not a file of results: it is read for the lines that cite it.)
     files = args.files or sorted(
@@ -705,7 +707,7 @@ def main():
         )
         if done:
             missing = sum(1 for n in range(min(done), max(done) + 1) if n not in done)
-            print(f"  {len(done)} completed games, n = {min(done)}..{max(done)} ({missing} missing)")
+            print(f"  {len(done)} completed lines, n = {min(done)}..{max(done)} ({missing} missing)")
         if unfinished:
             print(f"  unfinished: {len(unfinished)} games have only an unfinished search "
                   f"(n = {unfinished[0]} to {unfinished[-1]}); they are not proven")

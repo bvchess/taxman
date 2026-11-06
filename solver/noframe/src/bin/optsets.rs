@@ -24,7 +24,7 @@
 //! The line records how the enumeration ended ("complete", "limit" or "budget"), how many sets it found, how many
 //! distinct upper parts (numbers above n/2) and lower parts they have, how many have U\* (descending greedy's upper
 //! set) as their upper part, the canonical set (the largest in decreasing lexicographic order: compare the largest
-//! members, then the next, ...) when it is not the recorded game's, and every other set as its difference from
+//! members, then the next, ...) when it is not the recorded one, and every other set as its difference from
 //! the canonical one, {"out": [...], "in": [...]} (at most 200).  `--segments 1` turns on the segment cuts, which
 //! make the answer rest on the recorded optima of the smaller games being the true ones; the line says so.
 
@@ -232,7 +232,7 @@ fn main() {
         let started = Instant::now();
         let (score, moves) = &e.known[&n];
         let board = Board::new(n as u32, &e.spf);
-        assert_eq!(board.replay(moves), Ok(*score), "n={n}: the recorded game does not replay to its score");
+        assert_eq!(board.replay(moves), Ok(*score), "n={n}: the recorded moves do not replay to their score");
         let Outcome { sets, ended, source, nodes } = e.solve(n);
         let half = (n / 2) as u32;
         let upper_part = |s: &[u32]| -> Vec<u32> { s.iter().copied().filter(|&c| c > half).collect() };
@@ -245,7 +245,7 @@ fn main() {
         };
         assert!(
             ended != "complete" || !in_class || sets.contains(&recorded),
-            "n={n}: the recorded game is not among the sets"
+            "n={n}: the recorded moves are not among the sets"
         );
         let distinct = |above: bool| {
             let mut parts: Vec<Vec<u32>> =

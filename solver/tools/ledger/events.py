@@ -49,15 +49,15 @@ def main(directory, chain=None):
     over = [e["seconds"] - e["limit_s"] for e in stopped]
     if over:
         print(f"a stopped search's seconds beyond its limit: median {median(over):.2f}, max {max(over):.2f}")
-    # The finder (runs before the finder have no such fields), the games that seeded the searches, and the searches by
+    # The finder (runs before the finder have no such fields), the moves that seeded the searches, and the searches by
     # whether the boards n - 1 and n + 1 were proven when they began.
     finder = [e for e in maps + searches if e.get("lns_found") is not None]
     if finder:
         better = [e["lns_found"] - e["lns_from"] for e in finder if e["lns_found"] > e["lns_from"]]
         after_maps = sum(e["action"] == "init" for e in finder)
         print(f"the finder: {len(finder)} runs ({sum(e['lns_s'] for e in finder):.0f} s; {after_maps} after maps), "
-              f"{len(better)} found a better game (by {sum(better)} in all, median {median(better)})")
-        print("the games that seeded the searches:", dict(Counter(e.get("seed_from") for e in searches)))
+              f"{len(better)} found better moves (by {sum(better)} in all, median {median(better)})")
+        print("the moves that seeded the searches:", dict(Counter(e.get("seed_from") for e in searches)))
     if searches and "below_proven" in searches[0]:
         proven = {True: "proven", False: "not proven"}
         for below in (True, False):

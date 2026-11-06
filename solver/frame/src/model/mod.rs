@@ -6,12 +6,12 @@
 //! all of its factors still there (its tax).  A frame is *winnable* when some order takes every move.
 //! (`solver/frame/README.md` introduces the model with an example, and `docs/GLOSSARY.md` defines the words used here.)
 //!
-//! A game chooses which candidates to *promote*: promoting `n` takes it out of the factors of its *home frame*
+//! The moves are chosen by which candidates to *promote*: promoting `n` takes it out of the factors of its *home frame*
 //! (the frame it is promoted from) `h ≥ 1` and makes it a move of frame `h − 1`, one frame forward, where it pays
 //! its tax.  That is legal when both frames stay winnable.  After a promotion both frames are *reduced*: a move
 //! left with a single live factor is paid by it, and the pair is dropped, repeatedly.  Every frame's *freedoms*
 //! (initially factors minus moves) drop by one on each promotion into or out of it.  The search looks for the
-//! promotion set with the largest sum; the score of the game is what the game with no promotions scores plus
+//! promotion set with the largest sum; the score of the moves is what the moves with no promotions score plus
 //! that sum.
 //!
 //! What is where:

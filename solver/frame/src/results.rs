@@ -1,90 +1,90 @@
-//! Results files: what a result line records about where its game came from, and the checks a results file
+//! Results files: what a result line records about where its moves came from, and the checks a results file
 //! passes before anything builds on it.
 //!
 //! # Provenance
 //!
-//! A result line ([`GameResult::to_json`], schema [`SCHEMA`], the only one this build reads) says how the game's
-//! optimality is established (its [`Proof`]), what the proof takes as given beyond the frame model (its
-//! *assumptions*), which game of `n − 1` it was built from (`prev`), and which build made it (`build`, see
+//! A result line ([`GameResult::to_json`], schema [`SCHEMA`], the only one this build reads) says how the optimality of
+//! its moves is established (its [`Proof`]), what the proof takes as given beyond the frame model (its
+//! *assumptions*), which moves for `n − 1` it was built from (`prev`), and which build made it (`build`, see
 //! [`build_json`]).
 //!
-//! * `trivial`: the board has no promotion candidates, so the game with no promotions is the only one.
+//! * `trivial`: the board has no promotion candidates, so the moves with no promotions are the only ones.
 //! * `exhausted`: the search explored its whole tree.
-//! * `cap`: the search reached `n + score(n − 1)`.  That is a ceiling if the game of `n − 1` is optimal:
-//!   `opt(n) ≤ n + opt(n − 1)`, since deleting the move `n` from an optimal game of `n` leaves a game of `n − 1`
+//! * `cap`: the search reached `n + score(n − 1)`.  That is a ceiling if the moves for `n − 1` are optimal:
+//!   `opt(n) ≤ n + opt(n − 1)`, since deleting the move `n` from optimal moves for `n` leaves moves for `n − 1`
 //!   (`n` divides nothing else on the board, so no other move changes).
-//! * `prime_formula`: a prime `n` plays the game of `n − 1` with its first move replaced by `n`.  That is optimal
-//!   if the game of `n − 1` is (proved at `accelerate::prime_shortcut`).
+//! * `prime_formula`: a prime `n` plays the moves for `n − 1` with its first move replaced by `n`.  That is optimal
+//!   if the moves for `n − 1` are (proved at `accelerate::prime_shortcut`).
 //! * `same_search`: the game's search problem is the one an earlier game `m` of the file posed, and `m`'s proof
 //!   settles that problem's best promotion sum (`exhausted`, `cap`, `known` or `same_search` again); so this game's
-//!   best promotion sum is the same, and its game is `m`'s promotions played on this board (tactic `same_search`;
+//!   best promotion sum is the same, and its moves are `m`'s promotions played on this board (tactic `same_search`;
 //!   solver/docs/design/same-search.md, has the argument).
-//! * `known`: the optimality is a known source's, which the line's `known` field cites ([`Cite`], [`crate::known`]): the
-//!   game is taken from the source without a search (method `known`: the table built into the program, the committed
-//!   chain, or a board that the bounds store has proven), or a search found a game that scores what the bounds store's
-//!   upper bound of the
-//!   board allows (method `search` or `start`; the bound stops the search the way `cap` does, and is checked against
-//!   the store).
+//! * `known`: the optimality is a known source's, which the line's `known` field cites ([`Cite`], [`crate::known`]):
+//!   the moves are taken from the source without a search (method `known`: the table built into the program, the
+//!   committed chain, or a board that the bounds store has proven), or a search found moves that score what the bounds
+//!   store's upper bound of the board allows (method `search` or `start`; the bound stops the search the way `cap`
+//!   does, and is checked against the store).
 //!
-//! `cap` and `prime_formula` rest on the game of `n − 1` ([`Proof::rests_on_prev`]), and `same_search` on the game
-//! it repeats.  A proof that rests on another game assumes what that game's proof assumes ([`assumptions_of`]), and
-//! so on down the chain; a game's own search assumes nothing, since every tactic of the search is proven or sound.
-//! A `known` proof assumes what its source's game assumes: a game of the table is assumed optimal, and the line says
-//! so, as [`assumed_optimal`] words it ("the game of 1300 in results/optimal.jsonl.gz is optimal"); the committed
-//! chain's game assumes what its line does; a bound of the bounds store holds wherever statement U holds at the boards
-//! it rests on, one assumption each ([`assumed_u`]).  The same assumption comes in when a run takes the game of `n − 1`
-//! from the table (`solve --use-prev`) and a proof rests on it.  The table holds the games of the committed chain and
-//! not the proofs of their lines, which is why its games are assumed: the lines of the file say what each game
-//! assumes.  A line that assumes nothing is proven within the frame model, given that the solver is right.
+//! `cap` and `prime_formula` rest on the moves for `n − 1` ([`Proof::rests_on_prev`]), and `same_search` on the moves
+//! of the game it repeats.  A proof that rests on other moves assumes what the proof of those moves assumes
+//! ([`assumptions_of`]), and so on down the chain; a game's own search assumes nothing, since every tactic of the
+//! search is proven or sound.  A `known` proof assumes what its source's moves assume: the table's moves are assumed
+//! optimal, and the line says so, as [`assumed_optimal`] words it ("the moves recorded for game 1300 in
+//! results/optimal.jsonl.gz are optimal"); the committed chain's moves assume what their line does; a bound of the
+//! bounds store holds wherever statement U holds at the boards it rests on, one assumption each ([`assumed_u`]).  The
+//! same assumption comes in when a run takes the moves for `n − 1` from the table (`solve --use-prev`) and a proof
+//! rests on it.  The table holds the moves of the committed chain and not the proof kinds of their lines, which is why
+//! its moves are assumed: the lines of the file say what each line's moves assume.  A line that assumes nothing is
+//! proven within the frame model, given that the solver is right.
 //!
 //! # Checks
 //!
 //! [`read_results`] checks every completed line, in order of `n`, and fails naming the line:
 //!
-//! * the game replays legally to its recorded score, is over (no legal move left) and opens with the largest
-//!   prime ([`replay_finished`]); its promotions are among its moves;
-//! * its score is the table's, where the table ([`Optimal::built_in`], or another a test gives) has the game;
+//! * the moves replay legally to the recorded score, are over (no legal move left) and open with the largest
+//!   prime ([`replay_finished`]); the promotions are among the moves;
+//! * the score is the table's, where the table ([`Optimal::built_in`], or another a test gives) has the game;
 //! * the fields the proof and the assumptions are derived from agree with each other, as the solver writes them: a
-//!   searched or repeat game, and only such a game, has a `setup`; every game but a prime one records
-//!   `in_the_bag`, which a prime game and a known one do not; only a search reaches its ceiling (`reached_cap`); a
-//!   prime game's `n` is prime; a trivial game promotes nothing; a repeat, and only a repeat, records the game it
-//!   repeats, and its `setup` has no `cap` (it ran no search to stop); a known game, and a search that a bound of the
+//!   searched or repeat line, and only such a line, has a `setup`; every line but a prime one records
+//!   `in_the_bag`, which a prime line and a known one do not; only a search reaches its ceiling (`reached_cap`); a
+//!   prime line's `n` is prime; a trivial line promotes nothing; a repeat, and only a repeat, records the game it
+//!   repeats, and its `setup` has no `cap` (it ran no search to stop); a known line, and a search that a bound of the
 //!   store stopped, and only those, cite a source (`known`); only a search may count the nodes its near-repeat cut cut
 //!   (`stats.near_repeat_cut`, a number the proof does not rest on: the search still explores its whole tree);
-//! * against the game of `n − 1` (from the file, else from the table):
-//!   `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`.  Both are theorems for optimal games, so a violation proves one
-//!   of the two games is not optimal;
-//! * the arithmetic of the line: a searched game scores `in_the_bag` plus its promotions; the ceiling on the
+//! * against the moves for `n − 1` (from the file, else from the table):
+//!   `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`.  Both are theorems for optimal moves, so a violation proves that
+//!   one of the two sets of moves is not optimal;
+//! * the arithmetic of the line: a searched line scores `in_the_bag` plus its promotions; the ceiling on the
 //!   promotion sum (`setup`'s `cap`) is `n + score(n − 1) − in_the_bag` and the promotions do not exceed it; a
-//!   game records reaching it exactly when its promotions sum to it, where the search stops (so a proof by `cap`
-//!   cannot pass for an exhausted search, which does not rest on the game of `n − 1`); a prime game scores
+//!   line records reaching it exactly when its promotions sum to it, where the search stops (so a proof by `cap`
+//!   cannot pass for an exhausted search, which does not rest on the moves for `n − 1`); a prime line scores
 //!   `n + score(n − 1) − P`, `P` the largest prime below `n`;
-//! * the predecessor the line names is the game the file (or the table) holds for `n − 1`: same score,
+//! * the predecessor the line names is the line the file (or the table) holds for `n − 1`: same score,
 //!   same moves (by digest, [`moves_digest`]), same proof and assumptions.  But a record of the proof `known` of
-//!   the file's own game needs no more than the same score, moves and assumptions: it says where the run got its
-//!   copy of the game, and the file's line proves it.  A predecessor of a run or file with no proof is the best
-//!   game of an unfinished search (older files have such lines, made by a `solve` that went on past limits): an
-//!   earlier incomplete line of `n − 1` with that score and those moves.  Such a game seeds the line and proves
+//!   the file's own line needs no more than the same score, moves and assumptions: it says where the run got its
+//!   copy of the moves, and the file's line proves them.  A predecessor of a run or file with no proof is the best
+//!   moves of an unfinished search (older files have such lines, made by a `solve` that went on past limits): an
+//!   earlier incomplete line of `n − 1` with that score and those moves.  Such moves seed the line and prove
 //!   nothing, so the line has no ceiling (`setup.cap`) and no proof that rests on `n − 1` (`cap`, `prime_formula`),
-//!   and scores no less than that game; the proofs that rest on nothing of `n − 1` (`exhausted`, `trivial`, and
-//!   `same_search` on a completed game of the file) stand;
-//! * a repeat: the game `m` it names is a completed game of the file, on an earlier line, whose proof settles its
+//!   and scores no less than those moves; the proofs that rest on nothing of `n − 1` (`exhausted`, `trivial`, and
+//!   `same_search` on a completed line of the file) stand;
+//! * a repeat: the game `m` it names has a completed line in the file, an earlier one, whose proof settles its
 //!   search ([`Proof::settles_search`]) and whose proof and assumptions the record gives; the search problems of
 //!   both games, set up again from their n ([`search_problem`]), are as large as their lines record (frames,
 //!   candidates, `max_total`), are equal, and have the digest both lines record; the promotions are `m`'s, and both
-//!   games score their own `in_the_bag` (from the boards set up again) plus the recorded promotion sum;
-//! * a known line: the source it cites ([`Known::check_cite`]) holds a game of `n` that scores what the line does (the
+//!   lines score their own `in_the_bag` (from the boards set up again) plus the recorded promotion sum;
+//! * a known line: the source it cites ([`Known::check_cite`]) holds moves for `n` that score what the line does (the
 //!   table's, the committed chain's) or lines of the bounds store with that value as their bound of `n`, by the rules
 //!   and from the sources cited; the sources are given to the check ([`Known`]), and are not checked again by it;
-//! * the recorded proof and assumptions are the ones derived from the line and the game its proof rests on (for a
+//! * the recorded proof and assumptions are the ones derived from the line and the moves its proof rests on (for a
 //!   known line, from the source);
 //! * no game has two completed lines.
 //!
-//! An incomplete line that records its game (`best_so_far`, with `moves` and `promotions`: the solver always writes
-//! them) is checked as far as it goes: the game is legal, scores the `best_so_far`, has ascending promotions that are
-//! moves, and is no better than the table's score.  A file may have holes, games with no line or only incomplete
+//! An incomplete line that records its moves (`best_so_far`, with `moves` and `promotions`: the solver always writes
+//! them) is checked as far as it goes: the moves are legal, score the `best_so_far`, have ascending promotions that are
+//! moves, and are no better than the table's score.  A file may have holes, games with no line or only incomplete
 //! ones (the file of a `solve` that went on past limits, or a file that merges many); each line is checked against what
-//! it rests on in the same file, and a proof that rests on a game the file lacks is refused.
+//! it rests on in the same file, and a proof that rests on moves the file lacks is refused.
 //!
 //! The digest a line that is not a repeat records is not checked against its problem: it is how the solver finds
 //! an earlier game to repeat, which it then sets up again and compares problem for problem, as the check of the
@@ -101,13 +101,13 @@
 //! # The file of a run, and checking files on their own
 //!
 //! [`ResultsFile`] is the file a run appends to.  Opening it locks it against other processes (two runs appending to
-//! one file would leave two lines for a game) and checks it ([`read_results`]); the completed games in it count as
-//! done and are the previous games of the ones after them; each new result is appended and synced as soon as it is
-//! done (so a crash loses at most the line being written); and a game that failed a check after it was found is
-//! written to [`rejected_path`] instead, with the reason.  [`verify_files`] runs the same checks on files without
+//! one file would leave two lines for a game) and checks it ([`read_results`]); the games with a completed line in it
+//! count as done and are the previous games of the ones after them; each new result is appended and synced as soon as
+//! it is done (so a crash loses at most the line being written); and a result that failed a check after it was found
+//! is written to [`rejected_path`] instead, with the reason.  [`verify_files`] runs the same checks on files without
 //! changing them, and that the files agree on the games they share (`taxman verify-results`).  The Python referee
-//! `solver/tools/check_results.py` derives the same proofs and assumptions from the same rules with no code in common,
-//! so a mistake in either shows as a disagreement.
+//! `solver/tools/check_results.py` derives the same proof kinds and assumptions from the same rules with no code in
+//! common, so a mistake in either shows as a disagreement.
 //!
 //! The fields of a line are described in solver/docs/REFERENCE.md ("A results line (`--out`, schema 5)"); [`SCHEMA`] is
 //! the version of the format.
@@ -130,13 +130,14 @@ use std::thread;
 /// The version of the result-line format, the only one this build reads.
 pub const SCHEMA: u32 = 5;
 
-/// What a game's proof takes as given beyond the frame model, each a plain statement ([`assumed_optimal`]); empty
+/// What a line's proof takes as given beyond the frame model, each a plain statement ([`assumed_optimal`]); empty
 /// for a proof that rests on nothing else.
 pub type Assumptions = BTreeSet<String>;
 
-/// What a proof that rests on the table's game of `n` assumes: "the game of `n` in results/optimal.jsonl.gz is optimal".
+/// What a proof that rests on the table's moves for `n` assumes: "the moves recorded for game `n` in
+/// results/optimal.jsonl.gz are optimal".
 pub fn assumed_optimal(n: u32) -> String {
-    format!("the game of {n} in {RESULTS_IN_REPOSITORY} is optimal")
+    format!("the moves recorded for game {n} in {RESULTS_IN_REPOSITORY} are optimal")
 }
 
 /// What a bound of the bounds store that rests on statement U at the board `n` assumes: "statement U holds at n=4501".
@@ -154,7 +155,7 @@ fn u_board(statement: &str) -> Option<u32> {
     statement.strip_prefix(U_STATEMENT)?.parse().ok()
 }
 
-/// How a completed game's optimality is established (see the module documentation).
+/// How the optimality of the moves of a completed line is established (see the module documentation).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Proof {
     Trivial,
@@ -184,7 +185,7 @@ impl Proof {
         Proof::ALL.into_iter().find(|proof| proof.as_str() == name)
     }
 
-    /// The proof of a game solved by `method`; `None` for a search that a limit stopped.  (A search that stops at an
+    /// The proof of a result found by `method`; `None` for a search that a limit stopped.  (A search that stops at an
     /// upper bound of the bounds store is proven by it, [`Proof::Known`], which the citation on its line says and this
     /// cannot: see [`Known::check_cite`].)
     pub fn of(method: Method, completed: bool, reached_cap: bool) -> Option<Proof> {
@@ -199,13 +200,13 @@ impl Proof {
         }
     }
 
-    /// Whether the proof holds only if the game of `n − 1` it was built from is optimal.
+    /// Whether the proof holds only if the moves for `n − 1` it was built from are optimal.
     pub fn rests_on_prev(self) -> bool {
         matches!(self, Proof::PrimeFormula | Proof::Cap)
     }
 
-    /// Whether the proof holds only if another game's proof does: the game of `n − 1` ([`rests_on_prev`]), or for
-    /// `same_search` the earlier game it repeats.
+    /// Whether the proof holds only if the proof of other moves does: the moves for `n − 1` ([`rests_on_prev`]), or for
+    /// `same_search` the moves of the earlier game it repeats.
     ///
     /// [`rests_on_prev`]: Self::rests_on_prev
     pub fn rests_on_another_game(self) -> bool {
@@ -214,18 +215,18 @@ impl Proof {
 
     /// Whether the proof settles the best promotion sum of the game's search problem, so that a later game that poses
     /// the same problem can repeat it (tactic `same_search`): an exhausted search directly; a search that reached its
-    /// ceiling because every promotion set of the model is a game, which scores at most the ceiling; a repeat by
+    /// ceiling because every promotion set of the model gives moves that score at most the ceiling; a repeat by
     /// induction (solver/docs/design/same-search.md); a search that reached an upper bound of the bounds store
     /// (`known`: its sum is the problem's best, since the bound allows no more and the search found a set of that sum).
-    /// A trivial or prime game settles no search, and a game that is only taken from a known source (method `known`)
+    /// A trivial or prime game settles no search, and moves only taken from a known source (method `known`)
     /// set none up.
     pub fn settles_search(self) -> bool {
         matches!(self, Proof::Exhausted | Proof::Cap | Proof::SameSearch | Proof::Known)
     }
 }
 
-/// A game's assumptions: those of the game its proof rests on ([`Proof::rests_on_another_game`]: the game of
-/// `n − 1`, or the game a repeat repeats), which are `basis`, if the proof rests on one; else none.
+/// A line's assumptions: those of the moves its proof rests on ([`Proof::rests_on_another_game`]: the moves for
+/// `n − 1`, or the moves of the game a repeat repeats), which are `basis`, if the proof rests on one; else none.
 pub fn assumptions_of(proof: Proof, basis: Option<&Assumptions>) -> Assumptions {
     match basis {
         Some(basis) if proof.rests_on_another_game() => basis.clone(),
@@ -238,7 +239,7 @@ pub fn assumptions_json(assumes: &Assumptions) -> Json {
     Json::array(assumes.iter().map(String::as_str))
 }
 
-/// A digest of a game's moves: the 64-bit FNV-1a hash of the moves written in decimal and separated by commas
+/// A digest of moves: the 64-bit FNV-1a hash of the moves written in decimal and separated by commas
 /// (`"997,961,713"`), as 16 hexadecimal digits.
 pub fn moves_digest(moves: &[u32]) -> String {
     let text = moves.iter().map(u32::to_string).collect::<Vec<_>>().join(",");
@@ -277,7 +278,7 @@ pub fn build_json() -> Json {
 // ---------------------------------------------------------------------------------------------------------
 // Reading and checking
 
-/// A completed game of a results file, checked.
+/// A completed line of a results file, checked.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StoredGame {
     pub n: u32,
@@ -289,7 +290,7 @@ pub struct StoredGame {
     pub promotions: Vec<u32>,
     pub proof: Proof,
     pub assumes: Assumptions,
-    /// Which theorem the score reaches, given the game of `n − 1` (if the file or the table has it).
+    /// Which theorem the score reaches, given the moves for `n − 1` (if the file or the table has it).
     pub ceiling_proof: Option<CeilingProof>,
     /// For a game that set a search up (searched or repeat), the size of its search problem as the line records it
     /// (`setup.frames`, `setup.candidates`, `setup.max_total`), which the problem set up again from its n
@@ -302,7 +303,7 @@ pub struct StoredGame {
     pub near_repeat_cut: Option<u64>,
 }
 
-/// A score that equals a proven ceiling, given that the game of `n − 1` is optimal: this proves the game optimal
+/// A score that equals a proven ceiling, given that the moves for `n − 1` are optimal: this proves the moves optimal
 /// whatever found it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CeilingProof {
@@ -321,7 +322,7 @@ impl CeilingProof {
         }
     }
 
-    /// The ceiling that a game of `n` scoring `score` reaches, given that the game of `n − 1` scores `before`.
+    /// The ceiling that moves for `n` scoring `score` reach, given that the moves for `n − 1` score `before`.
     pub fn of(n: u32, score: u64, before: u64) -> Option<CeilingProof> {
         let ceiling = before + u64::from(n);
         if score == ceiling {
@@ -334,12 +335,12 @@ impl CeilingProof {
     }
 }
 
-/// What a prime `n` replaces in the game of `n − 1`: its first move, the largest prime below `n` (none for 2).
+/// What a prime `n` replaces in the moves for `n − 1`: its first move, the largest prime below `n` (none for 2).
 fn replaced_by_prime(n: u32) -> u64 {
     u64::from(n.checked_sub(1).and_then(largest_prime_at_most).unwrap_or(0))
 }
 
-/// The best game of a search that a limit stopped, from its incomplete line, checked: legal, and scoring what the line
+/// The best moves of a search that a limit stopped, from its incomplete line, checked: legal, and scoring what the line
 /// says.  A later line may be built on it as a seed, and it proves nothing.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnfinishedGame {
@@ -353,16 +354,16 @@ pub struct UnfinishedGame {
     pub promotions: Vec<u32>,
     /// [`moves_digest`] of the moves, which the line of a game built on this one records.
     pub digest: String,
-    /// What the search had from the game of `n − 1` (the line's `prev`); `None` if it had none.
+    /// What the search had from the moves for `n − 1` (the line's `prev`); `None` if it had none.
     pub built_on: Option<BuiltOn>,
 }
 
-/// What a search had from the game of `n − 1`, as its line records it: a seed (the game's score), and a ceiling and a
-/// prime formula too if the game was proven.
+/// What a search had from the moves for `n − 1`, as its line records it: a seed (their score), and a ceiling and a
+/// prime formula too if the moves were proven.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BuiltOn {
     pub score: u64,
-    /// The game was optimal, given what it assumed (a completed game, or the table's): not the best game of an
+    /// The moves were optimal, given what they assumed (a completed line, or the table's): not the best moves of an
     /// unfinished search.
     pub proven: bool,
 }
@@ -371,8 +372,8 @@ pub struct BuiltOn {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Contents {
     pub games: BTreeMap<u32, StoredGame>,
-    /// Every incomplete line that records its game, by n, in the order of the file (an n can have several, and a
-    /// completed game as well: a search stopped, then resumed).  An incomplete line without the game (one made by
+    /// Every incomplete line that records its moves, by n, in the order of the file (an n can have several, and a
+    /// completed line as well: a search stopped, then resumed).  An incomplete line without the moves (one made by
     /// hand) counts in `incomplete_lines` and `runs` only.
     pub unfinished: BTreeMap<u32, Vec<UnfinishedGame>>,
     /// For each n whose search was stopped by a limit and not yet completed: how many invocations its
@@ -429,7 +430,7 @@ struct Entry {
     recorded: (Proof, Assumptions),
     /// A repeat's record of the game it repeats.
     same_search: Option<SameSearch>,
-    /// The known source the line's game, or its proof, comes from.
+    /// The known source the line's moves, or its proof, come from.
     known: Option<Cite>,
     /// The nodes the near-repeat cut cut (`stats.near_repeat_cut`), on a line of a search armed with it.
     near_repeat_cut: Option<u64>,
@@ -438,7 +439,7 @@ struct Entry {
 /// A line of a results file.
 enum Line {
     Completed(Box<Entry>),
-    /// A search a limit stopped, with the number of invocations it records and its best game, if the line has one.
+    /// A search a limit stopped, with the number of invocations it records and its best moves, if the line has one.
     Incomplete {
         n: u32,
         invocations: u32,
@@ -534,7 +535,7 @@ fn parse_source(text: &str) -> Option<PrevSource> {
     PrevSource::ALL.into_iter().find(|s| s.as_str() == text)
 }
 
-/// The best game an incomplete line records (`best_so_far`, `moves`, `promotions`), if it has one.  The solver always
+/// The best moves an incomplete line records (`best_so_far`, `moves`, `promotions`), if it has one.  The solver always
 /// writes it; a line made by hand may lack it, and then counts but seeds nothing.
 fn parse_unfinished(f: &Fields, n: u32, line: usize) -> Result<Option<UnfinishedGame>, String> {
     let Some(best) = f.0.get("best_so_far").filter(|best| !matches!(best, Json::Null)) else { return Ok(None) };
@@ -553,9 +554,9 @@ fn parse_unfinished(f: &Fields, n: u32, line: usize) -> Result<Option<Unfinished
     Ok(Some(UnfinishedGame { n, line, score, moves, promotions, digest, built_on }))
 }
 
-/// The checks of an incomplete line's game: legal, scoring the `best_so_far` it records (it need not be over, which
-/// only a completed game claims), promotions that are moves in ascending order, and no more than the table's
-/// score where the table has the game.
+/// The checks of an incomplete line's moves: legal, scoring the `best_so_far` it records (it need not be over, which
+/// only a completed line claims), promotions that are moves in ascending order, and no more than the table's
+/// score where the table has an entry.
 fn check_unfinished(game: &UnfinishedGame, optimal: &Optimal) -> Result<(), String> {
     let replayed = replay(game.n, &game.moves)?;
     if replayed != game.score {
@@ -633,7 +634,7 @@ fn parse_line(json: &Json, line: usize) -> Result<Line, String> {
             Some(Named { source, record })
         }
     };
-    let proof = f.proof("proof")?.ok_or("a completed game needs a \"proof\"")?;
+    let proof = f.proof("proof")?.ok_or("a completed line needs a \"proof\"")?;
     Ok(Line::Completed(Box::new(Entry {
         line,
         n,
@@ -652,7 +653,7 @@ fn parse_line(json: &Json, line: usize) -> Result<Line, String> {
     })))
 }
 
-/// A completed game of the committed chain, or of any results file, as `taxman solve --use-prev` takes it ([`Known`]):
+/// A completed line of the committed chain, or of any results file, as `taxman solve --use-prev` takes it ([`Known`]):
 /// read, not checked again (`taxman verify-results` and `solver/tools/check_results.py` check the file).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommittedGame {
@@ -663,13 +664,13 @@ pub struct CommittedGame {
     pub assumes: Assumptions,
 }
 
-/// The completed games of the results file at `path` (a gzip file if its name ends in `.gz`), by n, all of them read
-/// now ([`Known::load`] reads a gzip file as its games are asked for instead).  The lines of unfinished searches are
+/// The completed lines of the results file at `path` (a gzip file if its name ends in `.gz`), by n, all of them read
+/// now ([`Known::load`] reads a gzip file as its lines are asked for instead).  The lines of unfinished searches are
 /// passed over.
 ///
 /// # Errors
 ///
-/// If the file cannot be read, a line is not a line of schema [`SCHEMA`], or two lines hold a completed game of one
+/// If the file cannot be read, a line is not a line of schema [`SCHEMA`], or two completed lines have one
 /// n.
 pub fn committed_games(path: &Path) -> Result<BTreeMap<u32, CommittedGame>, String> {
     let text = read_results_text(path)?;
@@ -680,22 +681,22 @@ pub fn committed_games(path: &Path) -> Result<BTreeMap<u32, CommittedGame>, Stri
         if let Line::Completed(entry) = parse_line(&json, i + 1).map_err(at)? {
             let (n, game) = committed_game(*entry);
             if games.insert(n, game).is_some() {
-                return Err(at(format!("a second completed game of n={n}")));
+                return Err(at(format!("a second completed line for n={n}")));
             }
         }
     }
     Ok(games)
 }
 
-/// The n and the committed game of a completed line.
+/// The n and the committed result of a completed line.
 fn committed_game(entry: Entry) -> (u32, CommittedGame) {
     let Entry { n, score, moves, recorded: (proof, assumes), .. } = entry;
     (n, CommittedGame { score, moves, proof, assumes })
 }
 
-/// Reads line number `number` of a gzip file of the committed chain, as [`crate::game::Text`] does: the n and the game of
-/// a completed line, none for an unfinished search's, or the reason the line is no line of schema [`SCHEMA`] (it starts
-/// with ": ", as `Text`'s errors do).
+/// Reads line number `number` of a gzip file of the committed chain, as [`crate::game::Text`] does: the n and the
+/// result of a completed line, none for an unfinished search's, or the reason the line is no line of schema [`SCHEMA`]
+/// (it starts with ": ", as `Text`'s errors do).
 pub(crate) fn parse_committed(number: usize, raw: &str) -> Result<Option<(u32, CommittedGame)>, String> {
     let json = Json::parse(raw).map_err(|e| format!(": {e}"))?;
     match parse_line(&json, number).map_err(|e| format!(": {e}"))? {
@@ -719,7 +720,7 @@ pub fn read_results(text: &str, optimal: &Optimal, threads: usize) -> Result<Con
 }
 
 /// [`read_results`] with the known sources `known` (the table, the committed chain, the bounds store) for the lines
-/// that cite them ([`Known::check_cite`]) and the games of `n − 1` taken from them.
+/// that cite them ([`Known::check_cite`]) and the moves for `n − 1` taken from them.
 pub fn read_results_with(text: &str, known: &Known, threads: usize) -> Result<Contents, String> {
     let optimal = known.optimal();
     let mut contents = Contents::default();
@@ -759,7 +760,7 @@ pub fn read_results_with(text: &str, known: &Known, threads: usize) -> Result<Co
     for pair in entries.windows(2) {
         if pair[0].n == pair[1].n {
             return Err(format!(
-                "lines {} and {} both hold a completed game of n={}",
+                "lines {} and {} are both completed lines for n={}",
                 pair[0].line, pair[1].line, pair[0].n
             ));
         }
@@ -855,20 +856,20 @@ pub fn read_results_file_with(path: &Path, known: &Known, threads: usize) -> Res
     read_results_with(&text, known, threads).map_err(|e| format!("{}: {e}", path.display()))
 }
 
-/// The game of `n − 1` that a line was built from, as far as it is known.  For a game of the table that the
+/// The moves for `n − 1` that a line was built from, as far as they are known.  For moves of the table that the
 /// table at hand does not have (a line made with a longer table), the line's own record stands in for its score,
 /// and its moves are not known.
 struct Pred<'a> {
     score: u64,
     moves: Option<&'a [u32]>,
-    /// How the game's optimality is established, as the line records it: the proof of the file's completed game or of
-    /// the committed chain's, `known` for a board of the store; none for the table's and for an unfinished
+    /// How the optimality of the moves is established, as the line records it: the proof of the file's completed line
+    /// or of the committed chain's, `known` for a board of the store; none for the table's and for an unfinished
     /// search's.
     proof: Option<Proof>,
     assumes: Assumptions,
     whence: String,
-    /// Whether the game is optimal, given what it assumes (the file's completed game, the table's); false for the
-    /// best game of an unfinished search, which a line can have been seeded with and nothing more.
+    /// Whether the moves are optimal, given what they assume (the file's completed line, the table's); false for the
+    /// best moves of an unfinished search, which a line can have been seeded with and nothing more.
     proven: bool,
 }
 
@@ -896,7 +897,7 @@ fn contradiction(e: &Entry) -> Option<String> {
     if repeat && e.setup.is_some_and(|setup| setup.cap.is_some()) {
         return Some("a repeat game whose \"setup\" has a cap, which only a search has".to_owned());
     }
-    // A game that set no board up (a prime game, a known one) has no `in_the_bag`.
+    // A line that set no board up (a prime game, a known one) has no `in_the_bag`.
     if e.in_the_bag.is_some() == matches!(e.method, Method::Prime | Method::Known) {
         let with = if e.in_the_bag.is_some() { "with" } else { "without" };
         return Some(format!(
@@ -910,7 +911,7 @@ fn contradiction(e: &Entry) -> Option<String> {
         return Some(format!("a {method} game with \"stats.near_repeat_cut\", which only a search has"));
     }
     // A citation of a known source: a known game has one; a search has one only when the store's bound, not the chain's
-    // ceiling, ended it, so it did not reach that ceiling, and the bound is the store's, with no game of the store's.
+    // ceiling, ended it, so it did not reach that ceiling, and the bound is the store's, with no moves of the store's.
     match (&e.known, e.method) {
         (None, Method::Known) => return Some("a known game that cites no source (\"known\")".to_owned()),
         (Some(_), method) if !matches!(method, Method::Known | Method::Search | Method::Start) => {
@@ -920,10 +921,10 @@ fn contradiction(e: &Entry) -> Option<String> {
             ));
         }
         (Some(Cite::Bounds { lower: Some(_), .. }), Method::Search | Method::Start) => {
-            return Some("a searched game that cites a game of the store, which only a known game does".to_owned());
+            return Some("a searched game that cites moves of the store, which only a known game does".to_owned());
         }
         (Some(Cite::Bounds { lower: None, .. }), Method::Known) => {
-            return Some("a known game that cites the store without the lower bound whose game it plays".to_owned());
+            return Some("a known game that cites the store without the lower bound whose moves it plays".to_owned());
         }
         (Some(Cite::Optimal | Cite::Strict), Method::Search | Method::Start) => {
             return Some(
@@ -1062,26 +1063,26 @@ fn check_entry(
         })
     });
 
-    // The chain, against whichever game of n − 1 there is: both bounds are theorems about optimal games.
+    // The chain, against whichever moves for n − 1 there are: both bounds are theorems about optimal moves.
     if let Some((before, whence)) = in_file.as_ref().or(in_optimal.as_ref()).map(|p| (p.score, &p.whence)) {
         let ceiling = before + u64::from(n);
         if e.score < before {
             return Err(fail(format!(
-                "scores {}, less than the {before} of n − 1 ({whence}); a game of n − 1 is a game of n, so one of \
+                "scores {}, less than the {before} of n − 1 ({whence}); moves for n − 1 are moves for n, so one of \
                  the two is not optimal",
                 e.score
             )));
         }
         if e.score > ceiling {
             return Err(fail(format!(
-                "scores {}, more than n + score(n − 1) = {ceiling} (n − 1 from {whence}), which proves that the game \
-                 of n − 1 is not optimal",
+                "scores {}, more than n + score(n − 1) = {ceiling} (n − 1 from {whence}), which proves that the moves \
+                 for n − 1 are not optimal",
                 e.score
             )));
         }
     }
 
-    // The game of n − 1 that a known source holds, for a line that was built on it.
+    // The moves for n − 1 that a known source holds, for a line that was built on it.
     let from_known: Option<KnownGame> = match &e.named {
         Some(Named { source: source @ (PrevSource::Strict | PrevSource::Bounds), .. }) => {
             let origin = if *source == PrevSource::Strict { Origin::Strict } else { Origin::Bounds };
@@ -1091,13 +1092,13 @@ fn check_entry(
         _ => None,
     };
 
-    // The game the line was built from, and the line's record of it.
+    // The moves the line was built from, and the line's record of it.
     let pred = match &e.named {
         None => None,
         Some(named) => {
             let record = &named.record;
             let pred = match named.source {
-                // The record of a game of this run or file with no proof is the best game of an unfinished search
+                // The record of moves of this run or file with no proof is the best moves of an unfinished search
                 // (older files have them): any earlier line of n − 1 with its score and moves.
                 PrevSource::Run | PrevSource::Results if record.proof.is_none() => {
                     let earlier =
@@ -1105,7 +1106,7 @@ fn check_entry(
                     let found = n.checked_sub(1).and_then(|before| unfinished.get(&before)?.iter().find(earlier));
                     let g = found.ok_or_else(|| {
                         fail(
-                            "it was built on the best game of an unfinished search of n − 1, and no earlier line of \
+                            "it was built on the best moves of an unfinished search of n − 1, and no earlier line of \
                              the file records one with that score and those moves"
                                 .to_owned(),
                         )
@@ -1120,7 +1121,7 @@ fn check_entry(
                     }
                 }
                 PrevSource::Run | PrevSource::Results => in_file.ok_or_else(|| {
-                    fail("it was built from the game of n − 1 in this file, which the file does not hold".to_owned())
+                    fail("it was built from the moves for n − 1 in this file, which the file does not hold".to_owned())
                 })?,
                 PrevSource::Optimal => in_optimal.unwrap_or_else(|| Pred {
                     score: named.record.score,
@@ -1133,7 +1134,7 @@ fn check_entry(
                 PrevSource::Strict | PrevSource::Bounds => {
                     let game = from_known.as_ref().ok_or_else(|| {
                         let whence = if named.source == PrevSource::Strict { Origin::Strict } else { Origin::Bounds };
-                        fail(format!("it was built on the game of n − 1 of {}, which has none", whence.whence()))
+                        fail(format!("it was built on the moves for n − 1 of {}, which has none", whence.whence()))
                     })?;
                     Pred {
                         score: game.score,
@@ -1145,10 +1146,10 @@ fn check_entry(
                     }
                 }
             };
-            // A record of the proof `known` says where the run got its copy of the game of n − 1 (a known source,
-            // `--use-prev`), not how that game is proven.  When the lines of such a run are appended to the file it
-            // drew on, the game of n − 1 is the file's own line, which carries and checks its own proof, and this
-            // line's search depends only on that game's score and moves, which must still match, and on what it
+            // A record of the proof `known` says where the run got its copy of the moves for n − 1 (a known source,
+            // `--use-prev`), not how those moves are proven.  When the lines of such a run are appended to the file it
+            // drew on, the moves for n − 1 are the file's own line, which carries and checks its own proof, and this
+            // line's search depends only on their score and moves, which must still match, and on what it
             // assumes, which must too.  So the record's proof need not be the line's, if the line is the file's.
             let known_copy =
                 record.proof == Some(Proof::Known) && matches!(named.source, PrevSource::Run | PrevSource::Results);
@@ -1158,14 +1159,14 @@ fn check_entry(
                 && (record.proof == pred.proof || known_copy)
                 && record.assumes == pred.assumes;
             if !same {
-                return Err(fail(format!("its record of the game of n − 1 does not match {}", pred.whence)));
+                return Err(fail(format!("its record of the moves for n − 1 does not match {}", pred.whence)));
             }
-            // A game of n − 1 is a game of n, so no game of n scores less than the best game of an unfinished search
+            // Moves for n − 1 are moves for n, so no moves for n score less than the best moves of an unfinished search
             // of n − 1.  (The score is not bounded above by it: it is not known to be optimal.)
             if !pred.proven && e.score < pred.score {
                 return Err(fail(format!(
-                    "scores {}, less than the {} of the unfinished search of n − 1 it was built on ({}); a game of \
-                     n − 1 is a game of n, so this one is not optimal",
+                    "scores {}, less than the {} of the unfinished search of n − 1 it was built on ({}); moves for \
+                     n − 1 are moves for n, so this one is not optimal",
                     e.score, pred.score, pred.whence
                 )));
             }
@@ -1173,7 +1174,7 @@ fn check_entry(
         }
     };
 
-    // The line's own arithmetic.  What rests on the game of n − 1 (the ceiling, the prime formula) needs it proven.
+    // The line's own arithmetic.  What rests on the moves for n − 1 (the ceiling, the prime formula) needs it proven.
     let sum: u64 = e.promotions.iter().map(|&p| u64::from(p)).sum();
     let proven_pred = pred.as_ref().filter(|p| p.proven);
     let prev_score = proven_pred.map(|p| p.score);
@@ -1191,7 +1192,7 @@ fn check_entry(
     if let Some(cap) = cap {
         if sum > cap {
             return Err(fail(format!(
-                "the promotions' {sum} exceed the cap {cap}, so the game of n − 1 is not optimal"
+                "the promotions' {sum} exceed the cap {cap}, so the moves for n − 1 are not optimal"
             )));
         }
         // in_the_bag is the score less the promotions, and the ceiling `cap` is n + score(n − 1) − in_the_bag.
@@ -1208,7 +1209,7 @@ fn check_entry(
     }
     let replaced = replaced_by_prime(n);
     if e.method == Method::Prime && prev_score.is_some_and(|before| e.score + replaced != before + u64::from(n)) {
-        return Err(fail(format!("a prime game scores n + score(n − 1) − {replaced}, and this one does not")));
+        return Err(fail(format!("a prime line scores n + score(n − 1) − {replaced}, and this one does not")));
     }
 
     // A line that cites a known source is proven by it, and assumes what the source's lines make it assume.
@@ -1218,14 +1219,14 @@ fn check_entry(
     };
     let proof = match cited {
         Some(_) => Proof::Known,
-        None => Proof::of(e.method, true, e.reached_cap).expect("a completed game has a proof"),
+        None => Proof::of(e.method, true, e.reached_cap).expect("a completed line has a proof"),
     };
     if proof.rests_on_prev() && pred.is_none() {
-        return Err(fail(format!("its proof ({}) rests on a game of n − 1 that it does not name", proof.as_str())));
+        return Err(fail(format!("its proof ({}) rests on moves for n − 1 that it does not name", proof.as_str())));
     }
     if proof.rests_on_prev() && proven_pred.is_none() {
         return Err(fail(format!(
-            "its proof ({}) rests on the game of n − 1, which it records as the best game of an unfinished search",
+            "its proof ({}) rests on the game of n − 1, which it records as the best moves of an unfinished search",
             proof.as_str()
         )));
     }
@@ -1264,7 +1265,7 @@ fn check_entry(
 // ---------------------------------------------------------------------------------------------------------
 // The results file of a run
 
-/// A results file being appended to: one JSON object per line, as games finish.  Only completed games count as
+/// A results file being appended to: one JSON object per line, as results finish.  Only completed lines count as
 /// done.  Opening it locks it and checks it ([`read_results`]).
 pub struct ResultsFile {
     path: PathBuf,
@@ -1275,7 +1276,7 @@ pub struct ResultsFile {
 
 impl ResultsFile {
     /// Opens (creating if need be) the file, locks it against every other process (the lock goes when the file is
-    /// dropped or the process ends, however it ends), and checks it, with `optimal` for the games of `n − 1` that
+    /// dropped or the process ends, however it ends), and checks it, with `optimal` for the moves for `n − 1` that
     /// came from it.  A torn last line is cut off.
     ///
     /// Two runs appending to one file would both solve the games it lacks and both append them, leaving two lines
@@ -1303,12 +1304,12 @@ impl ResultsFile {
         Ok(ResultsFile { path: path.to_owned(), file, contents })
     }
 
-    /// The completed game for `n`, if the file has one.
+    /// The completed line for `n`, if the file has one.
     pub fn completed(&self, n: u32) -> Option<&StoredGame> {
         self.contents.games.get(&n)
     }
 
-    /// The completed games of the file, by n.
+    /// The completed lines of the file, by n.
     pub fn games(&self) -> impl Iterator<Item = &StoredGame> {
         self.contents.games.values()
     }
@@ -1363,7 +1364,7 @@ impl ResultsFile {
         Ok(())
     }
 
-    /// Records a game that failed a check after it was found, with the reason, in [`rejected_path`].  Returns
+    /// Records a result that failed a check after it was found, with the reason, in [`rejected_path`].  Returns
     /// that path.
     pub fn reject(&self, result: &GameResult, reason: &str) -> Result<PathBuf, String> {
         let path = rejected_path(&self.path);
@@ -1386,7 +1387,7 @@ impl Drop for ResultsFile {
     }
 }
 
-/// Where the games that failed a check go: `<results>.rejected.jsonl`, with a `.jsonl` ending of the results
+/// Where the results that failed a check go: `<results>.rejected.jsonl`, with a `.jsonl` ending of the results
 /// file dropped (`default.jsonl` → `default.rejected.jsonl`).
 pub fn rejected_path(results: &Path) -> PathBuf {
     sibling_path(results, "rejected")
@@ -1612,7 +1613,7 @@ mod tests {
 
     #[test]
     fn proofs_and_assumptions() {
-        // A search whose starting game reached a ceiling (start) is proven as a search is.
+        // A search whose starting moves reached a ceiling (start) is proven as a search is.
         for method in [Method::Search, Method::Start] {
             assert_eq!(Proof::of(method, false, false), None);
             assert_eq!(Proof::of(method, true, true), Some(Proof::Cap));
@@ -1620,8 +1621,8 @@ mod tests {
         }
         assert!(Proof::ALL.iter().all(|&p| Proof::parse(p.as_str()) == Some(p)));
         let names = |assumes: Assumptions| assumes.into_iter().collect::<Vec<_>>();
-        // Inherited only by a proof that rests on the game of n − 1.
-        assert_eq!(assumed_optimal(1300), "the game of 1300 in results/optimal.jsonl.gz is optimal");
+        // Inherited only by a proof that rests on the moves for n − 1.
+        assert_eq!(assumed_optimal(1300), "the moves recorded for game 1300 in results/optimal.jsonl.gz are optimal");
         let prev = Assumptions::from([assumed_optimal(1300)]);
         assert_eq!(names(assumptions_of(Proof::Cap, Some(&prev))), [assumed_optimal(1300)]);
         assert_eq!(names(assumptions_of(Proof::PrimeFormula, Some(&prev))), [assumed_optimal(1300)]);
@@ -1632,7 +1633,8 @@ mod tests {
         assert_eq!(Proof::of(Method::Repeat, true, false), Some(Proof::SameSearch));
         let settled: Vec<Proof> = Proof::ALL.into_iter().filter(|p| p.settles_search()).collect();
         assert_eq!(settled, [Proof::Cap, Proof::Exhausted, Proof::SameSearch, Proof::Known]);
-        // A game taken from a known source is proven by it, and rests on no other game; what it assumes is the source's.
+        // Moves taken from a known source are proven by it, and rest on no other moves; what it assumes is the
+        // source's.
         assert_eq!(Proof::of(Method::Known, true, false), Some(Proof::Known));
         assert!(!Proof::Known.rests_on_prev() && !Proof::Known.rests_on_another_game());
         assert_eq!(assumed_u(4501), "statement U holds at n=4501");
@@ -1688,7 +1690,7 @@ mod tests {
         if let Json::Obj(pairs) = &mut prev {
             pairs.iter_mut().filter(|(k, _)| k == "moves_digest").for_each(|(_, v)| *v = Json::from("0000"));
         }
-        refused(10, with(&lines[10], "prev", prev), "record of the game of n − 1 does not match line 10");
+        refused(10, with(&lines[10], "prev", prev), "record of the moves for n − 1 does not match line 10");
         refused(11, with(&lines[11], "assumes", Json::array([assumed_optimal(11)])), "records the assumptions");
         // A score that is not the table's: here the table is wrong about game 12, which the check cannot tell.
         let other = Optimal::from_json(&Json::parse(r#"[{"n":12,"score":51,"moves":[]}]"#).unwrap()).unwrap();
@@ -1711,7 +1713,9 @@ mod tests {
         unreadable(11, unversioned, "missing \"schema\"");
         let mut twice = lines.clone();
         twice.push(lines[4].clone());
-        assert!(read_results(&text(&twice), Optimal::built_in(), 1).unwrap_err().contains("lines 5 and 13 both hold"));
+        assert!(read_results(&text(&twice), Optimal::built_in(), 1)
+            .unwrap_err()
+            .contains("lines 5 and 13 are both completed lines"));
     }
 
     /// An open results file is locked: opening it again (from this process or another) is refused until it is
@@ -1753,7 +1757,7 @@ mod tests {
             let err = read_results(&line, &optimal.unwrap(), 1).unwrap_err();
             assert!(err.starts_with("line 1 (n=12)") && err.contains(expected), "{err}");
         }
-        // Without a game of 11 the line cannot stand: it names one from this file.
+        // Without a line for 11 the line cannot stand: it names one from this file.
         let err = read_results(&line, Optimal::built_in(), 1).unwrap_err();
         assert!(err.contains("which the file does not hold"), "{err}");
     }

@@ -9,29 +9,29 @@ For every line:
   format      the fields a line of its side and rule has and no others; ascending `rests_on`; a repeat's two bags
   improve     the bound improves the best of its board and side so far (lines are appended, never changed), and a lower
               bound never passes an upper one
-  game        a lower bound's game replays under the rules, is over, opens with the largest prime <= n, and scores the
-              value of the line.  A game given as `moves` is replayed as it is.  A game given as `promotions` cannot be
-              rebuilt without the frame model, so the Rust program writes it (`ledger games FILE`) and this referee
+  moves       a lower bound's moves replay under the rules, are over, open with the largest prime <= n, and score the
+              value of the line.  Moves given as `moves` are replayed as they are.  Moves given as `promotions` cannot
+              be rebuilt without the frame model, so the Rust program writes them (`ledger games FILE`) and this referee
               replays what it wrote (--games): the moves must contain the promotions and score the line's value, so a
-              line whose promotions the frame model cannot play is refused by the Rust verifier, and a game that is not
-              a game is refused here.  A game of a monotone, ceiling or prime relation is not written but cited
-              (`from` and `from_value`, no game): it is the construction of the lemma (written out again here) applied
-              to the game of the line before it that gives that board that value, and is replayed in turn
+              line whose promotions the frame model cannot play is refused by the Rust verifier, and moves that are not
+              legal are refused here.  The moves of a monotone, ceiling or prime relation are not written but cited
+              (`from` and `from_value`, no moves): they are the construction of the lemma (written out again here)
+              applied to the moves of the line before it that gives that board that value, and are replayed in turn
   relation    an upper bound by monotone, ceiling, prime or repeat is at least what the arithmetic of the lemma gives
               from the value of the bound it cites; the cited bound is a line before it (a bound of that board at most
-              that value) or a game of the chain (results/optimal.jsonl.gz, whose score is exact); and it rests on
+              that value) or a line of the chain (results/optimal.jsonl.gz, whose score is exact); and it rests on
               every board that cited bound rests on (and, for a repeat, on its own board)
-  given       a given upper bound has the given game as the lower bound, at its value
-and across the file: where the chain has a game of a board, the file's bounds of it enclose the chain's score.
+  given       a given upper bound has the given moves as the lower bound, at its value
+and across the file: where the chain has a line for a board, the file's bounds of it enclose the chain's score.
 
 What this referee takes on the record of the lines, because only the Rust program can compute it: that a root bound is
 the root's GF(2) bound, that a repeat's bags are the boards' and that its two boards pose the same search problem
 (`ledger verify-bounds` recomputes all three), and the bounds of searches (`exhausted`, `dual`, `floor`), the Lagrangian
-bounds over nogoods (`nogoods`) and given games, which it lists.
+bounds over nogoods (`nogoods`) and given moves, which it lists.
 
 usage: check_bounds.py FILE [--games GAMES] [--strict FILE]
   GAMES  the output of `ledger games FILE` (a file, or - for the standard input)
-The exit status is 1 if any check fails, including a lower bound whose game could not be replayed.
+The exit status is 1 if any check fails, including a lower bound whose moves could not be replayed.
 """
 import argparse
 import importlib.util
@@ -92,7 +92,7 @@ def upper_by(referee, rule, source, target, value, bags=None):
 
 
 def carries(referee, rule, source, target):
-    """Whether the relation `rule` (named for the lemma that carries a game) carries a game from the board `source` to
+    """Whether the relation `rule` (named for the lemma that carries moves) carries moves from the board `source` to
     the board `target`: monotone up a board to a composite, the ceiling down a board from a composite, the prime
     formula across a prime, either way (N3 to N5, docs/theory/neighbors.md)."""
     prime = referee.is_prime
@@ -115,18 +115,18 @@ def complete(n, moves, divisors):
         for d in divisors.of(m):
             pot[d] = False
         pot[m] = False
-    game = list(moves)
+    carried = list(moves)
     for m in range(n, 1, -1):
         if pot[m] and any(pot[d] for d in divisors.of(m)):
             for d in divisors.of(m):
                 pot[d] = False
             pot[m] = False
-            game.append(m)
-    return game
+            carried.append(m)
+    return carried
 
 
 def carry_game(referee, rule, source, n, moves, divisors):
-    """The game of the board n that the relation `rule` makes of the finished game `moves` of the board `source`."""
+    """The moves for the board n that the relation `rule` makes of the finished `moves` of the board `source`."""
     if rule == "monotone":
         return complete(n, moves, divisors)
     if rule == "ceiling":
@@ -168,18 +168,18 @@ def shape_problems(referee, row):
     if side == "lower":
         sets, moves, cited = row.get("promotions"), row.get("moves"), row.get("from_value")
         if [sets, moves, cited].count(None) != 2:
-            found.append(f"{where}: it needs its game as promotions or as moves, or the game it is carried from")
+            found.append(f"{where}: it needs its moves as promotions or as moves, or the moves it is carried from")
         if sets is not None and not (is_list_of_ints(sets) and sets == sorted(set(sets))):
             found.append(f"{where}: the promotions are not ascending numbers")
         if moves is not None and not is_list_of_ints(moves):
             found.append(f"{where}: the moves are not numbers")
         if cited is not None and not (is_int(cited) and cited >= 0 and is_int(source) and carries(referee, rule, source, n)):
-            found.append(f"{where}: it cites a game, and that relation does not carry a game from its board to this one")
+            found.append(f"{where}: it cites moves, and that relation does not carry moves from its board to this one")
         if any(key in row for key in upper_fields if key != "from_value"):
             found.append(f"{where}: it has fields of an upper bound")
         return found
     if "promotions" in row or "moves" in row:
-        found.append(f"{where}: it has a game")
+        found.append(f"{where}: it has moves")
     if ("from_value" in row) != relation or ("bag" in row) != (rule == "repeat") or ("from_bag" in row) != ("bag" in row):
         found.append(f"{where}: it needs the value it came from (a repeat also the two bags), and only a relation has them")
     if "checkpoint" in row and (rule != "dual" or not isinstance(row["checkpoint"], str)):
@@ -206,7 +206,7 @@ class Chain:
 
     def __init__(self, referee, chain_scores):
         self.referee = referee
-        self.chain = chain_scores  # n -> score of the committed chain's games
+        self.chain = chain_scores  # n -> score of the committed chain's lines
         self.lower = {}  # n -> [value], ascending: each improves on the one before
         self.upper = {}  # n -> [(value, rests_on)]
 
@@ -217,7 +217,7 @@ class Chain:
         return min((v for v, _ in self.upper.get(n, ())), default=None)
 
     def cites(self, n, at_most):
-        """What the bounds of board `n` at most `at_most` rest on: lines before this one, and the chain's game."""
+        """What the bounds of board `n` at most `at_most` rest on: lines before this one, and the chain's line."""
         found = [rests for value, rests in self.upper.get(n, ()) if value <= at_most]
         if n in self.chain and self.chain[n] <= at_most:
             found.append([n])
@@ -233,7 +233,7 @@ class Chain:
             if upper is not None and upper < value:
                 return [f"the lower bound {value} is above the upper bound {upper}"]
             if "from_value" in row and row["from_value"] not in self.lower.get(row["from"], ()):
-                return [f"no line before it gives a game of board {row['from']} worth {row['from_value']}"]
+                return [f"no line before it gives moves for board {row['from']} worth {row['from_value']}"]
             self.lower.setdefault(n, []).append(value)
             return []
         best, lower = self.best_upper(n), self.best_lower(n)
@@ -242,7 +242,7 @@ class Chain:
         if lower is not None and lower > value:
             return [f"the upper bound {value} is below the lower bound {lower}"]
         if rule == "given" and lower != value:
-            return ["a given bound needs the given game as the lower bound, at the same value"]
+            return ["a given bound needs the given moves as the lower bound, at the same value"]
         if rule in RELATIONS:
             problems = self.follows(row)
             if problems:
@@ -264,7 +264,7 @@ class Chain:
             ]
         cites = self.cites(source, from_value)
         if not cites:
-            return [f"no line before it, and no game of the chain, bounds board {source} by {from_value}"]
+            return [f"no line before it, and no line of the chain, bounds board {source} by {from_value}"]
         own = [n] if rule == "repeat" else []
         if not any(set(rests) | set(own) <= set(row["rests_on"]) for rests in cites):
             return [
@@ -287,7 +287,7 @@ class Chain:
 
 
 def chain_scores(path, referee):
-    """{n: score} of the completed games of a results file, which the referee reads (a .gz file through gzip)."""
+    """{n: score} of the completed lines of a results file, which the referee reads (a .gz file through gzip)."""
     scores = {}
     for text in referee.read_text(path).split("\n"):
         if text.strip():
@@ -353,7 +353,7 @@ def main():
     largest = max((row["n"] for _, row in rows if row["side"] == "lower"), default=2)
     divisors = referee.Divisors(largest)
     replayed = Counter()
-    # The games that other lines cite, kept when they have replayed without a problem.
+    # The moves that other lines cite, kept when they have replayed without a problem.
     cited = {(row["from"], row["from_value"]) for _, row in rows if row["side"] == "lower" and "from_value" in row}
     kept = {}
     for number, row in rows:
@@ -362,26 +362,26 @@ def main():
         n, value = row["n"], row["value"]
 
         def fail(message):
-            problems.append(f"line {number} (n={n}): the game: {message}")
+            problems.append(f"line {number} (n={n}): the moves: {message}")
 
         if "moves" in row:
             kind, moves = "moves", row["moves"]
         elif "promotions" in row:
             kind, moves = "promotions", games.get((n, value))
             if moves is None:
-                fail("it is a promotion set and --games has no game of it; it was not replayed")
+                fail("it is a promotion set and --games has no moves for it; it was not replayed")
                 continue
             if not set(row["promotions"]) <= set(moves):
-                fail("the promotions are not all moves of the game")
+                fail("the promotions are not all among the moves")
         else:
             kind, source = "carried", kept.get((row["from"], row["from_value"]))
             if source is None:
-                fail(f"it is carried from a game of board {row['from']} worth {row['from_value']} that was not replayed")
+                fail(f"it is carried from moves for board {row['from']} worth {row['from_value']}, not replayed")
                 continue
             try:
                 moves = carry_game(referee, row["rule"], row["from"], n, source, divisors)
             except ValueError as e:
-                fail(f"carried from the game of board {row['from']}: {e}")
+                fail(f"carried from the moves for board {row['from']}: {e}")
                 continue
         score, found = referee.finished_problems(n, moves, divisors)
         if score is None:
@@ -400,8 +400,8 @@ def main():
     print(f"{args.file}: {len(lines)} lines for {len({row['n'] for row in lines})} boards")
     for side in ("lower", "upper"):
         print(f"  {side} bounds: " + ", ".join(f"{rule} {k}" for (s, rule), k in sorted(counts.items()) if s == side))
-    print(f"  games replayed: {sum(replayed.values())} ({replayed['promotions']} from promotion sets, "
-          f"{replayed['moves']} from moves, {replayed['carried']} carried from the game of another line)")
+    print(f"  moves replayed: {sum(replayed.values())} ({replayed['promotions']} from promotion sets, "
+          f"{replayed['moves']} from moves, {replayed['carried']} carried from the moves of another line)")
     best = {}
     for row in lines:
         if row["side"] == "upper":
@@ -414,7 +414,7 @@ def main():
     proven = sorted(n for n, row in best.items() if chain.best_lower(n) == row["value"])
     print(f"  proven (best lower bound = best upper bound): {len(proven)} boards" + (f": {ranges(proven)}" if proven else ""))
     in_chain = len({row["n"] for row in lines} & scores.keys())
-    print(f"  {in_chain} boards of the file are also games of the chain, whose scores its bounds enclose")
+    print(f"  {in_chain} boards of the file are also lines of the chain, whose scores its bounds enclose")
     if problems:
         print(f"{len(problems)} PROBLEMS:")
         for problem in problems[:50]:

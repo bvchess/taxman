@@ -1,10 +1,10 @@
-//! The finder: large neighborhood search (LNS) for a good game, and the thread that runs it beside a long search.
+//! The finder: large neighborhood search (LNS) for good moves, and the thread that runs it beside a long search.
 //!
-//! # The search for a good game
+//! # The search for good moves
 //!
 //! [`Lns`] keeps a random share of an incumbent's promotions fixed, searches the rest exactly as a unit of the engine
-//! ([`run_unit`]), takes any better game, and repeats.  It is not sound: it may miss an optimal game, and nothing it
-//! finds proves anything.  A lower bound needs only a legal game, so a caller offers what it finds as an incumbent,
+//! ([`run_unit`]), takes any better set, and repeats.  It is not sound: it may miss optimal moves, and nothing it
+//! finds proves anything.  A lower bound needs only legal moves, so a caller offers what it finds as an incumbent,
 //! after the checks of [`offer_found`] (the ledger does).  The measurements that chose its defaults are in
 //! solver/docs/design/trust.md.
 //!
@@ -22,7 +22,7 @@
 //! it has any.  The thread ([`beside`]) runs *rounds* of LNS, each with a random seed of its own (the round's number)
 //! for [`ROUND`] at most: the odd rounds start from the survivors of the seeds, one seed after another, if there are
 //! any, the others from the search's incumbent as it is when the round starts, and adopt a better incumbent that the
-//! search finds meanwhile.  A game better than the search's incumbent is offered to the search at once
+//! search finds meanwhile.  A set better than the search's incumbent is offered to the search at once
 //! ([`offer_found`]), through the control, the way a worker's improvement reaches the incumbent; the thread ends when
 //! its budget is spent or the search ends, whichever comes first.
 //!
@@ -46,7 +46,7 @@ use std::time::{Duration, Instant};
 
 /// What a search of one unit came to.
 pub struct Ran<const W: usize> {
-    /// The best game it knows: the incumbent it started from, or better.
+    /// The best set it knows: the incumbent it started from, or better.
     pub set: Bits<W>,
     pub nodes: u64,
     /// The unit's subtree was searched to the end (or the incumbent was proven optimal).
@@ -54,7 +54,7 @@ pub struct Ran<const W: usize> {
 }
 
 /// The engine on one thread searching `unit` from the incumbent `start`, to the end unless `node_limit` or `control`
-/// stops it.  A search of a unit finds the best game below it that beats `start`: a game of its own subtree.
+/// stops it.  A search of a unit finds the best set below it that beats `start`: a set of its own subtree.
 pub fn run_unit<const W: usize>(
     space: &SearchSpace<'_, W>,
     control: &Arc<Control>,
@@ -94,16 +94,16 @@ impl Options {
 
 /// What a search found and what it cost.
 pub struct Outcome<const W: usize> {
-    /// The best game it knows: the incumbent it started from, or better.
+    /// The best set it knows: the incumbent it started from, or better.
     pub set: Bits<W>,
     /// The engine's steps.
     pub nodes: u64,
     /// The units searched, the number of them searched to the end within the step limit, and the number that found a
-    /// better game.
+    /// better set.
     pub units: u64,
     pub finished: u64,
     pub improved: u64,
-    /// The time, on the caller's clock, at which the last better game was found (0 if none was).
+    /// The time, on the caller's clock, at which the last better set was found (0 if none was).
     pub found: f64,
 }
 
@@ -128,8 +128,8 @@ impl<const W: usize> Lns<'_, W> {
 
     /// Searches from the incumbent `start` until `over` says to stop (asked before each unit).  Each unit fixes a
     /// random share of the incumbent's promotions and searches the rest exactly, with every other candidate, for at
-    /// most `unit_nodes` steps; a better game becomes the incumbent.  `control` steers the units (stopping it ends the
-    /// one in progress); `clock` is the caller's seconds so far, read when a better game is found.
+    /// most `unit_nodes` steps; a better set becomes the incumbent.  `control` steers the units (stopping it ends the
+    /// one in progress); `clock` is the caller's seconds so far, read when a better set is found.
     pub fn search(
         &self,
         start: &Bits<W>,
@@ -193,7 +193,7 @@ pub struct Plan<const W: usize> {
     pub after: u64,
     /// The thread's budget, from the moment it starts.
     pub budget: Duration,
-    /// The seeds the search starts from, if it has any (the bounds store's game of the board, then the game of
+    /// The seeds the search starts from, if it has any (the bounds store's moves for the board, then the moves for
     /// `n − 1`): the finder's odd rounds start from what survives of them, in turn (each seed's candidates that can
     /// still be promoted, from the largest down, as a search seeded with it starts), a set that survives of
     /// several seeds once.
@@ -319,7 +319,7 @@ fn rounds<const W: usize>(
         let seed_start = seed_start(&survivors, round);
         let from_seed = seed_start.is_some();
         let mut best = seed_start.unwrap_or_else(incumbent);
-        // What survives of the seed is a game in itself, which the search may not have.
+        // What survives of the seed is a set in itself, which the search may not have.
         if from_seed && !offer(&best, round, true) {
             break;
         }
@@ -390,7 +390,7 @@ mod tests {
 
     /// The best promotion sum of game `n`, from the table.
     fn known(board: &Board<W>) -> u64 {
-        Optimal::built_in().score(board.n()).expect("a known game") - board.in_the_bag
+        Optimal::built_in().score(board.n()).expect("a known entry") - board.in_the_bag
     }
 
     #[test]
@@ -484,8 +484,8 @@ mod tests {
 
     #[test]
     fn the_finder_starts_its_first_round_from_the_seed() {
-        // The seed is the known game's promotions; the incumbent the finder is given is the greedy set, below it.  The
-        // first round starts from what survives of the seed, so the finder reaches the best game at once.
+        // The seed is the promotions of the known moves; the incumbent the finder is given is the greedy set, below it.
+        // The first round starts from what survives of the seed, so the finder reaches the best set at once.
         let board = board(800);
         let seed = board.seed(Optimal::built_in().moves(800).unwrap());
         let (report, control, p) = rounds_for(800, vec![seed], Duration::from_millis(50));

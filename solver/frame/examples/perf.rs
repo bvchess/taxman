@@ -179,9 +179,9 @@ fn setup<const W: usize>(n: u32) -> Prepared<W> {
     Board::<W>::for_n(n).prepare(SearchTactics::default()).expect("prepare")
 }
 
-/// The promotions of the optimal game that can be promoted from the root, one by one from the largest down.
+/// The promotions of the optimal moves that can be promoted from the root, one by one from the largest down.
 fn seed<const W: usize>(p: &Prepared<W>, optimal: &Optimal) -> Bits<W> {
-    let moves = optimal.moves(p.n).unwrap_or_else(|| panic!("no known game for n={} (--known FILE?)", p.n));
+    let moves = optimal.moves(p.n).unwrap_or_else(|| panic!("no known moves for n={} (--known FILE?)", p.n));
     let mut state = p.root;
     moves.iter().copied().filter(|&x| p.candidates.contains(x)).fold(Bits::EMPTY, |set, x| {
         if p.model.promote_in_place(&mut state, x) {

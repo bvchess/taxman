@@ -223,7 +223,7 @@ pub struct SearchResult<const W: usize> {
 /// one, else the search's own; the lowest ceiling counts, see [`Control::set_ceiling`]).  Nothing can beat a set that
 /// reaches it, so the dive is skipped when the best of the greedy set and the seed's survivors does, and the local
 /// search when the incumbent after the dive does: neither could change it as long as the ceiling holds, which the
-/// proof by the ceiling assumes (`solver::conclude` rejects any game above it).  The dive reads the ceiling when it is
+/// proof by the ceiling assumes (`solver::conclude` rejects any score above it).  The dive reads the ceiling when it is
 /// due and the local search before each of its passes, which it ends when its set reaches it, so one given while the
 /// dive or the local search runs counts.
 ///
@@ -247,8 +247,8 @@ pub fn search<const W: usize>(
 /// [`search`] from a *floor* instead of a start incumbent: a search for a promotion set worth more than `floor`, a
 /// promotion sum.  The incumbent it starts from is worth `floor` and is no set, so no start is made (no greedy set,
 /// seed, dive or local search), and nodes are pruned against `floor` as against an incumbent of that worth.  A set
-/// heavier than the floor becomes the incumbent as usual, and is a real game (so a lower bound on the game's optimum).
-/// If the search completes and finds none, no promotion set is heavier than `floor`
+/// heavier than the floor becomes the incumbent as usual, and gives real moves (so a lower bound on the game's
+/// optimum). If the search completes and finds none, no promotion set is heavier than `floor`
 /// ([`SearchResult::floor_held`], the floor lemma (R5), docs/theory/search-rules.md): an upper bound on the game's best
 /// promotion sum, proven by the tree of a search from an incumbent worth `floor`: the proof's, when the floor is P*.
 /// `cap` and `resume` are as for [`search`]; a search that a limit stopped resumes from its checkpoint under the same
@@ -271,7 +271,7 @@ pub fn search_above<const W: usize>(
 
 /// [`search`] with any number of `seeds` (the incumbent starts as the best start of any of them,
 /// [`start_incumbent`]) and the finder of `plan` beside it, if there is one: once the search has taken `plan.after`
-/// steps, a thread of its own looks for a better game than the incumbent and offers it ([`finder`]).  The finder only
+/// steps, a thread of its own looks for a better set than the incumbent and offers it ([`finder`]).  The finder only
 /// offers sets, each after the check of [`offer_found`], so the search stays exhaustive and its answer is the same as
 /// without it; it is not part of what a checkpoint is checked against, so a checkpoint resumes with any finder or none.
 pub fn search_beside<const W: usize>(
@@ -644,7 +644,7 @@ fn write_store<const W: usize>(harvest: &Harvest<W>, path: &Path) {
 ///
 /// A start that reaches the control's ceiling cannot be beaten, so the dive, the local search and the starts not yet
 /// made are skipped: they could not change it if the ceiling holds, as the proof by the ceiling assumes (and
-/// `solver::conclude` rejects any game above it).  The dive is taken only when strictly heavier, and the local search
+/// `solver::conclude` rejects any score above it).  The dive is taken only when strictly heavier, and the local search
 /// keeps only strictly heavier sets, after a first fill that can only add candidates; no promotable set is heavier
 /// than the ceiling.  The ceiling is read when each is due, and by the local search before each pass: the control may
 /// be given a lower one meanwhile.
@@ -718,7 +718,7 @@ pub fn offer_seed<const W: usize>(prepared: &Prepared<W>, control: &Control, see
     offer_set(control, &surviving(prepared, seed))
 }
 
-/// Offers `set`, a game that a finder ([`finder`]) found and claims is worth `claimed`, to the run of `control` as an
+/// Offers `set`, a set that a finder ([`finder`]) found and claims is worth `claimed`, to the run of `control` as an
 /// incumbent, after the checks that a checkpoint's incumbent passes on resuming ([`resume_point`]): it must be a set of
 /// candidates that can be promoted from the root ([`Prepared::can_promote`]) and worth `claimed`.  It then goes the way a
 /// worker's improvement does ([`Control::offer`]), so the run adopts it if it beats the incumbent, and ends if it reaches

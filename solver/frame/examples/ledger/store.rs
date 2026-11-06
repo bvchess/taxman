@@ -14,12 +14,12 @@ use taxman::json::Json;
 
 pub use taxman::store::{is_date, Best, Game, Line, Store};
 
-/// The proven games of the committed chain, or of any results file, at `path`: the games a store's line may cite.
+/// The proven lines of the committed chain, or of any results file, at `path`: the moves a store's line may cite.
 pub fn chain(path: &Path) -> Result<Optimal, String> {
     Optimal::from_json(&Json::Arr(Vec::new()))?.with_results(path)
 }
 
-/// The lines of a store checked one by one against the lines before them, and the chain's proven games
+/// The lines of a store checked one by one against the lines before them, and the chain's proven lines
 /// (`strict`, results/optimal.jsonl.gz: a line may cite a board of the committed chain, whose score is exact).
 pub struct Chain<'a> {
     strict: &'a Optimal,
@@ -42,7 +42,8 @@ impl<'a> Chain<'a> {
         self.upper.get(&n)?.iter().map(|&(value, _)| value).min()
     }
 
-    /// What the bounds of board `n` that are at most `at_most` rest on: the lines before this one, and the chain's game.
+    /// What the bounds of board `n` that are at most `at_most` rest on: the lines before this one, and the chain's
+    /// line.
     fn cites(&self, n: u32, at_most: u64) -> Vec<Vec<u32>> {
         let earlier = self.upper.get(&n).into_iter().flatten().filter(|(value, _)| *value <= at_most);
         let chain = self.strict.score(n).filter(|&score| score <= at_most).map(|_| vec![n]);
@@ -50,8 +51,8 @@ impl<'a> Chain<'a> {
     }
 
     /// Checks `line` against the lines added before it, and adds it.  Its bound must improve the best of its board and
-    /// side; a lower bound may not pass an upper one; a given bound's game is the lower bound at its value; and a
-    /// relation's bound must follow from the bound it cites (a line before it, or a game of the chain) by the
+    /// side; a lower bound may not pass an upper one; a given bound's moves are the lower bound at its value; and a
+    /// relation's bound must follow from the bound it cites (a line before it, or a line of the chain) by the
     /// arithmetic of the lemma, and rest on at least what that bound rests on (and, for a repeat, on its own board).
     /// A line that fails is not added.
     pub fn add(&mut self, line: &Line) -> Result<(), String> {
@@ -120,7 +121,7 @@ impl<'a> Chain<'a> {
         Ok(())
     }
 
-    /// What is wrong between the lines and the chain's games: a board of the chain whose score is outside the file's
+    /// What is wrong between the lines and the chain's lines: a board of the chain whose score is outside the file's
     /// bounds of it.
     pub fn against_chain(&self) -> Vec<String> {
         let mut found = Vec::new();

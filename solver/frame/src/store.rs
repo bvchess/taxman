@@ -5,10 +5,10 @@
 //! writes, checks and extends the store) and by `taxman solve --use-prev` ([`crate::known`], which reads it):
 //!
 //! * the vocabulary of a bound: [`Rule`], how it was derived, and [`Side`];
-//! * the relations between boards, with the arithmetic of the upper bounds ([`upper_by`]) and the games that carry a
+//! * the relations between boards, with the arithmetic of the upper bounds ([`upper_by`]) and the moves that carry a
 //!   lower bound across ([`carry_game`]), which docs/theory/neighbors.md and docs/theory/search-rules.md prove;
 //! * the line ([`Line`], [`Game`]) and the file ([`Store`], [`Best`]);
-//! * a lower bound's game as the referee has it ([`play`], [`expand`], [`carried`]).
+//! * a lower bound's moves as the referee has it ([`play`], [`expand`], [`carried`]).
 //!
 //! The checks of a line against the lines before it (`Chain`) are the ledger's, in `examples/ledger/store.rs`.
 
@@ -34,12 +34,12 @@ pub const SCHEMA: u64 = 1;
 /// How a bound was derived.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Rule {
-    /// The game with no promotions of a board that has nothing to promote: both bounds.
+    /// The moves with no promotions of a board that has nothing to promote: both bounds.
     Trivial,
     /// The standalone start incumbent (L) and the root's GF(2) bound (U), as the map has them.
     Start,
     Root,
-    /// A search's best game (L); the dual bound of a search that a limit stopped (U); the game of a search that
+    /// A search's best moves (L); the dual bound of a search that a limit stopped (U); the moves of a search that
     /// completed (U: it explored its tree).
     Search,
     Dual,
@@ -50,10 +50,10 @@ pub enum Rule {
     /// The Lagrangian bound over the nogoods of searches, each checked to fail to promote, with the GF(2) bound inside
     /// (U): the removed example `wall` made it; the store takes it on record.
     Nogoods,
-    /// The game the finder found (L): large neighborhood search, which is not sound and proves nothing; its game is a
-    /// lower bound because the referee replays it.
+    /// The moves the finder found (L): large neighborhood search, which is not sound and proves nothing; its moves
+    /// are a lower bound because the referee replays them.
     Lns,
-    /// A proven game given to the ledger: both bounds.
+    /// Proven moves given to the ledger: both bounds.
     Given,
     /// The relations between boards.
     Monotone,
@@ -141,28 +141,28 @@ impl Side {
 // ---------------------------------------------------------------------------------------------------------
 // The relations between boards (docs/theory/neighbors.md and docs/theory/search-rules.md)
 
-/// Monotonicity (N3, docs/theory/neighbors.md): the game of `n` (composite) that the finished game `moves` of n − 1
+/// Monotonicity (N3, docs/theory/neighbors.md): the moves for `n` (composite) that the finished `moves` for n − 1
 /// gives: the same moves, then n if it is still legal.  (n is the only move that can be left: the legal moves that
 /// `complete` adds are n, or none.)
 pub fn monotone_game(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
     complete(n, moves)
 }
 
-/// The ceiling lemma (N4, docs/theory/neighbors.md): the game of `n` that the finished game `moves` of n + 1
+/// The ceiling lemma (N4, docs/theory/neighbors.md): the moves for `n` that the finished `moves` for n + 1
 /// (composite) gives: its moves without n + 1, which stay legal, then the largest legal move as long as there is one.
 pub fn ceiling_game(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
     let without: Vec<u32> = moves.iter().copied().filter(|&m| m != n + 1).collect();
     complete(n, &without)
 }
 
-/// The prime formula (N5, docs/theory/neighbors.md): the game of the prime `p` that the finished game `moves` of p − 1
+/// The prime formula (N5, docs/theory/neighbors.md): the moves for the prime `p` that the finished `moves` for p − 1
 /// gives: its opening move, the largest prime below p, exchanged for p (`accelerate::prime_shortcut`).
 pub fn prime_up(p: u32, moves: &[u32]) -> Vec<u32> {
     prime_shortcut(p, moves)
 }
 
-/// The prime formula (N5, docs/theory/neighbors.md): the game of `n` = p − 1 that the finished game `moves` of the
-/// prime p gives: its opening move p exchanged for the largest prime up to n (none for n = 1, whose game has no move).
+/// The prime formula (N5, docs/theory/neighbors.md): the moves for `n` = p − 1 that the finished `moves` for the
+/// prime p gives: its opening move p exchanged for the largest prime up to n (none for n = 1, which has no move).
 pub fn prime_down(n: u32, moves: &[u32]) -> Vec<u32> {
     match largest_prime_at_most(n) {
         Some(q) => {
@@ -176,9 +176,9 @@ pub fn prime_down(n: u32, moves: &[u32]) -> Vec<u32> {
     }
 }
 
-/// Whether the relation `rule` (named for the lemma that carries a game) carries a game from the board `from` to the
+/// Whether the relation `rule` (named for the lemma that carries moves) carries moves from the board `from` to the
 /// board `n`: `Monotone` up a board to a composite, `Ceiling` down a board from a composite, `Prime` across a prime, in
-/// either direction (N3 to N5, docs/theory/neighbors.md).  The game is made by [`carry_game`].
+/// either direction (N3 to N5, docs/theory/neighbors.md).  The moves are made by [`carry_game`].
 pub fn carries(rule: Rule, from: u32, n: u32) -> bool {
     let prime = |m: u32| largest_prime_at_most(m) == Some(m);
     match rule {
@@ -189,14 +189,14 @@ pub fn carries(rule: Rule, from: u32, n: u32) -> bool {
     }
 }
 
-/// The game of `n` that the relation `rule` makes of the finished game `moves` of the board `from` (see [`carries`]).
+/// The moves for `n` that the relation `rule` makes of the finished `moves` for the board `from` (see [`carries`]).
 ///
 /// # Errors
 ///
-/// `rule` does not carry a game from `from` to `n`, or the game is not a game of `from`.
+/// `rule` does not carry moves from `from` to `n`, or `moves` are not finished moves for `from`.
 pub fn carry_game(rule: Rule, from: u32, n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
     if !carries(rule, from, n) {
-        return Err(format!("the {} relation does not carry a game from {from} to {n}", rule.name()));
+        return Err(format!("the {} relation does not carry moves from {from} to {n}", rule.name()));
     }
     match rule {
         Rule::Monotone => monotone_game(n, moves),
@@ -277,8 +277,8 @@ const KEYS: [&str; 15] = [
     "moves",
 ];
 
-/// A lower bound's game: the promotions it was made from, which `solution_for_promotions` turns into moves (the
-/// compact form, for every game that was made from promotions), or its moves.
+/// A lower bound's moves: the promotions it was made from, which `solution_for_promotions` turns into moves (the
+/// compact form, for any moves that were made from promotions), or its moves.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Game {
     Promotions(Vec<u32>),
@@ -294,7 +294,7 @@ pub struct Line {
     pub rule: Rule,
     /// The board a relation's bound came from.
     pub from: Option<u32>,
-    /// A lower bound's game, which the referee replays at `value`.
+    /// A lower bound's moves, which the referee replays at `value`.
     pub game: Option<Game>,
     /// An upper bound by a relation: the value of the upper bound of `from` that it was derived from.
     pub from_value: Option<u64>,
@@ -410,7 +410,7 @@ impl Line {
         }
         match self.side {
             Side::Lower => {
-                // A game, or the game it is carried from: the lower bound `from_value` of the board `from`.
+                // Moves, or the moves it is carried from: the lower bound `from_value` of the board `from`.
                 match (&self.game, self.from_value, self.from) {
                     (None, None, _) => return fail("it needs its game, or the game it is carried from"),
                     (Some(_), Some(_), _) => return fail("it has a game and cites one"),
@@ -567,10 +567,10 @@ impl<'a> Best<'a> {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// A lower bound's game, as the referee has it
+// A lower bound's moves, as the referee has it
 
-/// The game of the promotions `set` on `board`, as the referee has it: its score and moves.  The referee replays the
-/// game (legal, over, opening with the largest prime), and its score must be the board's `in_the_bag` and the sum of
+/// The moves of the promotions `set` on `board`, as the referee has it: its score and moves.  The referee replays the
+/// moves (legal, over, opening with the largest prime), and its score must be the board's `in_the_bag` and the sum of
 /// the promotions, as it is for every promotion set of the frame model.
 pub fn refereed<const W: usize>(board: &Board<W>, set: &Bits<W>) -> Result<(u64, Vec<u32>), String> {
     let moves = solution_for_promotions(&board.tables, *set);
@@ -582,7 +582,7 @@ pub fn refereed<const W: usize>(board: &Board<W>, set: &Bits<W>) -> Result<(u64,
     }
 }
 
-/// The game of the promotions `set` on the board of `n`, as the referee has it ([`refereed`]): its score and moves.
+/// The moves of the promotions `set` on the board of `n`, as the referee has it ([`refereed`]): its score and moves.
 pub fn expand(n: u32, set: &[u32]) -> Result<(u64, Vec<u32>), String> {
     if set.iter().any(|&member| member < 2 || member > n) {
         return Err(format!("the promotions are not numbers of the board 1..={n}"));
@@ -594,15 +594,15 @@ pub fn expand(n: u32, set: &[u32]) -> Result<(u64, Vec<u32>), String> {
     )
 }
 
-/// A lower bound's game as the referee has it: its moves, and the promotions it was made from if it was.
+/// A lower bound's moves as the referee has it: its moves, and the promotions it was made from if it was.
 pub struct Played {
     pub moves: Vec<u32>,
     pub promotions: Option<Vec<u32>>,
 }
 
-/// The game that a line of the store carries (its promotions or its moves), replayed by the referee: it must score the
+/// The moves that a line of the store carries (its promotions or its moves), replayed by the referee: it must score the
 /// line's value.  (A line is data from a file: promotions that no board has made would stop the frames' setup, and
-/// that is an error of the line.)  A line that cites the game it is carried from has none: see [`carried`].
+/// that is an error of the line.)  A line that cites the moves it is carried from has none: see [`carried`].
 pub fn play(line: &Line) -> Result<Played, String> {
     std::panic::catch_unwind(AssertUnwindSafe(|| play_checked(line)))
         .unwrap_or_else(|_| Err("the frame model's setup stops on these promotions".into()))
@@ -620,12 +620,12 @@ fn play_checked(line: &Line) -> Result<Played, String> {
     if score == line.value {
         Ok(Played { moves, promotions })
     } else {
-        Err(format!("the game scores {score}, not the {} of the line", line.value))
+        Err(format!("the moves score {score}, not the {} of the line", line.value))
     }
 }
 
-/// The game of `line`, which cites the game of its source, as the relation carries it from `source` (the moves of the
-/// game the citation names), replayed by the referee at the line's value.
+/// The moves of `line`, which cites the moves of its source, as the relation carries them from `source` (the moves
+/// the citation names), replayed by the referee at the line's value.
 pub fn carried(line: &Line, source: &[u32]) -> Result<Played, String> {
     let from = line.from.ok_or("it has no game and cites none")?;
     let moves = carry_game(line.rule, from, line.n, source)?;
@@ -633,6 +633,6 @@ pub fn carried(line: &Line, source: &[u32]) -> Result<Played, String> {
     if score == line.value {
         Ok(Played { moves, promotions: None })
     } else {
-        Err(format!("the game scores {score}, not the {} of the line", line.value))
+        Err(format!("the moves score {score}, not the {} of the line", line.value))
     }
 }

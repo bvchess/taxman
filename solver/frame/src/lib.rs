@@ -4,24 +4,25 @@
 //!
 //! The pot holds the numbers `1..=n`.  The player takes a number that still has a proper divisor in the pot and
 //! scores it; the taxman takes that number and every divisor of it still in the pot.  The game is over when no
-//! number in the pot has a divisor left in it.  An *optimal game* scores the most; the best scores for
-//! `n = 1, 2, 3, …` are the Taxman sequence.  [`game::replay`] is the rules in code, and the referee that every
-//! game the solver finds must satisfy.
+//! number in the pot has a divisor left in it.  Optimal moves score the most; the best scores for
+//! `n = 1, 2, 3, …` are the Taxman sequence.  [`game::replay`] is the rules in code, and the referee that all the
+//! moves the solver finds must satisfy.
 //!
 //! # What the crate does
 //!
-//! It finds optimal games.  Every number above `n/2` is never tax and is played (unless it turns out to be
-//! impossible), so a game is chosen by which of the other numbers to *promote* to a move as well.  The *frame
+//! It finds optimal moves.  Every number above `n/2` is never tax and is played (unless it turns out to be
+//! impossible), so the moves are chosen by which of the other numbers to *promote* to a move as well.  The *frame
 //! model* (a restatement of the algorithm of the Java solver) splits the board into independent *frames*, each a group
 //! of sources with the factors they compete for, numbers the ones that have freedoms from the front (0 is played first)
-//! and merges those with the same number, and turns an optimal game into the promotion set with the largest sum that
+//! and merges those with the same number, and turns optimal moves into the promotion set with the largest sum that
 //! keeps every frame winnable.  A branch-and-bound over promotion sets, bounded by the heaviest set independent in
-//! every frame over GF(2) (or by a matching relaxation) and run on many threads, finds that set; a game of `n` is
-//! built from the game of `n − 1`, so a chain of games from `n = 1` proves each from the one before.  `README.md` (in
-//! the crate's directory) is the user guide; `docs/GLOSSARY.md` defines the project's words; `DESIGN.md` explains the
-//! design; https://github.com/bvchess/taxman-notebook/blob/main/README.md is the lab notebook of how it got there.
+//! every frame over GF(2) (or by a matching relaxation) and run on many threads, finds that set; the moves for `n` are
+//! built from the moves for `n − 1`, so a chain of lines from `n = 1` proves each from the one before.  `README.md`
+//! (in the crate's directory) is the user guide; `docs/GLOSSARY.md` defines the project's words; `DESIGN.md`
+//! explains the design; https://github.com/bvchess/taxman-notebook/blob/main/README.md is the lab notebook of how it
+//! got there.
 //!
-//! # From n to a game
+//! # From n to its moves
 //!
 //! ```text
 //! n ──► numtheory::Tables               maximal factors and composites of 1..=n
@@ -51,16 +52,16 @@
 //!
 //! | layer | module | what it is |
 //! |---|---|---|
-//! | foundations | [`game`] | the rules as a referee ([`game::replay`]), and the table of optimal games |
+//! | foundations | [`game`] | the rules as a referee ([`game::replay`]), and the table of optimal moves |
 //! | | [`numtheory`] | maximal factors and composites, primes, divisors of the numbers on a board |
 //! | | [`playable`] | whether a set of numbers can all be played on the whole board, with nothing of the frame model |
 //! | | [`bits`] | fixed-width bitsets `Bits<W>` for sets of game numbers; the set widths, dispatched |
-//! | | [`json`] | a small JSON reader and writer (the table of optimal games, golden data, results lines) |
+//! | | [`json`] | a small JSON reader and writer (the table of optimal moves, golden data, results lines) |
 //! | | [`rng`] | a seeded generator, for the finder's random neighborhoods |
 //! | | [`utc`] | UTC timestamps of the records of a run (RFC 3339), written by hand |
 //! | frame model | [`frames`] | the frames of a board: formed, simplified, numbered from the front and merged |
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
-//! | | [`accelerate`] | the prime shortcut (the game of a prime `n` from the game of `n − 1`); promotions → moves |
+//! | | [`accelerate`] | the prime shortcut (the moves for a prime `n` from those for `n − 1`); promotions → moves |
 //! | search | [`matchbound`] | the matching bound, an upper bound on a state's completions, which the start's dive rounds |
 //! | | [`gf2`] | the GF(2) node bound: independence in every frame, by weighted matroid intersection |
 //! | | [`search`] | the branch-and-bound searcher, its tactics, its setup and checkpoint header, and the finder |
@@ -69,9 +70,9 @@
 //! | solving | [`tactics`] | the switchable pieces of the algorithm, by name and value |
 //! | | [`board`] | a board analyzed and prepared for a search: tables, frames, ceiling and seed |
 //! | | [`solver`] | the per-game pipeline, the options, the range driver |
-//! | | [`results`] | what a result line records about its proof, and the checks a results file passes |
+//! | | [`results`] | what a result line records about its proof kind, and the checks a results file passes |
 //! | | [`store`] | the bounds store: the line and the file the ledger keeps its bounds in, and the relations between boards |
-//! | | [`known`] | the known games `solve --use-prev` draws on: the table, the committed chain, the bounds store |
+//! | | [`known`] | the known moves `solve --use-prev` draws on: the table, the committed chain, the bounds store |
 //! | | [`certify`] | `taxman certify`: a recorded score proven on the whole board; `certify::verify` checks them |
 //! | | [`paths`] | where the default files are, found at run time |
 //! | studies | [`brute`] | exhaustive search without the frame model, to certify small boards |

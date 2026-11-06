@@ -18,15 +18,16 @@ use crate::search::SearchTactics;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Tactics {
     pub search: SearchTactics,
-    /// A prime `n` plays the game of `n − 1` with its first move replaced by `n` (proven).
+    /// A prime `n` plays the moves for `n − 1` with its first move replaced by `n` (proven).
     pub prime_shortcut: bool,
     /// Conclude a game whose search problem an earlier game of the chain already solved with that game's
-    /// promotions, without a search (proven, given the earlier game's proof; see `crate::solver`).
+    /// promotions, without a search (proven, given that the earlier game was proven; see `crate::solver`).
     pub same_search: bool,
     /// Stop the search as soon as the incumbent reaches `n + opt(n − 1) − in_the_bag` (proven if `opt(n − 1)` is
     /// optimal).
     pub prev_cap: bool,
-    /// Start the search from the better of the greedy set and the previous game's promotions (sound).
+    /// Start the search from the better of the greedy set and the promotions of the moves for the previous n
+    /// (sound).
     pub seed_incumbent: bool,
 }
 

@@ -4,7 +4,7 @@
 //! `cli.rs`.  Every subcommand is a plain function of the arguments after its name.  A command
 //! that fails prints `error: ...` and exits with status 1; a bad command line prints the usage and exits with
 //! status 2; a run that SIGINT or SIGTERM stopped (see `solve`) exits with 128 plus the signal; `certify` exits with
-//! status 2 when it finds a game that beats a recorded score.  `verify-certificates` fails with status 1 on the first
+//! status 2 when it finds moves that beat a recorded score.  `verify-certificates` fails with status 1 on the first
 //! line that is not what it says.
 
 mod cli;
@@ -21,21 +21,21 @@ const USAGE: &str = "\
 usage: taxman <command> [args]
 
 commands:
-  solve N|A-B [options]   solve game N or a range, each from the one before; the first from the game
-                          of A-1 in --out FILE, or with --use-prev from the known games (with neither it is
-                          solved standalone, which costs more: no seed from the game before and no ceiling).
-                          Every score is checked against the table of optimal games, which is built into this program
+  solve N|A-B [options]   solve game N or a range, each from the one before; the first from the moves
+                          for A-1 in --out FILE, or with --use-prev from the known moves (with neither it is
+                          solved standalone, which costs more: no seed from the moves before and no ceiling).
+                          Every score is checked against the table of optimal moves, which is built into this program
       --threads K              worker threads (default: all CPUs)
       --background             run the workers at the lowest priority (Linux SCHED_IDLE): on a machine shared with
                                other work, with every hardware thread, the search takes the CPU the rest leaves
       --window K               games of a range in flight at once, sharing the threads: game n+1 is set up, and
-                               searched from n's best game so far, while n searches (default 4; 1 is one game after
-                               another, and it is always 1 with one thread).  Scores and proofs are those of a
-                               window of 1
+                               searched from the best moves found for n so far, while n searches (default 4; 1 is
+                               one game after another, and it is always 1 with one thread).  Scores and proof kinds are
+                               those of a window of 1
       --tactic NAME=VALUE      set a tactic (repeatable): VALUE is on or off.  Names: {tactics}
       --finder-after NODES     once a game's search has taken NODES steps (over all its runs), start a finder beside
-                               it: a thread that looks for a better game than the incumbent, from the incumbent and
-                               from the game of n-1, and offers it to the search (default {finder_after}; 0: none).
+                               it: a thread that looks for better moves than the incumbent, from the incumbent and
+                               from the moves for n-1, and offers it to the search (default {finder_after}; 0: none).
                                It changes no answer and is no part of a checkpoint, which resumes with any finder or
                                none
       --finder-seconds S       the finder thread's budget, from the moment it starts (default {finder_seconds})
@@ -70,23 +70,23 @@ commands:
                                for a trial of the gates {trial_gates}
       --mem-cap UNITS          search units kept in memory before spilling to disk
       --force-search           search even where the previous game or an earlier search gives the answer
-      --use-prev               draw on the known games: the built-in table's, the committed chain's
+      --use-prev               draw on the known moves: the built-in table's, the committed chain's
                                (results/optimal.jsonl.gz) and the proven boards of the bounds store
                                (results/bounds.jsonl).  A board a source has proven is recorded without a
-                               search (proof known), citing the source and what it assumes (the table's games
+                               search (proof known), citing the source and what it assumes (the table's moves
                                are assumed optimal; the store's, wherever statement U holds at the boards its
-                               bound rests on); the game of A-1 from them, if --out FILE lacks it, gives the
+                               bound rests on); the moves for A-1 from them, if --out FILE lacks it, gives the
                                ceiling and the seed; the store's other boards seed their searches with its lower
-                               bound's game and stop at its upper bound.  --force-search leaves the boards to
+                               bound's moves and stop at its upper bound.  --force-search leaves the boards to
                                their searches
       --show                   print each game's promotions and moves
   regress [--from A] [--to N] [--threads K] [--window K] [--tactic ...] [--use-prev]
                           solve A..N (default 1..400) in memory and check every score against the built-in table
   verify-results [--threads K] FILE...
-                          check results files without changing them: every game replayed and its score checked
+                          check results files without changing them: every line's moves replayed and its score checked
                           against the built-in table, the chain from n-1, each line's proof and provenance, and that
-                          the files agree; counts games by proof and by what they assume.  A file whose name ends in
-                          .gz is read through the gzip decoder (the committed results are one).  K threads set up the
+                          the files agree; counts lines by proof kind and by what they assume.  A file whose name ends
+                          in .gz is read through the gzip decoder (the committed results are one).  K threads set up the
                           searches of the repeats (default: all CPUs).  A line that cites a known source is checked
                           against the built-in table, the committed chain and the bounds store of results
   certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE [options]
@@ -94,10 +94,10 @@ commands:
                           line in the order to certify them, blank lines and # comments skipped) that rest on the
                           frame model on the whole board, game by game: the extended problem with the open
                           members of the barred bounds (--upper, the prover's `upper` files) optional, searched
-                          from the recorded game (--results, over the built-in table; a .gz file is read as gzip);
+                          from the recorded moves (--results, over the built-in table; a .gz file is read as gzip);
                           one line a game in --out, certified or beaten; a game whose extended problem an
                           earlier certified game of the last 8 games posed is certified without a search
-                          (same_problem); a game that beats its score is also written to
+                          (same_problem); moves that beat the score are also written to
                           OUT.counterexample.jsonl and the run exits with status 2.
                           Options: --threads K, --checkpoint-dir DIR, --checkpoint-interval S, --progress S,
                           --time-limit S, --node-limit N, --mem-cap UNITS, --background, as for solve; --no-claims,
@@ -107,7 +107,7 @@ commands:
                           from its checkpoint
   verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]
                           check the files of certificates `certify --out` wrote, without changing them: every
-                          line against the recorded games, the barred bounds and the extended problem set up
+                          line against the recorded moves, the barred bounds and the extended problem set up
                           again, the games that rest on one another, and the counterexample files beside them;
                           the first line to fail ends it with status 1 (that a search explored its whole tree is
                           taken on trust).  Then says how far the proofs of the recorded scores reach: every

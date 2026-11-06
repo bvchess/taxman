@@ -218,7 +218,7 @@ class Rule(Case):
         certs = self.games([2, 2, 2, 2, 2, 2]) + [cert(1106, verdict="beaten")]
         code, out, _err = self.run_tool(certs, self.boards, listed=self.boards)
         self.assertEqual(code, 2)
-        self.assertIn("stop rule: COUNTEREXAMPLE: a game beats its recorded score: board 1106", out)
+        self.assertIn("stop rule: COUNTEREXAMPLE: moves beat the recorded score: board 1106", out)
         code, out, _err = self.run_tool([cert(1100, verdict="beaten")], self.boards, listed=self.boards)
         self.assertEqual(code, 2, "also with the other games missing")
 
@@ -351,7 +351,7 @@ class Committed(unittest.TestCase):
         lines[0] = dict(lines[0], verdict="beaten", beaten_by={"score": 1, "moves": [2]})
         code, out, _err = self.run_pilot(lines)
         self.assertEqual(code, 2)
-        self.assertIn("COUNTEREXAMPLE: a game beats its recorded score: board 3300", out)
+        self.assertIn("COUNTEREXAMPLE: moves beat the recorded score: board 3300", out)
 
 
 class Real(unittest.TestCase):

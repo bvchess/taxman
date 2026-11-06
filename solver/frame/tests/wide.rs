@@ -4,7 +4,7 @@
 //! to n = 511, then 16, 20, 24, 28, 32, 36, 40, 48 and 56 words up to 1023, 1279, 1535, 1791, 2047, 2303, 2559, 3071
 //! and 3583, 64 up to 4095 and 128 up to 8191 (`bits::WIDTHS`), so the boards above n = 1023 meet few tests besides
 //! these: `tests/board_layer.rs` and `tests/golden_frames.rs` (to the end of the committed results and to 2049) and
-//! the committed results (`results/optimal.jsonl.gz`, whose games past 1000 are the solver's own answer and no check of
+//! the committed results (`results/optimal.jsonl.gz`, whose lines past 1000 are the solver's own answer and no check of
 //! it).  What is cheap to run here: the same small game at every
 //! width that holds it (a width-dependent bug changes the tree), games of 1100 to 1250 that need a few thousand
 //! nodes against the committed results, boards of 2048 and more through their setup, and the boards past 4095
@@ -363,7 +363,7 @@ fn the_gf2_engines_of_four_and_five_words_search_the_same_tree() {
 /// (five), and the largest.  The board has nine frames, whose numbers are all on it; the game with no promotions is
 /// legal and finished and scores what the board says; the setup succeeds, every root frame has as many freedoms as
 /// factors beyond its moves, and the greedy set is made of candidates and can be promoted.  The greedy set and random
-/// subsets of it (which can be promoted too) turn into games that are legal, finished, open with the largest prime and
+/// subsets of it (which can be promoted too) turn into moves that are legal, finished, open with the largest prime and
 /// score the plain game's score plus the promotions' sum.  The root's GF(2) bound is at least the greedy sum and at
 /// most the matching bound, and an engine of five words gives the same as the one the board needs.  (The setup's
 /// local search is left out: this is the board layer's invariants, not the solver's.)

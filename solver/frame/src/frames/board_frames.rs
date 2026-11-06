@@ -262,11 +262,11 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     }
 
     /// The order the frames are kept in: those in front before those behind, so that playing the frames one after
-    /// the other is always a legal game.  It is a breadth-first topological sort: start from the frames with
+    /// the other is always legal.  It is a breadth-first topological sort: start from the frames with
     /// nothing in front of them, smallest source first; after taking a frame, queue the frames directly behind it
     /// whose every frame in front is already taken, again smallest source first.
     ///
-    /// The tie-breaking by smallest source is what makes the order, and with it the names and the final game,
+    /// The tie-breaking by smallest source is what makes the order, and with it the names and the final moves,
     /// the Java's.
     fn order_frames(&self) -> Vec<usize> {
         let count = self.frames.len();
@@ -598,7 +598,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     ///
     /// This greedy choice, largest first, decides which sources the whole model gives up on, for good: the first pass
     /// over a frame keeps U\*, and the later passes keep everything (the kept-sources lemma (X1),
-    /// docs/theory/exactness.md; that an optimal game plays U\* is the statement the frame model rests on, see
+    /// docs/theory/exactness.md; that optimal moves play U\* is the statement the frame model rests on, see
     /// [`crate::frames`]).  (Sources that were mandatory are not reconsidered: they are not in the remaining sources.)
     ///
     /// It looks at nothing but the frame's own remaining sources and factors, and keeps every source that
@@ -703,11 +703,11 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     /// A legal order in which to play the sources of frame `i`: the peel of `count_freedoms`
     /// again, this time keeping the order it finds.
     ///
-    /// The game is built from both ends.  In each round, first every source that has exactly one factor left
+    /// The moves are built from both ends.  In each round, first every source that has exactly one factor left
     /// (visited in ascending order against a snapshot) is played now, with that factor; then every factor
     /// wanted by exactly one source is paired with that source, which is set aside for the end of the frame's
     /// game (the sources set aside later are played earlier).  A move with a single choice goes first and one
-    /// with a private factor goes last, as in the peel; that the result is a legal game is the peel theorem
+    /// with a private factor goes last, as in the peel; that the result is legal is the peel theorem
     /// (P4) of `docs/theory/playability.md`.  A round that makes no progress panics: it would mean the frame's sources
     /// cannot be played together, which `remove_impossible` rules out.
     pub fn solution_of(&self, i: usize) -> Vec<u32> {
@@ -741,9 +741,9 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         now
     }
 
-    /// The whole game with no promotions beyond those these frames were built with: the frames' games, one after
+    /// All the moves, with no promotions beyond those these frames were built with: the frames' moves, one after
     /// the other in playing order (front first).  Built on the plain board it scores `in_the_bag`, the
-    /// base of every score in the frame model; built with promotions it is the game those promotions make
+    /// base of every score in the frame model; built with promotions it is the moves those promotions make
     /// ([`crate::accelerate::solution_for_promotions`]).
     pub fn solution(&self) -> Vec<u32> {
         let mut moves = Vec::with_capacity(self.t.n as usize);
@@ -1316,7 +1316,7 @@ mod tests {
         assert_eq!(column_name(26 * 27), "AAA");
     }
 
-    /// A case from the Java's tests: with these promotions the board's frames must give a legal game.
+    /// A case from the Java's tests: with these promotions the board's frames must give legal moves.
     #[test]
     fn the_mystery_of_528() {
         let t = Tables::new(528);

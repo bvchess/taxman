@@ -23,8 +23,8 @@
 #
 # What it does with the exit status of each `taxman certify`:
 #   0        the list is done if every game has a verdict in its output; otherwise (a limit in EXTRA_ARGS) it goes on
-#   2        a COUNTEREXAMPLE: a game that beats its recorded score (the result itself).  Everything stops at once, with
-#            a final checkpoint, the game is in OUT.counterexample.jsonl, and the script ends with status 2.  Keep
+#   2        a COUNTEREXAMPLE: moves that beat the recorded score (the result itself).  Everything stops at once, with
+#            a final checkpoint, the moves are in OUT.counterexample.jsonl, and the script ends with status 2.  Keep
 #            the work directory as it is
 #   130/143  stopped by SIGINT/SIGTERM (this script forwards them, once, to every process, which writes a final
 #            checkpoint): the script ends
@@ -35,7 +35,7 @@
 #            add no verdict and last under five minutes end the script
 #
 # When every list is done the script checks the output files with `taxman verify-certificates` (the barred bounds,
-# the recorded games, the problem set up again, the games that rest on one another) and exits 0 only if that passes.
+# the recorded moves, the problem set up again, the games that rest on one another) and exits 0 only if that passes.
 # The script exits 0 when complete, 2 for a counterexample, 143 when stopped, 3 for the deadline, 1 otherwise.
 #
 # Output (all in $OUT_DIR and $LOGS): certificates_NAME.jsonl per list; certify_NAME.out (the result line of each game)
@@ -45,7 +45,7 @@
 # Environment (all optional):
 #   THREADS              threads to share among the lists without :THREADS, default every CPU
 #   LISTS                where the lists are, default solver/tools/certify/lists/stage4
-#   CERT_RESULTS         the recorded games, default results/optimal.jsonl.gz
+#   CERT_RESULTS         the recorded moves, default results/optimal.jsonl.gz
 #   CERT_UPPER           the prover's barred bounds, a list of files, default every solver/noframe/data/upper_*.jsonl
 #   OUT_DIR              the output files, default $TAXMAN_WORK/results (the directory that save.sh copies)
 #   CHECKPOINT_INTERVAL  seconds, default 300       PROGRESS  seconds between progress lines, default 60
@@ -207,7 +207,7 @@ handle_exit() {
             fi
             ;;
         2)
-            log "COUNTEREXAMPLE: $name has a game that beats its recorded score.  Everything stops.  The game is in" \
+            log "COUNTEREXAMPLE: $name has moves that beat the recorded score.  Everything stops.  The moves are in" \
                 "${L_out[$i]%.jsonl}.counterexample.jsonl; the last lines of certify_$name.out:"
             tail -n 3 "$LOGS/certify_$name.out" >&2
             L_state[$i]=end

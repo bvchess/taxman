@@ -3,7 +3,7 @@
 //! Nothing here is a path fixed at compile time, so a binary works wherever it is as long as it can find the
 //! repository: the nearest directory above the working directory, and failing that above the directory of the
 //! executable, that holds the committed results, `results/optimal.jsonl.gz`.  (The solver itself needs no
-//! file: the table of optimal games is built into the binary, [`crate::game::Optimal::built_in`].)  The defaults are
+//! file: the table of optimal moves is built into the binary, [`crate::game::Optimal::built_in`].)  The defaults are
 //! relative to that directory:
 //!
 //! | file | default | flag |
@@ -16,8 +16,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The committed results, the chain of games from n = 1 (gzip), relative to the repository; its presence is what makes a
-/// directory the repository.
+/// The committed results, the chain of lines from n = 1 (gzip), relative to the repository; its presence is what makes
+/// a directory the repository.
 pub const RESULTS_IN_REPOSITORY: &str = "results/optimal.jsonl.gz";
 
 /// The bounds store, the bounds on opt(n) that the ledger finds, relative to the repository.

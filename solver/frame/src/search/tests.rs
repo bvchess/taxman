@@ -496,10 +496,10 @@ fn the_start_is_the_same_on_every_number_of_threads() {
 }
 
 /// A search with two seeds starts from the better of their starts, not from the seed whose survivors weigh more.  The
-/// bounds store's lower-bound game of the board is a game of it, so all of it survives; here it is the start with no
-/// seed, S0, a local optimum.  In game 187 S0 weighs 751 and what survives of the game of 186 only 748, so the seed with
-/// more survivors is S0, but the start from the game of 186 reaches 762.  Starting from S0 alone leaves the search at
-/// 751; the best of the two starts is 762.
+/// bounds store's lower-bound moves for the board are moves for it, so all of them survive; here it is the start with
+/// no seed, S0, a local optimum.  In game 187 S0 weighs 751 and what survives of the moves for 186 only 748, so the
+/// seed with more survivors is S0, but the start from the moves for 186 reaches 762.  Starting from S0 alone leaves the
+/// search at 751; the best of the two starts is 762.
 #[test]
 fn the_start_is_the_best_of_the_starts_of_the_seeds() {
     let n = 187;
@@ -511,8 +511,8 @@ fn the_start_is_the_best_of_the_starts_of_the_seeds() {
     let start = |seeds: &[Bits<8>]| start_incumbent(&p, &graph, &Control::new(), 1, seeds);
     let (s0, from_prev) = (start(&[]), start(&[prev]));
 
-    // The trap: S0 has the survivors that weigh more, and the start from the game of n − 1 climbs above it.
-    assert!(seed_survivors_sum(&p, &s0) > seed_survivors_sum(&p, &prev), "S0 survives heavier than the previous game");
+    // The trap: S0 has the survivors that weigh more, and the start from the moves for n − 1 climbs above it.
+    assert!(seed_survivors_sum(&p, &s0) > seed_survivors_sum(&p, &prev), "S0 survives heavier than the previous moves");
     assert_eq!((start(&[s0]), s0.sum(), from_prev.sum()), (s0, 751, 762), "the start from S0 alone stays at S0");
 
     // Either order of the seeds starts from the better start.
@@ -618,7 +618,7 @@ fn a_ceiling_given_to_the_control_ends_the_search_of(n: u32, live: bool) {
     assert_eq!(control.ceiling(), Some(optimum));
 }
 
-/// The previous game's promotions offered to the control before the run raise its start as `seed` does: game 930
+/// The promotions of the previous moves offered to the control before the run raise its start as `seed` does: game 930
 /// starts from 20,469 on its own and from its optimum, 20,480, with the seed, and the search is the same either way.
 #[test]
 fn a_seed_offered_to_the_control_is_the_seed_of_the_search() {
@@ -799,7 +799,7 @@ fn units_and_headers_round_trip() {
 
 // ---- the extended problem: one-sided candidates ----
 
-/// U\*_{≥3} of `board`: the sources that setup keeps (the numbers above n/2 of the game with no promotions) with three
+/// U\*_{≥3} of `board`: the sources that setup keeps (the numbers above n/2 of the moves with no promotions) with three
 /// or more prime factors, which can be open in the extended problem Π⁺(O).
 fn open_sources<const W: usize>(board: &Board<W>) -> Bits<W> {
     board.plain.iter().copied().filter(|&x| 2 * x > board.n() && board.tables.omega(x) >= 3).collect()

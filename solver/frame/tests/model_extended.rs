@@ -25,7 +25,7 @@
 //!   empty, for random
 //!   subsets of U\*_{≥3} and for O = U\*_{≥3}: the sets X = K ∪ L with F ∪ X playable (family A, found depth first),
 //!   all promotion sets (family B, found the same way), and the two families must be equal; the heaviest set weighs
-//!   what the table of optimal games has for n, and the oracle's order for it is a legal game of that score.
+//!   what the table of optimal moves has for n, and the oracle's order for it is a legal game of that score.
 //! * With O empty, Π⁺(∅) has the promotion sets of the frame model: those of Π_n (`Board::prepare`) and those of the
 //!   problem the search is given for Π⁺(∅) (`Board::prepare_extended`).
 //! * On larger boards (to 1300 by default, to 4095 in an ignored test) the sets are random, in either formulation:
@@ -262,7 +262,7 @@ fn count_disagreements<const W: usize>(case: &Case<W>) -> (usize, usize) {
 /// The extended exactness theorem (E1, docs/theory/extended-problem.md) on the board `1..=n` for the open sources
 /// `open`, in the formulation `claims` says, on every set: the sets X of family A (F ∪ X playable, found depth first)
 /// are promotion sets, the promotion sets of family B (found the same way) make F ∪ X playable, the two families are
-/// equal, `in_the_bag` is ΣF, the heaviest ΣS is what the table of optimal games has for `n`, and the oracle's order
+/// equal, `in_the_bag` is ΣF, the heaviest ΣS is what the table of optimal moves has for `n`, and the oracle's order
 /// for the heaviest S replays to its sum.  Returns the number of sets.
 ///
 /// The sets are those of [`walk_every_set`], which panics here at the first disagreement: every set of A asserted a

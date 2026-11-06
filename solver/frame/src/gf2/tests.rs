@@ -77,8 +77,8 @@ fn promotable_sets<const W: usize>(
 }
 
 /// On every board up to 400 with at most 22 candidates: every promotable set is independent in every frame, and
-/// the bound is at least the heaviest of them.  On every board up to 400: the optimal game's promotions (from the
-/// known games) are independent and the bound is at least their sum.
+/// the bound is at least the heaviest of them.  On every board up to 400: the promotions of the optimal moves (from the
+/// known moves) are independent and the bound is at least their sum.
 #[test]
 fn bound_and_independence_on_small_boards() {
     const W: usize = 8;
@@ -103,7 +103,7 @@ fn bound_and_independence_on_small_boards() {
             assert!(value >= best, "n={n}: the bound {value} is below the heaviest promotable set {best}");
             enumerated += 1;
         }
-        let moves = optimal.moves(n).expect("a known game");
+        let moves = optimal.moves(n).expect("a known entry");
         let seed = board.seed(moves);
         let opt = optimal.score(n).unwrap() - board.in_the_bag;
         if seed.sum() == opt {
@@ -254,7 +254,7 @@ fn extended_problem<const W: usize>(
     Ok((ext, prepared))
 }
 
-/// U\*_{≥3} of `board`, the sources that can be open: the numbers above n/2 of the game with no promotions that have
+/// U\*_{≥3} of `board`, the sources that can be open: the numbers above n/2 of the moves with no promotions that have
 /// three or more prime factors, ascending.
 fn upper_from_3<const W: usize>(board: &Board<W>) -> Vec<u32> {
     let mut upper: Vec<u32> =
@@ -276,15 +276,15 @@ struct ExtendedTally {
     capped: usize,
     sets: usize,
     sets_with_one_sided: usize,
-    /// Problems on boards that the table of optimal games knows, whose bound was compared with its optimum.
+    /// Problems on boards that the table of optimal moves knows, whose bound was compared with its optimum.
     optimum_checks: usize,
 }
 
 /// On every board from 2 to 120, for the open sets U\*_{≥3} and three random subsets of it, the bound of the extended
 /// problem Π⁺(O) at the root: every promotion set found by enumeration (at most 2²⁰ of them, for problems of at most
 /// 22 candidates) is independent in every frame, one-sided members included, and the bound is at least the heaviest
-/// of them; and since the optimal game of these boards plays U\*_{≥3} (the table of optimal games has its score), the
-/// bound is at least that score less what the fixed sources bring.
+/// of them; and since the optimal moves for these boards play U\*_{≥3} (the table of optimal moves has their score),
+/// the bound is at least that score less what the fixed sources bring.
 #[test]
 #[cfg_attr(
     debug_assertions,

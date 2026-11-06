@@ -1,4 +1,4 @@
-//! UTC timestamps for the records of a run: a game's `started` and `finished`, and the time of day that starts a
+//! UTC timestamps for the records of a run: a result's `started` and `finished`, and the time of day that starts a
 //! progress line.  Written by hand from [`SystemTime`], the date from the day count by the civil-from-days algorithm
 //! (H. Hinnant, "chrono-Compatible Low-Level Date Algorithms"), so that the crate needs no date library.
 

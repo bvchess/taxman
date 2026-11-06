@@ -93,8 +93,8 @@ pub(super) enum Need {
     SetUp,
     /// Its setup runs: it holds one thread.
     SettingUp,
-    /// Set up for a search that cannot start yet (its repeat lookup is not made, the game before it has no game yet to
-    /// seed it with, or it is deferred): it may claim threads later.
+    /// Set up for a search that cannot start yet (its repeat lookup is not made, the game before it has no moves yet
+    /// to seed it with, or it is deferred): it may claim threads later.
     Pending,
     /// Its search can start.
     Ready,

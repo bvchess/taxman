@@ -458,7 +458,7 @@ fn the_tree_with_frequent_forgetting_has_not_changed() {
 }
 
 /// (game, nodes with the near-repeat cut, nodes without it): the game solved by the solver on one thread from the
-/// committed chain's game of n − 1, which is the cut's game proven before (tactic `near_repeat`).  The cut ends the
+/// committed chain's moves for n − 1, which is the cut's game proven before (tactic `near_repeat`).  The cut ends the
 /// search of 1101 at its first step, and shortens those of 768 and 1083.  The line of each game counts the nodes the
 /// cut cut.
 const NEAR_REPEATS: [(u32, u64, u64); 3] = [(768, 62, 85), (1083, 18, 70), (1101, 1, 548)];

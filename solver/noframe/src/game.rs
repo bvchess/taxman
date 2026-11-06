@@ -12,19 +12,19 @@
 //! * **The Franklín–Moniot bound**: a playable S pays each pick with a distinct maximal factor outside S (P2), so S is
 //!   the pick side of a matching in the graph joining each c to its maximal factors c/p, with each number in at most
 //!   one edge, weighing the larger end.  The graph is bipartite by the parity of Ω.
-//! * **opt(n) <= n + opt(n−1)** (deleting the move n from a game of n leaves a game of n − 1), and for a prime n,
-//!   **opt(n) <= n + opt(n−1) − p** with p the largest prime below n (a game playing n plays it first, paying 1;
-//!   swapping it for p, which divides nothing up to n − 1 by Bertrand, gives a game of n − 1).
+//! * **opt(n) <= n + opt(n−1)** (deleting the move n from legal moves for n leaves legal moves for n − 1), and for a
+//!   prime n, **opt(n) <= n + opt(n−1) − p** with p the largest prime below n (moves that play n play it first,
+//!   paying 1; swapping it for p, which divides nothing up to n − 1 by Bertrand, gives legal moves for n − 1).
 //!
 //! [`Prover`] decides "is there a playable S with sum > V?" by branch and bound over the numbers' roles: each
 //! number is a forced pick, free, or barred from picking.  A node's bound is the maximum matching with the forced
-//! picks matched downward and the barred ones only as payments; if the matching's picks are playable they are a
-//! game worth the bound; otherwise they contain an unplayable subset K (shrunk to a minimal one), every
+//! picks matched downward and the barred ones only as payments; if the matching's picks are playable they are
+//! moves worth the bound; otherwise they contain an unplayable subset K (shrunk to a minimal one), every
 //! playable set leaves out some member of K, and child j bars the j-th free member of K and forces the ones
 //! before it.  With [`Prover::enumerate`] it lists every playable set with sum > V instead of stopping at the
 //! first (with V = opt(n) − 1, every optimal set).  With [`Prover::weighted`] a set's worth is the sum of other
 //! positive weights of its picks: with every weight 1, "is there a playable S with more than V picks?" (the
-//! longest games, [`crate::moves`]).
+//! longest move sequences, [`crate::moves`]).
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
@@ -1627,7 +1627,7 @@ pub fn prime_below(n: u64, spf: &[u32]) -> u64 {
 /// How a recorded optimum V(n) meets the proven upper bounds from V(n − 1).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Relation {
-    /// V(n) = n + V(n − 1): a game at its ceiling (the data's `chain`).
+    /// V(n) = n + V(n − 1): an n at its ceiling (the data's `chain`).
     Chain,
     /// n is prime and V(n) = n + V(n − 1) − p, p the largest prime below n: the prime formula (the data's `prime`).
     Prime,
@@ -1649,12 +1649,12 @@ impl Relation {
     }
 }
 
-/// Which relation V(n) = `score` meets, given V(n − 1) = `prev` (0 where game n − 1 is not recorded, which leaves the
-/// semiprime formula nothing to rest on).
+/// Which relation V(n) = `score` meets, given V(n − 1) = `prev` (0 where no moves for n − 1 are recorded, which
+/// leaves the semiprime formula nothing to rest on).
 ///
-/// The semiprime formula proves opt(n) = V(n − 1) + n − x if V(n − 1) is optimal, and the recorded game of n shows
+/// The semiprime formula proves opt(n) = V(n − 1) + n − x if V(n − 1) is optimal, and the recorded moves for n show
 /// opt(n) ≥ V(n).  So a score above the formula contradicts a theorem or the recorded V(n − 1), and one below it means
-/// that the recorded game of n is not optimal; either panics, naming n.
+/// that the recorded moves for n are not optimal; either panics, naming n.
 pub fn relation(n: u64, score: u64, prev: u64, spf: &[u32]) -> Relation {
     if score == n + prev {
         return Relation::Chain;
@@ -1672,7 +1672,7 @@ pub fn relation(n: u64, score: u64, prev: u64, spf: &[u32]) -> Relation {
         ),
         std::cmp::Ordering::Less => panic!(
             "n={n}: V(n) = {score} is below V(n − 1) + n − x = {formula} (V(n − 1) = {prev}, x = {x}), which is \
-             opt(n) by J3 if V(n − 1) is optimal: the recorded game of n is not optimal"
+             opt(n) by J3 if V(n − 1) is optimal: the recorded moves for n are not optimal"
         ),
     }
 }
@@ -1693,7 +1693,7 @@ pub fn the_prime_of_every_optimal_set(set: &[u32], n: u32, spf: &[u32]) -> Resul
 
 /// The optimal sets of game n from all those of game n − 1, when V(n) meets a relation and V(n − 1) = opt(n − 1):
 ///
-/// * **At its ceiling** (`Relation::Chain`, opt(n) = n + opt(n − 1)): a playable S without n is a game of n − 1,
+/// * **At its ceiling** (`Relation::Chain`, opt(n) = n + opt(n − 1)): a playable S without n is playable for n − 1,
 ///   worth at most opt(n − 1), so every optimal S holds n, and S − n (playable: a subset; n is no one's factor) is
 ///   worth opt(n − 1), an optimal set of n − 1.  So the optimal sets of n are the T + n, T optimal for n − 1,
 ///   that are playable.
@@ -1908,7 +1908,7 @@ mod tests {
                     p = p.with_smaller_games(&known);
                 }
                 assert_eq!(p.run(), Verdict::Proven);
-                let best = p.found.last().expect("a game");
+                let best = p.found.last().expect("moves");
                 assert_eq!(best.iter().map(|&c| u64::from(c)).sum::<u64>(), known[n as usize], "n={n}");
             }
             for (segments, parity) in [(false, false), (true, false), (false, true), (true, true)] {
@@ -1935,7 +1935,7 @@ mod tests {
         }
     }
 
-    /// With unit weights the search decides the most moves of a game: against brute force for n <= 20, on both
+    /// With unit weights the search decides the most moves that can be played: against brute force for n <= 20, on both
     /// sides of the maximum, with and without the segment cuts (given the maxima of the smaller games).
     #[test]
     fn unit_weights_find_the_most_moves() {
@@ -1974,7 +1974,7 @@ mod tests {
                         picks.iter().for_each(|&c| pick[c as usize] = true);
                         assert!(board.playable(&pick) && picks.len() as u64 == best, "n={n}: {picks:?}");
                     }
-                    other => panic!("n={n}: the longest game beats {}, got {other:?}", best - 1),
+                    other => panic!("n={n}: the longest sequence beats {}, got {other:?}", best - 1),
                 }
             }
         }
@@ -2066,7 +2066,7 @@ mod tests {
     }
 
     /// The first game with two optimal sets: 424 has one, 425 has two, which differ by {110, 132, 168} exchanged for
-    /// {98, 150, 162} and have the same upper part.  The committed chain's game of 425 is one of them.
+    /// {98, 150, 162} and have the same upper part.  The committed chain's moves for 425 are one of them.
     #[test]
     fn game_425_has_two_optimal_sets() {
         let known = recorded_games_to(&[committed_chain()], 500);
@@ -2087,7 +2087,7 @@ mod tests {
             m.sort_unstable();
             m
         };
-        assert!(found.contains(&recorded), "the recorded game of 425 is not an optimal set");
+        assert!(found.contains(&recorded), "the recorded moves for 425 are not an optimal set");
         let (first, second) = (&found[0], &found[1]);
         let only_in = |a: &[u32], b: &[u32]| -> Vec<u32> { a.iter().copied().filter(|c| !b.contains(c)).collect() };
         let (mut gone, mut new) = (only_in(first, second), only_in(second, first));

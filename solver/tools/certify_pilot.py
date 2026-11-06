@@ -17,7 +17,7 @@ game, the source's nodes of a repeat) and c its stretch's cost per node (plan.md
 
 The stop rule: GO if the median R of the pilot's games is at most 3 and none is above 5 (then the campaign costs at
 most 1.5 times the plan); STOP otherwise (report, and build the speedups before spending more); COUNTEREXAMPLE if any
-line is `beaten` (a game that beats a recorded score: stop at once).  While games of the list have no verdict yet the
+line is `beaten` (moves that beat a recorded score: stop at once).  While games of the list have no verdict yet the
 answer is UNFINISHED, unless a game is already above 5 (STOP) or a line is beaten.
 
 Games that rest on another game's certificate by the rule of the same problem (`same_problem`) have no search: they are
@@ -187,7 +187,7 @@ def judge(rated, beaten, missing):
     no verdict yet."""
     if beaten:
         boards = ", ".join(map(str, sorted(beaten)))
-        return Verdict("COUNTEREXAMPLE", f"a game beats its recorded score: board {boards}")
+        return Verdict("COUNTEREXAMPLE", f"moves beat the recorded score: board {boards}")
     worst = max(rated, key=lambda game: game.r, default=None)
     if worst is not None and worst.r > GO_MAXIMUM:
         return Verdict("STOP", f"board {worst.n} has R {worst.r:.2f}, above {GO_MAXIMUM:g}")

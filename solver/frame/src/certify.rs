@@ -2,8 +2,8 @@
 //! problem (`taxman certify`; docs/theory/extended-problem.md, the extended exactness theorem (E1) and the certificate
 //! theorem (E2)).
 //!
-//! A game of `n` whose proof uses the frame model (an exhausted search, a trivial board, a repeat) is optimal on the
-//! whole board if some optimal game plays every source of three or more prime factors that setup keeps, U\*_{≥3}
+//! The moves for `n` whose proof kind uses the frame model (an exhausted search, a trivial board, a repeat) are optimal
+//! on the whole board if some optimal moves play every source of three or more prime factors that setup keeps, U\*_{≥3}
 //! (the statement U).  The prover's barred parity bounds (`solver/noframe/src/bin/upper.rs`, one line per game) settle
 //! most of U\*_{≥3} against the game's score V: a member is *certified* when no set that respects the bottom-layers
 //! theorem (F4, docs/theory/frame-model.md) and leaves it out weighs more than V; the others are *open*, O.  The
@@ -11,12 +11,12 @@
 //! leaves the open ones optional (one-sided candidates of the search), and by the certificate theorem (E2), if no
 //! promotion set of Π⁺(O) is worth more than V − `in_the_bag⁺`, then opt(n) = V.
 //!
-//! [`certify_game`] does that for one game: it takes V and the recorded game from the results files, checks that the
-//! game plays U\* above n/2 and is the promotion set (K\*, L\*) = (O, its moves up to n/2) of Π⁺(O), worth V, and
+//! [`certify_game`] does that for one game: it takes V and the recorded moves from the results files, checks that the
+//! moves play U\* above n/2 and is the promotion set (K\*, L\*) = (O, its moves up to n/2) of Π⁺(O), worth V, and
 //! searches Π⁺(O) from it, in extended mode ([`SearchTactics::extended`]), with the ceiling n + V(n − 1) −
 //! `in_the_bag⁺`.  The verdict is [`Verdict::Certified`] when the search ends with nothing better (opt(n) = V), and
-//! [`Verdict::Beaten`] when it finds a promotion set worth more: then F ∪ K ∪ L is playable (E1), and the game
-//! that plays it, in the order of [`play_order`] (which shares no code with the frame model) and finished with the
+//! [`Verdict::Beaten`] when it finds a promotion set worth more: then F ∪ K ∪ L is playable (E1), and the moves
+//! that play it, in the order of [`play_order`] (which shares no code with the frame model) and finished with the
 //! largest legal moves left, is refereed by [`replay_finished`] and scores more than V: a counterexample to the score,
 //! and to U if the score was proven on the frame model.  A search stopped by a limit or a signal keeps its checkpoint
 //! and is [`Verdict::Incomplete`]; the same call resumes it.
@@ -35,17 +35,17 @@
 //! Consecutive games often pose the same Π⁺ (the same [`search::Problem`], which has `n` nowhere in it), as they often
 //! pose the same search problem in the solver (`solver::SAME_SEARCH_WINDOW`).  If an earlier game m of the last
 //! `SAME_SEARCH_WINDOW` games is certified, and Π⁺(n) equals Π⁺(m) whole, then the heaviest promotion set of Π⁺(n) is
-//! worth what m's certificate proved the heaviest worth, V(m) − `in_the_bag⁺`(m), and a recorded game of n that is
-//! worth the same has nothing above it: [`certify_game_with`] concludes `certified` with no search, recording the game
-//! m it rests on ([`SameProblem`]).  The problems are compared whole in the run's formulation, whatever formulation
-//! m's certificate was made in (a line of the other formulation is set up again in the run's): m's certificate bounds
-//! the heaviest promotion set, which does not depend on the formulation, so the rule proves what a search of Π⁺(n)
-//! would, and n's own barred bounds then give opt(n) = V(n) by E2.  A game worth less than
-//! m's certificate says is searched (it is not optimal, and the search finds the better set); one worth more
+//! worth what m's certificate proved the heaviest worth, V(m) − `in_the_bag⁺`(m), and recorded moves for n that are
+//! worth the same have nothing above them: [`certify_game_with`] concludes `certified` with no search, recording the
+//! game m it rests on ([`SameProblem`]).  The problems are compared whole in the run's formulation, whatever
+//! formulation m's certificate was made in (a line of the other formulation is set up again in the run's): m's
+//! certificate bounds the heaviest promotion set, which does not depend on the formulation, so the rule proves what a
+//! search of Π⁺(n) would, and n's own barred bounds then give opt(n) = V(n) by E2.  Moves worth less than
+//! m's certificate says are searched (they are not optimal, and the search finds the better set); one worth more
 //! contradicts the certificate and is refused.  Research code: the solver does not use it.
 //!
 //! The files `taxman certify` writes are checked again, line by line, by [`verify`] (`taxman verify-certificates`),
-//! which sets each certificate's problem up again, applies the same checks of the recorded game and the same rule of
+//! which sets each certificate's problem up again, applies the same checks of the recorded moves and the same rule of
 //! the same problem, and says how far the proofs of the recorded scores reach (the prover's, the certificates' and the
 //! ceilings').
 
@@ -74,14 +74,14 @@ pub mod verify;
 // The barred bounds
 
 /// What a certificate takes from a line of the prover's barred bounds (`upper`): the board, the score the open members
-/// were found against, whether the game rests on the frame model, and the open members of U\*_{≥3}.
+/// were found against, whether the score rests on the frame model, and the open members of U\*_{≥3}.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Upper {
     pub n: u32,
     /// The score V the bounds were compared with.
     pub score: u64,
     /// Whether the game needs a certificate: `n` is not prime and V is below n + V(n − 1), so it rests on the frame
-    /// model, not on the game of n − 1.
+    /// model, not on the moves for n − 1.
     pub needs: bool,
     /// The members of U\*_{≥3} whose barred bound is above V, ascending (none on a line that does not need it).
     pub open: Vec<u32>,
@@ -143,7 +143,7 @@ pub fn read_upper(paths: &[PathBuf]) -> Result<BTreeMap<u32, Upper>, String> {
 pub enum Verdict {
     /// The search ended and nothing beats the recorded score: it is optimal.
     Certified,
-    /// The search found a game that scores more than the recorded score.
+    /// The search found moves that score more than the recorded score.
     Beaten,
     /// A limit or a signal stopped the search, which its checkpoint resumes.
     Incomplete,
@@ -173,7 +173,7 @@ pub struct SameProblem {
     pub digest: u64,
     /// What m's certificate proved the heaviest promotion set of the problem is worth: V(m) − `in_the_bag⁺`(m).
     pub best: u64,
-    /// What this game's recorded game is worth in the problem: V(n) − `in_the_bag⁺`(n), which equals `best`.
+    /// What this game's recorded moves are worth in the problem: V(n) − `in_the_bag⁺`(n), which equals `best`.
     pub worth: u64,
 }
 
@@ -224,7 +224,7 @@ pub struct Certificate {
     /// With [`Verdict::Certified`] by the rule of the module docs, no search (`nodes` and the seconds are 0), the
     /// earlier game it rests on.
     pub same_problem: Option<SameProblem>,
-    /// With [`Verdict::Beaten`], the game found: its score and its moves.
+    /// With [`Verdict::Beaten`], the moves found: their score and the moves.
     pub beaten_by: Option<(u64, Vec<u32>)>,
 }
 
@@ -271,7 +271,7 @@ impl Certificate {
         Ok(certificate)
     }
 
-    /// What the recorded game is worth in Π⁺(O), V − `in_the_bag⁺` (which, for a certified line, is the most a
+    /// What the recorded moves are worth in Π⁺(O), V − `in_the_bag⁺` (which, for a certified line, is the most a
     /// promotion set of the problem is worth); `None` for a score below its own `in_the_bag⁺`, which no certificate
     /// has.
     pub fn worth(&self) -> Option<u64> {
@@ -313,7 +313,7 @@ impl Certificate {
 
     /// The summary line of the game, for stdout.
     pub fn summary_line(&self) -> String {
-        let beaten = self.beaten_by.as_ref().map_or_else(String::new, |(score, _)| format!(" by a game of {score}"));
+        let beaten = self.beaten_by.as_ref().map_or_else(String::new, |(score, _)| format!(" by moves worth {score}"));
         let verdict = match &self.same_problem {
             Some(same) => format!("{} (same problem as {})", self.verdict.as_str(), same.n),
             None => self.verdict.as_str().to_owned(),
@@ -337,16 +337,16 @@ impl Certificate {
     }
 }
 
-/// Certifies the recorded game of `n` (see the module docs): `known` gives the scores and games of `n` and `n − 1` (the
-/// results files, over the table of optimal games), `upper` the open members; the search runs with `opts`' threads,
-/// checkpoint (resumed if it exists), limits and progress, in extended mode whatever `opts`' tactics say.  `claims` is
-/// the formulation of Π⁺(O) ([`Board::extended`]): with the claims of `unzip` that E4 (docs/theory/extended-problem.md)
-/// keeps, or without any.
+/// Certifies the recorded moves of `n` (see the module docs): `known` gives the scores and moves of `n` and `n − 1`
+/// (the results files, over the table of optimal moves), `upper` the open members; the search runs with `opts`'
+/// threads, checkpoint (resumed if it exists), limits and progress, in extended mode whatever `opts`' tactics say.
+/// `claims` is the formulation of Π⁺(O) ([`Board::extended`]): with the claims of `unzip` that E4
+/// (docs/theory/extended-problem.md) keeps, or without any.
 ///
 /// # Errors
 ///
-/// If the game is not one a certificate can be made for (no recorded game, a game that does not replay to its score,
-/// does not play U\* above n/2, or is not a promotion set of Π⁺(O)), if Π⁺(O) cannot be set up (an open member that
+/// If the game is not one a certificate can be made for (no recorded moves, moves that do not replay to their score,
+/// do not play U\* above n/2, or are not a promotion set of Π⁺(O)), if Π⁺(O) cannot be set up (an open member that
 /// is no kept source of three or more prime factors, more frames than a frame set holds), if the search fails, or if
 /// the search found nothing better but `upper`'s score is above the recorded one (no certificate then).
 pub fn certify_game(
@@ -360,15 +360,15 @@ pub fn certify_game(
 }
 
 /// [`certify_game`] with the certified games `earlier`, which a game may rest on instead of a search (the rule of the
-/// module docs): after the checks of the recorded game and before the search, a game whose problem an earlier game
-/// of the last `SAME_SEARCH_WINDOW` games posed, and whose recorded game is worth what that game's certificate proved
+/// module docs): after the checks of the recorded moves and before the search, a game whose problem an earlier game
+/// of the last `SAME_SEARCH_WINDOW` games posed, and whose recorded moves are worth what that game's certificate proved
 /// the most, is certified with no search, its [`Certificate::same_problem`] naming that game; the earlier game may
 /// have been certified in the other formulation.  A certified game, by search or by the rule, is added to `earlier`.
 ///
 /// # Errors
 ///
-/// As [`certify_game`], and if the recorded game is worth more than an earlier certificate for the same problem proved
-/// the most a promotion set is worth (one of them is wrong, and nothing is certified on it).
+/// As [`certify_game`], and if the recorded moves are worth more than an earlier certificate for the same problem
+/// proved the most a promotion set is worth (one of them is wrong, and nothing is certified on it).
 pub fn certify_game_with(
     n: u32,
     known: &Optimal,
@@ -385,14 +385,14 @@ pub fn certify_game_with(
     crate::with_words!(width, W => certify_at::<W>(n, recorded, known, upper, claims, opts, earlier), else Err(beyond()))
 }
 
-/// The score and the moves of the recorded game of `n`, if the barred bounds `upper` given are the board's and the
-/// results have a game of it.
+/// The score and the moves recorded for `n`, if the barred bounds `upper` given are the board's and the
+/// results have moves for it.
 fn recorded_game<'a>(n: u32, known: &'a Optimal, upper: &Upper) -> Result<(u64, &'a [u32]), String> {
     let at = |e: String| format!("n={n}: {e}");
     if upper.n != n {
         return Err(at(format!("the barred bounds given are those of n={}", upper.n)));
     }
-    known.score(n).zip(known.moves(n)).ok_or_else(|| at("the results have no game of n".into()))
+    known.score(n).zip(known.moves(n)).ok_or_else(|| at("the results have no moves for n".into()))
 }
 
 /// The block words the GF(2) bound of Π⁺(`open`) of the board `1..=n` needs at its root ([`Board::extended_words`]: an
@@ -492,22 +492,22 @@ fn certify_at<const W: usize>(
     Ok(certificate)
 }
 
-/// What the checks of a recorded game ([`check_recorded_game`]) leave for the search, or for a verifier of the
-/// certificate: the board, the extended problem and the search set up for it, the problem as posed, the recorded game
+/// What the checks of recorded moves ([`check_recorded_game`]) leave for the search, or for a verifier of the
+/// certificate: the board, the extended problem and the search set up for it, the problem as posed, the recorded moves
 /// as a promotion set of it and what that is worth.
 struct Recorded<const W: usize> {
     board: Board<W>,
     extended: ExtendedFrames<W>,
     prepared: Prepared<W>,
     posed: Posed,
-    /// The recorded game as a promotion set of Π⁺(O): the open sources, and its moves up to n/2.
+    /// The recorded moves as a promotion set of Π⁺(O): the open sources, and its moves up to n/2.
     start: Bits<W>,
     /// What `start` is worth, which with `in_the_bag⁺` is the recorded score.
     worth: u64,
 }
 
-/// The checks a certificate makes of the recorded game of `n` before it searches or settles anything, shared by
-/// [`certify_game_with`] and the verifier of a certificate's line (`verify`): the game replays to `score`, plays U\*
+/// The checks a certificate makes of the recorded moves of `n` before it searches or settles anything, shared by
+/// [`certify_game_with`] and the verifier of a certificate's line (`verify`): the moves replay to `score`, play U\*
 /// above n/2 and is a promotion set of Π⁺(`open`) worth `score`, set up at the set width `W`, in the formulation
 /// `claims` ([`Board::extended`]).  The search is set up to resume the checkpoint `resume`, if there is one.
 ///
@@ -524,9 +524,9 @@ fn check_recorded_game<const W: usize>(
     resume: Option<&Path>,
 ) -> Result<Recorded<W>, String> {
     let at = |e: String| format!("n={n}: {e}");
-    let replayed = replay(n, moves).map_err(|e| at(format!("the recorded game is illegal: {e}")))?;
+    let replayed = replay(n, moves).map_err(|e| at(format!("the recorded moves are illegal: {e}")))?;
     if replayed != score {
-        return Err(at(format!("the recorded game scores {replayed}, not the {score} recorded")));
+        return Err(at(format!("the recorded moves score {replayed}, not the {score} recorded")));
     }
     let board = Board::<W>::for_n(n);
     let kept: Bits<W> = board.plain.iter().copied().filter(|&x| 2 * x > n).collect();
@@ -535,7 +535,7 @@ fn check_recorded_game<const W: usize>(
     if above != kept {
         let (more, fewer) = ((above - kept).to_vec(), (kept - above).to_vec());
         return Err(at(format!(
-            "the recorded game does not play U*, the sources setup keeps, above n/2: it plays {more:?} besides, and \
+            "the recorded moves do not play U*, the sources setup keeps, above n/2: they play {more:?} besides, and \
              not {fewer:?}"
         )));
     }
@@ -553,19 +553,19 @@ fn check_recorded_game<const W: usize>(
     let promotable = start.is_subset(&prepared.candidates)
         && prepared.model.can_promote_all_using(&mut Scratch::new(), &prepared.root, &start);
     if !promotable {
-        return Err(at("the recorded game is not a promotion set of Π⁺(O) (E1 says a playable one is)".into()));
+        return Err(at("the recorded moves are not a promotion set of Π⁺(O) (E1 says a playable one is)".into()));
     }
     let worth = start.sum();
     if extended.in_the_bag + worth != score {
         return Err(at(format!(
-            "the recorded game is worth {} in Π⁺(O), not its score {score}",
+            "the recorded moves are worth {} in Π⁺(O), not their score {score}",
             extended.in_the_bag + worth
         )));
     }
     Ok(Recorded { board, extended, prepared, posed, start, worth })
 }
 
-/// Searches the extended problem `prepared` from the recorded game `start`, with the ceiling `cap`, on `opts`' threads
+/// Searches the extended problem `prepared` from the recorded moves `start`, with the ceiling `cap`, on `opts`' threads
 /// and with its checkpoint (resumed if `resuming`), limits and progress.
 fn search_from<const W: usize>(
     n: u32,
@@ -712,9 +712,9 @@ impl EarlierCertificates {
     }
 
     /// The latest certified game m of the last `SAME_SEARCH_WINDOW` games before `n` whose problem is `ours`,
-    /// the problem of the recorded game of `n` in the formulation `claims`, worth `worth`, and what that means for `n`:
-    /// `Some` with the record of m if `worth` is what m's certificate proved the most, `None` if there is no such game
-    /// or if `worth` is less (`n` is searched, then).
+    /// the problem of the recorded moves of `n` in the formulation `claims`, worth `worth`, and what that means for
+    /// `n`: `Some` with the record of m if `worth` is what m's certificate proved the most, `None` if there is no such
+    /// game or if `worth` is less (`n` is searched, then).
     ///
     /// A game of the same formulation whose digest is not `ours`' is passed over.  A game of the other formulation has
     /// a digest that says nothing of `ours`, so it is passed over unless the sizes that do not depend on the
@@ -759,15 +759,15 @@ impl EarlierCertificates {
 }
 
 /// What the certified game m, whose problem is `theirs` and whose certificate proved the most a promotion set of it is
-/// worth, `best`, says of a later game: its problem `ours`, in which its recorded game is worth `worth`.
+/// worth, `best`, says of a later game: its problem `ours`, in which its recorded moves are worth `worth`.
 #[derive(Debug, PartialEq, Eq)]
 enum Rule {
     /// The problems differ: m says nothing of the game.
     Other,
-    /// The same problem, and the recorded game is worth less than m's certificate proved the most: the game is
+    /// The same problem, and the recorded moves are worth less than m's certificate proved the most: the game is
     /// searched.
     Searched,
-    /// The same problem, and the recorded game is worth what m's certificate proved the most: the game is certified
+    /// The same problem, and the recorded moves are worth what m's certificate proved the most: the game is certified
     /// with no search, resting on m.
     Settled(SameProblem),
 }
@@ -787,14 +787,14 @@ fn apply_rule(m: &Certificate, best: u64, theirs: &Problem, ours: &Problem, wort
         Ordering::Equal => Ok(Rule::Settled(SameProblem { n: m.n, digest: ours.digest(), best, worth })),
         Ordering::Less => Ok(Rule::Searched),
         Ordering::Greater => Err(format!(
-            "the recorded game is worth {worth} in Π⁺(O), which is the problem of n={0} too, and the certificate of \
+            "the recorded moves are worth {worth} in Π⁺(O), which is the problem of n={0} too, and the certificate of \
              n={0} says no promotion set of it is worth more than {best}: it contradicts the certificate of n={0}",
             m.n
         )),
     }
 }
 
-/// The game of a promotion set `promotions` of Π⁺(O) worth more than `score`: the set S = F ∪ K ∪ L played in the
+/// The moves for a promotion set `promotions` of Π⁺(O) worth more than `score`: the set S = F ∪ K ∪ L played in the
 /// order of [`play_order`] (the peel of the peel theorem (P4, docs/theory/playability.md), which uses nothing of the
 /// frame model), then the largest legal move left, again and again, until none is left, so that the game is over;
 /// refereed by [`replay_finished`].
@@ -814,9 +814,9 @@ fn beating_game<const W: usize>(
             None => break,
         }
     }
-    let found = replay_finished(t.n, &moves).map_err(|e| format!("the game found is refused: {e}"))?;
+    let found = replay_finished(t.n, &moves).map_err(|e| format!("the moves found are refused: {e}"))?;
     if found <= score {
-        return Err(format!("the game found scores {found}, not more than {score}"));
+        return Err(format!("the moves found score {found}, not more than {score}"));
     }
     Ok((found, moves))
 }
@@ -928,7 +928,7 @@ mod tests {
     }
 
     /// The certificate of board `n`, made by hand, whose problem is `posed` (set up with the open members `open`, with
-    /// the claims of `unzip`: the default formulation) and whose game is worth `best` in it.
+    /// the claims of `unzip`: the default formulation) and whose recorded moves are worth `best` in it.
     fn line(n: u32, posed: &Posed, open: &[u32], best: u64) -> Certificate {
         Certificate {
             n,
@@ -1099,10 +1099,10 @@ mod tests {
         let mut earlier = remembering(&lines(worth, worth + 1), &remembered);
         let same = SameProblem { n: n - 1, digest, best: worth, worth };
         assert_eq!(earlier.find(n, &posed.problem, true, worth), Ok(Some(same)));
-        // A game worth less than the certificate says is not settled by the rule (and the window is not searched on).
+        // Moves worth less than the certificate says are not settled by the rule (and the window is not searched on).
         let mut earlier = remembering(&lines(worth + 1, worth), &remembered);
         assert_eq!(earlier.find(n, &posed.problem, true, worth), Ok(None));
-        // A game worth more contradicts it: an error that names both games' values.
+        // Moves worth more contradict it: an error that names both games' values.
         let mut earlier = remembering(&lines(worth - 1, worth), &remembered);
         let e = earlier.find(n, &posed.problem, true, worth).unwrap_err();
         assert!(e.contains(&format!("n={}", n - 1)) && e.contains("contradicts the certificate"), "{e}");
@@ -1219,7 +1219,7 @@ mod tests {
             assert_eq!(earlier.find(n, &without.problem, false, worth), found(&without));
             assert_eq!(earlier.find(n, &with.problem, false, worth), Ok(None));
         }
-        // A game worth more than the certificate allows contradicts it, whichever formulation the certificate is of.
+        // Moves worth more than the certificate allows contradict it, whichever formulation the certificate is of.
         let mut earlier = remembering(&[from_without], &[]);
         let e = earlier.find(n, &with.problem, true, worth + 1).unwrap_err();
         assert!(e.contains(&format!("contradicts the certificate of n={m}")), "{e}");

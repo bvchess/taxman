@@ -1,6 +1,6 @@
 //! The board layer ([`taxman::frames`], [`taxman::board`]) against the committed chain.
 //!
-//! Every game of `results/optimal.jsonl.gz` that was searched (or repeats a search) records the moves of the game its
+//! Every game of `results/optimal.jsonl.gz` that was searched (or repeats a search) records the moves its
 //! promotions make and the digest of the search problem its board poses.  Both come out of the board layer, which
 //! nothing else compares with the chain at the boards that matter (the golden data stops at 2049): a change of how
 //! setup forms and simplifies the frames, however it is made, must leave every one of them as it was.  A sample of
@@ -61,7 +61,7 @@ fn sampled_lines(every: usize, up_to: u32) -> Vec<Line> {
     sampled.filter(|line| line.n <= up_to).collect()
 }
 
-/// The game the line's promotions make, as the board layer plays it now, at the set width the solver picks.
+/// The moves the line's promotions make, as the board layer plays it now, at the set width the solver picks.
 fn moves_of(line: &Line) -> Vec<u32> {
     with_width!(line.n, W => {
         let promotions = Bits::<W>::from_slice(&line.promotions);
@@ -69,7 +69,7 @@ fn moves_of(line: &Line) -> Vec<u32> {
     })
 }
 
-/// The moves of the games a promotion set makes, and the digest of the search problem of a board, are those of the
+/// The moves a promotion set makes, and the digest of the search problem of a board, are those of the
 /// committed chain: at a sample of its boards, from small sets to the widest.
 #[test]
 #[cfg_attr(
@@ -91,11 +91,11 @@ fn the_board_layer_reproduces_the_chains_moves_and_problems_to_1300() {
     the_board_layer_reproduces(&lines);
 }
 
-/// The moves of the games the promotions of each of `lines` make, and the digest of the search problem of each board,
+/// The moves the promotions of each of `lines` make, and the digest of the search problem of each board,
 /// are those of the committed chain.
 fn the_board_layer_reproduces(lines: &[Line]) {
     for line in lines {
-        assert_eq!(moves_of(line), line.moves, "n={}: the game the promotions make", line.n);
+        assert_eq!(moves_of(line), line.moves, "n={}: the moves the promotions make", line.n);
         let (problem, _in_the_bag) = search_problem(line.n).expect("a problem");
         assert_eq!(digest_text(problem.digest()), line.digest, "n={}: the search problem's digest", line.n);
     }

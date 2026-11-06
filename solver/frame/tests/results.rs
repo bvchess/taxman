@@ -1,6 +1,6 @@
-//! The committed results pass the checks that `taxman verify-results` runs (see `taxman::results`): every game
-//! replays legally to its recorded score, is over and opens with the largest prime, keeps to the chain from
-//! n − 1, and the arithmetic and provenance of its line hold; the files agree on every game they share.  No count of
+//! The committed results pass the checks that `taxman verify-results` runs (see `taxman::results`): the moves of
+//! every line replay legally to its recorded score, are over and open with the largest prime, keep to the chain from
+//! n − 1, and the arithmetic and provenance of the line hold; the files agree on every game they share.  No count of
 //! the file is asserted here: they are `results/README.md`'s to print.  And both verifiers, `verify-results` and the
 //! Python referee, refuse lines that a hand edit made contradict themselves, and derive assumptions by the same
 //! rules.
@@ -39,13 +39,13 @@ fn with(line: &Json, path: &str, value: &Json) -> Json {
     Json::Obj(fields)
 }
 
-/// The first games of the committed results that the checks of these tests meet, which the Python referee takes as its
+/// The first lines of the committed results that the checks of these tests meet, which the Python referee takes as its
 /// table as the Rust verifier takes the built-in one.
 const TABLE_GAMES: usize = 400;
 
 /// The Python referee `solver/tools/check_results.py` on the files `paths`.  Their lines cite no known source, so it is
 /// given none (a path that is not there): by default it reads the committed chain and the bounds store, 0.4 s each
-/// time.  Its table is the first [`TABLE_GAMES`] games of the committed results, in a file beside the first of `paths`.
+/// time.  Its table is the first [`TABLE_GAMES`] lines of the committed results, in a file beside the first of `paths`.
 fn python_referee(paths: &[PathBuf]) -> std::process::Output {
     let none = "/nonexistent/none.jsonl";
     let table = common::referee_table(&paths[0], TABLE_GAMES);
@@ -169,7 +169,7 @@ fn lines_whose_fields_contradict_each_other_are_refused_by_both_verifiers() {
     both_verifiers(&TempDir::new("contradictions"), &lines, &accepted, &refused);
 }
 
-/// A search whose starting game reaches the ceiling before the search takes a step has the method `start`, with the
+/// A search whose starting moves reach the ceiling before the search takes a step has the method `start`, with the
 /// proof `cap` and no nodes: game 18's greedy set already scores `n + score(n − 1)`.  Games 20 and 21 run their trees
 /// and stay `search`.  Both verifiers read the file.  The line of an older build, which called game 18 a `search`
 /// with no node, still reads in the Rust verifier, which guards what could change a proof and not the label; the
@@ -262,7 +262,7 @@ fn the_line_of_a_search_armed_with_the_near_repeat_cut_counts_the_nodes_it_cut()
 }
 
 /// A proof assumes what the game it rests on assumes, and nothing else.  Games 33 to 50, the first built on
-/// the table's game of 32 (`--use-prev`): 33 reaches its ceiling and 34 repeats 33, so both assume that game
+/// the table's moves for 32 (`--use-prev`): 33 reaches its ceiling and 34 repeats 33, so both assume those moves
 /// optimal; 35 exhausts its search, which rests on no game, so it and the games after it that rest on it assume
 /// nothing.  Both verifiers refuse a line that records a proof by `cap` without the assumption, an exhausted search
 /// with it, or a prime game built on a game that assumes nothing with it.
@@ -300,7 +300,7 @@ fn a_proof_assumes_what_the_game_it_rests_on_assumes_and_nothing_else() {
 }
 
 /// A repeat (method `repeat`, proof `same_search`) stands on the game it names: both verifiers refuse one whose
-/// record, digests, promotions or arithmetic do not fit that game, whose game is not a completed game of the file
+/// record, digests, promotions or arithmetic do not fit that game, whose game is not a completed line of the file
 /// before it, settles no search or comes after it, and one that drops what the game it repeats assumes.  The Rust
 /// verifier also sets both search problems up again and compares them, which refuses two more that the Python
 /// referee, which cannot, accepts.  Games 1..90, in which 65 repeats 64, a search.
@@ -501,15 +501,15 @@ fn stopped_at(line: &Json) -> Json {
 }
 
 /// A file with holes, and unfinished searches, passes both verifiers when each line stands against what it rests on in
-/// the file: a game built on the best game of an unfinished search (as a `solve` that went on past limits wrote it) has
-/// no ceiling and no proof that rests on it, and names an earlier incomplete line that records that game.  The lines
-/// that claim otherwise are refused by both, naming the line.
+/// the file: a line built on the best moves of an unfinished search (as a `solve` that went on past limits wrote it)
+/// has no ceiling and no proof that rests on it, and names an earlier incomplete line that records those moves.  The
+/// lines that claim otherwise are refused by both, naming the line.
 #[test]
 fn games_built_on_unfinished_searches_are_checked_by_both_verifiers() {
     let dir = TempDir::new("unfinished-prev");
-    // 598..602 stop at a time limit (of nothing, which stops a search before it starts), each on the best game of the
+    // 598..602 stop at a time limit (of nothing, which stops a search before it starts), each on the best moves of the
     // one before; 603 finishes on 602's.  The solver no longer goes on past a limit, so the lines are those of the games
-    // solved alone, each naming the best game of the one before it as its `prev`, as the older `solve` wrote them.
+    // solved alone, each naming the best moves of the one before it as its `prev`, as the older `solve` wrote them.
     let stopping = SolveOptions { time_limit: Some(Duration::ZERO), force_search: true, ..common::options(1) };
     let built_on = |line: Json, before: &GameResult| {
         let prev = Json::object([
@@ -548,7 +548,7 @@ fn games_built_on_unfinished_searches_are_checked_by_both_verifiers() {
     cases.push(refused(&[("prev.moves_digest", zeros)], "no earlier line"));
     // An unproven game assumes nothing.
     cases.push(refused(&[("prev.assumes", Json::array(["a statement"]))], "does not match"));
-    // The incomplete line itself: its game must score what it says.
+    // The incomplete line itself: its moves must score what it says.
     let worse = Json::from(kept[2].get("best_so_far").and_then(Json::as_u64).unwrap() + 1);
     let mut lying = kept.clone();
     lying[2] = with(&kept[2], "best_so_far", &worse);
@@ -557,7 +557,7 @@ fn games_built_on_unfinished_searches_are_checked_by_both_verifiers() {
     let mut swapped = kept.clone();
     swapped.swap(4, 5);
     cases.push((swapped, Verdict::Refused { line: 5, n: 603, expected: "no earlier line" }));
-    // An incomplete line with no game in it (made by hand) is only counted.
+    // An incomplete line with no moves in it (made by hand) is only counted.
     let minimal = Json::object([
         ("schema", Json::from(taxman::results::SCHEMA)),
         ("n", Json::from(700u32)),
@@ -589,11 +589,11 @@ fn games_built_on_unfinished_searches_are_checked_by_both_verifiers() {
 }
 
 /// A record of the proof `known` stands on the file's own line of the game before, whatever proof that line has.  A run
-/// with `--use-prev` records the committed chain's games as `known`, so when its lines are appended to the committed
-/// file, its first line names a game of n − 1 as `known` while the file's line of that game has the proof it was made
-/// with.  Both verifiers accept such a record when the score, the moves and the assumptions are the line's, and refuse
-/// it when any of them differs, when the game is not in the file, when it names another source, and a record of any
-/// other proof that is not the line's.  Games 1..90.
+/// with `--use-prev` records the committed chain's moves as `known`, so when its lines are appended to the committed
+/// file, its first line names the moves for n − 1 as `known` while the file's line of that game has the proof it was
+/// made with.  Both verifiers accept such a record when the score, the moves and the assumptions are the line's, and
+/// refuse it when any of them differs, when the game is not in the file, when it names another source, and a record of
+/// any other proof that is not the line's.  Games 1..90.
 #[test]
 fn a_known_record_of_the_game_before_stands_on_the_files_own_line() {
     let games = solver::solve_range(1, 90, &common::options(1), None).unwrap();
@@ -641,7 +641,7 @@ const QUICK_LAST: usize = 400;
 
 /// What holds of the committed chain whatever its length, of the first `last` games of it (a file of its first `last`
 /// lines is a chain from n = 1 itself) or of all of it (`None`): the verifier accepts it, n runs from 1 with no gap,
-/// every line is a completed game, none is left unfinished, and the table built into the library has the file's
+/// every line is a completed line, none is left unfinished, and the table built into the library has the file's
 /// scores and moves.  The counts of the file, by proof and by range, are `results/README.md`'s to print
 /// (`taxman verify-results results/optimal.jsonl.gz`), and no test fixes them.
 fn check_the_committed_results(last: Option<usize>) {
@@ -672,7 +672,7 @@ fn check_the_committed_results(last: Option<usize>) {
     assert_eq!((file.contents.incomplete_lines, file.contents.torn), (0, false), "{}", file.path.display());
     assert!(file.contents.runs.is_empty(), "{}: a game left unfinished", file.path.display());
 
-    // The table is the file's games, as the library reads them.
+    // The table is the file's moves, as the library reads them.
     for (&n, game) in games {
         assert_eq!((optimal.score(n), optimal.moves(n)), (Some(game.score), Some(&game.moves[..])), "n={n}");
     }

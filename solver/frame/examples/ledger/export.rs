@@ -153,7 +153,7 @@ impl Citing for Lowers<'_> {
         self.settled.contains(&n)
     }
 
-    /// The board a game was carried from, if the line of `n` may cite its game (a game of the chain is never cited, as
+    /// The board moves were carried from, if the line of `n` may cite its moves (moves of the chain are never cited, as
     /// a run need not have the chain); whether it does is decided when the line is made.
     fn cited(&self, n: u32) -> Option<u32> {
         let lower = self.to_append(n)?;
@@ -161,9 +161,9 @@ impl Citing for Lowers<'_> {
         self.ledger.get(&from)?.lower.as_ref().map(|_| from)
     }
 
-    /// Appends the line of the ledger's lower bound of board `n`, if there is one to append.  A game that a relation
-    /// made of the game of another board (monotone, ceiling or prime) is not written but cited, if the ledger's lower
-    /// bound of that board is that game and the file has it by now.
+    /// Appends the line of the ledger's lower bound of board `n`, if there is one to append.  Moves that a relation
+    /// made of the moves for another board (monotone, ceiling or prime) are not written but cited, if the ledger's
+    /// lower bound of that board is those moves and the file has it by now.
     fn finish(&mut self, n: u32) -> Result<(), String> {
         self.settled.insert(n);
         let Some(lower) = self.to_append(n) else { return Ok(()) };
@@ -215,8 +215,8 @@ struct Uppers<'a> {
 }
 
 impl Uppers<'_> {
-    /// The ledger's upper bound of board `n` if it is to be appended: the chain has no game of the board (its score is
-    /// exact), and the bound improves on the store's.
+    /// The ledger's upper bound of board `n` if it is to be appended: the chain has no moves for the board (its score
+    /// is exact), and the bound improves on the store's.
     fn to_append(&self, n: u32) -> Option<Upper> {
         let upper = self.ledger.get(&n)?.upper?;
         let stored = self.best.upper.get(&n);
@@ -303,7 +303,7 @@ impl Citing for Uppers<'_> {
         self.to_append(n).filter(|upper| upper.rule.is_relation())?.from
     }
 
-    /// Settles the best upper bound of board `n` after the export, if it has one: a game of the chain, which is exact;
+    /// Settles the best upper bound of board `n` after the export, if it has one: moves of the chain, which are exact;
     /// else the ledger's if that improves on the store's (appended, after the bound it cites); else the store's.
     fn finish(&mut self, n: u32) -> Result<(), String> {
         let stored = self.best.upper.get(&n).map(|line| Bound { value: line.value, rests_on: line.rests_on.clone() });

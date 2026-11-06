@@ -1,9 +1,9 @@
-//! The known games `taxman solve --use-prev` draws on (`src/known.rs`): the table, the committed chain and the
+//! The known moves `taxman solve --use-prev` draws on (`src/known.rs`): the table, the committed chain and the
 //! bounds store.  A board that a source has proven is recorded without a search, citing the source and carrying what it
-//! assumes; the game of `n − 1` from a source gives the ceiling and the seed; the store's open boards seed their
+//! assumes; the moves for `n − 1` from a source give the ceiling and the seed; the store's open boards seed their
 //! searches and give them a ceiling.  Both verifiers of results files check the citations against the sources, and refuse a store line
 //! that is missing, changed, or not the one cited.  The stores here are made by hand, for boards 900..960 and the like,
-//! with the truth's games (the table's) as their lines; the committed chain is a small one made for the purpose.
+//! with the truth's moves (the table's) as their lines; the committed chain is a small one made for the purpose.
 
 mod common;
 
@@ -18,14 +18,14 @@ use taxman::results::{assumed_optimal, assumed_u, verify_files_with, Assumptions
 use taxman::solver::{self, GameResult, Method, PrevSource, SolveOptions};
 use taxman::store::{Rule, Side, Store};
 
-/// The truth: the table's game of `n`.
+/// The truth: the table's moves for `n`.
 fn truth(n: u32) -> (u64, Vec<u32>) {
     let table = Optimal::built_in();
-    (table.score(n).expect("a game of the table"), table.moves(n).expect("a game of the table").to_vec())
+    (table.score(n).expect("moves in the table"), table.moves(n).expect("moves in the table").to_vec())
 }
 
-/// A table with the games `games` of the built-in table: the table a run confirms its scores against, so that the other
-/// boards of its range are known to nothing but the sources it is given.
+/// A table with the moves for the boards `games` of the built-in table: the table a run confirms its scores against, so
+/// that the other boards of its range are known to nothing but the sources it is given.
 fn table_of(games: &[u32]) -> Optimal {
     let mut table = Optimal::from_json(&Json::Arr(Vec::new())).unwrap();
     for &n in games {
@@ -48,7 +48,7 @@ fn line(n: u32, side: &str, value: u64, rule: &str, rest: &[(&str, Json)]) -> Js
     Json::object(pairs)
 }
 
-/// The two lines of a board the store has proven with the truth's game: a lower bound by `given` with its moves, and
+/// The two lines of a board the store has proven with the truth's moves: a lower bound by `given` with its moves, and
 /// an upper bound by `given` that rests on the board itself.
 fn proven_lines(n: u32) -> Vec<Json> {
     let (score, moves) = truth(n);
@@ -77,7 +77,7 @@ fn read_lines(path: &Path) -> Vec<Json> {
     fs::read_to_string(path).unwrap().lines().map(|text| Json::parse(text).unwrap()).collect()
 }
 
-/// A store of the boards `proven`, each proven with the truth's game.
+/// A store of the boards `proven`, each proven with the truth's moves.
 fn store_of(dir: &TempDir, boards: &[u32]) -> PathBuf {
     let path = dir.join("bounds.jsonl");
     write_lines(&path, &boards.iter().flat_map(|&n| proven_lines(n)).collect::<Vec<_>>());
@@ -92,7 +92,7 @@ fn options(sources: KnownSources) -> SolveOptions {
     SolveOptions { threads: 1, use_prev: true, known: sources, ..SolveOptions::default() }
 }
 
-/// Solves `lo..=hi` into `out` from the sources, with the one-game table of the game before `lo` (so that nothing but
+/// Solves `lo..=hi` into `out` from the sources, with the one-line table of the moves for `lo − 1` (so that nothing but
 /// the sources and the search knows the boards of the range).
 fn run(lo: u32, hi: u32, opts: &SolveOptions, out: &Path) -> Vec<GameResult> {
     let mut games = Vec::new();
@@ -119,7 +119,8 @@ fn python_verdict(file: &Path, sources: &KnownSources) -> (Option<i32>, String) 
     let none = Path::new("/nonexistent/none.jsonl");
     let committed = sources.committed.as_deref().unwrap_or(none);
     let bounds = sources.bounds.as_deref().unwrap_or(none);
-    // Its table, as the Rust verifier's built-in one: the first games of the committed results, in a file beside `file`.
+    // Its table, as the Rust verifier's built-in one: the first lines of the committed results, in a file beside
+    // `file`.
     let table = common::referee_table(file, common::FIRST_GAMES as usize);
     let args = [
         common::path(file),
@@ -181,7 +182,7 @@ fn proven_boards_of_the_store_are_recorded_in(lo: u32, hi: u32, boards: &[u32]) 
     let out = dir.join("out.jsonl");
     let games = run(lo, hi, &options(sources.clone()), &out);
 
-    // The control: the same range from the same game before it, with nothing but the search to find the games.
+    // The control: the same range from the same game before it, with nothing but the search to find the moves.
     let control = run(lo, hi, &options(KnownSources::default()), &dir.join("control.jsonl"));
     assert_eq!(games.len(), control.len());
 
@@ -191,8 +192,8 @@ fn proven_boards_of_the_store_are_recorded_in(lo: u32, hi: u32, boards: &[u32]) 
         assert_eq!(game.score, score, "n={}", game.n);
         assert_eq!(game.score, board(&control, game.n).score, "n={}", game.n);
         if proven.contains(&game.n) {
-            // The store's game, recorded with no search, citing the lines it comes from, and assuming U where the upper
-            // bound does.
+            // The store's moves, recorded with no search, citing the lines it comes from, and assuming U where the
+            // upper bound does.
             let cited = LineRef { rule: Rule::Given, source: "test-run".into() };
             let cite = Cite::Bounds { lower: Some(cited.clone()), upper: cited };
             assert_eq!((game.method, game.proof, game.nodes), (Method::Known, Some(Proof::Known), 0), "n={}", game.n);
@@ -203,7 +204,8 @@ fn proven_boards_of_the_store_are_recorded_in(lo: u32, hi: u32, boards: &[u32]) 
             assert!(game.known.is_none() && game.method != Method::Known, "n={}", game.n);
         }
     }
-    // The first game's game before it is the table's, assumed optimal; what rests on a game inherits its assumptions.
+    // The moves for the game before the first one are the table's, assumed optimal; what rests on moves inherits their
+    // assumptions.
     let first = games[0].prev.as_ref().unwrap();
     assert_eq!((first.source, first.n), (PrevSource::Optimal, lo - 1));
     for pair in games.windows(2).filter(|pair| pair[1].proof.is_some_and(Proof::rests_on_prev)) {
@@ -222,8 +224,8 @@ fn proven_boards_of_the_store_are_recorded_in(lo: u32, hi: u32, boards: &[u32]) 
 
     both_accept(&out, &sources);
 
-    // A run that starts after a board the store has proven takes that game as the game before it: from the store, which
-    // is the better source than the table that has it too (the proven game assumes U where its bound rests).
+    // A run that starts after a board the store has proven takes those moves as the game before it: from the store,
+    // which is the better source than the table that has it too (the proven moves assume U where its bound rests).
     let later = dir.join("later.jsonl");
     let games = run(907, hi, &options(sources.clone()), &later);
     let prev = games[0].prev.as_ref().unwrap();
@@ -242,7 +244,8 @@ fn proven_boards_of_the_store_are_recorded_in(lo: u32, hi: u32, boards: &[u32]) 
 
 #[test]
 fn a_game_that_the_store_carries_from_the_game_of_another_line_is_played_and_cited() {
-    // 902 is at its ceiling: the game of 901 followed by 902.  The store has it as a line that cites the game of 901.
+    // 902 is at its ceiling: the moves for 901 followed by 902.  The store has it as a line that cites the moves for
+    // 901.
     let dir = TempDir::new("known-carried");
     let (score901, moves901) = truth(901);
     let score902 = score901 + 902;
@@ -271,7 +274,7 @@ fn a_game_that_the_store_carries_from_the_game_of_another_line_is_played_and_cit
     let games = run(901, 903, &options(sources.clone()), &out);
     assert_eq!((games[0].method, games[1].method), (Method::Known, Method::Known));
     assert_eq!(games[1].assumes, Assumptions::from([assumed_u(901)]));
-    // 903 follows a known game, and rests on it where it can: it has the same assumption or none.
+    // 903 follows known moves, and rests on them where it can: it has the same assumption or none.
     both_accept(&out, &sources);
 }
 
@@ -386,10 +389,10 @@ fn both_verifiers_refuse_the_cases(sampled: impl Fn(usize) -> bool) {
     refuse(&refused, &sources_ok, 1, 906, "cites no source");
     let refused = edit_line("proof.jsonl", 906, "proof", Json::from("exhausted"));
     refuse(&refused, &sources_ok, 1, 906, "records the proof exhausted, but it is known");
-    // The game of a known line is checked as any game: a score that the moves do not make is refused.
+    // The moves of a known line are checked as any moves: a score that the moves do not make is refused.
     let refused = edit_line("score.jsonl", 906, "score", Json::from(games[0].score + 1));
     refuse(&refused, &sources_ok, 1, 906, "the moves score");
-    // A citation on a line that is not a known game, a prime game say, is a contradiction.
+    // A citation on a line that is not known moves, a prime's say, is a contradiction.
     let refused = edit_line("prime.jsonl", 907, "known", cite("test-run"));
     refuse(&refused, &sources_ok, 2, 907, "known");
 }
@@ -444,7 +447,7 @@ fn an_open_board_of_the_store_seeds_its_search_to(hi: u32) {
     }
     both_accept(&out, &sources);
 
-    // Only the lower bound: its game seeds the search, which starts at P*, and proves it as it did.  A search of the
+    // Only the lower bound: its moves seed the search, which starts at P*, and proves it as it did.  A search of the
     // board on its own (no game before it) shows the seed: the nodes fall to those of a seed at P*.
     let store = dir.join("lower.jsonl");
     write_lines(&store, &[line(n, "lower", score, "given", &[("moves", Json::array(moves.clone()))])]);
@@ -468,8 +471,8 @@ fn the_committed_chain_and_the_table_are_known_games_too() {
     let chain = chain.unwrap();
     let store = store_of(&dir, &[50, 62]);
 
-    // From the committed chain: 50..=60 are its games, recorded without a search and assuming what its lines do
-    // (nothing); 61 is built on its game of 60, and 62 is the store's, which proves it.  50 is in the store too, but
+    // From the committed chain: 50..=60 are its lines, recorded without a search and assuming what its lines do
+    // (nothing); 61 is built on its moves for 60, and 62 is the store's, which proves it.  50 is in the store too, but
     // the committed chain is the better source.
     let sources = sources(Some(&committed), Some(&store));
     let out = dir.join("out.jsonl");
@@ -485,7 +488,7 @@ fn the_committed_chain_and_the_table_are_known_games_too() {
     }
     let first = games[0].prev.as_ref().unwrap();
     assert_eq!((first.source, first.n, first.proof), (PrevSource::Strict, 49, chain[48].proof));
-    // 61 is a prime: the prime formula on the known game of 60, which assumes nothing.
+    // 61 is a prime: the prime formula on the known moves for 60, which assume nothing.
     let sixty_one = board(&games, 61);
     assert_eq!((sixty_one.method, sixty_one.proof), (Method::Prime, Some(Proof::PrimeFormula)));
     assert_eq!(board(&games, 61).prev.as_ref().map(|p| p.source), Some(PrevSource::Run));
@@ -502,7 +505,7 @@ fn the_committed_chain_and_the_table_are_known_games_too() {
     assert!(games.iter().take(3).all(|g| g.method != Method::Known), "boards are not known without `boards`");
     both_accept(&out, &sources);
 
-    // From the table: the whole range is its games, each assumed optimal.
+    // From the table: the whole range is its lines, each assumed optimal.
     let out = dir.join("table.jsonl");
     let from_table = options(KnownSources { boards: true, ..KnownSources::default() });
     let games = run_with(&from_table, 40, 45, &out, Optimal::built_in());
@@ -514,9 +517,9 @@ fn the_committed_chain_and_the_table_are_known_games_too() {
     both_accept(&out, &KnownSources::default());
 }
 
-/// A committed chain in a gzip file, as the committed results are, gives the games of the same chain in a plain file, is
-/// decoded as its games are asked for (a member that nothing asks for is not read), and a fault in the member a game is
-/// read from is an error of asking for the game, naming the file.
+/// A committed chain in a gzip file, as the committed results are, gives the moves of the same chain in a plain file,
+/// is decoded as its moves are asked for (a member that nothing asks for is not read), and a fault in the member the
+/// moves of a game are read from is an error of asking for them, naming the file.
 #[test]
 fn a_gzip_committed_chain_gives_the_games_of_a_plain_one_and_is_read_as_they_are_asked_for() {
     let dir = TempDir::new("known-committed-gz");
@@ -530,7 +533,8 @@ fn a_gzip_committed_chain_gives_the_games_of_a_plain_one_and_is_read_as_they_are
     fs::write(&zipped, common::gzip_stored(&[&text[..cut], &text[cut..]])).unwrap();
     let load = |file: &Path| Known::load(Optimal::built_in(), &sources(Some(file), None));
     let (from_plain, from_zipped) = (load(&plain).unwrap(), load(&zipped).unwrap());
-    // Every game, and one past the end, is the same game with the same proof and assumptions; so is every citation.
+    // Every game, and one past the end, has the same moves with the same proof kind and assumptions; so is every
+    // citation.
     for n in 0..=61 {
         let game = |known: &Known| format!("{:?}", known.game_from(Origin::Strict, n).unwrap());
         assert_eq!(game(&from_zipped), game(&from_plain), "n={n}");
@@ -543,7 +547,7 @@ fn a_gzip_committed_chain_gives_the_games_of_a_plain_one_and_is_read_as_they_are
     let err = from_zipped.check_cite(61, 1, &Cite::Strict).unwrap_err();
     assert!(err.contains("which has no game of 61"), "{err}");
 
-    // The last member damaged: the games of the first are read, and asking for a game of the last is an error.
+    // The last member damaged: the moves of the first are read, and asking for the moves of the last is an error.
     let mut bytes = fs::read(&zipped).unwrap();
     let crc = bytes.len() - 8;
     bytes[crc] ^= 1;
@@ -566,7 +570,7 @@ fn a_gzip_committed_chain_gives_the_games_of_a_plain_one_and_is_read_as_they_are
     let err = load(&not_gzip).err().expect("a refusal");
     assert!(err.contains("plain.jsonl.gz") && err.contains("not a gzip file"), "{err}");
 
-    // A run takes its games from the gzip chain as it does from the plain one, and the verifier accepts the lines.
+    // A run takes its moves from the gzip chain as it does from the plain one, and the verifier accepts the lines.
     let table = Optimal::from_json(&Json::Arr(Vec::new())).unwrap();
     let sources = sources(Some(&zipped), None);
     let out = dir.join("out.jsonl");

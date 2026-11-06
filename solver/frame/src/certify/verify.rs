@@ -6,9 +6,9 @@
 //! ([`Certificate::from_json`]) or whose `build` lacks the commit of 40 hexadecimal digits or the `dirty` flag.  A line
 //! with a final verdict (`certified` or `beaten`; the `incomplete` ones are counted and skipped) is then checked
 //! against the data it was made from: the prover's barred bounds (the board needs a certificate, with the line's open
-//! members and the line's score), the results' game (its score, the checks `certify` makes of the recorded game, at the
-//! set width [`certificate_width`] gives, [`check_recorded_game`]), and Π⁺(O) set up again, which must reproduce the
-//! line's digest and sizes ([`Posed::reproduces`](super::Posed::reproduces)).  Each line is set up in its own
+//! members and the line's score), the results' moves (their score, the checks `certify` makes of the recorded moves,
+//! at the set width [`certificate_width`] gives, [`check_recorded_game`]), and Π⁺(O) set up again, which must reproduce
+//! the line's digest and sizes ([`Posed::reproduces`](super::Posed::reproduces)).  Each line is set up in its own
 //! formulation, the one it records (`claims`: with the claims of `unzip` that E4 (docs/theory/extended-problem.md)
 //! keeps, or without), for the width and for the problem.  A `certified` line has no `beaten_by` and no line for its
 //! board in the counterexample file beside the certificates ([`counterexample_path`]); a `certified` line with
@@ -16,7 +16,7 @@
 //! `certified` and among the last `SAME_SEARCH_WINDOW` games, and the rule of the same problem ([`apply_rule`], the one
 //! `certify` applies) must give what the line records, with the two problems equal whole, in the formulation of the
 //! line that rests on the other (the game it rests on is set up again in that formulation if its own line is of the
-//! other); a `beaten` line has a finished legal game scoring more than the recorded score, and an identical line in the
+//! other); a `beaten` line has finished legal moves scoring more than the recorded score, and an identical line in the
 //! counterexample file.  A board with final lines in several places must have only `certified` ones.  The first line to
 //! fail ends the check.
 //!
@@ -169,11 +169,11 @@ pub struct FileReport {
     pub torn: bool,
 }
 
-/// A game that beats a recorded score, from a `beaten` line.
+/// Moves that beat a recorded score, from a `beaten` line.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Counterexample {
     pub n: u32,
-    /// The recorded score, and the score of the game that beats it.
+    /// The recorded score, and the score of the moves that beat it.
     pub score: u64,
     pub found: u64,
     pub path: PathBuf,
@@ -198,7 +198,7 @@ fn check_rests_on(f: &Final, rests_on: Option<&Final>) -> Result<(), String> {
     let c = &f.line.certificate;
     let (n, m) = (c.n, c.same_problem.as_ref().expect("a line that rests on a game").n);
     if c.verdict != Verdict::Certified {
-        return Err(f.fail(format!("a {} line has no business resting on the game of n={m}", c.verdict.as_str())));
+        return Err(f.fail(format!("a {} line has no business resting on n={m}", c.verdict.as_str())));
     }
     if !(n.saturating_sub(SAME_SEARCH_WINDOW)..n).contains(&m) {
         return Err(f.fail(format!("it rests on n={m}, which is none of the {SAME_SEARCH_WINDOW} games before it")));
@@ -231,10 +231,10 @@ fn check_line(f: &Final, known: &Optimal, upper: &BTreeMap<u32, Upper>, keep: bo
     }
 
     let (Some(score), Some(moves)) = (known.score(n), known.moves(n)) else {
-        return Err(f.fail("the results have no game of it"));
+        return Err(f.fail("the results have no moves for it"));
     };
     if score != c.score {
-        return Err(f.fail(format!("its score is {}, that of the results' game {score}", c.score)));
+        return Err(f.fail(format!("its score is {}, that of the results' moves {score}", c.score)));
     }
     let (words, width) = certificate_width(n, &c.open, c.claims).map_err(|e| f.refusal(e))?;
     if width != Some(c.width) {
@@ -265,7 +265,7 @@ fn check_line(f: &Final, known: &Optimal, upper: &BTreeMap<u32, Upper>, keep: bo
     match c.verdict {
         Verdict::Certified => {
             if c.beaten_by.is_some() {
-                return Err(f.fail("it is certified, but records a game that beats the score"));
+                return Err(f.fail("it is certified, but records moves that beat the score"));
             }
             if f.source.counterexamples.boards.contains(&n) {
                 return Err(
@@ -277,15 +277,14 @@ fn check_line(f: &Final, known: &Optimal, upper: &BTreeMap<u32, Upper>, keep: bo
             if c.same_problem.is_some() {
                 return Err(f.fail("it is beaten, which only a search says, but records the game it rests on"));
             }
-            let Some((found, game)) = &c.beaten_by else { return Err(f.fail("it is beaten, but records no game")) };
+            let Some((found, game)) = &c.beaten_by else { return Err(f.fail("it is beaten, but records no moves")) };
             let scored =
-                replay_finished(n, game).map_err(|e| f.fail(format!("the game that beats it is refused: {e}")))?;
+                replay_finished(n, game).map_err(|e| f.fail(format!("the moves that beat it are refused: {e}")))?;
             if scored != *found {
-                return Err(f.fail(format!("the game that beats it scores {scored}, not the {found} recorded")));
+                return Err(f.fail(format!("the moves that beat it score {scored}, not the {found} recorded")));
             }
             if *found <= c.score {
-                let why =
-                    format!("the game that beats it scores {found}, not more than the recorded score {}", c.score);
+                let why = format!("the moves that beat it score {found}, not more than the recorded score {}", c.score);
                 return Err(f.fail(why));
             }
             if !f.source.counterexamples.lines.contains(&f.line.text) {
@@ -317,8 +316,8 @@ fn check_rule(f: &Final, game: &Final, ours: &Problem, theirs: &Problem) -> Resu
     match apply_rule(m, best, &theirs, ours, worth).map_err(|e| f.fail(e))? {
         Rule::Other => Err(f.fail(format!("its problem is not that of n={}, which it rests on", m.n))),
         Rule::Searched => Err(f.fail(format!(
-            "its recorded game is worth {worth}, less than the {best} that the certificate of n={} proved the most: it \
-             should have been searched",
+            "its recorded moves are worth {worth}, less than the {best} that the certificate of n={} proved the most: \
+             it should have been searched",
             m.n
         ))),
         Rule::Settled(expected) if expected == *recorded => Ok(()),
@@ -345,7 +344,7 @@ fn check_rule(f: &Final, game: &Final, ours: &Problem, theirs: &Problem) -> Resu
     }
 }
 
-/// Checks every line of the files of certificates `paths` (see the module docs) against the recorded games `known` and
+/// Checks every line of the files of certificates `paths` (see the module docs) against the recorded moves `known` and
 /// the barred bounds `upper`, and returns what they hold.  The checks that set Π⁺(O) up again, the dear ones, run on
 /// `threads` threads; the first line to fail is the same whatever `threads` is.
 ///
@@ -496,7 +495,7 @@ impl fmt::Display for Verified {
                 let (path, line) = (c.path.display(), c.line);
                 writeln!(
                     f,
-                    "  n={}: the recorded score {} is beaten by a game of {} ({path} line {line})",
+                    "  n={}: the recorded score {} is beaten by moves worth {} ({path} line {line})",
                     c.n, c.score, c.found
                 )?;
             }
@@ -596,7 +595,7 @@ pub fn read_exact(paths: &[PathBuf]) -> Result<BTreeMap<u32, ExactLine>, String>
 /// Why a game is not proven.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Gap {
-    /// The results have no game of it.
+    /// The results have no moves for it.
     NoGame,
     /// It has no proof of the prover's, is not certified, and is not at a ceiling given a proven game before it.
     Unproven,
@@ -636,7 +635,7 @@ pub fn frontier(
     for (&n, line) in exact {
         if let Some(&score) = scores.get(&n).filter(|&&score| score != line.score) {
             return Err(format!(
-                "n={n}: the prover's proof is of the score {}, the results' game scores {score}",
+                "n={n}: the prover's proof is of the score {}, the results' moves score {score}",
                 line.score
             ));
         }

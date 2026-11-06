@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Unit tests of check_results.py's reading of the committed file (a gzip file of several members, as
-results/optimal.jsonl.gz is), of the table of games it makes, and of the comparison of a file with that table.  They
+results/optimal.jsonl.gz is), of the table of lines it makes, and of the comparison of a file with that table.  They
 use small files made here, so they hold for the committed file whatever it contains.
 
 usage: python3 -I test_check_results.py      (or python3 -I -m unittest test_check_results, from this directory)
@@ -33,7 +33,7 @@ def line(n, score, moves, method, proof, prev, **extra):
 
 
 def prime_game(n, score, moves, below):
-    """The line of a prime game, built on the game of n - 1, whose line is `below`."""
+    """The line of a prime game, built on the moves for n - 1, whose line is `below`."""
     prev = {
         "n": n - 1, "score": below["score"], "source": "run", "moves_digest": check_results.digest(below["moves"]),
         "proof": below["proof"], "assumes": [],
@@ -97,19 +97,20 @@ class TableTest(FileCase):
         table = self.gz("table.jsonl.gz", GAMES)
         sources = check_results.Sources(committed, table=table)
         self.assertEqual((sorted(sources.table), sorted(sources.committed)), ([1, 2, 3], [1, 2]))
-        # By default the table is the committed file's games, the same dict; a table that is not given is empty.
+        # By default the table is the committed file's lines, the same dict; a table that is not given is empty.
         default = check_results.Sources(committed)
         self.assertIs(default.table, default.committed)
         self.assertEqual(check_results.Sources(committed, table=None).table, {})
         self.assertEqual(sources.cite_problems(3, 3, {"source": "optimal"}), ({check_results.assumed_optimal(3)}, []))
         self.assertEqual(
             sources.cite_problems(3, 3, {"source": "strict"})[1],
-            ["it cites the committed chain, which has no game of 3 scoring 3"],
+            ["it cites the committed chain, which has no line for 3 scoring 3"],
         )
 
     def test_a_game_of_the_table_is_assumed_optimal_in_the_words_of_the_committed_file(self):
         self.assertEqual(
-            check_results.assumed_optimal(1300), "the game of 1300 in results/optimal.jsonl.gz is optimal"
+            check_results.assumed_optimal(1300),
+            "the moves recorded for game 1300 in results/optimal.jsonl.gz are optimal",
         )
 
     def test_a_citation_of_the_table_holds_for_the_score_of_its_game_only(self):
@@ -119,7 +120,7 @@ class TableTest(FileCase):
         )
         assumes, problems = sources.cite_problems(3, 4, {"source": "optimal"})
         self.assertIsNone(assumes)
-        self.assertEqual(problems, ["it cites the table, which has no game of 3 scoring 4"])
+        self.assertEqual(problems, ["it cites the table, which has no line for 3 scoring 4"])
         self.assertEqual(sources.cite_problems(3, 3, {"source": "strict"}), (set(), []))
 
 
@@ -162,7 +163,7 @@ class MainTest(FileCase):
         path = self.gz("committed.jsonl.gz", GAMES[:1], GAMES[1:])
         code, out = self.run_main(path, "--committed", path, "--bounds", self.dir / "none.jsonl")
         self.assertEqual(code, 0, out)
-        self.assertIn("3 completed games, n = 1..3 (0 missing)", out)
+        self.assertIn("3 completed lines, n = 1..3 (0 missing)", out)
         self.assertIn("all checks passed", out)
 
     def test_a_gz_file_that_the_table_disagrees_with_fails(self):

@@ -976,11 +976,11 @@ fn promotion_order_conflicts_and_nogoods_on_perturbed_frame_sets() {
 }
 
 /// The conjecture that the promotion set with the largest sum also has the most promotions is false for the whole frame
-/// game of n = 833, the first board whose optimal game is not a longest one (`solver/noframe/docs/longest-games.md`):
-/// the optimal set promotes 48 numbers, as many as `max_total` allows less one, and a set the model accepts promotes
-/// 49, four large promotions of the optimal set exchanged for five small ones; both games are over, the second one move
-/// longer and 29 points lighter.  (The Java solver's revision of the freedoms assumed the conjecture of the two-frame
-/// game of frames 0 and 1, which this does not decide.)
+/// game of n = 833, the first board whose optimal moves are not a longest play
+/// (`solver/noframe/docs/longest-games.md`): the optimal set promotes 48 numbers, as many as `max_total` allows less
+/// one, and a set the model accepts promotes 49, four large promotions of the optimal set exchanged for five small
+/// ones; both sets of moves are over, the second one move longer and 29 points lighter.  (The Java solver's revision of
+/// the freedoms assumed the conjecture of the two-frame game of frames 0 and 1, which this does not decide.)
 #[test]
 fn the_heaviest_promotion_set_of_833_is_not_the_largest() {
     const W: usize = 16;
@@ -1026,7 +1026,7 @@ fn extended_configs() -> Vec<Config> {
 }
 
 /// The table's best promotion sum of the extended problem `ext` of game `n`, whatever sources are open: its score
-/// less what the sources fixed in `ext` make (U holds up to 1300: some optimal game plays all of U\*, so the heaviest
+/// less what the sources fixed in `ext` make (U holds up to 1300: some optimal moves play all of U\*, so the heaviest
 /// promotion set of Π⁺(O) plays the open sources too).
 fn extended_optimum<const W: usize>(optimal: &Optimal, n: u32, ext: &ExtendedFrames<W>) -> u64 {
     optimal.score(n).expect("a known game") - ext.in_the_bag

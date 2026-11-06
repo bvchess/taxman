@@ -272,7 +272,7 @@ if [ "${SKIP_SMOKE:-0}" != 1 ]; then
         say "smoke: the committed results file, with the solver's verifier and the independent Python one"
         "$TAXMAN_BIN" verify-results "${COMMITTED_RESULTS[@]}"
         python3 "$TOOLS/check_results.py" "${COMMITTED_RESULTS[@]}"
-        say "smoke: games 1..400 against the table of optimal games"
+        say "smoke: games 1..400 against the table of optimal moves"
         "$TAXMAN_BIN" regress --to 400 --threads "$(( $(ncpu) < 8 ? $(ncpu) : 8 ))"
     else
         say "smoke: none for the solver (not in this build)"

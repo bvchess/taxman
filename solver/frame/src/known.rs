@@ -1,31 +1,31 @@
-//! The known games: what `taxman solve --use-prev` draws on besides what the run itself has made.
+//! The known moves: what `taxman solve --use-prev` draws on besides what the run itself has made.
 //!
-//! Three sources hold games the run has not solved, each with what its game rests on:
+//! Three sources hold moves the run has not found, each with what they rest on:
 //!
-//! * **the table** ([`Origin::Optimal`]), the table of optimal games built into the binary: the games of
-//!   `results/optimal.jsonl.gz` as of the build.  It records no proofs, so a game of it is *assumed* optimal (`the game
-//!   of n in results/optimal.jsonl.gz is optimal`).
+//! * **the table** ([`Origin::Optimal`]), the table of optimal moves built into the binary: the moves of
+//!   `results/optimal.jsonl.gz` as of the build.  It records no proof kinds, so the moves for a game of it are
+//!   *assumed* optimal (`the moves recorded for game n in results/optimal.jsonl.gz are optimal`).
 //! * **the committed chain** ([`Origin::Strict`]), `results/optimal.jsonl.gz` in the checkout: a chain from n = 1, each
-//!   game with its proof and what it assumes.  A game of it is as proven as its line is.
+//!   line with its proof kind and what it assumes.  Its moves are as proven as their line says.
 //! * **the bounds store** ([`Origin::Bounds`]), `results/bounds.jsonl` ([`crate::store`]): bounds on opt(n) that the
-//!   ledger finds.  A board whose best lower bound is its best upper bound is *proven*: the lower bound's game scores
-//!   what the upper bound allows, and the game is optimal wherever statement U holds at the boards its upper bound rests
-//!   on (`rests_on`; the statements are the game's assumptions, [`assumed_u`]).  A board with only one of the bounds, or
-//!   with a gap, is *open*; the store still helps its search ([`Known::open`]): its lower bound's game is a seed, and
-//!   its upper bound a ceiling the search may stop at.
+//!   ledger finds.  A board whose best lower bound is its best upper bound is *proven*: the lower bound's moves score
+//!   what the upper bound allows, and the moves are optimal wherever statement U holds at the boards its upper bound
+//!   rests on (`rests_on`; the statements are the moves' assumptions, [`assumed_u`]).  A board with only one of the
+//!   bounds, or with a gap, is *open*; the store still helps its search ([`Known::open`]): its lower bound's moves are
+//!   a seed, and its upper bound a ceiling the search may stop at.
 //!
-//! [`Known::game`] is the game of n from the best source (the committed chain, then the store, then the table); the
-//! solver records it without a search (method `known`, proof `known`) or builds the next game on it.  A result line says
-//! which source it took the game from ([`Cite`]), and what the game assumes follows from the source; the referees check
-//! the citation against the same sources ([`Known::check_cite`]).
+//! [`Known::game`] gives the moves for n from the best source (the committed chain, then the store, then the table);
+//! the solver records them without a search (method `known`, proof `known`) or seeds the next game with them.  A result
+//! line says which source it took the moves from ([`Cite`]), and what the moves assume follows from the source; the
+//! referees check the citation against the same sources ([`Known::check_cite`]).
 //!
 //! The sources are read as they are given: the committed chain and the store are checked by their own referees
 //! (`taxman verify-results`, `solver/tools/check_results.py`; `ledger verify-bounds`, `solver/tools/check_bounds.py`),
-//! not again here.  The committed chain is a gzip file that decodes to tens of megabytes, so it is decoded and parsed only
-//! as far as the games asked for ([`Known::load`]): a run or a check that takes few games from it reads a member or two.
-//! What the solver does check of a game it takes is what it checks of every game: the referee's replay
-//! (legal, over, opening with the largest prime) at the score the source gives, and the chain bounds against the game
-//! before it.
+//! not again here.  The committed chain is a gzip file that decodes to tens of megabytes, so it is decoded and parsed
+//! only as far as the lines asked for ([`Known::load`]): a run or a check that takes few lines from it reads a member
+//! or two.  What the solver does check of moves it takes is what it checks of all moves: the referee's replay (legal,
+//! over, opening with the largest prime) at the score the source gives, and the chain bounds against the moves before
+//! it.
 
 use crate::game::{is_gzip, Optimal, Text};
 use crate::json::Json;
@@ -34,7 +34,7 @@ use crate::store::{carried, play, Line, Rule, Side, Store};
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
-/// Where a known game comes from.
+/// Where the moves of a known game come from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Origin {
     /// The table built into the binary.
@@ -98,15 +98,15 @@ impl LineRef {
     }
 }
 
-/// What a result line records of the known source its game, or its proof, comes from (its `known` field).  The board
-/// and the value of the cited lines are the line's own `n` and `score`.
+/// What a result line records of the known source its moves, or its proof kind, come from (its `known` field).  The
+/// board and the value of the cited lines are the line's own `n` and `score`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Cite {
-    /// The game is the table's.
+    /// The moves are the table's.
     Optimal,
-    /// The game is the committed chain's.
+    /// The moves are the committed chain's.
     Strict,
-    /// The store's lines: the lower bound whose game the line plays, if it is a game of the store (not if the search
+    /// The store's lines: the lower bound whose moves the line plays, if they are the store's (not if the search
     /// found it), and the upper bound the score meets.
     Bounds { lower: Option<LineRef>, upper: LineRef },
 }
@@ -155,17 +155,17 @@ impl Cite {
     }
 }
 
-/// A game one of the sources holds, and what it rests on.
+/// The moves for a game that one of the sources holds, and what they rest on.
 #[derive(Clone, Debug)]
 pub struct KnownGame {
     pub n: u32,
     pub score: u64,
     pub moves: Vec<u32>,
     pub origin: Origin,
-    /// How the source establishes it, as the game of `n − 1` of a result line records it (`prev.proof`): the committed
+    /// How the source establishes it, as a result line records the moves for `n − 1` (`prev.proof`): the committed
     /// line's proof; [`Proof::Known`] for a board of the store; none for the table, which records none.
     pub proof: Option<Proof>,
-    /// What the game rests on: [`assumed_optimal`] for the table's, the committed line's for the committed chain's, and
+    /// What the moves rest on: [`assumed_optimal`] for the table's, the committed line's for the committed chain's, and
     /// [`assumed_u`] at the boards the store's upper bound rests on.
     pub assumes: Assumptions,
     pub cite: Cite,
@@ -180,7 +180,7 @@ pub struct Bound {
     pub assumes: Assumptions,
 }
 
-/// What the store has of an open board: the game of its best lower bound, and its best upper bound.
+/// What the store has of an open board: the moves of its best lower bound, and its best upper bound.
 #[derive(Clone, Debug, Default)]
 pub struct Open {
     pub game: Option<Vec<u32>>,
@@ -194,14 +194,14 @@ pub struct KnownSources {
     pub committed: Option<PathBuf>,
     /// The bounds store.
     pub bounds: Option<PathBuf>,
-    /// Whether an n that a source holds a proven game of is recorded without a search (`solve --use-prev`).
-    /// Without it the sources give the game before the range, and the store helps the searches of its open boards.
+    /// Whether an n that a source holds proven moves for is recorded without a search (`solve --use-prev`).
+    /// Without it the sources give the moves before the range, and the store helps the searches of its open boards.
     pub boards: bool,
 }
 
 impl KnownSources {
-    /// What `solve --use-prev` draws on: every game of the table, the committed chain and the store in the repository's
-    /// `results`, for the games of the range as well as the game before it.  The files that are not there
+    /// What `solve --use-prev` draws on: every line of the table, the committed chain and the store in the repository's
+    /// `results`, for the games of the range as well as the one before it.  The files that are not there
     /// are left out.
     ///
     /// # Errors
@@ -245,8 +245,8 @@ impl Held {
         &self.store.lines[i]
     }
 
-    /// The game of the lower line `i`, replayed by the referee at its value: its own, or, for a line that cites the game
-    /// it is carried from, that of the line it cites (a line before it), carried by the relation.
+    /// The moves of the lower line `i`, replayed by the referee at its value: its own, or, for a line that cites the
+    /// moves it is carried from, that of the line it cites (a line before it), carried by the relation.
     fn moves_of(&self, i: usize) -> Result<Vec<u32>, String> {
         let mut chain = vec![i];
         loop {
@@ -254,7 +254,7 @@ impl Held {
             if line.game.is_some() {
                 break;
             }
-            let (from, value) = line.from.zip(line.from_value).ok_or("a lower bound with no game that cites none")?;
+            let (from, value) = line.from.zip(line.from_value).ok_or("a lower bound with no moves that cites none")?;
             let cited =
                 *self.at.get(&(from, Side::Lower, value)).filter(|&&j| j < *chain.last().expect("a line")).ok_or_else(
                     || format!("it cites a game of board {from} worth {value}, which no line before it has"),
@@ -279,20 +279,21 @@ impl Held {
 enum Committed {
     /// There is none.
     None,
-    /// A plain file, read whole: its completed games by n.
+    /// A plain file, read whole: its completed lines by n.
     Games(BTreeMap<u32, CommittedGame>),
-    /// A gzip file, `results/optimal.jsonl.gz`, which is one game a line, the line of the game of n the nth, read as its
-    /// games are asked for: a check of results that cites nothing of it, or a run that takes a few games from it,
+    /// A gzip file, `results/optimal.jsonl.gz`, which is one line for each game, the line of game n the nth, read as
+    /// its lines are asked for: a check of results that cites nothing of it, or a run that takes a few lines from it,
     /// decodes a few members of tens of megabytes.
     Chain(Text<CommittedGame>),
 }
 
 impl Committed {
-    /// The committed game of `n`, if the chain has one.
+    /// The committed line of `n`, if the chain has one.
     ///
     /// # Errors
     ///
-    /// If a gzip chain is damaged where the game is read from, or is not one game a line; the message names the file.
+    /// If a gzip chain is damaged where the line is read from, or is not one line for each game; the message names the
+    /// file.
     fn game(&self, n: u32) -> Result<Option<&CommittedGame>, String> {
         match self {
             Committed::None => Ok(None),
@@ -301,7 +302,7 @@ impl Committed {
         }
     }
 
-    /// Whether a committed chain with a game in it was given to the check.
+    /// Whether a committed chain with a line in it was given to the check.
     fn is_given(&self) -> bool {
         match self {
             Committed::None => false,
@@ -324,7 +325,7 @@ impl<'a> Known<'a> {
         Known { optimal, committed: Committed::None, held: None }
     }
 
-    /// The table of optimal games the sources include.
+    /// The table of optimal moves the sources include.
     pub fn optimal(&self) -> &'a Optimal {
         self.optimal
     }
@@ -332,10 +333,10 @@ impl<'a> Known<'a> {
     /// The table `optimal` and the files of `sources`.
     ///
     /// The committed chain is read whole if it is a plain file.  A gzip file (its name ends in `.gz`, as the committed
-    /// results' does) is read into memory and decoded as far as the games asked for (its first member now, so that a
-    /// file that is no gzip file is refused), and parsed when asked; it must be one game a line, as the committed
-    /// results are, and a fault in a member decoded later is an error of the call that asks for the game, so that a
-    /// member that nothing asks for is not read.
+    /// results' does) is read into memory and decoded as far as the lines asked for (its first member now, so that a
+    /// file that is no gzip file is refused), and parsed when asked; it must be one line for each game, as the
+    /// committed results are, and a fault in a member decoded later is an error of the call that asks for the line, so
+    /// that a member that nothing asks for is not read.
     ///
     /// # Errors
     ///
@@ -350,12 +351,12 @@ impl<'a> Known<'a> {
         Ok(Known { optimal, committed, held })
     }
 
-    /// The game of `n` that `origin` holds, if it holds a proven one: the table's, the committed chain's, or, for the
-    /// store, the game of the best lower bound of a board whose best bounds meet.
+    /// The moves for `n` that `origin` holds, if it holds a proven one: the table's, the committed chain's, or, for the
+    /// store, the moves of the best lower bound of a board whose best bounds meet.
     ///
     /// # Errors
     ///
-    /// If the store's game does not replay under the referee at its value.
+    /// If the store's moves do not replay under the referee at its value.
     pub fn game_from(&self, origin: Origin, n: u32) -> Result<Option<KnownGame>, String> {
         let known = |score, moves: Vec<u32>, proof, assumes, cite| {
             Some(KnownGame { n, score, moves, origin, proof, assumes, cite })
@@ -374,14 +375,14 @@ impl<'a> Known<'a> {
                 if low.value != high.value {
                     return Ok(None);
                 }
-                let moves = held.moves_of(lower).map_err(|e| format!("the bounds store, n={n}: the game: {e}"))?;
+                let moves = held.moves_of(lower).map_err(|e| format!("the bounds store, n={n}: the moves: {e}"))?;
                 let cite = Cite::Bounds { lower: Some(LineRef::of(low)), upper: LineRef::of(high) };
                 known(high.value, moves, Some(Proof::Known), Held::assumes(high), cite)
             }
         })
     }
 
-    /// The game of `n` from the best source that holds one: the committed chain, the store, then the
+    /// The moves for `n` from the best source that holds them: the committed chain, the store, then the
     /// table.
     ///
     /// # Errors
@@ -396,19 +397,19 @@ impl<'a> Known<'a> {
         Ok(None)
     }
 
-    /// What the store has of board `n` to help its search: the game of its best lower bound (replayed by the referee),
+    /// What the store has of board `n` to help its search: the moves of its best lower bound (replayed by the referee),
     /// and its best upper bound.  A board the store has proven is a known game ([`game`](Self::game)); this is for the
     /// others, and gives the same for the proven.
     ///
     /// # Errors
     ///
-    /// If the game of the lower bound does not replay under the referee at its value.
+    /// If the moves of the lower bound do not replay under the referee at its value.
     pub fn open(&self, n: u32) -> Result<Open, String> {
         let Some(held) = &self.held else { return Ok(Open::default()) };
         let game = held
             .lower
             .get(&n)
-            .map(|&i| held.moves_of(i).map_err(|e| format!("the bounds store, n={n}: the game: {e}")))
+            .map(|&i| held.moves_of(i).map_err(|e| format!("the bounds store, n={n}: the moves: {e}")))
             .transpose()?;
         let upper = held.upper.get(&n).map(|&i| {
             let line = held.line(i);
@@ -417,14 +418,14 @@ impl<'a> Known<'a> {
         Ok(Open { game, upper })
     }
 
-    /// Checks a citation of a result line against the sources: board `n`'s game scores `score` there, the cited lines
-    /// exist with those values, rules and sources.  Returns what the citation makes the game assume.  The sources are not
-    /// checked themselves (their own referees do), and which game the line plays is not compared: a finished game of
-    /// the score the source gives for `n` is optimal as the source's game is.
+    /// Checks a citation of a result line against the sources: board `n`'s moves score `score` there, the cited lines
+    /// exist with those values, rules and sources.  Returns what the citation makes the moves assume.  The sources are
+    /// not checked themselves (their own referees do), and which moves the line plays is not compared: finished moves
+    /// of the score the source gives for `n` are optimal as the source's moves are.
     ///
     /// # Errors
     ///
-    /// If a source the citation needs was not given, or has no such line or game, or a different one.
+    /// If a source the citation needs was not given, or has no such line or moves, or a different one.
     pub fn check_cite(&self, n: u32, score: u64, cite: &Cite) -> Result<Assumptions, String> {
         match cite {
             Cite::Optimal => match self.optimal.score(n) {

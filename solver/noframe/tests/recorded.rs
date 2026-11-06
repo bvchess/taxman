@@ -1,5 +1,5 @@
-//! The recorded games read from result files, plain or gzip (`recorded_games`, `recorded_games_to`), on files of twelve
-//! small games made here.
+//! The recorded moves read from result files, plain or gzip (`recorded_games`, `recorded_games_to`), on files of twelve
+//! small lines made here.
 
 use std::path::{Path, PathBuf};
 use taxman_gzip::crc32;
@@ -45,7 +45,7 @@ fn gzip_file(dir: &Path, damaged: bool) -> PathBuf {
     path
 }
 
-/// A gzip file gives the games of the plain file of the same lines, and an earlier file wins over a later one.
+/// A gzip file gives the moves of the plain file of the same lines, and an earlier file wins over a later one.
 #[test]
 fn a_gzip_file_and_a_plain_file_give_the_same_games() {
     let dir = directory("same");
@@ -63,8 +63,8 @@ fn a_gzip_file_and_a_plain_file_give_the_same_games() {
     std::fs::remove_dir_all(&dir).expect("remove the directory");
 }
 
-/// The games up to `last` are read from the members that hold them and no more: a damaged member after them is not
-/// decoded.  A damaged member is an error, never wrong games, when the games wanted reach it.
+/// The lines up to `last` are read from the members that hold them and no more: a damaged member after them is not
+/// decoded.  A damaged member is an error, never wrong moves, when the lines wanted reach it.
 #[test]
 fn a_gzip_file_is_decoded_only_as_far_as_the_last_game_wanted() {
     let dir = directory("damaged");

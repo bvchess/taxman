@@ -15,8 +15,8 @@
 //!   arms the search's cut, which the searchers pick up as each starts a unit).
 //! * Π_M is set up as Π_N is.  The candidates of Π_N that are candidates of Π_M are marked, and among them those with
 //!   the same home in both.
-//! * The incumbent, or the floor, is worth at least B.  A search armed below it, from a provisional game of n − 1 that
-//!   the game improved on, say, cuts nothing until the incumbent reaches B: the searcher compares the incumbent its
+//! * The incumbent, or the floor, is worth at least B.  A search armed below it, from provisional moves for n − 1 that
+//!   the search improved on, say, cuts nothing until the incumbent reaches B: the searcher compares the incumbent its
 //!   step read with B before it checks a node.  The incumbent only rises, so this holds at every later node.
 //!
 //! At a node:
@@ -33,7 +33,7 @@
 //!
 //! Why each is needed: a set holding a number that is no candidate of Π_M is no promotion set of it, though Π_M's model
 //! may promote it (22 at n = 98); a promoted number with another home in Π_M would change frames that the check did not
-//! compare; and a provisional game of M bounds nothing.  The cut drops only nodes none of whose completions beats the
+//! compare; and provisional moves for M bound nothing.  The cut drops only nodes none of whose completions beats the
 //! incumbent, as a bound does, so the search stays exact; it learns nothing.  It does not treat the one-sided
 //! candidates of the extended problem, and is never set up for a problem that has them.
 

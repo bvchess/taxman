@@ -62,9 +62,9 @@ pub fn committed_text(count: usize) -> String {
 }
 
 /// The table of the Python referee (`check_results.py --table`), as the Rust verifiers' built-in one: the first `games`
-/// games of the committed results, in a file beside `beside` (written the first time it is asked for).  Its name is
+/// lines of the committed results, in a file beside `beside` (written the first time it is asked for).  Its name is
 /// this function's alone and holds `games`: no results file that a test writes in the directory is this file, which a
-/// run would open as its own results and check, and a file already there has the games asked for.
+/// run would open as its own results and check, and a file already there has the lines asked for.
 pub fn referee_table(beside: &Path, games: usize) -> PathBuf {
     let table = beside.with_file_name(format!("referee-table-{games}.jsonl"));
     if !table.exists() {

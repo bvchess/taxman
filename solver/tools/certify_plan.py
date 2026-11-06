@@ -13,7 +13,7 @@ take several files read them in order):
               for a board replaces an earlier one.  Fields used: n, score, proof (exhausted, cap, same_search,
               prime_formula, trivial, known), nodes, threads, seconds.search, same_search.n (the game whose search a
               repeat repeats) and known.source (where a known game rests: bounds, the bounds store; strict, the
-              committed chain; or optimal, the table of optimal games).
+              committed chain; or optimal, the table of optimal moves).
   --upper     the prover's barred bounds.  Fields: n, score, relation (prime; chain, which is a score at its ceiling
               n + score(n-1); semiprime, a score that meets the semiprime formula of docs/theory/arrival.md; none),
               needs (1 if the game needs a certificate), open (where it needs one: a list of [u, omega, margin], so
@@ -36,10 +36,10 @@ time, so the window's inflation is visible.  Every board of the range must fall 
 
 Per game, for every board of the range (plan.jsonl has one line each, null where a field does not apply):
   relation    prime, ceiling (upper's chain), semiprime or none; needs, open (|O|) from upper; rejected (|R|) from problems
-  proof       the results' proof of a game that needs a certificate, and for a searched game (exhausted) chain_nodes,
-              chain_seconds (seconds.search) and chain_threads; for a repeat (same_search) m, the game it repeats,
-              source, the game that m comes down to when same_search is followed to a proof that is not one, and its
-              source_proof and source_exhausted
+  proof       the results' proof kind of a game needing a certificate, and for a searched game (exhausted)
+              chain_nodes, chain_seconds (seconds.search) and chain_threads; for a repeat (same_search) m, the game it
+              repeats, source, the game that m comes down to when same_search is followed to a proof that is not
+              one, and its source_proof and source_exhausted
   share       the board m when the problems line says same_as = m, m is a planned game that needs a certificate too, and
               the two lines' worth are equal: taxman certify settles n from m's certificate with no search.  When
               same_as is set, m is such a game and the worths differ, the share is refused (share_refused) and the
@@ -57,7 +57,7 @@ Per game, for every board of the range (plan.jsonl has one line each, null where
   expected_thread_hours_recorded   the same from the recorded seconds x threads (the upper end, which ignores the
               window; a gap-model game as above)
 
-A known game (proof known) rests on its source, known.source, not on a search of its own: the chain took its game from
+A known game (proof known) rests on its source, known.source, not on a search of its own: the chain took its moves from
 the source (nodes 0), or ran a search that the bounds store's upper bound stopped before it finished.  No search of its
 problem was exhausted, so there is nothing to price it by.  It is planned as any game is: relation, needs, open,
 rejected and share come from the other files, and it costs 0 where it needs no certificate or shares one.  One that
@@ -139,7 +139,7 @@ class Era(NamedTuple):
     lo: int
     hi: int
     hours: float
-    games: int = 0  # completed games of the results in lo..hi
+    games: int = 0  # completed lines of the results in lo..hi
     nodes: int = 0
     recorded: float = 0.0  # thread-hours: the sum of seconds.search x threads / 3600
     c: float = 0.0  # thread-seconds per node
@@ -333,7 +333,7 @@ def parse_era(text):
 
 
 def calibrate(eras, results, machine_threads):
-    """The eras with their completed games, nodes, recorded thread-hours and c (thread-seconds per node) filled in."""
+    """The eras with their completed lines, nodes, recorded thread-hours and c (thread-seconds per node) filled in."""
     ordered = sorted(eras)
     for before, after in zip(ordered, ordered[1:]):
         if after.lo <= before.hi:
@@ -651,7 +651,7 @@ def section_inputs(plan):
         "",
         "The chain ran several searches at once (a window), so a game's recorded search seconds are the time it",
         "shared the machine, not what it cost.  The cost is taken from nodes: c is the era's wall hours x 3600 x the",
-        "machine's threads / the nodes of all its completed games.  Recorded / wall is the window's inflation.",
+        "machine's threads / the nodes of all its completed lines.  Recorded / wall is the window's inflation.",
         "",
     ]
     rows = [

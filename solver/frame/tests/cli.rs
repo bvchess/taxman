@@ -251,7 +251,7 @@ fn certify_names_the_input_that_is_missing() {
     let args = ["certify", &board, "--results", path(&alone), "--upper", path(&needs), "--out", path(&out)];
     let run = taxman(&args);
     assert_eq!(run.code, Some(1), "{}", run.stderr);
-    assert!(run.stderr.contains(&format!("n={past}: the results have no game of n")), "{}", run.stderr);
+    assert!(run.stderr.contains(&format!("n={past}: the results have no moves for n")), "{}", run.stderr);
 }
 
 /// `verify-results` reports the same on one thread and on several (the games of 22, 34 and 38 are repeats, whose

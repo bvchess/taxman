@@ -1,7 +1,7 @@
 //! A check that the parity search finds what it proves absent: `paritycheck A B [STEP]` runs, for each game in
 //! the range that needs a search, the prover's search with the parity bound against the target V(n) − 1, one below
 //! the recorded optimum (the committed chain).  It must return a playable set worth at least V(n), which replays by
-//! the rules; a bound or a pruning rule that cut an optimal game would make it fail.  One JSON line per game.
+//! the rules; a bound or a pruning rule that cut the optimal moves would make it fail.  One JSON line per game.
 
 use std::time::Instant;
 use taxman_prover::game::{relation, Board, Prover, Verdict};

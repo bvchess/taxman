@@ -201,7 +201,7 @@ fn an_interrupted_game_resumes_from_its_checkpoint() {
         }
         assert!(checkpoint.exists(), "an unfinished game keeps its checkpoint");
         assert_eq!((r.optimal_match, r.method), (None, Method::Search));
-        assert!(r.score > 0 && r.score <= optimal.score(N).unwrap(), "the best game so far, not more than the best");
+        assert!(r.score > 0 && r.score <= optimal.score(N).unwrap(), "the best moves so far, not more than the best");
         assert!(pieces < 100, "no progress");
     };
     assert!(pieces >= 2, "only {pieces} pieces");
@@ -211,10 +211,10 @@ fn an_interrupted_game_resumes_from_its_checkpoint() {
     assert!(left.is_empty(), "left behind: {left:?}");
 }
 
-/// Solves `n` and `n + 1` (the prime after it, which takes `n` as its predecessor) from `base`, with no previous game to
-/// start from: a time limit of nothing stops the search of `n` before it starts, and a second run, without the limit,
-/// resumes it and goes on.  Returns the games of the second run and the lines of the results file, which the verifier
-/// accepts.
+/// Solves `n` and `n + 1` (the prime after it, which takes `n` as its predecessor) from `base`, with no previous moves
+/// to start from: a time limit of nothing stops the search of `n` before it starts, and a second run, without the
+/// limit, resumes it and goes on.  Returns the results of the second run and the lines of the results file, which the
+/// verifier accepts.
 fn run_stopped_and_resumed(name: &str, base: SolveOptions, n: u32) -> (Vec<GameResult>, Vec<Json>) {
     let dir = TempDir::new(name);
     let results = dir.join("results.jsonl");
@@ -452,7 +452,7 @@ fn a_range_stops_at_an_unfinished_game_and_picks_up_where_it_left_off() {
     let left: Vec<_> = fs::read_dir(&ckpt).unwrap().map(|e| e.unwrap().path()).collect();
     assert!(left.is_empty(), "left behind: {left:?}");
 
-    // Every n is in the file as a completed game exactly once, and the unfinished one also as such.
+    // Every n is in the file as a completed line exactly once, and the unfinished one also as such.
     let lines: Vec<Json> = fs::read_to_string(&results).unwrap().lines().map(|l| Json::parse(l).unwrap()).collect();
     let completed = |n: u32| {
         let is = |l: &&Json| {
@@ -518,12 +518,12 @@ fn a_big_board_gets_through_setup_at(n: u32) {
     assert_eq!((r.method, r.optimal_match), (Method::Search, None), "n={n}");
     // The engine checks its node limit only every so often.
     assert!(r.nodes < 10_000, "n={n}: {} nodes", r.nodes);
-    // The best game so far is the greedy one: legal (the solver replays it) and not empty.
+    // The best moves so far are the greedy ones: legal (the solver replays it) and not empty.
     let setup = r.setup.expect("a searched game has a setup");
     assert!(setup.frames > 0 && setup.candidates > 0 && setup.greedy_sum > 0, "n={n}: {setup:?}");
     assert!(r.score > 0 && !r.moves.is_empty(), "n={n}");
-    assert_eq!(r.moves.first().copied(), largest_prime_at_most(n), "n={n}: the game opens with the largest prime");
-    assert_eq!(replay_finished(n, &r.moves), Ok(r.score), "n={n}: the game is legal, over, and scores as claimed");
+    assert_eq!(r.moves.first().copied(), largest_prime_at_most(n), "n={n}: the moves open with the largest prime");
+    assert_eq!(replay_finished(n, &r.moves), Ok(r.score), "n={n}: the moves are legal, over, and score as claimed");
     let json = r.to_json();
     assert_eq!(json.get("completed").and_then(Json::as_bool), Some(false));
     assert_eq!(json.get("optimal_match"), Some(&Json::Null));

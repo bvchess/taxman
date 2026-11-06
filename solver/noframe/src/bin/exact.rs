@@ -6,8 +6,8 @@
 //!           [--parity 0] [--segments 1] [--lagrangian 0|1] [--fix-low 0 | --fix-upper 1] [--checkpoints DIR]
 //!           [--optimal FILE] [--results FILE]... --out FILE
 //!
-//! Per game: the recorded game is replayed by the rules (a lower bound, opt(n) >= V(n)); the Franklín–Moniot bound and
-//! the parity bound (W1, docs/theory/parity-bound.md; `parity.rs`) are computed at the root; the
+//! Per game: the recorded moves are replayed by the rules (a lower bound, opt(n) >= V(n)); the Franklín–Moniot bound
+//! and the parity bound (W1, docs/theory/parity-bound.md; `parity.rs`) are computed at the root; the
 //! ceiling opt(n) <= n + opt(n−1), for a prime n the prime formula opt(n) <= n + opt(n−1) − p, and for an odd n with
 //! two prime factors that closes a cycle with U\*_2(n − 1) the semiprime formula opt(n) = opt(n−1) + n − x (J3,
 //! docs/theory/arrival.md; `semiprime.rs`), are noted (the line's `relation` is `chain`, `prime`, `semiprime` or
@@ -23,7 +23,7 @@
 //! board's own U\*, not from n), every number of layer 2 up to n/2 barred.  The bottom-layers theorem (F4,
 //! docs/theory/frame-model.md) says every optimal set obeys them, so a search from them that proves "no playable set
 //! obeying them beats V" still proves opt(n) <= V (an optimal set beating V would obey them), and its line is written
-//! `"proven"` like any other.  The recorded game must obey them (checked).  The sources of layer 3 and up stay free.
+//! `"proven"` like any other.  The recorded moves must obey them (checked).  The sources of layer 3 and up stay free.
 //! Against the plain root it takes half the time a node (the parity solves have fewer free elements) at the plain
 //! search's nodes within a few percent (1575 and 1584).  Because the proof rests on F4 besides the other theorems,
 //! every line records `"fix_low"`, 1 or 0, and with it `fixed_bound`, the parity bound at the roles searched from.
@@ -61,8 +61,8 @@
 //! upper part to U\*, every source in it forced and every other barred, "D" below, which is the frame model's problem
 //! on the whole board.  It proves nothing about opt(n) (that some optimal set has the upper part U\* is the open
 //! statement U of docs/theory/exactness.md), so a finished search of that kind is written `"search":"upper_fixed"` and
-//! no tool counts it as a proof; it is a measurement, and its line has `"fix_upper":1`.  A playable set beating V is a
-//! real game whatever the roles, so a search that finds one stops with an error in every mode.  Two counters show where
+//! no tool counts it as a proof; it is a measurement, and its line has `"fix_upper":1`.  A playable set beating V is
+//! real whatever the roles, so a search that finds one stops with an error in every mode.  Two counters show where
 //! B spends on the sources of layer 3 and up, in every search (0 for a game not searched): `branched_on_sources`, the
 //! nodes that branched on a set holding a free source of layer 3 or up, and `barred_upper`, the nodes whose roles, as
 //! the node received them, bar a member of U\*_{>=3} (`game::Prover::watch`; they change nothing in the search).
@@ -125,7 +125,7 @@ impl Head {
 }
 
 fn main() {
-    // First, so that a signal during the start-up (the recorded games take seconds to read) is a clean stop too.
+    // First, so that a signal during the start-up (the recorded lines take seconds to read) is a clean stop too.
     stop::on_signals().expect("install the handlers of SIGINT and SIGTERM");
     let (items, flags) = parse_items(std::env::args().skip(1));
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -176,12 +176,12 @@ fn main() {
         let score = *score;
         let board = Board::new(n as u32, &spf);
         let replayed = board.replay(moves);
-        assert_eq!(replayed, Ok(score), "n={n}: the recorded game does not replay to its score");
+        assert_eq!(replayed, Ok(score), "n={n}: the recorded moves do not replay to their score");
         let prev = known.get(&(n - 1)).map_or(0, |(s, _)| *s);
         let relation = relation(n, score, prev, &spf).name();
         let mut root_prover = Prover::new(&board, score, budget);
         let fm = root_prover.root_bound();
-        assert!(fm >= score, "n={n}: the matching bound {fm} is below a legal game's {score}");
+        assert!(fm >= score, "n={n}: the matching bound {fm} is below the score {score} of legal moves");
         let weights: Vec<i64> = (0..=n as i64).collect();
         let parity_at = |roles: &[Role]| Meet::new(Parity::pair(&board, &weights)).solve(roles);
         let parity_bound = {
@@ -189,11 +189,11 @@ fn main() {
             let Outcome::Bound(root_bound) = parity_at(&roles) else {
                 panic!("n={n}: the root's parity bound is not certified")
             };
-            assert!(root_bound.value >= score as i64, "n={n}: the parity bound is below a legal game's {score}");
-            // The recorded game's moves are independent at both parities (W1, docs/theory/parity-bound.md).
+            assert!(root_bound.value >= score as i64, "n={n}: the parity bound is below the score {score}");
+            // The recorded moves are independent at both parities (W1, docs/theory/parity-bound.md).
             moves.iter().for_each(|&c| roles[c as usize] = Role::Pick);
             let independent = parity_at(&roles);
-            assert!(matches!(independent, Outcome::Bound(_)), "n={n}: the recorded game is dependent");
+            assert!(matches!(independent, Outcome::Bound(_)), "n={n}: the recorded moves are dependent");
             root_bound.value as u64
         };
         let bounded = fm == score || (parity && parity_bound == score);
@@ -201,7 +201,7 @@ fn main() {
         // U* fixes the roles and names the numbers the counters watch; a game that is left alone needs neither.
         let ustar = if fix_low || !skip { recorded_ustar(n, moves, &spf) } else { Vec::new() };
         // The roles the search starts from (those of F4, docs/theory/frame-model.md, unless --fix-low 0 says the plain
-        // root): the recorded game obeys them, so their parity bound is at least its score.
+        // root): the recorded moves obey them, so their parity bound is at least its score.
         let unit = if fix_upper {
             upper_fixed_roles(n as u32, &spf, &ustar)
         } else if fix_low {
@@ -211,7 +211,7 @@ fn main() {
         };
         if fix_low {
             obeys(&unit, moves)
-                .unwrap_or_else(|e| panic!("n={n}: the recorded game breaks the roles searched from: {e}"));
+                .unwrap_or_else(|e| panic!("n={n}: the recorded moves break the roles searched from: {e}"));
         }
         let fixed_bound = fix_low.then(|| {
             let Outcome::Bound(bound) = parity_at(&unit) else {

@@ -7,8 +7,8 @@
 //! counts the freedoms.  [`build_frames`] numbers the frames that have freedoms by layer, from the front (0 is played
 //! first), and merges those with the same number, which gives the [`SearchFrames`] the search works on.  The next step is
 //! [`crate::model::FrameGraph::build`], which takes [`SearchFrames::columns`], and then [`crate::search`].  At the end
-//! of every game [`BoardFrames::solution`], on the frames built with the winning promotions as sources, turns them into
-//! the moves of a game.
+//! of every search [`BoardFrames::solution`], on the frames built with the winning promotions as sources, turns them
+//! into moves.
 //!
 //! # The types
 //!
@@ -48,7 +48,7 @@
 //! Frames are independent of each other, except that a factor of one frame can be *promoted* into a source of a
 //! frame in front of it.  Frame `X` is *in front of* frame `Y`, and `Y` *behind* `X`, when a number of `Y` has a
 //! maximal factor in `X`: `Y`'s numbers are multiples of `X`'s.  A [`BoardFrames`] holds all the frames of one board,
-//! in playing order, front first, in which their games can simply be concatenated.  (A move takes all of its
+//! in playing order, front first, in which their moves can simply be concatenated.  (A move takes all of its
 //! divisors, and they lie in its own frame or in front of it; so a frame played after the frames in front of it
 //! finds its factors untouched.)
 //!
@@ -64,24 +64,24 @@
 //! and the reduction-step lemma X6), which follow this code step by step, summed up in
 //! solver/docs/design/frame-model.md, “What "optimal" means”.  What remains is a statement about the game, not about
 //! this code:
-//! that some optimal game plays every source with three or more prime factors that setup keeps.
+//! that some optimal moves exist that play every source with three or more prime factors that setup keeps.
 //!
 //! * **unzip** finds the frame's *mandatory* moves, in two ways: a source with a single usable factor must take
 //!   it, and a factor wanted by a single source is given to that source.  A pair is settled only when the factor
 //!   cannot be put to better use outside the frame, as tax for a number promoted from another frame or (in the
 //!   second way) as a promoted number itself, a move of a frame in front of it.  Each settled pair of a move and
 //!   its *claimed* factor leaves the frame's *remaining* sources and factors, which are what the frame shows the
-//!   search.  Every such pair is a move that any game playing the frame's sources must make, as the frame takes
+//!   search.  Every such pair is a move that any moves playing the frame's sources must make, as the frame takes
 //!   them with whatever is promoted into it (X5); a pair of the second kind needs that no promotion
 //!   candidate has the factor among its maximal factors, which the candidate filter makes so (the census
 //!   `examples/structure.rs` at commit 3ca11bf checked it on every board).  (Earlier notes call these moves "forced";
 //!   this code keeps that word out of the frames, since the search has forced members of its own that are unrelated.)
 //! * **remove_impossible** drops, greedily from the largest source down, every source that cannot be played
-//!   together with the sources already kept.  They are the frame's *impossible* moves, which no game of the model
-//!   plays.  What the greedy keeps is U\* (X1), the heaviest playable set of sources wherever the
+//!   together with the sources already kept.  They are the frame's *impossible* moves, which no moves of the model
+//!   include.  What the greedy keeps is U\* (X1), the heaviest playable set of sources wherever the
 //!   sources conjecture (S1, docs/theory/sources.md) holds (certified on every board to 100,000), although the playable
 //!   subsets of a frame's sources lack the exchange property in general (docs/theory/sources.md, "Where exchange
-//!   breaks"); that an optimal game plays all of U\* is proven for the sources with one or two prime factors (the
+//!   breaks"); that optimal moves can play all of U\* is proven for the sources with one or two prime factors (the
 //!   bottom-layers theorem, F4, docs/theory/frame-model.md) and is the open statement for the others.
 //! * The *freedoms* (`Frame::freedoms`) are `|factors| − |sources|`: how many factors the frame can
 //!   spare, each promotion out of or into the frame using one up.  A frame with none is *closed* and takes no part

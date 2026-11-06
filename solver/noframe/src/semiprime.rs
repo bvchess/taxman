@@ -151,7 +151,7 @@ mod tests {
             let message = caught.downcast_ref::<String>().expect("a message");
             assert!(message.contains("n=39") && message.contains("503"), "{message}");
         }
-        // Without V(n − 1) (0 for a game not recorded) the formula has nothing to rest on.
+        // Without V(n − 1) (0 for an n with no recorded moves) the formula has nothing to rest on.
         assert_eq!(relation(39, 503, 0, &spf), Relation::None);
     }
 
@@ -161,7 +161,7 @@ mod tests {
         let board = Board::new(n, spf);
         let mut prover = Prover::new(&board, 0, u64::MAX).optimize();
         assert_eq!(prover.run(), Verdict::Proven, "n={n}");
-        prover.found.last().expect("a game").iter().map(|&c| u64::from(c)).sum()
+        prover.found.last().expect("moves").iter().map(|&c| u64::from(c)).sum()
     }
 
     /// The last board of the brute-force tests.

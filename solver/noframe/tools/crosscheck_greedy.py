@@ -7,7 +7,7 @@
 For each game in the span file whose n is selected, U* is recomputed with heuristics/core.py's optimize_mini
 (peel-based descending greedy, sharing no code with the Rust crate) and its size and sum are compared with the
 file's `kept` and `kept_sum`.  For every n that the committed chain (results/optimal.jsonl.gz) has, the sum is also
-compared with the upper half of the optimal game in it.
+compared with the upper half of the optimal moves in it.
 
     crosscheck_greedy.py SPAN_FILE [--max N] [--every K]
 """
@@ -50,7 +50,7 @@ def main():
             assert upper == sum(kept), (n, upper, sum(kept))
             with_optimal += 1
     print(f"greedy agrees with core.optimize_mini on {checked} games (n <= {args.max}); "
-          f"with the upper half of the committed chain's game on {with_optimal}")
+          f"with the upper half of the committed chain's moves on {with_optimal}")
 
 
 if __name__ == "__main__":

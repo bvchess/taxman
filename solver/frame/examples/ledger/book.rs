@@ -1,22 +1,23 @@
-//! The book of the ledger: for every game n, a lower bound L(n), the score of a game it holds, and an upper bound U(n)
-//! on opt(n), each with its derivation (the rule and the board it came from), and the relations between boards, applied
-//! to a fixpoint.  The relations are proven in docs/theory/neighbors.md and docs/theory/search-rules.md; each gives an
-//! L direction (a game of one board made from a game of another, which the referee replays here before it counts, and
-//! which is made and replayed only if it can beat the board's own) and a U direction (an inequality on opt(n)):
+//! The book of the ledger: for every game n, a lower bound L(n), the score of the moves it holds, and an upper bound
+//! U(n) on opt(n), each with its derivation (the rule and the board it came from), and the relations between boards,
+//! applied to a fixpoint.  The relations are proven in docs/theory/neighbors.md and docs/theory/search-rules.md; each
+//! gives an L direction (moves for one board made from moves for another, which the referee replays here before it
+//! counts, and which is made and replayed only if it can beat the board's own) and a U direction (an inequality on
+//! opt(n)):
 //!
-//! * `monotone` (monotonicity, N3): opt(n − 1) ≤ opt(n).  L(n) from the game of n − 1, followed by n when it is still
+//! * `monotone` (monotonicity, N3): opt(n − 1) ≤ opt(n).  L(n) from the moves for n − 1, followed by n when it is still
 //!   legal (n composite); U(n − 1) ≤ U(n).
-//! * `ceiling` (the ceiling lemma, N4): opt(n) ≤ opt(n − 1) + n.  U(n) ≤ U(n − 1) + n; L(n − 1) from the game of n
+//! * `ceiling` (the ceiling lemma, N4): opt(n) ≤ opt(n − 1) + n.  U(n) ≤ U(n − 1) + n; L(n − 1) from the moves for n
 //!   without the move n, completed (n composite).
 //! * `prime` (the prime formula, N5): for a prime p and q the largest prime below it, opt(p) = opt(p − 1) + p − q, both
-//!   ways, the games by exchanging the opening q and p.
+//!   ways, the moves by exchanging the opening q and p.
 //! * `repeat` (the repeat lemma, R6, in docs/theory/search-rules.md): boards with the same search problem have the same
-//!   best promotion sum, so U(n) − bag(n) ≤ U(m) − bag(m); L(n) from the promotions of m's game played on n's board.
+//!   best promotion sum, so U(n) − bag(n) ≤ U(m) − bag(m); L(n) from the promotions of m's moves played on n's board.
 //!
 //! The sources (a board's own bounds) are the standalone start and root bound (`start`, `root`: the map), searches
 //! (`search`, `dual`, `exhausted`, the dual-bound lemma (R4) for the dual bound;
 //! `floor`, the floor lemma (R5), a search under a floor that completed having found nothing: U is the floor), the
-//! finder's games (`lns`: L only), proven games given (`given`), boards with nothing to promote (`trivial`), and the
+//! finder's moves (`lns`: L only), proven moves given (`given`), boards with nothing to promote (`trivial`), and the
 //! Lagrangian bound over checked nogoods (`nogoods`: U only, which nothing makes now: the removed example `wall` did).
 //! Every bound only improves: L only rises and U only falls, and a board is proven when they meet.  L > U anywhere is a
 //! violation, which [`Book::propagate`] reports as an error: a bug, or, since the U of the frame model rests on
@@ -32,12 +33,12 @@ use taxman::search::Problem;
 /// `taxman solve` reads too.
 pub use taxman::store::{carries, carry_game, repeat_game, upper_by, Rule, Side};
 
-/// A lower bound: a finished game of the board (the referee's `replay_finished` accepts it) and its score.
+/// A lower bound: finished moves for the board (the referee's `replay_finished` accepts it) and its score.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lower {
     pub value: u64,
     pub moves: Vec<u32>,
-    /// The promotions that make the game in the frame model (`solution_for_promotions`), when it was made so.
+    /// The promotions that make the moves in the frame model (`solution_for_promotions`), when it was made so.
     pub promotions: Option<Vec<u32>>,
     pub rule: Rule,
     pub from: Option<u32>,
@@ -129,7 +130,7 @@ pub struct Entry {
     /// The floor steps that completed, in order, and the one the limit stopped, if any.
     pub steps: Vec<Step>,
     pub stalled: Option<Stalled>,
-    /// The score of the best seed the board had when the finder last ran on it, its own game included (none: it has
+    /// The score of the best seed the board had when the finder last ran on it, its own moves included (none: it has
     /// not run): the finder runs again before a search only if the best seed is another score.
     pub lns_score: Option<u64>,
     /// The board's own map is made (`start` and `root`), which every board searched has first.
@@ -427,7 +428,7 @@ impl Book {
     /// The changed boards go in sweeps, up from the lowest and then from the lowest again, so that a chain of changes up
     /// the boards (each one's ceiling from the one before) is passed on in one sweep and a chain down them in the
     /// next, and a board is not improved again by every source that happens to reach it first.
-    /// Returns the changes, in order.  An error is a violation (L > U), or a game a relation made that the referee
+    /// Returns the changes, in order.  An error is a violation (L > U), or moves a relation made that the referee
     /// refuses: either is a bug, or a counterexample to statement U (docs/theory/search-rules.md, "Bounds carried
     /// between games").
     pub fn propagate(&mut self, changed: impl IntoIterator<Item = u32>) -> Result<Vec<Change>, String> {
@@ -453,7 +454,7 @@ impl Book {
     }
 
     /// The bounds of `target` that the relation `link` derives from `source`'s.  The upper bound is arithmetic.  The
-    /// lower bound is a game: made once for each lower bound its source has (and not at all if the target's cannot be
+    /// lower bound is moves: made once for each lower bound its source has (and not at all if the target's cannot be
     /// beaten by it), and shown to the referee only if its score, the sum of its moves, is more than the target's.
     fn derive(&mut self, source: u32, target: u32, link: Link, changes: &mut Vec<Change>) -> Result<(), String> {
         let s = &self.entries[&source];
@@ -461,19 +462,19 @@ impl Book {
         let s_value = s.lower.as_ref().map(|l| l.value);
         let t = &self.entries[&target];
         let (t_bag, t_prime, t_value) = (t.bag, t.prime, t.lower.as_ref().map_or(0, |l| l.value));
-        // The relation that carries a game across the link, and the rule that names the upper bound (up a board it is
+        // The relation that carries moves across the link, and the rule that names the upper bound (up a board it is
         // the ceiling, down a board monotonicity).  N5 (the prime formula, docs/theory/neighbors.md): U(p) <= U(p - 1)
-        // + p - q, and the game's exchange of the opening q for p scores that much more, and the same down; N4 (the
-        // ceiling lemma): U(n) <= U(n - 1) + n; N3 (monotonicity): the game of n - 1 scores as it did, or n more, and
+        // + p - q, and the moves' exchange of the opening q for p scores that much more, and the same down; N4 (the
+        // ceiling lemma): U(n) <= U(n - 1) + n; N3 (monotonicity): the moves for n - 1 score as it did, or n more, and
         // U(n - 1) <= U(n); R6 (the repeat lemma, docs/theory/search-rules.md): U(n) - bag(n) <= U(m) - bag(m), and the
-        // promotions of the source's game on the target's board score its bag and their sum (a game that was not made
+        // promotions of the source's moves on the target's board score its bag and their sum (moves that were not made
         // from promotions is made only if it has more to give than the target's, on the same terms).  `upper_by` has
-        // the arithmetic, which bounds the score of a game too, except down a board.
+        // the arithmetic, which bounds the score of moves too, except down a board.
         let (relation, upper_rule) = match link {
             Link::Up if t_prime => (Rule::Prime, Rule::Prime),
             Link::Up => (Rule::Monotone, Rule::Ceiling),
             Link::Down if s_prime => (Rule::Prime, Rule::Prime),
-            // The game below that of n + 1: its moves less n + 1, completed.
+            // The moves for the board below that of n + 1: its moves less n + 1, completed.
             Link::Down => (Rule::Ceiling, Rule::Monotone),
             Link::Repeat => (Rule::Repeat, Rule::Repeat),
         };
@@ -508,7 +509,7 @@ impl Book {
                 (repeat_game(target, &promotions), Some(promotions))
             }
         };
-        let what = || format!("the {} game of {target} from the game of {source}", relation.name());
+        let what = || format!("the {} moves for {target} from the moves for {source}", relation.name());
         let value: u64 = moves.iter().map(|&m| u64::from(m)).sum();
         if let (Rule::Repeat, true, Some(promotions)) = (relation, from_promotions, &promotions) {
             let sum: u64 = promotions.iter().map(|&x| u64::from(x)).sum();
@@ -520,8 +521,8 @@ impl Book {
             return Ok(());
         }
         match replay_finished(target, &moves) {
-            Ok(score) => debug_assert_eq!(score, value, "{}: the score of a game is the sum of its moves", what()),
-            // Moves of a game that was not made from promotions need not be a promotion set of the frame model.
+            Ok(score) => debug_assert_eq!(score, value, "{}: the score of moves is their sum", what()),
+            // Moves that were not made from promotions need not be a promotion set of the frame model.
             Err(_) if relation == Rule::Repeat && !from_promotions => return Ok(()),
             Err(e) => return Err(format!("{}: {e}", what())),
         }

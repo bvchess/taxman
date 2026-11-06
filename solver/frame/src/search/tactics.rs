@@ -47,7 +47,7 @@ pub struct SearchTactics {
     /// Cut a node whose completions are promotion sets of a game M proven before, once the incumbent reaches a proven
     /// bound of M's best promotion sum ([`NearRepeat`](super::NearRepeat); proven: the near-repeat lemma (R7),
     /// docs/theory/search-rules.md).  It acts only where the search is given M
-    /// ([`search_steered`](super::search_steered): the solver gives the game of n − 1 when it is concluded and proven
+    /// ([`search_steered`](super::search_steered): the solver gives the moves for n − 1 when it is concluded and proven
     /// before the search starts) and its incumbent or floor reaches that bound.
     pub near_repeat: bool,
     /// With `conflict_branching`, keep the prices of a node's members that the choice of the conflict makes, from one

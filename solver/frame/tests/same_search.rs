@@ -215,7 +215,7 @@ fn a_game_with_a_checkpoint_is_resumed_not_repeated_from(first: u32, last: u32) 
 }
 
 /// A repeat assumes what the game it repeats assumes: 34 repeats 33, which, built on the table's 32 (`--use-prev`),
-/// reaches its ceiling and so assumes that game optimal, and so does 34 then, though it ran no search.  Searched
+/// reaches its ceiling and so assumes those moves optimal, and so does 34 then, though it ran no search.  Searched
 /// without the repeat and without the ceiling (a proof by `cap` would rest on 33 too), 34 is an exhausted search
 /// and assumes nothing.
 #[test]

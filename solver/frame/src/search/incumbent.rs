@@ -1,5 +1,5 @@
 //! The incumbent a search starts from: the best of the greedy set ([`crate::bounds::greedy`], made by
-//! [`prepare`](super::prepare)), what [`surviving`] of the seed (the previous game's promotions), and the
+//! [`prepare`](super::prepare)), what [`surviving`] of the seed (the promotions of the previous moves), and the
 //! [`dive`] (with the matching bound), improved by a local search ([`Neighborhood::improve`]).  Every one of them
 //! is a set of candidates that can be promoted, so any of them is a valid incumbent; a good one only makes the
 //! search prune sooner.  The local search also runs on several threads ([`Neighborhood::improve_on`]), with the
@@ -281,13 +281,13 @@ mod tests {
     }
 
     /// `improve_on` on 0 to 4 threads gives the set of `improve`, which is the nested loops', from the greedy set and
-    /// from the survivors of the previous game, with and without pairs.  Returns how many of the local searches
+    /// from the survivors of the previous moves, with and without pairs.  Returns how many of the local searches
     /// improved their start.
     fn same_answers<const W: usize>(n: u32) -> usize {
         let board = Board::<W>::for_n(n);
         let prepared = board.prepare(SearchTactics::default()).unwrap();
         let hood = Neighborhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
-        let seed = board.seed(Optimal::built_in().moves(n - 1).expect("the table has the game"));
+        let seed = board.seed(Optimal::built_in().moves(n - 1).expect("the table has an entry"));
         let starts = [("greedy", prepared.greedy), ("seed", surviving(&prepared, &seed))];
         let mut improved = 0;
         for (what, start) in starts {

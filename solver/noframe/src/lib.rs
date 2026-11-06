@@ -3,8 +3,8 @@
 //! The prover is the second program of the repository: a branch and bound over sets of moves on the whole board that
 //! decides playability by peel (the peel theorem, P4, docs/theory/playability.md), uses only proven bounds, takes the
 //! recorded score as its target and proves that no set of moves beats it, so that the frame model's answers are checked
-//! without assuming the frame model.  It also lists every optimal set, finds the longest games, certifies conjecture
-//! (★) at scale and searches for adversarial instances.
+//! without assuming the frame model.  It also lists every optimal set, finds the longest move sequences, certifies
+//! conjecture (★) at scale and searches for adversarial instances.
 //!
 //! This crate shares no proof code with the frame solver (`../frame/src`) or with the Python heuristics; it rests only
 //! on the theorems of `docs/theory/` (playability = peel succeeds = no self-covering subset, P2, P4 and P7; residual
@@ -12,7 +12,7 @@
 //! the bottom-layers theorem F4 of docs/theory/frame-model.md, which the proofs of `exact` start from by default; and
 //! the semiprime formula J3 of docs/theory/arrival.md, which proves an odd number with two prime factors from the game
 //! before it) and on elementary bounds.  Both programs read the committed chain through the gzip decoder in `../gzip`,
-//! whose CRC-32 check makes a decoding error fail loudly rather than give both programs the same wrong game.  The
+//! whose CRC-32 check makes a decoding error fail loudly rather than give both programs the same wrong moves.  The
 //! report is `README.md` next to this file.
 //!
 //! * [`primes`]: the sieve.
@@ -24,7 +24,7 @@
 //! * [`span`]: the span check (♦), which certifies (★) on a whole instance by GF(2) linear algebra.
 //! * [`star`]: the per-threshold check of conjecture (★) on one instance.
 //! * [`game`]: the full game on the whole board: replay, peel, and an exact branch and bound.
-//! * [`moves`]: the longest games (the most moves), against the optimal game's moves.
+//! * [`moves`]: the longest move sequences (the most moves), against the optimal moves.
 //! * [`nogoods`]: the search's table of nogoods (unplayable sets), kept so that a node reads only the nogoods its
 //!   changes touch.
 //! * [`parity`]: the parity vectors, two families of vectors over GF(2) in each of which every playable set is
@@ -36,7 +36,7 @@
 //!   every set beating a recorded score must hold, certified by the parity bound with the two bottom layers fixed
 //!   (F4).
 //! * [`adversary`]: synthetic Taxman-shaped instances for the adversarial search.
-//! * [`jsonl`]: the resumable result files every campaign writes, and the reading of the recorded games.
+//! * [`jsonl`]: the resumable result files every campaign writes, and the reading of the recorded moves.
 //! * [`team`]: `exact`'s campaign, which searches a game on several threads when fewer games are left than threads.
 //! * [`stop`]: the clean stop of that campaign on SIGINT and SIGTERM.
 

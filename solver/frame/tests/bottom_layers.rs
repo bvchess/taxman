@@ -21,11 +21,12 @@
 //! * [`layer_2_greedy_is_what_setup_keeps`]: the numbers of layer 2 above n/2 in the game with no promotions
 //!   (`Board::plain`) are Kruskal's, on every board to 400 and on a sample of the boards to 8191 (an ignored test
 //!   takes every 25th).
-//! * [`theorem_b_holds_for_every_recorded_game`]: the games of the committed chain `results/optimal.jsonl.gz` and of the
-//!   chain 2176 to 2276 of the Graviton calibration, another run of games the committed chain has.  The frame solver's
-//!   games play numbers of layer 2 up to n/2 only on small boards, where the frames of layer 2 have freedoms.
+//! * [`theorem_b_holds_for_every_recorded_game`]: the moves of the committed chain `results/optimal.jsonl.gz` and of
+//!   the chain 2176 to 2276 of the Graviton calibration, another run of moves for the games the committed chain has.
+//!   The frame solver's moves play numbers of layer 2 up to n/2 only on small boards, where the frames of layer 2 have
+//!   freedoms.
 //! * [`theorem_b_holds_for_every_enumerated_optimal_set`]: the prover's lists of all the optimal sets of a board
-//!   (`solver/noframe/data/optsets_*.jsonl`): the other sets of a board as well as the recorded game.  Each set is
+//!   (`solver/noframe/data/optsets_*.jsonl`): the other sets of a board as well as the recorded moves.  Each set is
 //!   checked to be playable and worth opt(n) before the theorem is asked of it.
 //! * [`theorem_b_holds_for_every_optimal_set_of_the_small_boards`]: on the small boards the optimal sets are found
 //!   again, by an exhaustive search over the playable sets that uses no model of the game, only the oracle and the
@@ -304,14 +305,14 @@ fn layer_2_greedy_is_what_setup_keeps_on_every_25th_board() {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// The recorded games
+// The recorded moves
 
 /// A file under the crate's directory (`solver/frame/`).
 fn crate_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
 
-/// The completed games of the results file at `path` with `n` ≥ 2, as `(n, moves)` ascending in `n` (the lines of
+/// The completed lines of the results file at `path` with `n` ≥ 2, as `(n, moves)` ascending in `n` (the lines of
 /// searches that did not complete are skipped).
 fn completed_games(path: &Path) -> Vec<(u32, Vec<u32>)> {
     let none = Optimal::from_json(&Json::Arr(Vec::new())).expect("an empty table");
@@ -340,7 +341,7 @@ fn check_games(source: &str, games: &[(u32, Vec<u32>)]) -> Vec<String> {
     failures
 }
 
-/// The bottom-layers theorem (F4, docs/theory/frame-model.md) on the games of the committed chain,
+/// The bottom-layers theorem (F4, docs/theory/frame-model.md) on the moves of the committed chain,
 /// `results/optimal.jsonl.gz`, and of the chain 2176 to 2276 of the Graviton calibration.
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_b_holds_for_every_20th_recorded_game")]
@@ -367,7 +368,7 @@ fn theorem_b_holds_for_the_recorded_games(every: usize) {
 
     let mut failures = check_games("results/optimal.jsonl.gz", &thin(chain));
     failures.extend(check_games("testdata/c8g.chain-2176.jsonl", &thin(ec2)));
-    assert!(failures.is_empty(), "F4 fails on {} recorded games:\n{}", failures.len(), failures.join("\n"));
+    assert!(failures.is_empty(), "F4 fails on {} recorded moves:\n{}", failures.len(), failures.join("\n"));
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -380,7 +381,7 @@ fn data_lines(name: &str) -> Vec<Json> {
     text.lines().filter(|line| !line.trim().is_empty()).map(|line| Json::parse(line).expect("a line of JSON")).collect()
 }
 
-/// The sets a line of the prover's lists holds, each ascending: the canonical one (written, or else the recorded game
+/// The sets a line of the prover's lists holds, each ascending: the canonical one (written, or else the recorded moves
 /// `recorded`) first, then each other as the canonical one less `out` plus `in`.
 fn sets_of_line(line: &Json, recorded: &[u32]) -> Result<Vec<Vec<u32>>, String> {
     let mut canonical = match line.get("canonical") {
@@ -408,7 +409,7 @@ fn sets_of_line(line: &Json, recorded: &[u32]) -> Result<Vec<Vec<u32>>, String> 
 
 /// The bottom-layers theorem (F4, docs/theory/frame-model.md) on every set of every line of
 /// `solver/noframe/data/<name>` that holds sets.  Each is checked to be what the line says (the sets are distinct, as
-/// many as the line counts, worth its score, playable, the recorded game among them where the line lists all the
+/// many as the line counts, worth its score, playable, the recorded moves among them where the line lists all the
 /// optimal sets), and then against the theorem.  Prints what it found and returns the failures.
 fn check_enumerated(name: &str) -> Vec<String> {
     let start = Instant::now();
@@ -424,7 +425,7 @@ fn check_enumerated(name: &str) -> Vec<String> {
         }
         let t = Tables::new(n);
         let mut fail = |why: String| failures.push(format!("{name}: n={n}: {why}"));
-        let recorded = table.moves(n).unwrap_or_else(|| panic!("n={n}: no recorded game"));
+        let recorded = table.moves(n).unwrap_or_else(|| panic!("n={n}: no recorded moves"));
         let sets = match sets_of_line(line, recorded) {
             Ok(sets) => sets,
             Err(e) => {
@@ -442,7 +443,7 @@ fn check_enumerated(name: &str) -> Vec<String> {
         let mut recorded_set = recorded.to_vec();
         recorded_set.sort_unstable();
         if line.get("upper").and_then(Json::as_str) == Some("all") && !sets.contains(&recorded_set) {
-            fail("the recorded game is not among the optimal sets of the line".to_owned());
+            fail("the recorded moves are not among the optimal sets of the line".to_owned());
         }
         checked += 1;
         if sets.len() > 1 {
@@ -563,7 +564,7 @@ const BRUTE_FORCE_TO: u32 = 40;
 
 /// The bottom-layers theorem (F4, docs/theory/frame-model.md) on every optimal set of each board of `boards`, found by
 /// [`Search`]: there is one, the brute force has opt(n) (on the boards it reaches), the number of optimal sets is the
-/// prover's, the recorded game is one of them, and the theorem holds of each.  Prints what it found and returns the
+/// prover's, the recorded moves are one of them, and the theorem holds of each.  Prints what it found and returns the
 /// failures.
 fn check_small_boards(boards: RangeInclusive<u32>) -> Vec<String> {
     let start = Instant::now();
@@ -589,10 +590,10 @@ fn check_small_boards(boards: RangeInclusive<u32>) -> Vec<String> {
                 fail(format!("{} optimal sets found, the prover has {counted}", sets.len()));
             }
         }
-        let mut recorded = table.moves(n).expect("a recorded game").to_vec();
+        let mut recorded = table.moves(n).expect("recorded moves").to_vec();
         recorded.sort_unstable();
         if !sets.contains(&recorded) {
-            fail(format!("the recorded game {recorded:?} is not among the optimal sets"));
+            fail(format!("the recorded moves {recorded:?} are not among the optimal sets"));
         }
         for set in &sets {
             if let Err(e) = check_and_note(&t, set, &mut plays_lower) {

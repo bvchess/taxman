@@ -218,8 +218,8 @@ where
     ledger.close();
 }
 
-/// The committed chain, the file `results/optimal.jsonl.gz` of the games that the frame solver proved: one result line
-/// a game, the line of game n the n-th.
+/// The committed chain, the file `results/optimal.jsonl.gz` of the moves that the frame solver proved optimal: one
+/// result line a game, the line of game n the n-th.
 pub fn committed_chain() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/optimal.jsonl.gz")
 }
@@ -228,7 +228,7 @@ pub fn committed_chain() -> PathBuf {
 /// `.gz` is a gzip file, which the project's decoder ([`taxman_gzip`]) gives a member at a time, so that a reader that
 /// has what it wants leaves the later members undecoded; any other path is plain text, a single piece.  A file that
 /// cannot be read or decoded stops the program: the decoder checks every member's CRC-32, so a fault in it is an
-/// error and never a wrong game.
+/// error and never wrong moves.
 fn read_pieces(path: &Path, mut read: impl FnMut(&str) -> bool) {
     if path.extension().is_some_and(|ext| ext == "gz") {
         let bytes = std::fs::read(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
@@ -246,14 +246,14 @@ fn read_pieces(path: &Path, mut read: impl FnMut(&str) -> bool) {
     }
 }
 
-/// The recorded game of each n, (score, moves), from result files in the solver's format (the first "n", "score" and
+/// The recorded moves of each n, (score, moves), from result files in the solver's format (the first "n", "score" and
 /// "moves" of each line holding an "n"); an earlier file wins over a later one.
 pub fn recorded_games<P: AsRef<Path>>(paths: &[P]) -> std::collections::BTreeMap<u64, (u64, Vec<u32>)> {
     recorded_games_to(paths, u64::MAX)
 }
 
-/// [`recorded_games`] for the games of n <= `last`; a line of a larger game is skipped before its score and moves are
-/// read, so a check of the small boards does not parse the large games.  A gzip file, whose members hold the games in
+/// [`recorded_games`] for the moves of n <= `last`; a line of a larger n is skipped before its score and moves are
+/// read, so a check of the small boards does not parse the large lines.  A gzip file, whose members hold the lines in
 /// order, is decoded only as far as the member that reaches `last`.
 pub fn recorded_games_to<P: AsRef<Path>>(paths: &[P], last: u64) -> std::collections::BTreeMap<u64, (u64, Vec<u32>)> {
     fn after<'a>(line: &'a str, key: &str) -> Option<&'a str> {

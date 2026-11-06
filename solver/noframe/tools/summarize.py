@@ -15,7 +15,7 @@
                                   roles of F4) against the same search with the whole upper part fixed to U*
                                   (--fix-upper 1)
     summarize.py optsets FILE...  every optimal pick set per game (bin/optsets.rs): tables, exchanges, canonical sets
-    summarize.py moves FILE...    the longest games against the optimal ones (bin/moves.rs)
+    summarize.py moves FILE...    the longest move sequences against the optimal ones (bin/moves.rs)
 """
 
 import gzip
@@ -27,7 +27,7 @@ from itertools import combinations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-COMMITTED = ROOT / "results/optimal.jsonl.gz"  # the committed chain: the recorded games, a result line each
+COMMITTED = ROOT / "results/optimal.jsonl.gz"  # the committed chain: the recorded moves, a result line each
 UPPER_MODES = {
     "all": "every optimal set",
     "fixed": "optimal sets whose upper part is U*",
@@ -293,7 +293,7 @@ def recorded_games():
 
 
 def recorded_moves(n):
-    """The moves of the recorded game for n."""
+    """The recorded moves for n."""
     return recorded_games()[n]["moves"]
 
 
@@ -318,7 +318,7 @@ def semiprime_exchange(n):
     """x of the semiprime formula (J3, docs/theory/arrival.md) at an odd n with two prime factors, or None if n is not
     such a number or closes no cycle with U*_2(n - 1), the numbers of layer 2 in U*(n - 1).  The graph has the primes
     up to n / 2 and the ground, 0, for vertices; pq is the edge p-q and p^2 the edge p-0.  U*(n - 1) is read from the
-    recorded game of n - 1, which plays it above (n - 1) / 2 (`recorded_ustar` in src/upper.rs checks that for every
+    recorded moves for n - 1, which play it above (n - 1) / 2 (`recorded_ustar` in src/upper.rs checks that for every
     game the prover proves); x is the smallest edge on the path between the ends of n."""
     def ends(m):
         factors = prime_factors(m)
@@ -469,7 +469,7 @@ def optsets_exchanges(rows, sets_of):
 
 def optsets_canonical(rows, sets_of):
     """Whether the canonical set of n - 1 maps to that of n at each step to a game at its ceiling (`chain`) or to a
-    prime (`prime`), and where the recorded game's set stands among the canonically ordered sets."""
+    prime (`prime`), and where the recorded moves' set stands among the canonically ordered sets."""
     kept, steps, broken = 0, 0, []
     for n in sorted(sets_of):
         before = sets_of.get(n - 1)
@@ -489,7 +489,7 @@ def optsets_canonical(rows, sets_of):
     for n, sets in sets_of.items():
         if len(sets) > 1:
             recorded = frozenset(recorded_moves(n))
-            assert recorded in sets, f"n={n}: the recorded game is not among the listed sets"
+            assert recorded in sets, f"n={n}: the recorded moves are not among the listed sets"
             ranks[n] = sets.index(recorded)
     off = {n: rank for n, rank in sorted(ranks.items()) if rank}
     print(f"recorded = canonical in {len(ranks) - len(off)} of {len(ranks)} multi-set games"
@@ -519,7 +519,8 @@ def optsets(paths):
 
 
 def moves(paths):
-    """How M(n), the most moves of a game of n, was settled, and the games whose recorded optimal game is shorter."""
+    """How M(n), the most moves that can be played on 1..n, was settled, and the games whose recorded moves are fewer.
+    """
     rows = {r["n"]: r for r in lines(paths)}
     ns = sorted(rows)
     how = Counter(r["how"] for r in rows.values())
@@ -528,16 +529,16 @@ def moves(paths):
     over = [n for n in ns if rows[n]["most"] is not None and rows[n]["nu"] > rows[n]["most"]]
     print(f"matching number above M(n): {compact_ranges(over)}")
     gaps = Counter(r["gap"] for r in rows.values() if r["most"] is not None)
-    print(f"M(n) minus the recorded game's moves: {dict(sorted(gaps.items()))}")
+    print(f"M(n) minus the number of recorded moves: {dict(sorted(gaps.items()))}")
     for n in ns:
         r = rows[n]
         if not r.get("gap"):
             continue
         heaviest = ""
         if "heaviest_sum" in r:
-            heaviest = (f"; the heaviest longest game scores {r['heaviest_sum']} ({r['score'] - r['heaviest_sum']} "
+            heaviest = (f"; the heaviest longest sequence scores {r['heaviest_sum']} ({r['score'] - r['heaviest_sum']} "
                         f"less): {r['heaviest_out']} out, {r['heaviest_in']} in")
-        print(f"n={n}: the recorded game has {r['recorded_moves']} moves ({r['recorded_upper']} above n/2), "
+        print(f"n={n}: the recorded moves number {r['recorded_moves']} ({r['recorded_upper']} above n/2), "
               f"M(n) = {r['most']} ({r['how']}){heaviest}")
 
 

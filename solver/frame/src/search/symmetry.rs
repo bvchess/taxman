@@ -539,7 +539,7 @@ mod tests {
         covered.games += 1;
         let pairs = symmetries.pairs();
         let mut scratch = Scratch::new();
-        let moves = optimal.moves(n).expect("a known game");
+        let moves = optimal.moves(n).expect("a known entry");
         let best: Bits<W> = moves.iter().copied().filter(|&x| p.candidates.contains(x)).collect();
         assert!(p.model.promote_all_using(&mut scratch, &p.root, &best).is_some(), "n={n}: an optimal set");
         check_images(&p, pairs, &mut scratch, &best);

@@ -16,12 +16,12 @@ pub struct Checked {
     pub known: usize,
     /// Proven boards whose value is the known optimum.
     pub proven_right: usize,
-    /// Everything wrong: a game the referee refuses or that scores other than its bound, a bound on the wrong side of
+    /// Everything wrong: moves the referee refuses or that score other than their bound, a bound on the wrong side of
     /// the known optimum, a proven value that is not it.
     pub violations: Vec<String>,
 }
 
-/// Checks every board of `entries`: its game replays to its lower bound, and with a known optimum (`known`), L <= opt
+/// Checks every board of `entries`: its moves replay to its lower bound, and with a known optimum (`known`), L <= opt
 /// <= U, with equality for a proven board.
 pub fn check(entries: &[Entry], known: &Optimal) -> Checked {
     let mut c = Checked::default();
@@ -31,9 +31,9 @@ pub fn check(entries: &[Entry], known: &Optimal) -> Checked {
             match replay_finished(n, &l.moves) {
                 Ok(score) if score == l.value => {}
                 Ok(score) => {
-                    c.violations.push(format!("n={n}: the game of the lower bound {} scores {score}", l.value))
+                    c.violations.push(format!("n={n}: the moves of the lower bound {} score {score}", l.value))
                 }
-                Err(err) => c.violations.push(format!("n={n}: the game of the lower bound: {err}")),
+                Err(err) => c.violations.push(format!("n={n}: the moves of the lower bound: {err}")),
             }
         }
         let Some(opt) = known.score(n) else { continue };
@@ -75,7 +75,7 @@ fn quantiles(values: &mut [i64]) -> String {
 }
 
 /// The report of the run in `dir` as text, and whether the check against the known optima (the table, with the
-/// completed games of the results files `known`) found nothing wrong.
+/// completed lines of the results files `known`) found nothing wrong.
 pub fn report(dir: &Path, known: &[PathBuf]) -> Result<(String, bool), String> {
     let entries = read_ledger(dir)?;
     let events = fs::read_to_string(events_path(dir)).unwrap_or_default();
@@ -128,8 +128,8 @@ pub fn report(dir: &Path, known: &[PathBuf]) -> Result<(String, bool), String> {
         outcomes(&steps, "moot"),
     );
 
-    // The finder: its runs (a map or a search with an `lns_found`), those that found a better game than they began
-    // from, and the boards whose lower bound at the end is its game.
+    // The finder: its runs (a map or a search with an `lns_found`), those that found better moves than they began
+    // from, and the boards whose lower bound at the end is its moves.
     let jobs = || events.iter().filter(|e| matches!(e.get("action").and_then(Json::as_str), Some("init" | "search")));
     let runs: Vec<(u64, u64)> =
         jobs().filter_map(|e| Some((e.get("lns_from")?.as_u64()?, e.get("lns_found")?.as_u64()?))).collect();
@@ -140,8 +140,8 @@ pub fn report(dir: &Path, known: &[PathBuf]) -> Result<(String, bool), String> {
         entries.iter().filter(|e| e.lower.as_ref().is_some_and(|l| l.rule == Rule::Lns)).collect();
     let _ = writeln!(
         w,
-        "finder: {} runs, {lns_s:.0} s of them; {} found a better game than they began from (by {} in all); {} boards \
-         end with its game as the lower bound ({} of them proven)",
+        "finder: {} runs, {lns_s:.0} s of them; {} found better moves than they began from (by {} in all); {} boards \
+         end with its moves as the lower bound ({} of them proven)",
         runs.len(),
         better.len(),
         better.iter().sum::<u64>(),

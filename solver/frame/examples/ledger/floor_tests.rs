@@ -1,5 +1,5 @@
 //! The tests of the floor steps: a step that completes lowers the upper bound by the floor rule, one that finds a set
-//! raises the lower bound with a game the referee replays, one that its limit stops is kept and resumed under its
+//! raises the lower bound with moves the referee replays, one that its limit stops is kept and resumed under its
 //! floor, the boards go by the forecast of their proofs with the climbs first, a climb into a repeat class holds the
 //! boards beside the whole class, and a ledger written before the steps goes on.
 
@@ -17,8 +17,8 @@ use taxman::engine::Control;
 use taxman::game::replay_finished;
 use taxman::json::Json;
 
-/// A scheduler of the board `n` alone, mapped by hand: its lower bound worth `lower`, at most opt(n) (the game is
-/// the optimal one, which these tests' jobs do not replay), its upper bound and its root's `upper`.
+/// A scheduler of the board `n` alone, mapped by hand: its lower bound worth `lower`, at most opt(n) (the moves are
+/// the optimal ones, which these tests' jobs do not replay), its upper bound and its root's `upper`.
 fn alone(dir: &Path, n: u32, settings: &Settings, lower: u64, upper: u64) -> Scheduler {
     let (mut scheduler, _) = Scheduler::open(n, n, dir, settings, None).unwrap();
     let game = Lower { value: lower, moves: opt_game(n), promotions: None, rule: Rule::Start, from: None };
@@ -97,10 +97,10 @@ fn a_floor_step_that_completes_lowers_the_upper_bound_with_the_floor_rule() {
 }
 
 /// A floor below opt(n) finds sets, the last of them optimal, and the search that completes has proven it
-/// (the floor lemma (R5, docs/theory/search-rules.md)): the lower bound is the game it found, which the referee
-/// replays, and the upper bound is exhausted.  One that its limit stops with a set found leaves the lower bound at that
-/// game; its floor, now below it, is dropped, and its checkpoint, a search from that set, becomes the board's own for
-/// the proof if the board has none.
+/// (the floor lemma (R5, docs/theory/search-rules.md)): the lower bound is the moves it found, which the referee
+/// replays, and the upper bound is exhausted.  One that its limit stops with a set found leaves the lower bound at
+/// those moves; its floor, now below it, is dropped, and its checkpoint, a search from that set, becomes the board's
+/// own for the proof if the board has none.
 #[test]
 fn a_floor_step_that_finds_a_set_raises_the_lower_bound_with_a_game_the_referee_replays() {
     let (dir, n) = (TempDir::new("ledger-floor-found"), 1218);
@@ -115,13 +115,13 @@ fn a_floor_step_that_finds_a_set_raises_the_lower_bound_with_a_game_the_referee_
     let (lower, upper) = (entry.lower.as_ref().unwrap(), entry.upper.unwrap());
     assert!(entry.proven() && lower.value == opt(n) && upper.value == opt(n));
     assert_eq!((lower.rule, upper.rule), (Rule::Search, Rule::Exhausted));
-    assert_eq!(replay_finished(n, &lower.moves), Ok(opt(n)), "the game of the lower bound");
+    assert_eq!(replay_finished(n, &lower.moves), Ok(opt(n)), "the moves of the lower bound");
     assert!(entry.steps.is_empty() && entry.stalled.is_none());
     let events = job_events(&dir);
     assert_eq!(text(&events[0], "outcome").as_deref(), Some("proved"));
     assert!(!dir.join("ckpt").read_dir().unwrap().any(|_| true), "no checkpoint is left of a proven board");
 
-    // A step stopped with a set found, 30 under opt(n): the lower bound is that game; the floor, below it, is
+    // A step stopped with a set found, 30 under opt(n): the lower bound is those moves; the floor, below it, is
     // dropped with the stalled step that was there; its checkpoint becomes the board's own, unless the board has one,
     // which stays and the step's is deleted.
     for ordinary in [false, true] {
@@ -270,7 +270,7 @@ fn floor_steps_go_by_the_forecast_of_the_proofs_and_the_climbs_go_first() {
 }
 
 /// A climb into the repeat class {925, 926} holds the boards beside the whole class, 924 and 927, not just the
-/// neighbors of the board searched; and a climb down into it from 927 is seeded with 927's game, which is not beside
+/// neighbors of the board searched; and a climb down into it from 927 is seeded with 927's moves, which are not beside
 /// the board searched.
 #[test]
 fn a_climb_into_a_class_holds_the_boards_beside_it_and_is_seeded_from_the_far_side() {
@@ -293,7 +293,7 @@ fn a_climb_into_a_class_holds_the_boards_beside_it_and_is_seeded_from_the_far_si
     let job = scheduler.next_job(0.0).unwrap();
     assert_eq!((job.kind, job.n), (Kind::Climb(Way::Down), 925));
     let game = scheduler.book.entries[&927].lower.as_ref().unwrap().moves.clone();
-    assert!(seeded_with(&job, &game), "seeded with the game of 927, past the class");
+    assert!(seeded_with(&job, &game), "seeded with the moves for 927, past the class");
     assert!(job.seeds.iter().any(|seed| seed.from == 927));
     start(&mut scheduler, &job);
     assert!(scheduler.next_job(0.0).is_some());
@@ -352,7 +352,7 @@ fn a_run_with_floor_steps_proves_the_stretch_and_the_events_and_the_report_say_h
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is a_run_is_exported_and_both_referees_accept_the_file")]
 fn a_ledger_from_before_the_floor_steps_goes_on() {
     let (dir, n) = (TempDir::new("ledger-old-format"), 1218);
-    // What the earlier build left: the board mapped (the start game, the root's bound), and the file as that build
+    // What the earlier build left: the board mapped (the start moves, the root's bound), and the file as that build
     // wrote it, none of the three new fields.
     let map = attempted(&dir, &job_of(n, Kind::Init, Vec::new(), None, finder(0.0, None)));
     let bag = taxman::with_width!(n, W => Board::<W>::for_n(n).in_the_bag);

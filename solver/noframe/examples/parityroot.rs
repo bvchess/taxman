@@ -1,6 +1,6 @@
 //! The parity bound at the root of each game (`parityroot A B [STEP]`): the heaviest set independent at both parities,
 //! against the recorded optimum (the committed chain), with the Franklín–Moniot bound beside it, its cost, and checks:
-//! the bound is at least opt(n) and the recorded game's moves are independent at both parities (the bound with every
+//! the bound is at least opt(n) and the recorded moves are independent at both parities (the bound with every
 //! recorded move forced is still at least opt(n)).
 
 use std::time::Instant;
@@ -30,7 +30,7 @@ fn main() {
         assert!(bound.value >= *score as i64, "n={n}: the parity bound {} is below {score}", bound.value);
         let mut with_game = roles.clone();
         moves.iter().for_each(|&c| with_game[c as usize] = Role::Pick);
-        let Outcome::Bound(forced) = meet.solve(&with_game) else { panic!("n={n}: the recorded game is dependent") };
+        let Outcome::Bound(forced) = meet.solve(&with_game) else { panic!("n={n}: the recorded moves are dependent") };
         let extra = forced.value - *score as i64;
         let forced_out = bound.without.iter().filter(|&&(_, v)| v <= *score as i64).count();
         println!(

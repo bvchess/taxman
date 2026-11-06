@@ -1,4 +1,4 @@
-//! The integrity of results: what the solver checks before it builds on a previous game, the tripwires that catch one
+//! The integrity of results: what the solver checks before it builds on previous moves, the tripwires that catch one
 //! that is not optimal, how an assumption travels down a chain from the table, what a results file must pass when
 //! it is opened, what survives a failure after a search, and the provenance every line carries.  Small boards, one or
 //! two threads.
@@ -36,8 +36,8 @@ fn prev(moves: Vec<u32>, score: u64) -> Prev {
     Prev { moves, score, source: PrevSource::Results, proof: Some(Proof::Exhausted), assumes: Assumptions::new() }
 }
 
-/// A game of 80 that is legal, over and opens with 79, as an optimal game does, but scores less than
-/// opt(n): the table's game cut short and finished by always playing the smallest legal move.
+/// Moves for 80 that are legal, over and open with 79, as optimal moves do, but score less than
+/// opt(n): the table's moves cut short and finished by always playing the smallest legal move.
 fn finished_but_worse_game_of_80() -> (Vec<u32>, u64) {
     let optimal = Optimal::built_in();
     let best = optimal.moves(80).unwrap();
@@ -47,12 +47,12 @@ fn finished_but_worse_game_of_80() -> (Vec<u32>, u64) {
             moves.push(m);
         }
         let score = replay(80, &moves).unwrap();
-        // Low enough that a game of 81 beats n + score(80) by a margin.
+        // Low enough that moves for 81 beat n + score(80) by a margin.
         if score + 81 + 50 < optimal.score(81).unwrap() {
             return (moves, score);
         }
     }
-    panic!("no such game");
+    panic!("no such moves");
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -62,7 +62,7 @@ fn finished_but_worse_game_of_80() -> (Vec<u32>, u64) {
 fn a_previous_game_that_cannot_be_optimal_is_refused() {
     let opts = options(1);
     let optimal = Optimal::built_in();
-    // Not over: the table's game of 80 without its last move.
+    // Not over: the table's moves for 80 without the last one.
     let mut moves = optimal.moves(80).unwrap().to_vec();
     moves.pop();
     let score = replay(80, &moves).unwrap();
@@ -101,7 +101,7 @@ fn a_ceiling_tripped_in_a_range_is_recorded_as_rejected() {
     let dir = TempDir::new("tripped");
     let results = dir.join("r.jsonl");
     let (moves, score) = finished_but_worse_game_of_80();
-    // The bad game as a table's game of 80, so that a range told to use it builds on it.
+    // The bad moves as the table's moves for 80, so that a range told to use it builds on it.
     let fake = Json::array([Json::object([
         ("n", Json::from(80u32)),
         ("score", Json::from(score)),
@@ -122,7 +122,7 @@ fn a_ceiling_tripped_in_a_range_is_recorded_as_rejected() {
 // ---------------------------------------------------------------------------------------------------------
 // Assumptions
 
-/// A run told to (`use_prev`) builds on a game of the table, which it assumes optimal, and each result records
+/// A run told to (`use_prev`) builds on the table's moves, which it assumes optimal, and each result records
 /// that assumption exactly where its proof rests on it: a proof by `cap` or the prime formula on the game before, a
 /// repeat on the game it repeats, and an exhausted search on no game.
 #[test]

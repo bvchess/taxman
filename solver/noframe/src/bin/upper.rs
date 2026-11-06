@@ -1,6 +1,6 @@
 //! The upper part of the optimal sets, game by game: for every game in a range, which members of U\*_{≥3} (the
 //! sources of three or more prime factors that descending greedy keeps) the parity bound certifies to be in every
-//! set beating the recorded score, and which it leaves open.  The recorded games are those of the committed chain and
+//! set beating the recorded score, and which it leaves open.  The recorded moves are those of the committed chain and
 //! the `--results` files (solver/noframe/docs/reproducing.md, "The recorded games").  One line per game, resumable:
 //!
 //!     upper --from A --to B [--list ...] [--threads K] [--seconds S] [--optimal FILE] [--results FILE]...
@@ -13,7 +13,7 @@
 //! root's heaviest set holds all of U\*_{≥3} (`root_has_upper`), the number of members of U\*_{≥3} (`members`), how
 //! many the bound certifies (`certified`), and the `open` ones as triples [u, Ω(u), margin], ascending in u, the
 //! margin being the bound with u barred minus the score (null if the bound could not be certified).  Per game the
-//! recorded game is replayed by the rules, its moves above n/2 are checked to be U\* and the whole game to obey the
+//! recorded moves are replayed by the rules, their moves above n/2 are checked to be U\* and all of them to obey the
 //! roles of F4 (checks of the data).
 //!
 //! The roles are those of every optimal set (the bottom-layers theorem, F4, docs/theory/frame-model.md; `upper.rs`).  A
@@ -56,10 +56,10 @@ fn main() {
         let started = Instant::now();
         let (score, moves) = &known[&n];
         let board = Board::new(n as u32, &spf);
-        assert_eq!(board.replay(moves), Ok(*score), "n={n}: the recorded game does not replay to its score");
+        assert_eq!(board.replay(moves), Ok(*score), "n={n}: the recorded moves do not replay to their score");
         let ustar = recorded_ustar(n, moves, &spf);
         let roles = low_roles(n as u32, &spf, &ustar);
-        obeys(&roles, moves).unwrap_or_else(|e| panic!("n={n}: the recorded game breaks the roles of F4: {e}"));
+        obeys(&roles, moves).unwrap_or_else(|e| panic!("n={n}: the recorded moves break the roles of F4: {e}"));
         let prev = known.get(&(n - 1)).map_or(0, |(s, _)| *s);
         let relation = relation(n, *score, prev, &spf);
         let needs = relation == Relation::None;
@@ -69,7 +69,7 @@ fn main() {
         if needs {
             let barred = barred_bounds(&board, &spf, *score, &ustar);
             let gap = barred.root - *score as i64;
-            assert!(gap >= 0, "n={n}: the parity bound {} is below a legal game's {score}", barred.root);
+            assert!(gap >= 0, "n={n}: the parity bound {} is below the score {score} of legal moves", barred.root);
             let open: Vec<String> = barred.open.iter().map(triple).collect();
             line = line
                 .num("root", barred.root)

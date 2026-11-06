@@ -1,13 +1,13 @@
 //! Whether a set of numbers of a whole board can all be played, decided with nothing from the frame solver.
 //!
 //! The decision is the peel of docs/theory/playability.md (the playability theorem (P2) and the peel theorem (P4)): a
-//! set is playable, that is, some order of it is
-//! a legal game on the board `1..=n`, exactly when the peel pairs every member with a maximal factor of its own,
-//! whatever the order of the peel's moves.  The code uses only the tables of maximal factors and composites of
-//! [`crate::numtheory::Tables`], which are foundation code, and `std`: it shares nothing with `frames` or `model`.  So
-//! the tests that decide playability here check the frame model against the board and not against itself
-//! (`tests/model_exact.rs`, `tests/model_extended.rs`), and `taxman certify` ([`crate::certify`]) orders the game of a
-//! set that beats a recorded score with it, independently of the search that found the set.
+//! set is playable, that is, some order of it is a legal sequence of moves on the board `1..=n`, exactly when the peel
+//! pairs every member with a maximal factor of its own, whatever the order of the peel's moves.  The code uses only the
+//! tables of maximal factors and composites of [`crate::numtheory::Tables`], which are foundation code, and `std`: it
+//! shares nothing with `frames` or `model`.  So the tests that decide playability here check the frame model against
+//! the board and not against itself (`tests/model_exact.rs`, `tests/model_extended.rs`), and `taxman certify`
+//! ([`crate::certify`]) orders the moves for a set that beats a recorded score with it, independently of the search
+//! that found the set.
 //!
 //! [`peel`] gives the pairing, [`playable`] the answer, and [`play_order`] a legal order of the set.
 //! [`playable_against`] decides an instance whose pool is given, as the frame model's definitions use it
@@ -139,7 +139,7 @@ pub fn playable(t: &Tables, set: &[u32]) -> bool {
     peel(t, set).is_some()
 }
 
-/// A legal game that plays exactly `set`, if it is playable: the topological order of the precedence of the peel's
+/// Legal moves that play exactly `set`, if it is playable: the topological order of the precedence of the peel's
 /// pairs (P2 and P4, docs/theory/playability.md), where `a` comes before `b` whenever the payment of `a` divides `b`,
 /// or `a` divides `b` (and `a` is not `b`).  Quadratic in the size of the set.
 ///

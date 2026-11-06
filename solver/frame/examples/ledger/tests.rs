@@ -1,5 +1,5 @@
 //! The ledger's tests: the relations on the boards of the table (every bound they derive brackets opt(n), and
-//! every game they make is legal), a violation, the choice of the next search (the climbs), the finder, and runs of the
+//! the moves they make are legal), a violation, the choice of the next search (the climbs), the finder, and runs of the
 //! scheduler checked against the table.  The runs of the first tests leave the finder off (`lns_seconds` 0), whose
 //! default second a board would make them slow; the finder has tests of its own at the end.
 
@@ -35,8 +35,8 @@ pub(crate) fn book_of(ns: impl Iterator<Item = u32>) -> Book {
     book_with_plains(ns).0
 }
 
-/// [`book_of`] and the game with no promotions of each board, taken from the setup that made the book: a test that
-/// wants the games would otherwise set every board up a second time, and a board's setup is most of what these tests
+/// [`book_of`] and the moves with no promotions of each board, taken from the setup that made the book: a test that
+/// wants the moves would otherwise set every board up a second time, and a board's setup is most of what these tests
 /// cost.
 pub(crate) fn book_with_plains(ns: impl Iterator<Item = u32>) -> (Book, BTreeMap<u32, Vec<u32>>) {
     let ns: Vec<u32> = ns.collect();
@@ -45,14 +45,14 @@ pub(crate) fn book_with_plains(ns: impl Iterator<Item = u32>) -> (Book, BTreeMap
     (Book::new(facts), plains)
 }
 
-/// Gives the book the optimal game of `n` as proven.
+/// Gives the book the optimal moves of `n` as proven.
 pub(crate) fn give(book: &mut Book, n: u32) {
     let lower = Lower { value: opt(n), moves: opt_game(n), promotions: None, rule: Rule::Given, from: None };
     book.offer_lower(n, lower, true).unwrap();
     book.offer_upper(n, Upper { value: opt(n), rule: Rule::Given, from: None }, true).unwrap();
 }
 
-/// Every bound of the book brackets opt(n), and every game replays to its lower bound.  Returns how many
+/// Every bound of the book brackets opt(n), and every set of moves replays to its lower bound.  Returns how many
 /// lower and upper bounds each rule has.
 fn brackets(book: &Book) -> BTreeMap<(&'static str, Rule), usize> {
     let mut rules = BTreeMap::new();
@@ -62,7 +62,7 @@ fn brackets(book: &Book) -> BTreeMap<(&'static str, Rule), usize> {
             assert_eq!(
                 replay_finished(n, &l.moves),
                 Ok(l.value),
-                "n={n}: the game of L ({:?} from {:?})",
+                "n={n}: the moves of L ({:?} from {:?})",
                 l.rule,
                 l.from
             );
@@ -77,8 +77,8 @@ fn brackets(book: &Book) -> BTreeMap<(&'static str, Rule), usize> {
     rules
 }
 
-/// Proven games every tenth board of 2..1300 and nothing else: the relations give every board both bounds, all of
-/// them on the right side of opt(n) and every game legal, with each relation used for both bounds; and they are
+/// Proven moves for every tenth board of 2..1300 and nothing else: the relations give every board both bounds, all of
+/// them on the right side of opt(n) and all moves legal, with each relation used for both bounds; and they are
 /// exact where the lemmas are equalities (a prime after a proven board, a repeat of one).
 #[test]
 #[cfg_attr(
@@ -124,7 +124,7 @@ fn the_relations_bracket_the_optimum_of_every_board_to(top: u32, min_changes: us
     }
 }
 
-/// Loose bounds everywhere (U above opt(n) by up to 48, L the game with no promotions) and a proven game every
+/// Loose bounds everywhere (U above opt(n) by up to 48, L the moves with no promotions) and proven moves every
 /// fiftieth board: what the relations derive still brackets opt(n), and tightens many of the loose bounds.
 #[test]
 #[cfg_attr(
@@ -149,7 +149,7 @@ fn loose_bounds_and_the_relations_bracket_the_optimum_of(
 ) {
     let (mut book, mut plains) = book_with_plains(ns.clone());
     for n in ns.clone() {
-        let plain = plains.remove(&n).expect("the game of a board of the book");
+        let plain = plains.remove(&n).expect("the moves of a board of the book");
         let value = replay_finished(n, &plain).unwrap();
         book.offer_lower(n, Lower { value, moves: plain, promotions: None, rule: Rule::Start, from: None }, false)
             .unwrap();
@@ -167,10 +167,10 @@ fn loose_bounds_and_the_relations_bracket_the_optimum_of(
     assert!(derived("lower") > lower && derived("upper") > upper, "{rules:?}");
 }
 
-/// The games the relations make from the optimal game of a neighbor are finished and score what the lemmas say: the
-/// exchange of the opening primes by exactly p - q, the game of n - 1 followed by n by its sum or n more, the game
+/// The moves the relations make from the optimal moves of a neighbor are finished and score what the lemmas say: the
+/// exchange of the opening primes by exactly p - q, the moves for n - 1 followed by n by their sum or n more, the moves
 /// below that of n + 1 by at least its sum less n + 1 and at most opt(n).  The ledger relies on the first and the
-/// second to leave a game unmade or unrefereed when it cannot beat the target's.
+/// second to leave moves unmade or unrefereed when they cannot beat the target's.
 #[test]
 fn the_games_the_relations_make_score_as_the_lemmas_say() {
     let q_of = |p: u32| u64::from(largest_prime_at_most(p - 1).expect("a prime below"));
@@ -184,13 +184,13 @@ fn the_games_the_relations_make_score_as_the_lemmas_say() {
             assert_eq!(replay_finished(n - 1, &down), Ok(opt(n) + q - u64::from(n)), "n={n}: the exchange down");
         } else {
             let up = monotone_game(n, &opt_game(n - 1)).unwrap();
-            let score = replay_finished(n, &up).unwrap_or_else(|e| panic!("n={n}: the game of n - 1 and n: {e}"));
+            let score = replay_finished(n, &up).unwrap_or_else(|e| panic!("n={n}: the moves for n - 1 and n: {e}"));
             assert!(score == opt(n - 1) || score == opt(n - 1) + u64::from(n), "n={n}: scores {score}");
         }
-        // The game of n below the game of n + 1, when n + 1 is composite.
+        // The moves for n below the moves for n + 1, when n + 1 is composite.
         if largest_prime_at_most(n + 1) != Some(n + 1) {
             let below = ceiling_game(n, &opt_game(n + 1)).unwrap();
-            let score = replay_finished(n, &below).unwrap_or_else(|e| panic!("n={n}: the game below n + 1: {e}"));
+            let score = replay_finished(n, &below).unwrap_or_else(|e| panic!("n={n}: the moves below n + 1: {e}"));
             assert!(opt(n + 1) <= score + u64::from(n + 1) && score <= opt(n), "n={n}: scores {score}");
         }
     }
@@ -270,7 +270,7 @@ fn a_run_proves_a_stretch_at_the_optimum_and_goes_on_from_its_ledger() {
     assert!(text.contains(&format!("{0} in the ledger, {0} proven", LAST - 900)), "{text}");
 }
 
-/// Writes a results file of the optimal games of `ns` to `path`, to give a run as proven.
+/// Writes a results file of the optimal moves of `ns` to `path`, to give a run as proven.
 pub(crate) fn write_results(path: &Path, ns: &[u32]) {
     let line = |n: u32| {
         let moves: Vec<String> = opt_game(n).iter().map(u32::to_string).collect();
@@ -279,7 +279,7 @@ pub(crate) fn write_results(path: &Path, ns: &[u32]) {
     std::fs::write(path, ns.iter().map(|&n| line(n)).collect::<String>()).unwrap();
 }
 
-/// A run given proven games (a results file) takes them as fixed points, and the boards past them follow.
+/// A run given proven moves (a results file) takes them as fixed points, and the boards past them follow.
 #[test]
 fn a_run_takes_the_proven_games_it_is_given() {
     let dir = TempDir::new("ledger-given");
@@ -297,7 +297,7 @@ fn a_run_takes_the_proven_games_it_is_given() {
     }
 }
 
-/// A scheduler of the boards 901..960, given the proven games of `proven`, with every board mapped and bounds that a
+/// A scheduler of the boards 901..960, given the proven moves of `proven`, with every board mapped and bounds that a
 /// map might leave (opt(n) less 10 and more 400), except board 930, the cheapest board of the ordinary order (a
 /// gap of 1).  The tests set the rest of what they need by hand.
 pub(crate) fn climbing(dir: &Path, proven: &[u32], settings: &Settings) -> Scheduler {
@@ -330,8 +330,8 @@ pub(crate) fn start(scheduler: &mut Scheduler, job: &Job) {
     scheduler.running.insert(job.n, Running { kind: job.kind, control: Control::new() });
 }
 
-/// A search that ended: the optimal game of `n`, proven by the search if `proven`; else a search that stopped, with a
-/// game scoring 1 less than opt(n) (the moves are the optimal game's: nothing here replays them) and a dual bound
+/// A search that ended: the optimal moves of `n`, proven by the search if `proven`; else a search that stopped, with
+/// moves scoring 1 less than opt(n) (the moves are the optimal ones: nothing here replays them) and a dual bound
 /// at opt(n), so that the gap is 1.
 pub(crate) fn ended(n: u32, kind: Kind, proven: bool) -> Done {
     let attempt = Attempt {
@@ -359,17 +359,17 @@ pub(crate) fn ended(n: u32, kind: Kind, proven: bool) -> Done {
     }
 }
 
-/// Whether `job` is seeded with the game `moves`.
+/// Whether `job` is seeded with `moves`.
 pub(crate) fn seeded_with(job: &Job, moves: &[u32]) -> bool {
     job.seeds.iter().any(|seed| seed.moves == moves)
 }
 
-/// With the games of 900 and 906 given, the relations prove the boards of their repeat classes (900-902, 904-908, 907
+/// With the moves for 900 and 906 given, the relations prove the boards of their repeat classes (900-902, 904-908, 907
 /// a prime among them), so that the boards to climb to are 903 and 909, the first unproven, searched boards above
 /// them, not 901 or 908: each is searched ahead of the ordinary order (here board 940, boosted, and board 930, of a gap
-/// of 1), seeded with the proven game below it and capped by the ceiling the relations derive.  The board above a
-/// board climbed to waits (910 would be the cheapest of the ordinary order), and when a climb proves its board the
-/// board above that is climbed to next.
+/// of 1), seeded with the proven moves for the board below it and capped by the ceiling the relations derive.  The
+/// board above a board climbed to waits (910 would be the cheapest of the ordinary order), and when a climb proves its
+/// board the board above that is climbed to next.
 #[test]
 fn a_proven_board_is_climbed_to_with_its_game_and_the_board_above_waits() {
     let dir = TempDir::new("ledger-climb-order");
@@ -389,7 +389,7 @@ fn a_proven_board_is_climbed_to_with_its_game_and_the_board_above_waits() {
         assert_eq!(job.limit, Duration::from_secs(60));
         let (below, entry) = (&scheduler.book.entries[&(job.n - 1)], &scheduler.book.entries[&job.n]);
         assert!(below.proven() && !entry.proven());
-        assert!(seeded_with(&job, &below.lower.as_ref().unwrap().moves), "n={}: seeded with the game below", job.n);
+        assert!(seeded_with(&job, &below.lower.as_ref().unwrap().moves), "n={}: seeded with the moves below", job.n);
         assert_eq!(job.cap, entry.upper.map(|u| u.value), "n={}: capped by the ledger's bound", job.n);
         assert!(job.cap.unwrap() <= opt(job.n - 1) + u64::from(job.n), "n={}: at most the ceiling", job.n);
         start(&mut scheduler, &job);
@@ -406,7 +406,7 @@ fn a_proven_board_is_climbed_to_with_its_game_and_the_board_above_waits() {
     let ordinary = scheduler.next_job(0.0).unwrap();
     assert_eq!((ordinary.kind, ordinary.n), (Kind::Search, 930));
 
-    // The climb to 909 proves it: 910 is climbed to next, with the game of 909.
+    // The climb to 909 proves it: 910 is climbed to next, with the moves for 909.
     scheduler.finish(ended(909, Kind::Climb(Way::Up), true)).unwrap();
     assert!(scheduler.book.entries[&909].proven());
     let next = scheduler.next_job(0.0).unwrap();
@@ -453,8 +453,8 @@ fn a_climb_that_stops_parks_its_board_in_the_ordinary_queue() {
     assert!(events.contains("\"job\":\"climb\"") && events.contains("\"outcome\":\"parked\""), "{events}");
 }
 
-/// With the game of 906 given, 909 is climbed to up and 903 down (904-908 are proven; 902 is not searched, 901 being
-/// the board of its class): the climb up goes first, the climb down is seeded with the proven game above, and a
+/// With the moves for 906 given, 909 is climbed to up and 903 down (904-908 are proven; 902 is not searched, 901 being
+/// the board of its class): the climb up goes first, the climb down is seeded with the proven moves above, and a
 /// climb down that stops parks its board like one up, with the way in its event.  The ways are settable: the climb down
 /// alone goes first, the climb up alone has no climb down after it, and with neither there are none.  A board next to
 /// one that is climbed to, either way, has no ordinary search meanwhile.
@@ -483,7 +483,7 @@ fn a_proven_board_is_climbed_down_from_after_the_climbs_up() {
     let down = scheduler.next_job(0.0).unwrap();
     assert_eq!((down.kind, down.n, down.limit), (Kind::Climb(Way::Down), 903, Duration::from_secs(60)));
     let above = &scheduler.book.entries[&904];
-    assert!(above.proven() && seeded_with(&down, &above.lower.as_ref().unwrap().moves), "seeded with the game above");
+    assert!(above.proven() && seeded_with(&down, &above.lower.as_ref().unwrap().moves), "seeded with the moves above");
     assert_eq!(down.cap, scheduler.book.entries[&903].upper.map(|u| u.value), "capped by the ledger's bound");
     start(&mut scheduler, &down);
     scheduler.finish(ended(903, Kind::Climb(Way::Down), false)).unwrap();
@@ -515,7 +515,7 @@ fn a_board_next_to_a_climb_down_waits_as_one_next_to_a_climb_up_does() {
     assert_eq!(scheduler.next_job(0.0).unwrap().n, 924);
 }
 
-/// A run given the proven game of 906 climbs from it both ways, with climbs of a few milliseconds some of which stop:
+/// A run given the proven moves for 906 climbs from it both ways, with climbs of a few milliseconds some of which stop:
 /// every board is proven at its optimum, each board is climbed to at most once, a climb that ended unproven left its
 /// board parked in the ledger, and the report counts the climbs of each way.  With one way only or with `climb_limit`
 /// 0, only the climbs that are asked for are made.
@@ -607,15 +607,15 @@ pub(crate) fn attempted(dir: &Path, job: &Job) -> Attempt {
 
 /// The finder follows a board's map, from the start incumbent, and precedes a search whose best seed is another than
 /// the one it last ran from (a climb's always counts as another), from that seed; it does not run for an ordinary search
-/// that goes on from the same seed, nor when the seed reaches the ceiling, nor with no seconds.  Its game seeds the
-/// search when it beats the seed, and every game it returns plays at the score it says, by the referee.
+/// that goes on from the same seed, nor when the seed reaches the ceiling, nor with no seconds.  Its moves seed the
+/// search when they beat the seed, and all moves it returns play at the score it says, by the referee.
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is a_run_is_exported_and_both_referees_accept_the_file")]
 fn the_finder_follows_a_map_and_precedes_a_search_whose_seed_it_has_not_seen() {
     let (dir, n) = (TempDir::new("ledger-finder"), 1218);
     // The seconds of each run of the finder, which has most of its gain in the first fraction of a second.
     let seconds = if QUICK { 0.2 } else { 0.5 };
-    let referee = |run: &LnsRun| assert_eq!(replay_finished(n, &run.moves), Ok(run.found), "the finder's game");
+    let referee = |run: &LnsRun| assert_eq!(replay_finished(n, &run.moves), Ok(run.found), "the finder's moves");
     // 1218's start incumbent is 204 short of opt(n), which the finder reaches in a fraction of a second.
     let map = attempted(&dir, &job_of(n, Kind::Init, Vec::new(), None, finder(seconds, None)));
     let run = map.lns.as_ref().expect("the finder follows the map");
@@ -624,7 +624,7 @@ fn the_finder_follows_a_map_and_precedes_a_search_whose_seed_it_has_not_seen() {
     assert!(run.seconds >= seconds && map.seed_from.is_none());
     referee(run);
 
-    // A search whose best seed is the start game, not the finder's game that the board has since.
+    // A search whose best seed is the start moves, not the finder's moves that the board has since.
     let seeded = |moves: &[u32]| vec![Seed { from: n, moves: moves.to_vec() }];
     let before = job_of(n, Kind::Search, seeded(&map.moves), None, finder(seconds, Some(run.found)));
     let first = attempted(&dir, &before);
@@ -633,7 +633,7 @@ fn the_finder_follows_a_map_and_precedes_a_search_whose_seed_it_has_not_seen() {
     assert!(again.improved() && first.value >= again.found);
     referee(again);
 
-    // A search of the board with the game the finder left it with has nothing new.
+    // A search of the board with the moves the finder left it with has nothing new.
     let same =
         attempted(&dir, &job_of(n, Kind::Search, seeded(&again.moves), None, finder(seconds, Some(again.found))));
     assert!(same.lns.is_none() && same.seed_from == Some(SeedFrom::Own));
@@ -641,7 +641,7 @@ fn the_finder_follows_a_map_and_precedes_a_search_whose_seed_it_has_not_seen() {
     let climb = job_of(n, Kind::Climb(Way::Up), seeded(&again.moves), None, finder(0.1, Some(again.found)));
     assert!(attempted(&dir, &climb).lns.is_some());
     // A seed that reaches the ceiling is settled by the search at once (in a directory of its own: the checkpoint of
-    // the searches above may hold a game that beats the finder's).
+    // the searches above may hold moves that beat the finder's).
     let capped = job_of(n, Kind::Search, seeded(&again.moves), Some(again.found), finder(seconds, None));
     let capped = attempted(&TempDir::new("ledger-finder-capped"), &capped);
     assert!(capped.lns.is_none() && capped.reached_cap && capped.value == again.found);
@@ -651,8 +651,8 @@ fn the_finder_follows_a_map_and_precedes_a_search_whose_seed_it_has_not_seen() {
         .is_none());
 }
 
-/// The referee accepts the promotions of a game that plays at the bag and their sum, and refuses a set that does not
-/// play as the game it claims.
+/// The referee accepts the promotions of moves that play at the bag and their sum, and refuses a set that does not
+/// play as the moves it claims.
 #[test]
 fn the_referee_refuses_promotions_that_do_not_play_as_the_game_they_claim() {
     let n = 250;
@@ -661,14 +661,14 @@ fn the_referee_refuses_promotions_that_do_not_play_as_the_game_they_claim() {
         let board = Board::<W>::for_n(n);
         let set = taxman::bits::Bits::<W>::from_slice(&map.promotions);
         assert_eq!(schedule::refereed(&board, &set), Ok((map.value, map.moves.clone())));
-        // Not every candidate can be promoted at once: what plays is not a game of all their sum.
+        // Not every candidate can be promoted at once: what plays is not moves of all their sum.
         let all = board.candidates();
         assert!(all.sum() > set.sum());
-        assert!(schedule::refereed(&board, &all).is_err(), "all the candidates are not a game");
+        assert!(schedule::refereed(&board, &all).is_err(), "all the candidates are not moves");
     });
 }
 
-/// A search that ended after the finder, for `finish`: it stopped with a game of `value`, after the finder's run (if
+/// A search that ended after the finder, for `finish`: it stopped with moves of `value`, after the finder's run (if
 /// any), seeded by `seed_from`, with the board below proven.
 fn ended_after_finder(n: u32, value: u64, lns: Option<LnsRun>, seed_from: Option<SeedFrom>) -> Done {
     let mut done = ended(n, Kind::Search, false);
@@ -678,8 +678,8 @@ fn ended_after_finder(n: u32, value: u64, lns: Option<LnsRun>, seed_from: Option
     done
 }
 
-/// The finder's game is a board's lower bound where it beats the board's and the search's (and credited to it when the
-/// search, which began from it, found nothing better); the search's where that is better, and nobody's but the
+/// The finder's moves are a board's lower bound where it beats the board's and the search's (and credited to it when
+/// the search, which began from it, found nothing better); the search's where that is better, and nobody's but the
 /// search's where the finder did not improve on its seed.  The board keeps the score the finder left it with, and the
 /// event says what the finder and the seed were.
 #[test]
@@ -709,7 +709,7 @@ fn the_finders_game_is_the_lower_bound_where_it_beats_the_search_and_the_event_s
     let lower = |entry: &Entry, n: u32| entry.lower.as_ref().map(|l| (l.value, l.rule)).map(|(v, r)| (opt(n) - v, r));
     let lns = Some(SeedFrom::Lns);
 
-    // The finder improved on its seed (4 under opt(n)), and the search that began from its game found nothing
+    // The finder improved on its seed (4 under opt(n)), and the search that began from its moves found nothing
     // better: the lower bound is the finder's.
     let (entry, event) = finished(940, 4, Some(4), lns);
     assert_eq!(lower(&entry, 940), Some((4, Rule::Lns)));
@@ -723,10 +723,10 @@ fn the_finders_game_is_the_lower_bound_where_it_beats_the_search_and_the_event_s
     assert_eq!(event.get("below_proven").and_then(Json::as_bool), Some(true));
     assert_eq!(event.get("above_proven").and_then(Json::as_bool), Some(false));
 
-    // The search found more: the search's game.
+    // The search found more: the search's moves.
     let (entry, _) = finished(944, 2, Some(4), lns);
     assert_eq!((lower(&entry, 944), entry.lns_score), (Some((2, Rule::Search)), Some(opt(944) - 4)));
-    // The finder found nothing better than its seed: the search's game, and the board has the seed's score for the
+    // The finder found nothing better than its seed: the search's moves, and the board has the seed's score for the
     // finder; the seed was the board's own.
     let (entry, event) = finished(948, 8, Some(10), Some(SeedFrom::Own));
     assert_eq!((lower(&entry, 948), entry.lns_score), (Some((8, Rule::Search)), Some(opt(948) - 10)));
@@ -747,7 +747,7 @@ pub(crate) fn job_events(dir: &Path) -> Vec<Json> {
 }
 
 /// A run with the finder on: every board is proven at its optimum, every job's event says what the finder and the
-/// seed were (the finder's scores between its seed's and opt(n)), the games of the finder pass the report's
+/// seed were (the finder's scores between its seed's and opt(n)), the moves of the finder pass the report's
 /// referee, and the report counts the finder's runs.
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is a_run_is_exported_and_both_referees_accept_the_file")]
@@ -794,7 +794,7 @@ fn a_run_with_the_finder_proves_the_stretch_and_the_events_and_the_report_say_wh
     assert!(report.contains(&format!("finder: {runs} runs")), "{report}");
 }
 
-/// With no seconds for the finder nothing of it is left in a run (no run, no game of its rule, no score kept, no seed
+/// With no seconds for the finder nothing of it is left in a run (no run, no moves of its rule, no score kept, no seed
 /// from it), and the choice of the jobs is what it is with the finder on: its setting changes only what a job carries.
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is a_run_is_exported_and_both_referees_accept_the_file")]

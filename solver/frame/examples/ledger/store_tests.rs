@@ -20,16 +20,16 @@ fn options() -> Options<'static> {
     Options { source: "test-run", date: "2026-10-17", checkpoints: Some("s3://bucket/run/ckpt/") }
 }
 
-/// The optimal game of `n` as promotions: its value, moves and the set.
+/// The optimal moves of `n` as promotions: its value, moves and the set.
 fn promoted(n: u32) -> (u64, Vec<u32>, Vec<u32>) {
     let set = taxman::with_width!(n, W => Board::<W>::for_n(n).seed(&opt_game(n)).to_vec());
     let (value, moves) = taxman::store::expand(n, &set).unwrap();
-    assert_eq!(value, opt(n), "n={n}: the promotions of the optimal game play it");
+    assert_eq!(value, opt(n), "n={n}: the promotions of the optimal moves play it");
     (value, moves, set)
 }
 
 /// How far below its place in a long run a board of the hand-made books is: none in a long run, and in a quick run
-/// (`QUICK`) 600, where setting a board up and replaying its game cost about a sixth of what they cost at 901.  The
+/// (`QUICK`) 600, where setting a board up and replaying its moves cost about a sixth of what they cost at 901.  The
 /// books of a quick run are of the same shape: every kind of bound is there, and the cases below find the lines they
 /// edit.  The comments and names here are of the boards of a long run.
 const SHIFT: u32 = if QUICK { 600 } else { 0 };
@@ -41,23 +41,23 @@ const fn board(n: u32) -> u32 {
 
 /// The boards of the hand-made books: 901..960, and two islands with no board next to them, 975 and 976 (which the
 /// run found: its bound is the better for 975, which has nothing below it) and 980 (which the relations leave as it
-/// was, with its start game).
+/// was, with its start moves).
 fn boards() -> Vec<u32> {
     (board(901)..=board(960)).chain([board(975), board(976), board(980)]).collect()
 }
 
-/// What the run found in the hand-made books, and the chain's games they are given.
+/// What the run found in the hand-made books, and the chain's moves they are given.
 const FOUND: [u32; 3] = [board(925), board(950), board(976)];
 const GIVEN: [u32; 2] = [board(920), board(940)];
 
-/// A book of the boards `ns` as a run might leave them partway: every board has its start game (no promotions) and a
+/// A book of the boards `ns` as a run might leave them partway: every board has its start moves (no promotions) and a
 /// bound above opt(n) (the root's bound for every tenth board, else a stopped search's), the boards `found` have
-/// their optimal game (a search's) and an exhausted search, `given` boards are the chain's games, and the relations
+/// their optimal moves (a search's) and an exhausted search, `given` boards are the chain's moves, and the relations
 /// have carried the bounds between the boards.
 fn partial_book(ns: &[u32], given: &[u32], found: &[u32]) -> Book {
     let (mut book, mut plains) = book_with_plains(ns.iter().copied());
     for &n in ns {
-        let moves = plains.remove(&n).expect("the game of a board of the book");
+        let moves = plains.remove(&n).expect("the moves of a board of the book");
         let value = moves.iter().map(|&m| u64::from(m)).sum();
         let start = Lower { value, moves, promotions: Some(Vec::new()), rule: Rule::Start, from: None };
         book.offer_lower(n, start, false).unwrap();
@@ -199,7 +199,7 @@ fn a_line_is_written_and_read_back_and_a_malformed_one_is_refused() {
     // 900 -> 901 is a ceiling, and 902 -> 901 is monotone; a repeat has its two bags.
     let mut monotone = sample(Side::Upper, Rule::Monotone);
     monotone.from = Some(902);
-    // A game cited, not written: 900 -> 901 is monotone (901 is composite).
+    // Moves cited, not written: 900 -> 901 is monotone (901 is composite).
     let carried = Line { game: None, from_value: Some(4000), ..sample(Side::Lower, Rule::Monotone) };
     lines.extend([
         sample(Side::Lower, Rule::Ceiling),
@@ -279,16 +279,17 @@ fn an_export_appends_the_improvements_only_and_a_second_export_appends_nothing()
     let lowers = lines.iter().filter(|l| l.side == Side::Lower).count();
     assert_eq!((summary.lines, summary.lower_first, summary.upper_first), (lines.len(), lowers, lines.len() - lowers));
     assert_eq!((summary.lower_better, summary.upper_better), (0, 0));
-    // A game carried by a relation from the game of another board is cited (`from_value`), after the line it cites.
+    // Moves carried by a relation from the moves for another board are cited (`from_value`), after the line it cites.
     let cited: Vec<usize> =
         (0..lines.len()).filter(|&i| lines[i].side == Side::Lower && lines[i].game.is_none()).collect();
-    assert!(cited.len() > 5, "{} cited games", cited.len());
+    assert!(cited.len() > 5, "{} cited moves", cited.len());
     for &i in &cited {
         let (from, value) = (lines[i].from.unwrap(), lines[i].from_value.unwrap());
         assert!(matches!(lines[i].rule, Rule::Monotone | Rule::Ceiling | Rule::Prime));
         assert!(lines[..i].iter().any(|l| l.side == Side::Lower && (l.n, l.value) == (from, value)), "{:?}", lines[i]);
     }
-    // None cites a game of the chain, which a run need not have: the boards next to the chain's have their games written.
+    // None cites moves of the chain, which a run need not have: the boards next to the chain's have their moves
+    // written.
     assert!(lines.iter().all(|l| l.side != Side::Lower || l.game.is_some() || !GIVEN.contains(&l.from.unwrap())));
 
     // Every rule of the format is there, with what it rests on.
@@ -333,7 +334,7 @@ fn an_export_appends_the_improvements_only_and_a_second_export_appends_nothing()
         from_chain.iter().any(|l| l.side == Side::Upper && l.rests_on.contains(&l.from.unwrap())),
         "{from_chain:?}"
     );
-    // The proven boards: the two found, and what the relations settled around them and the chain's games.
+    // The proven boards: the two found, and what the relations settled around them and the chain's moves.
     let proven = Best::of(&lines).proven();
     let [found_first, found_second, _] = FOUND;
     assert!(proven.contains(&found_first) && proven.contains(&found_second) && proven.len() > 6, "{proven:?}");
@@ -347,7 +348,7 @@ fn an_export_appends_the_improvements_only_and_a_second_export_appends_nothing()
     assert!(again.is_empty() && summary.lines == 0 && summary.newly_proven.is_empty(), "{again:?}");
     assert_eq!(summary.proven, proven.len());
 
-    // More is found: the optimal game of a board and an exhausted search of it, and the optimal game of another board
+    // More is found: the optimal moves of a board and an exhausted search of it, and the optimal moves of another board
     // (the long run's 930 and 910); the relations carry them.
     let (searched, played) = (board(930), board(910));
     for n in [searched, played] {
@@ -458,13 +459,14 @@ fn all_proven_run(dir: &Path, first: u32, last: u32, proven: Option<&Path>, boun
     run_dir
 }
 
-/// A run of 901..`LAST` (901..960) with the games of 900 and one in the middle (930) given (the chain's, so the export
+/// A run of 901..`LAST` (901..960) with the moves for 900 and one in the middle (930) given (the chain's, so the export
 /// leaves them out) and the rest hidden: its export has every other board proven, a second export appends nothing, and
-/// both referees accept the file, the Python one with the games `ledger games` writes.  A quick run (`QUICK`) is of
+/// both referees accept the file, the Python one with the moves `ledger games` writes.  A quick run (`QUICK`) is of
 /// 521..532 with 520 and 526 given: every search of a run sets its board up again, and these boards take a fraction of
-/// the time that 901's do.  It has the climbs from the given game, which stop at their limits and park their boards,
-/// the ordinary searches, which stop and go on from their checkpoints, and in its export lower bounds by the start game,
-/// a search and the ceiling, prime and repeat relations, and upper bounds by an exhausted search and the same relations.
+/// the time that 901's do.  It has the climbs from the given moves, which stop at their limits and park their boards,
+/// the ordinary searches, which stop and go on from their checkpoints, and in its export lower bounds by the start
+/// moves, a search and the ceiling, prime and repeat relations, and upper bounds by an exhausted search and the same
+/// relations.
 #[test]
 fn a_run_is_exported_and_both_referees_accept_the_file() {
     let dir = TempDir::new("store-run");
@@ -497,7 +499,7 @@ fn a_run_is_exported_and_both_referees_accept_the_file() {
     let (status, report) = python(&bounds, Some(&games), &strict);
     assert_eq!(status, Some(0), "{report}");
     assert!(report.contains("all checks passed") && report.contains(&format!("{proven} boards")), "{report}");
-    // Without the games the Python referee cannot replay the promotion sets, and says so.
+    // Without the moves the Python referee cannot replay the promotion sets, and says so.
     let (status, report) = python(&bounds, None, &strict);
     assert_eq!(status, Some(1), "{report}");
     assert!(report.contains("was not replayed"), "{report}");
@@ -544,8 +546,8 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
     }
 
     // Each case edits the lines and says which line (by index) the referees must name, whether the Python one finds it too
-    // (it replays games and checks arithmetic; it cannot recompute a root bound or a repeat's problem), and a part of the
-    // Rust message.
+    // (it replays moves and checks arithmetic; it cannot recompute a root bound or a repeat's problem), and a part of
+    // the Rust message.
     type Edit = Box<dyn Fn(&mut Vec<Line>) -> usize>;
     let lower_moves = |l: &Line| l.side == Side::Lower && matches!(l.game, Some(Game::Moves(_)));
     let lower_promoted = |l: &Line| l.side == Side::Lower && l.rule == Rule::Search;
@@ -554,7 +556,7 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
     let (chain_board, [searched, ..]) = (GIVEN[0], FOUND);
     let cases: Vec<(&str, Edit, bool, String)> = vec![
         (
-            "a game of moves with its first two moves swapped",
+            "moves with their first two moves swapped",
             Box::new(move |lines| {
                 let k = line_of(lines, lower_moves);
                 if let Some(Game::Moves(moves)) = &mut lines[k].game {
@@ -645,7 +647,7 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
             "the bags are".into(),
         ),
         (
-            "the value that a carried game cites changed",
+            "the value that carried moves cite changed",
             Box::new(move |lines| {
                 let k = line_of(lines, |l| l.side == Side::Lower && l.game.is_none());
                 lines[k].from_value = lines[k].from_value.map(|value| value + 1);
@@ -655,7 +657,7 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
             "no line before it gives a game".into(),
         ),
         (
-            "a carried game moved before the line it cites",
+            "carried moves moved before the line they cite",
             Box::new(move |lines| {
                 let k = line_of(lines, |l| l.side == Side::Lower && l.game.is_none());
                 let (from, value) = (lines[k].from.unwrap(), lines[k].from_value.unwrap());
@@ -667,7 +669,7 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
             "no line before it gives a game".into(),
         ),
         (
-            "the game that another line cites is not a game",
+            "the moves that another line cites are not moves",
             Box::new(move |lines| {
                 let k = line_of(lines, |l| l.side == Side::Lower && l.game.is_none());
                 let (from, value) = (lines[k].from.unwrap(), lines[k].from_value.unwrap());
@@ -722,7 +724,7 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
 }
 
 /// A run started from the file does not map the boards the file has both bounds of, and ends where a run without it
-/// ends: every board proven at opt(n).  The file is by hand, with loose bounds (a start game and a stopped
+/// ends: every board proven at opt(n).  The file is by hand, with loose bounds (start moves and a stopped
 /// search's bound above opt(n)) for every board, so that none is proven at the start.
 #[test]
 fn a_run_starts_from_the_file_and_skips_the_maps_of_boards_with_both_bounds() {
@@ -730,7 +732,7 @@ fn a_run_starts_from_the_file_and_skips_the_maps_of_boards_with_both_bounds() {
     let (strict, bounds) = (dir.join("committed.jsonl"), dir.join("bounds.jsonl"));
     // The stretch `first..=last`, the first board that the file has, the last board of the file and the boards that the
     // run found: 901..960, 910, 960, and 925 and 950; in a quick run 115..124, 119, 127 and 121 (small boards, whose runs
-    // are short, with a game beside the one it cites in the repeat class of 121).
+    // are short, with moves beside the ones it cites in the repeat class of 121).
     let (first, split, last, top, found): (u32, u32, u32, u32, &[u32]) =
         if QUICK { (115, 119, 124, 127, &[121]) } else { (901, 910, 960, 960, &[925, 950]) };
     write_results(&strict, &[first - 1]);
@@ -766,8 +768,8 @@ fn a_run_starts_from_the_file_and_skips_the_maps_of_boards_with_both_bounds() {
     let events = std::fs::read_to_string(schedule::events_path(&started)).unwrap();
     assert!(events.contains("\"bounds_file\""), "the start event names the file");
 
-    // A game of the file that is not a game of its board stops the run at the start, naming the board; a game that
-    // other lines cite stops it at a line that cites it (here 923, carried from 924, carried from 925).
+    // Moves in the file that are not moves for their board stop the run at the start, naming the board; moves that
+    // other lines cite stop it at a line that cites them (here 923, carried from 924, carried from 925).
     let cited: Vec<(u32, u64)> =
         lines.iter().filter(|l| l.side == Side::Lower).filter_map(|l| Some((l.from?, l.from_value?))).collect();
     let alone = |l: &Line| {
@@ -801,8 +803,8 @@ fn the_python_referee_prints_its_usage() {
 const COMMITTED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/bounds.jsonl");
 
 /// The lines of the committed store that the quick check verifies: an export writes its lower bounds first, so these
-/// are games replayed by the referee, and the whole file, its upper bounds with it, is the long test's (and is checked
-/// at every export).  The first three are a promotion set (of board 4401) and the games carried from it by the ceiling
+/// are moves replayed by the referee, and the whole file, its upper bounds with it, is the long test's (and is checked
+/// at every export).  The first three are a promotion set (of board 4401) and the moves carried from it by the ceiling
 /// lemma and by monotonicity; each further promotion set is the same replay on another board of that size, whose
 /// frames cost as much to set up as board 4401's.
 const QUICK_LINES: usize = 3;

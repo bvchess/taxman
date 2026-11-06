@@ -1,4 +1,4 @@
-//! Work shared out over threads: the boards' facts, the games of a store, the bounds that a check recomputes.
+//! Work shared out over threads: the boards' facts, the moves of a store, the bounds that a check recomputes.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, PoisonError};

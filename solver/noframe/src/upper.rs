@@ -1,7 +1,7 @@
 //! Which members of U\*_{≥3} every set beating a score must hold, certified by the parity bound.
 //!
 //! A *source* of game n is a number above n/2.  U\* is descending greedy's set of sources ([`crate::peel::u_star`]),
-//! and every recorded optimal game plays exactly U\* above n/2.  The *layer* of x is Ω(x), its number of prime
+//! and the recorded optimal moves play exactly U\* above n/2.  The *layer* of x is Ω(x), its number of prime
 //! factors with multiplicity; U\*_k holds the members of U\* in layer k, and U\*_{≥3} those in layers 3 and up.
 //!
 //! The bottom-layers theorem (F4, docs/theory/frame-model.md) pins down the two bottom layers of every optimal set S of
@@ -17,7 +17,7 @@
 //! *certified* (for V).  If V is below opt(n), every optimal set beats V and obeys F4, so it holds every
 //! certified member.  If with u barred the roles cannot be met at all ([`Outcome::Infeasible`]) no set lacks u, and
 //! u is certified for every V.  A member that is not certified is *open*, with the margin by which its bound
-//! exceeds V.  The bound at the roles of F4 alone, the *root*, is at least V whenever a game worth V obeys
+//! exceeds V.  The bound at the roles of F4 alone, the *root*, is at least V whenever a playable set worth V obeys
 //! them, and its excess over V is the gap that the open members share out.
 //!
 //! The members certified for a lower V are certified for a higher one: the bound does not depend on V.
@@ -43,20 +43,20 @@ pub fn omega(c: u32, spf: &[u32]) -> u32 {
     count
 }
 
-/// The sources a recorded game of n plays (its moves above n/2), ascending; for an optimal game, U\*.
+/// The sources that the recorded moves for n play (the moves above n/2), ascending; for optimal moves, U\*.
 pub fn played_sources(n: u64, moves: &[u32]) -> Vec<u32> {
     let mut sources: Vec<u32> = moves.iter().copied().filter(|&c| u64::from(c) > n / 2).collect();
     sources.sort_unstable();
     sources
 }
 
-/// U\* of a recorded game of n, ascending: the game's moves above n/2 ([`played_sources`]), checked against descending
-/// greedy ([`u_star`], `spf` must reach n), which every recorded game plays.  Panics, naming n, if they differ.
+/// U\* of the recorded moves for n, ascending: their moves above n/2 ([`played_sources`]), checked against descending
+/// greedy ([`u_star`], `spf` must reach n), which the recorded optimal moves play.  Panics, naming n, if they differ.
 pub fn recorded_ustar(n: u64, moves: &[u32], spf: &[u32]) -> Vec<u32> {
     let ustar = played_sources(n, moves);
     let mut expected = u_star(n, spf);
     expected.sort_unstable();
-    assert_eq!(ustar, expected, "n={n}: the recorded game's moves above n/2 are not U*");
+    assert_eq!(ustar, expected, "n={n}: the recorded moves above n/2 are not U*");
     ustar
 }
 
@@ -132,7 +132,7 @@ pub fn watched(n: u32, spf: &[u32], ustar: &[u32]) -> (Vec<bool>, Vec<bool>) {
     (sources, members)
 }
 
-/// Whether the numbers a game plays, `set`, obey `roles`: it holds every number with role `Pick` and none with role
+/// Whether the numbers played, `set`, obey `roles`: it holds every number with role `Pick` and none with role
 /// `Barred`.  The error names the first breach.
 pub fn obeys(roles: &[Role], set: &[u32]) -> Result<(), String> {
     let mut held = vec![false; roles.len()];
@@ -187,8 +187,8 @@ impl Barred {
 /// For game n (`board`) with U\* = `ustar` (any order) and the score `v`: the root bound at the roles of
 /// [`low_roles`], and for each member u of U\*_{≥3} the bound with u barred as well, which certifies u if it is at
 /// most `v` or the roles cannot be met, and otherwise leaves u open (module comment).  Each barred solve starts from
-/// the root's certificate.  Panics if the root's bound is not certified: a game obeying the roles exists, so they
-/// can be met.
+/// the root's certificate.  Panics if the root's bound is not certified: a playable set obeying the roles exists, so
+/// they can be met.
 pub fn barred_bounds(board: &Board, spf: &[u32], v: u64, ustar: &[u32]) -> Barred {
     let n = board.n;
     let roles = low_roles(n, spf, ustar);
@@ -227,7 +227,7 @@ mod tests {
     /// The last board that the tests over every board check.
     const LAST_BOARD: u64 = 1300;
 
-    /// The games of the committed chain to `last`, n -> (score, moves): only the members of the file that hold them
+    /// The lines of the committed chain to `last`, n -> (score, moves): only the members of the file that hold them
     /// are decoded.
     fn optimal(last: u64) -> BTreeMap<u64, (u64, Vec<u32>)> {
         recorded_games_to(&[committed_chain()], last)
@@ -356,8 +356,8 @@ mod tests {
     }
 
     /// The roles follow each board's own closure of the frames of layer 2: the numbers of layer 2 up to n/2 are
-    /// barred where U\*_2 spans every prime up to n/2 and free where it does not, and every recorded game of the
-    /// committed chain obeys its board's roles, closed or not.  The frames are closed on every board from 187 on, as
+    /// barred where U\*_2 spans every prime up to n/2 and free where it does not, and the recorded moves of the
+    /// committed chain obey their board's roles, closed or not.  The frames are closed on every board from 187 on, as
     /// this test checks to 1300 (and on some below it, which the roles then bar too).  Every board, 2..=1300.
     #[test]
     fn the_roles_follow_each_boards_closure_of_layer_two() {
@@ -367,7 +367,7 @@ mod tests {
             let ustar = played_sources(n, moves);
             let closed = layer_two_closed(n as u32, &spf, &ustar);
             let roles = low_roles(n as u32, &spf, &ustar);
-            obeys(&roles, moves).unwrap_or_else(|e| panic!("n={n}: the recorded game: {e}"));
+            obeys(&roles, moves).unwrap_or_else(|e| panic!("n={n}: the recorded moves: {e}"));
             let wanted = if closed { Role::Barred } else { Role::Free };
             let mut low_layer_two = (2..=n as u32 / 2).filter(|&c| omega(c, &spf) == 2);
             assert!(low_layer_two.all(|c| roles[c as usize] == wanted), "n={n}: closed {closed}");
@@ -447,7 +447,7 @@ mod tests {
         pick
     }
 
-    /// Every recorded game of the committed chain plays exactly U\* above n/2 (`recorded_ustar` checks it).  Boards
+    /// The recorded moves of the committed chain play exactly U\* above n/2 (`recorded_ustar` checks it).  Boards
     /// 2..=1300.
     #[test]
     fn every_recorded_game_plays_ustar() {
@@ -507,7 +507,7 @@ mod tests {
     }
 
     /// The counters count what they say.  From `upper_fixed_roles` nothing above n/2 is free and no member of U\*_{≥3}
-    /// is barred, so both are 0, and the search proves the score (the recorded game has upper part U\*, so nothing
+    /// is barred, so both are 0, and the search proves the score (the recorded moves have upper part U\*, so nothing
     /// with that upper part beats it); from `low_roles` neither exceeds the nodes.  Every 4th game that needs a
     /// search in 187..=700 (all of them take four times the time); the totals are printed.
     #[test]
@@ -522,7 +522,7 @@ mod tests {
             assert!((0..=*n as usize).all(|c| !barred[c] || branch[c]), "n={n}: U*_(>=3) is not in the sources");
             let fixed_roles = upper_fixed_roles(n32, &spf, ustar);
             assert!(fixed_roles[(n32 / 2 + 1) as usize..].iter().all(|&r| r != Role::Free), "n={n}: a source is free");
-            obeys(&fixed_roles, moves).unwrap_or_else(|e| panic!("n={n}: the recorded game: {e}"));
+            obeys(&fixed_roles, moves).unwrap_or_else(|e| panic!("n={n}: the recorded moves: {e}"));
             let mut fixed = Prover::new(&board, *v, u64::MAX).with_parity().watch(branch.clone(), barred.clone());
             assert_eq!(fixed.run_units(vec![fixed_roles]), Verdict::Proven, "n={n}");
             let watch = fixed.watch.as_ref().expect("watching");

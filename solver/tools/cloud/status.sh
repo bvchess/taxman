@@ -49,12 +49,12 @@ span_text() {
 }
 
 # What the line of a game that is not recorded has (an extended regular expression, for grep -E): the solver prints one
-# for a game whose search a limit stopped, with `incomplete` where a recorded game has `optimal`, and the line ends
+# for a game whose search a limit stopped, with `incomplete` where a recorded line has `optimal`, and the line ends
 # there or, from a solver that prints the game's times, goes on to `active=`.
 INCOMPLETE_LINE=' incomplete($|  active=)'
 
-# The last line of each of the COUNT highest games up to THROUGH among the lines of recorded games on stdin
-# (logs/chain.out), the lowest game first.  A replacement machine may print a game again after an interruption: the last
+# The last line of each of the COUNT highest games up to THROUGH among the recorded lines on stdin
+# (logs/chain.out), the lowest game first.  A replacement machine may print a line again after an interruption: the last
 # line of a game is the one that counts.
 recorded_games() {
     awk -v count="$1" -v through="$2" '
@@ -65,8 +65,8 @@ recorded_games() {
     }'
 }
 
-# The games, a line each: the recorded games, then those in flight.  The text on stdin is the lines of the recorded
-# games (recorded_games), then the progress lines of the solver (logs/chain.err).  A recorded game's line, `n=4864
+# The games, a line each: the recorded ones, then those in flight.  The text on stdin is the recorded
+# lines (recorded_games), then the progress lines of the solver (logs/chain.err).  A recorded line, `n=4864
 # score=7437375   search  nodes=1133462769   4636.026 s  optimal unknown  proof=exhausted  active=3011.250 s
 # cpu=98123.500 s  best=341541`, gives the columns of the row: `nodes`; `active`, the seconds the game had a worker, and
 # `cpu`, the CPU seconds of its search's workers (`active=` and `cpu=`, both over every run of the game); and `best`,
@@ -135,9 +135,9 @@ games_table() {
         last = first + flight - 1
         row("n", "active", "cpu", "nodes", "best", "state")
     }
-    # A recorded game, a row at once, so that the recorded games come above those in flight.  Its state is its score,
+    # A recorded line, a row at once, so that the recorded ones come above those in flight.  Its state is its score,
     # its method, its proof (the text after `proof=` up to the next two spaces) and `optimal ok`, if the solver found
-    # the game in its table of optimal games.  Its active time, CPU time and best sum are the last three fields of the
+    # the moves in its table of optimal moves.  Its active time, CPU time and best sum are the last three fields of the
     # line (`  active=3011.250 s  cpu=98123.500 s  best=341541`), if the solver that printed it had them.
     $1 ~ /^n=[0-9]+$/ && $2 ~ /^score=[0-9]+$/ && $4 ~ /^nodes=[0-9]+$/ && $6 == "s" {
         detail = $3
@@ -234,7 +234,7 @@ table_heading() {
 }
 
 # The games of the chain.  Arguments: the game recorded through and its score (both empty for no game), the window, the
-# last game of the chain, the lines of the recorded games (logs/chain.out) and whether there are progress lines
+# last game of the chain, the recorded lines (logs/chain.out) and whether there are progress lines
 # (logs/chain.err) to read.  It prints the line of the game recorded through, the heading, and the table of the last
 # SHOW_RECORDED games recorded and the games in flight after the game recorded through.
 chain_games() {

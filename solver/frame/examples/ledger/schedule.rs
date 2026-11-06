@@ -36,7 +36,7 @@ pub struct Settings {
     pub base: f64,
     /// The most any search is given, in seconds.
     pub max_limit: f64,
-    /// The time limit of a climb, in seconds: the search of a board next to a proven one, which that game seeds (0: no
+    /// The time limit of a climb, in seconds: the search of a board next to a proven one, which those moves seed (0: no
     /// climbs).  60 s: on the cloud run's boards a climb of 60 s on each would have cost 142 core-seconds a proof, and
     /// the proofs a longer limit adds cost 310 (60 to 90 s), 420 (to 120 s), 870 (to 180 s) against the 1,500 to 2,600 of
     /// the run's late ones
@@ -46,7 +46,7 @@ pub struct Settings {
     pub climb_up: bool,
     pub climb_down: bool,
     /// The seconds of one thread that the finder (large neighborhood search, `search/finder.rs`) is given after a board's
-    /// map and before a search whose best seed has changed since it last ran on the board (0: none).  Its game is
+    /// map and before a search whose best seed has changed since it last ran on the board (0: none).  Its moves are
     /// offered as the board's lower bound and seeds the search if it is the better.  1 s: from the finders'
     /// measurements (solver/docs/design/trust.md) it has most of
     /// its gain in the first second, and a search seeded with it costs 0.48 of the CPU of the unseeded, the finder
@@ -128,10 +128,10 @@ fn remove_checkpoints(dir: &Path, n: u32) -> std::io::Result<()> {
 /// Which way a climb goes from a proven board.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Way {
-    /// To the board above: the proven game seeds the search, and the ceiling opt(n) <= opt(n − 1) + n, which the
+    /// To the board above: the proven moves seed the search, and the ceiling opt(n) <= opt(n − 1) + n, which the
     /// relations have derived and is exact in about a third of the boards, is its ceiling.
     Up,
-    /// To the board below: the proven game seeds the search (the game below it that the ceiling lemma (N4,
+    /// To the board below: the proven moves seed the search (the moves for the board below that the ceiling lemma (N4,
     /// docs/theory/neighbors.md) makes, its moves less n and then completed, is exactly optimal for n − 1 in about 35%
     /// of the composite pairs), and the ceiling is the ledger's, which is loose (opt(n − 1) <= opt(n)).
     Down,
@@ -157,7 +157,7 @@ impl Way {
 }
 
 /// The two boards just outside the repeat class `class` (ascending): below its smallest and above its largest.  A
-/// proven one starts a climb into the class, and its game seeds the class's searches; the other waits while a climb
+/// proven one starts a climb into the class, and its moves seed the class's searches; the other waits while a climb
 /// into the class runs.
 fn outside(class: &[u32]) -> [u32; 2] {
     [class[0] - 1, class[class.len() - 1] + 1]
@@ -217,14 +217,14 @@ pub struct Floor {
     pub resume: bool,
 }
 
-/// A game that can seed a search: the moves of the lower bound of the board `from`, which is n − 1, n or n + 1.
+/// Moves that can seed a search: the moves of the lower bound of the board `from`, which is n − 1, n or n + 1.
 pub struct Seed {
     pub from: u32,
     pub moves: Vec<u32>,
 }
 
-/// Which game seeded a search, as its event says: the lower bound of the board below it (`n-1`), its own (`n`), the
-/// board above's (`n+1`), or the game the finder found (`lns`).
+/// Whose moves seeded a search, as its event says: the lower bound of the board below it (`n-1`), its own (`n`), the
+/// board above's (`n+1`), or the moves the finder found (`lns`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SeedFrom {
     Below,
@@ -258,7 +258,7 @@ impl SeedFrom {
 pub struct LnsPlan {
     /// Seconds of one thread (0: it does not run).
     pub seconds: f64,
-    /// The score of the best seed the board had when the finder last ran on it, its own game included: it runs before
+    /// The score of the best seed the board had when the finder last ran on it, its own moves included: it runs before
     /// a search only if the best seed is another score (or the job is a climb).  None: it has not run on the board.
     pub last: Option<u64>,
     /// The number of searches the board has had, so that the finder's random choices differ from run to run.
@@ -270,7 +270,7 @@ pub struct Job {
     pub n: u32,
     pub kind: Kind,
     pub limit: Duration,
-    /// The games whose candidates seed the search: the one that keeps the most is taken.
+    /// The moves whose candidates seed the search: the one that keeps the most is taken.
     pub seeds: Vec<Seed>,
     /// The ceiling on the score.
     pub cap: Option<u64>,
@@ -282,8 +282,8 @@ pub struct Job {
     pub floor: Option<Floor>,
 }
 
-/// What the finder did: the scores of the game it began from and of the game it found (the same if it found nothing
-/// better), the seconds it took, and the game, which the referee has replayed at `found`.
+/// What the finder did: the scores of the moves it began from and of the moves it found (the same if it found nothing
+/// better), the seconds it took, and the moves, which the referee has replayed at `found`.
 pub struct LnsRun {
     pub from: u64,
     pub found: u64,
@@ -302,8 +302,8 @@ impl LnsRun {
 pub struct Attempt {
     pub completed: bool,
     pub reached_cap: bool,
-    /// A floor step completed having found no set: no promotion set weighs more than its floor.  Then the game is the
-    /// one with no promotions.
+    /// A floor step completed having found no set: no promotion set weighs more than its floor.  Then the moves are the
+    /// ones with no promotions.
     pub held: bool,
     pub value: u64,
     pub moves: Vec<u32>,
@@ -316,7 +316,7 @@ pub struct Attempt {
     pub seconds: f64,
     /// What the finder did before the search (after the map, for a map), if it ran.
     pub lns: Option<LnsRun>,
-    /// Which game seeded the search (none if nothing did).
+    /// Whose moves seeded the search (none if nothing did).
     pub seed_from: Option<SeedFrom>,
 }
 
@@ -335,7 +335,7 @@ pub struct Done {
 }
 
 /// The finder on `board` from the promotions `start`, for the seconds of the job's plan (less if `stop` is stopped or
-/// the process is told to stop), with the referee's replay of its game: the promotions of the game it found, and what
+/// the process is told to stop), with the referee's replay of its moves: the promotions of the moves it found, and what
 /// it did.
 fn find<const W: usize>(
     job: &Job,
@@ -352,7 +352,7 @@ fn find<const W: usize>(
     let seconds = || began.elapsed().as_secs_f64();
     let over = || seconds() >= job.lns.seconds || stop.stopped() || engine::stop_signal().is_some();
     let out = finder.search(start, &mut finder.options.rng(job.n), &Control::new(), &seconds, &over);
-    let (found, moves) = refereed(board, &out.set).map_err(|e| format!("n={}: the finder's game: {e}", job.n))?;
+    let (found, moves) = refereed(board, &out.set).map_err(|e| format!("n={}: the finder's moves: {e}", job.n))?;
     let run = LnsRun {
         from: board.in_the_bag + start.sum(),
         found,
@@ -370,7 +370,7 @@ pub fn attempt(job: &Job, control: &Arc<Control>, dir: &Path, every: Duration) -
 }
 
 /// The search of `job`, with the finder before it or, for a map, after it (`LnsPlan`): the finder starts from the best
-/// seed (or the map's start incumbent), and its game seeds the search if it beats the seed.  A floor step has neither
+/// seed (or the map's start incumbent), and its moves seed the search if they beat the seed.  A floor step has neither
 /// (`step_at`).
 fn attempt_at<const W: usize>(
     job: &Job,
@@ -399,7 +399,7 @@ fn attempt_at<const W: usize>(
     }
     let ckpt = checkpoint_path(dir, n);
     let resume = job.kind != Kind::Init && ckpt.exists();
-    // The best seed: the game that keeps the most promotions (the last of equals), and what survives of it.
+    // The best seed: the moves that keep the most promotions (the last of equals), and what survives of it.
     let best = job
         .seeds
         .iter()
@@ -413,7 +413,7 @@ fn attempt_at<const W: usize>(
             None => p.greedy,
         };
         let score = board.in_the_bag + start.sum();
-        // Nothing to find if the seed reaches the ceiling; a climb always has a new seed (a proven neighbor's game).
+        // Nothing to find if the seed reaches the ceiling; a climb always has a new seed (a proven neighbor's moves).
         let changed = matches!(job.kind, Kind::Climb(_)) || job.lns.last != Some(score);
         if changed && !cap.is_some_and(|cap| start.sum() >= cap) {
             let (found, run) = find(job, &board, &p, &start, control)?;
@@ -427,7 +427,7 @@ fn attempt_at<const W: usize>(
     let seed_set = seed.as_ref().map(|(_, set)| set);
     let r = search::search(&p, &engine_config(&ckpt), seed_set, cap, resume)
         .map_err(|e| at("the search", e.to_string()))?;
-    let (value, moves) = refereed(&board, &r.promotions).map_err(|e| at("the search's game", e))?;
+    let (value, moves) = refereed(&board, &r.promotions).map_err(|e| at("the search's moves", e))?;
     let upper = match r.completed {
         true => None,
         false => Some(board.in_the_bag + dual_bound(&p, &ckpt).map_err(|e| at("the dual bound", e))?.bound()),
@@ -454,7 +454,7 @@ fn attempt_at<const W: usize>(
 
 /// A floor step: the search under `floor` (`search::search_above`), from the checkpoint in `cfg` if the step was
 /// stopped before and is resumed, else from scratch (an old checkpoint is deleted).  There is no seed and no finder:
-/// the floor is the start, and a set found above it is a game like any other, which the referee replays.  A stopped
+/// the floor is the start, and a set found above it is moves like any other, which the referee replays.  A stopped
 /// step gives no bound (the dual-bound lemma (R4, docs/theory/search-rules.md) would give its dual bound, but the open
 /// units of a depth-first search are the root's and near it).
 fn step_at<const W: usize>(
@@ -474,7 +474,7 @@ fn step_at<const W: usize>(
     let t0 = Instant::now();
     let r = search::search_above(p, cfg, floor.score.saturating_sub(board.in_the_bag), cap, resume)
         .map_err(|e| at("the search under the floor", e.to_string()))?;
-    let (value, moves) = refereed(board, &r.promotions).map_err(|e| at("the step's game", e))?;
+    let (value, moves) = refereed(board, &r.promotions).map_err(|e| at("the step's moves", e))?;
     Ok(Attempt {
         completed: r.completed,
         reached_cap: r.reached_cap,
@@ -498,9 +498,9 @@ pub fn all_facts(ns: &[u32], workers: usize) -> Result<Vec<Facts>, String> {
     Ok(all)
 }
 
-/// The games of the lower bounds `lines` of a store, in the order of the file, each replayed by the referee at its
-/// value: the promotion sets on `workers` threads, then, in order, the lines that cite the game they are carried from
-/// (by a relation: `carry_game`), each of the game of the earlier line it cites.
+/// The moves of the lower bounds `lines` of a store, in the order of the file, each replayed by the referee at its
+/// value: the promotion sets on `workers` threads, then, in order, the lines that cite the moves they are carried from
+/// (by a relation: `carry_game`), each of the moves of the earlier line it cites.
 pub fn play_all(lines: &[&Line], workers: usize) -> Vec<Result<Played, String>> {
     let direct = pool::map(lines, workers, |&line| line.game.is_some().then(|| play(line)));
     let mut index: HashMap<(u32, u64), usize> = HashMap::new();
@@ -513,18 +513,18 @@ pub fn play_all(lines: &[&Line], workers: usize) -> Vec<Result<Played, String>> 
     done
 }
 
-/// The game of `line`, which cites its source, carried from it and replayed at the line's value.
+/// The moves of `line`, which cites its source, carried from it and replayed at the line's value.
 fn carried(line: &Line, index: &HashMap<(u32, u64), usize>, done: &[Result<Played, String>]) -> Result<Played, String> {
-    let (from, value) = line.from.zip(line.from_value).ok_or("it has no game and cites none")?;
+    let (from, value) = line.from.zip(line.from_value).ok_or("it has no moves and cites none")?;
     let at = index
         .get(&(from, value))
-        .ok_or_else(|| format!("it cites a game of board {from} worth {value}, which no line before it has"))?;
-    let source = done[*at].as_ref().map_err(|e| format!("the game it cites (board {from}, {value}): {e}"))?;
+        .ok_or_else(|| format!("it cites moves for board {from} worth {value}, which no line before it has"))?;
+    let source = done[*at].as_ref().map_err(|e| format!("the moves it cites (board {from}, {value}): {e}"))?;
     taxman::store::carried(line, &source.moves)
 }
 
-/// Offers the book the best bounds of the store `path` for the boards `first..=last`: each lower bound with its game,
-/// played by the referee (with the games it cites), and each upper bound as the store has it (`ledger verify-bounds`
+/// Offers the book the best bounds of the store `path` for the boards `first..=last`: each lower bound with its moves,
+/// played by the referee (with the moves it cites), and each upper bound as the store has it (`ledger verify-bounds`
 /// checks them: this reads the store as given, as the run reads a results file it is given).  A board with both
 /// bounds there needs no map.
 fn start_from(book: &mut Book, path: &Path, first: u32, last: u32, workers: usize) -> Result<Vec<Change>, String> {
@@ -563,7 +563,7 @@ fn start_from(book: &mut Book, path: &Path, first: u32, last: u32, workers: usiz
     Ok(changes)
 }
 
-/// The proven games of the results file `path` in `first - 1..=last`, each checked by the referee.
+/// The proven lines of the results file `path` in `first - 1..=last`, each checked by the referee.
 fn given_games(path: &Path, first: u32, last: u32) -> Result<Vec<(u32, u64, Vec<u32>)>, String> {
     let known = Optimal::from_json(&Json::Arr(Vec::new()))?.with_results(path)?;
     let mut games = Vec::new();
@@ -577,7 +577,7 @@ fn given_games(path: &Path, first: u32, last: u32) -> Result<Vec<(u32, u64, Vec<
     Ok(games)
 }
 
-/// The book of a run: set up from the boards, with what an earlier run's ledger holds, the games given and the best
+/// The book of a run: set up from the boards, with what an earlier run's ledger holds, the moves given and the best
 /// bounds of the store `bounds`, if the run has one.
 pub fn open_book(
     dir: &Path,
@@ -728,7 +728,7 @@ struct StepEnd {
     seconds: f64,
 }
 
-/// The runs of the finder in this run, and how many of them found a better game than the one they began from.
+/// The runs of the finder in this run, and how many of them found better moves than the ones they began from.
 #[derive(Default)]
 struct LnsTally {
     runs: u32,
@@ -790,7 +790,7 @@ fn process_cpu() -> f64 {
 
 impl Scheduler {
     /// The scheduler of the boards `first..=last` in `dir`, going on from what the directory holds, with the proven
-    /// games of `proven` if given, and the changes of bounds that setting up the book made.  The run's time and CPU
+    /// moves of `proven` if given, and the changes of bounds that setting up the book made.  The run's time and CPU
     /// count from here.
     pub fn open(
         first: u32,
@@ -944,7 +944,7 @@ impl Scheduler {
 
     /// The boards that wait while a climb runs: those just outside the repeat class of a board being climbed to.  One
     /// of them is the proven board the climb goes from; the other may be proven within the climb's limit, and then it
-    /// is climbed to with its game (and, going up, its exact ceiling), so it has no ordinary search meanwhile.
+    /// is climbed to with its moves (and, going up, its exact ceiling), so it has no ordinary search meanwhile.
     fn held(&self) -> HashSet<u32> {
         let climbing = self.running.iter().filter(|(_, run)| matches!(run.kind, Kind::Climb(_)));
         climbing.flat_map(|(&n, _)| outside(&self.book.class(n))).collect()
@@ -1007,7 +1007,7 @@ impl Scheduler {
         };
         let remaining = (s.cpu_budget - cpu) / s.workers as f64;
         let limit = Duration::from_secs_f64(limit.min(s.max_limit).min(remaining.max(1.0)));
-        // The games that seed a search: those of the boards next to it and, if it is the board of a repeat class, of
+        // The moves that seed a search: those of the boards next to it and, if it is the board of a repeat class, of
         // the boards just outside the class (the proven one a climb into the class goes from).
         let seeds = match floor {
             Some(_) => Vec::new(),
@@ -1095,9 +1095,9 @@ impl Scheduler {
             _ => (Rule::Search, Rule::Dual),
         };
         let found_set = !a.promotions.is_empty();
-        // The games offered as lower bounds, the lesser first (the finder's before an equal search's, which began from
-        // it and so has found nothing better): a game replaces the board's only if it is better.  The finder's counts
-        // only if it improved on the game it began from.  Every one has passed the referee on its worker.
+        // The moves offered as lower bounds, the lesser first (the finder's before an equal search's, which began from
+        // it and so has found nothing better): moves replace the board's only if they are better.  The finder's count
+        // only if they improved on the moves they began from.  Every one has passed the referee on its worker.
         let mut lowers = vec![Lower {
             value: a.value,
             moves: a.moves,
@@ -1118,7 +1118,7 @@ impl Scheduler {
         for lower in lowers {
             changes.extend(self.book.offer_lower(n, lower, false)?);
         }
-        // The upper bound the job proved: a search that reached its ceiling proves its game by the bound that was its
+        // The upper bound the job proved: a search that reached its ceiling proves its moves by the bound that was its
         // ceiling, which stands; a floor step that completed having found nothing proves its floor, and one that
         // completed having found a set proves that set (the floor lemma, R5, docs/theory/search-rules.md); a floor step
         // that stopped proves nothing.
@@ -1170,8 +1170,8 @@ impl Scheduler {
             Json::array([l.map_or(Json::Null, Json::from), u.map_or(Json::Null, Json::from)])
         };
         fields.extend([("before", pair(before)), ("after", pair(after))]);
-        // The finder (its seconds, 0 if it did not run; the scores of its input and of its game), which game seeded the
-        // search, and whether the boards n − 1 and n + 1 were proven when the job started.
+        // The finder (its seconds, 0 if it did not run; the scores of its input and of its moves), whose moves seeded
+        // the search, and whether the boards n − 1 and n + 1 were proven when the job started.
         let run = a.lns.as_ref();
         fields.extend([
             ("lns_s", Json::from((lns_s * 1000.0).round() / 1000.0)),
@@ -1475,7 +1475,7 @@ impl Scheduler {
     }
 }
 
-/// Runs the ledger over `first..=last` in `dir` (going on from what it holds), with the proven games of `proven` if
+/// Runs the ledger over `first..=last` in `dir` (going on from what it holds), with the proven moves of `proven` if
 /// given.  Returns why it ended.
 pub fn run(first: u32, last: u32, dir: &Path, settings: &Settings, proven: Option<&Path>) -> Result<String, String> {
     fs::create_dir_all(checkpoint_dir(dir)).map_err(|e| format!("{}: {e}", dir.display()))?;

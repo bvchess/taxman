@@ -1,5 +1,5 @@
 //! Certificates of U (`taxman certify`, `taxman::certify`): on the committed chain every game that rests on the frame
-//! model comes out certified, a score planted wrong comes out beaten with a game that the referee accepts, a search
+//! model comes out certified, a score planted wrong comes out beaten with moves that the referee accepts, a search
 //! that is stopped keeps its checkpoint and ends as an uninterrupted one does (with a little work redone), and the
 //! file of certificates and the reader of the prover's barred bounds are strict about what they are given.
 //!
@@ -56,7 +56,7 @@ use taxman::solver::{digest_text, SolveOptions, SAME_SEARCH_WINDOW};
 // ---------------------------------------------------------------------------------------------------------
 // The data and the helpers
 
-/// What the tests read: the recorded games of the chain and the lines of the barred bounds.
+/// What the tests read: the recorded moves of the chain and the lines of the barred bounds.
 struct Fixtures {
     known: Optimal,
     upper: BTreeMap<u32, Upper>,
@@ -76,13 +76,13 @@ fn upper_files() -> Vec<PathBuf> {
         .collect()
 }
 
-/// The games the commands take as recorded when they are given the results `file`: its games, over the built-in table's,
-/// with no check that they agree (a wrong score is what `certify` is there to find).
+/// The moves the commands take as recorded when they are given the results `file`: its moves, over the built-in
+/// table's, with no check that they agree (a wrong score is what `certify` is there to find).
 fn recorded_in(file: &Path) -> Optimal {
     Optimal::built_in().clone().with_results(file).unwrap_or_else(|e| panic!("{e}"))
 }
 
-/// The recorded games (`results/optimal.jsonl.gz`, over the built-in table) and the barred bounds, read once.
+/// The recorded moves (`results/optimal.jsonl.gz`, over the built-in table) and the barred bounds, read once.
 fn fixtures() -> &'static Fixtures {
     static FIXTURES: OnceLock<Fixtures> = OnceLock::new();
     FIXTURES.get_or_init(|| {
@@ -97,7 +97,7 @@ fn needing(range: RangeInclusive<u32>) -> Vec<u32> {
     range.filter(|n| fixtures().upper[n].needs).collect()
 }
 
-/// Certifies the recorded game of `n` with the committed data and `opts`, in the default formulation (with the claims
+/// Certifies the recorded moves of `n` with the committed data and `opts`, in the default formulation (with the claims
 /// of `unzip` that the kept-claims lemma (E4, docs/theory/extended-problem.md) keeps).
 fn certify(n: u32, opts: &SolveOptions) -> Certificate {
     certify_in(n, true, opts)
@@ -109,7 +109,7 @@ fn certify_in(n: u32, claims: bool, opts: &SolveOptions) -> Certificate {
     certify_game(n, known, &upper[&n], claims, opts).unwrap_or_else(|e| panic!("{e}"))
 }
 
-/// Checks a certificate that says nothing beats the recorded game of `n` against the data it was made from: the
+/// Checks a certificate that says nothing beats the recorded moves of `n` against the data it was made from: the
 /// verdict, the score, the open members, the sizes of the problem (the one-sided candidates are the open members and
 /// the sources greedy rejected), a search that did something where there was something to search (a game the rule of
 /// the same problem settled has none), and the run.
@@ -150,11 +150,11 @@ fn certify_all(boards: &[u32]) -> (u64, f64) {
     (nodes, start.elapsed().as_secs_f64())
 }
 
-/// A game of a results file: the board, the score and the moves.
+/// A line of a results file: the board, the score and the moves.
 type Game<'a> = (u32, u64, &'a [u32]);
 
 /// Writes a results file with `games` (a completed search a line; the reader of the chain takes only `n`, `score`,
-/// `moves` and `completed` from a line) and returns the games the commands take as recorded when they are given it.
+/// `moves` and `completed` from a line) and returns the moves the commands take as recorded when they are given it.
 fn known_with(file: &Path, games: &[Game]) -> Optimal {
     let line = |&(n, score, moves): &Game| {
         let line = Json::object([
@@ -169,8 +169,8 @@ fn known_with(file: &Path, games: &[Game]) -> Optimal {
     recorded_in(file)
 }
 
-/// A wrong game for board `n`: the chain's game with its smallest move up to n/2 left out and its score lowered by that
-/// move.  A game stays legal when a move is left out (what the move would have taxed stays in the pot, and none of its
+/// Wrong moves for board `n`: the chain's moves with the smallest move up to n/2 left out and the score lowered by that
+/// move.  Moves stay legal when a move is left out (what the move would have taxed stays in the pot, and none of its
 /// divisors is played after it), and it plays the same numbers above n/2, so it is still a promotion set of the
 /// extended problem; but its score is below opt(n), which the chain has proven, so a search must beat it.
 /// Returns the planted score, the moves and the move left out.
@@ -180,12 +180,12 @@ fn planted_game(n: u32) -> (u64, Vec<u32>, u32) {
     let left_out = moves.iter().copied().filter(|&m| 2 * m <= n).min().expect("a move up to n/2");
     let kept: Vec<u32> = moves.iter().copied().filter(|&m| m != left_out).collect();
     let planted = score - u64::from(left_out);
-    assert_eq!(replay(n, &kept), Ok(planted), "n={n}: a game without a move is a legal game");
+    assert_eq!(replay(n, &kept), Ok(planted), "n={n}: moves without a move are legal moves");
     (planted, kept, left_out)
 }
 
-/// A wrong score for board `n`, planted in the results file `dir/results.jsonl` that holds the chain's games of
-/// `n − 1` and `n`, except that the game of `n` is the one of [`planted_game`].  Returns the file, the planted score
+/// A wrong score for board `n`, planted in the results file `dir/results.jsonl` that holds the chain's moves for
+/// `n − 1` and `n`, except that the moves for `n` are those of [`planted_game`].  Returns the file, the planted score
 /// and the move left out.
 fn plant_wrong_score(dir: &Path, n: u32) -> (PathBuf, u64, u32) {
     let known = &fixtures().known;
@@ -207,7 +207,7 @@ fn verdicts(file: &Path) -> Vec<String> {
     json_lines(file).into_iter().map(verdict).collect()
 }
 
-/// Runs `taxman certify RANGE` on the games of `results` and the committed barred bounds, appending to `out`, with one
+/// Runs `taxman certify RANGE` on the moves of `results` and the committed barred bounds, appending to `out`, with one
 /// thread and no progress lines, and the flags `extra` besides.
 fn run_certify(range: &str, results: &Path, out: &Path, extra: &[&str]) -> Run {
     run_certify_boards(&[range], results, out, extra)
@@ -359,17 +359,17 @@ fn a_certificate_writes_the_fields_of_its_search_for(n: u32, open: impl Into<Vec
 // ---------------------------------------------------------------------------------------------------------
 // A planted wrong score
 
-/// Checks that `c` says the planted score of board `n` is beaten: the verdict is `Beaten` and the game found is one
-/// that the referee accepts, scores more than the planted score, and, since the chain's score is opt(n), scores
+/// Checks that `c` says the planted score of board `n` is beaten: the verdict is `Beaten` and the moves found are
+/// moves that the referee accepts, score more than the planted score, and, since the chain's score is opt(n), score
 /// that.
 fn assert_beaten_by_the_optimum(c: &Certificate, n: u32, planted: u64) {
     assert_eq!(c.verdict, Verdict::Beaten, "n={n}: {}", c.summary_line());
     assert_eq!(c.score, planted);
-    let (found, moves) = c.beaten_by.as_ref().expect("a beaten game has the game that beats it");
-    assert_eq!(replay_finished(n, moves), Ok(*found), "n={n}: the referee accepts the game found");
-    assert!(*found > planted, "n={n}: the game found scores {found}, not more than {planted}");
-    assert_eq!(Some(*found), fixtures().known.score(n), "n={n}: the best game is the proven optimum");
-    assert!(c.summary_line().contains(&format!("by a game of {found}")), "{}", c.summary_line());
+    let (found, moves) = c.beaten_by.as_ref().expect("a beaten line has the moves that beat it");
+    assert_eq!(replay_finished(n, moves), Ok(*found), "n={n}: the referee accepts the moves found");
+    assert!(*found > planted, "n={n}: the moves found score {found}, not more than {planted}");
+    assert_eq!(Some(*found), fixtures().known.score(n), "n={n}: the best moves are the proven optimum");
+    assert!(c.summary_line().contains(&format!("by moves worth {found}")), "{}", c.summary_line());
     let json = Json::parse(&c.to_json().to_string()).unwrap();
     assert_eq!(json.get("verdict").and_then(Json::as_str), Some("beaten"));
     let beating = json.get("beaten_by").expect("beaten_by");
@@ -378,8 +378,8 @@ fn assert_beaten_by_the_optimum(c: &Certificate, n: u32, planted: u64) {
 }
 
 /// A wrong score planted on a board (see [`plant_wrong_score`]) is beaten, with the real barred bounds: the verdict
-/// is `Beaten` and the game found is one that the referee accepts, scores more than the planted score, and, since the
-/// chain's score is opt(n), scores that.
+/// is `Beaten` and the moves found are moves that the referee accepts, score more than the planted score, and, since
+/// the chain's score is opt(n), score that.
 #[test]
 #[cfg_attr(
     debug_assertions,
@@ -415,7 +415,7 @@ fn planted_wrong_scores_are_beaten(boards: &[u32]) {
 }
 
 /// The same through the binary: status 2, the `beaten` line in `--out` and the same line in `OUT.counterexample.jsonl`.
-/// The planted score is not the built-in table's, and the command takes the results' game over the table's.
+/// The planted score is not the built-in table's, and the command takes the results' moves over the table's.
 #[test]
 fn the_command_exits_with_status_2_on_a_planted_wrong_score_and_writes_the_counterexample() {
     let n = 1302;
@@ -426,10 +426,10 @@ fn the_command_exits_with_status_2_on_a_planted_wrong_score_and_writes_the_count
 
     let run = run_certify(&format!("{n}-{n}"), &results, &out, &[]);
     assert_eq!(run.code, Some(2), "{}{}", run.stdout, run.stderr);
-    let message = format!("counterexample: n={n}: a game of {real} beats the recorded score {planted}");
+    let message = format!("counterexample: n={n}: moves worth {real} beat the recorded score {planted}");
     assert!(run.stderr.contains(&message), "{}", run.stderr);
-    assert!(run.stdout.contains(&format!("beaten by a game of {real}")), "{}", run.stdout);
-    assert!(run.stdout.contains(&format!("  the game of {real}: [")), "{}", run.stdout);
+    assert!(run.stdout.contains(&format!("beaten by moves worth {real}")), "{}", run.stdout);
+    assert!(run.stdout.contains(&format!("  moves scoring {real}: [")), "{}", run.stdout);
 
     assert_eq!(verdicts(&out), ["beaten"]);
     let line = &json_lines(&out)[0];
@@ -444,15 +444,15 @@ fn the_command_exits_with_status_2_on_a_planted_wrong_score_and_writes_the_count
     // A counterexample stays one: the same command again says so, with status 2, and searches nothing.
     let again = run_certify(&format!("{n}-{n}"), &results, &out, &[]);
     assert_eq!(again.code, Some(2), "{}{}", again.stdout, again.stderr);
-    let recorded = format!("counterexample: n={n}: --out already records a game that beats the recorded score");
+    let recorded = format!("counterexample: n={n}: --out already records moves that beat the recorded score");
     assert!(again.stderr.contains(&recorded), "{}", again.stderr);
     assert_eq!(verdicts(&out), ["beaten"], "the rerun added no line");
 }
 
 /// A game is refused, with an error that says why, instead of certified or beaten: when the barred bounds are those of
 /// another board, when they were found against a score above the recorded one (nothing beats the recorded score, but
-/// they certify the open members against a higher one, so nothing is proven), when the results have no game of the
-/// board, when the recorded game does not replay to its score, and when it does not play the sources above n/2 that
+/// they certify the open members against a higher one, so nothing is proven), when the results have no moves for the
+/// board, when the recorded moves do not replay to its score, and when it does not play the sources above n/2 that
 /// setup keeps.
 #[test]
 fn a_game_that_a_certificate_cannot_be_made_for_is_refused() {
@@ -470,19 +470,19 @@ fn a_game_that_a_certificate_cannot_be_made_for_is_refused() {
     refused(known, &upper[&1304], "the barred bounds given are those of n=1304");
     let higher = Upper { score: score + 1, ..line.clone() };
     refused(known, &higher, &format!("found against {}, more: not a certificate", score + 1));
-    refused(&Optimal::default(), line, "the results have no game of n");
-    // The missing game is said before the board is set up, which would refuse the open member 682, no source of 5001.
+    refused(&Optimal::default(), line, "the results have no moves for n");
+    // The missing moves are said before the board is set up, which would refuse the open member 682, no source of 5001.
     let far = Upper { n: 5001, score: 1, needs: true, open: vec![682] };
     let e = certify_game(5001, &Optimal::default(), &far, true, &options(1)).unwrap_err();
-    assert_eq!(e, "n=5001: the results have no game of n");
+    assert_eq!(e, "n=5001: the results have no moves for n");
 
     let wrong = known_with(
         &dir.join("score.jsonl"),
         &[(n - 1, known.score(n - 1).unwrap(), known.moves(n - 1).unwrap()), (n, score + 1, moves)],
     );
-    refused(&wrong, line, &format!("the recorded game scores {score}, not the {} recorded", score + 1));
+    refused(&wrong, line, &format!("the recorded moves score {score}, not the {} recorded", score + 1));
 
-    // The last of the moves above n/2 left out: a legal game that scores less and plays one source fewer than setup
+    // The last of the moves above n/2 left out: legal moves that score less and play one source fewer than setup
     // keeps.
     let dropped = moves.iter().copied().rev().find(|&m| 2 * m > n).unwrap();
     let rest: Vec<u32> = moves.iter().copied().filter(|&m| m != dropped).collect();
@@ -492,7 +492,7 @@ fn a_game_that_a_certificate_cannot_be_made_for_is_refused() {
     refused(
         &short,
         line,
-        &format!("does not play U*, the sources setup keeps, above n/2: it plays [] besides, and not [{dropped}]"),
+        &format!("do not play U*, the sources setup keeps, above n/2: they play [] besides, and not [{dropped}]"),
     );
 }
 
@@ -1000,7 +1000,7 @@ fn the_claims_change_the_problems_and_not_their_sizes(boards: &[u32], counts: Op
 
 /// A pair the claims make the rule settle: 609 and 611 pose different problems without the claims and the same one
 /// with them.  With them, 611 is certified from the certificate of 609 with no search, and comes out as a search of it
-/// does (the heaviest set is the recorded game's in both formulations); without them, 611 is searched.
+/// does (the heaviest set is the recorded moves' in both formulations); without them, 611 is searched.
 #[test]
 fn a_pair_of_games_is_settled_by_the_rule_only_with_the_claims() {
     let (m, n) = (609, 611);
@@ -1107,7 +1107,7 @@ fn the_rule_settles_across_formulations_over(boards: &[u32]) {
     }
 }
 
-/// A wrong score planted on a game that repeats an earlier game's problem is still beaten: its recorded game is worth
+/// A wrong score planted on a game that repeats an earlier game's problem is still beaten: its recorded moves are worth
 /// less than the earlier certificate says the problem allows, so the rule is not used and the search finds the better
 /// set.
 #[test]
@@ -1266,7 +1266,7 @@ fn the_command_writes_same_problem_lines() {
     assert_eq!(keys, ["n", "digest", "best", "worth"]);
     assert_eq!(same.get("n").and_then(Json::as_u32), Some(632));
     let (best, worth) = (same.get("best").and_then(Json::as_u64), same.get("worth").and_then(Json::as_u64));
-    assert!(best.is_some() && best == worth, "the heaviest set m's certificate proved is n's recorded game: {same}");
+    assert!(best.is_some() && best == worth, "the heaviest set m's certificate proved are n's recorded moves: {same}");
     let digest = repeat.get("digest").and_then(Json::as_str);
     assert_eq!(same.get("digest").and_then(Json::as_str), digest);
     assert_eq!(lines[1].get("digest").and_then(Json::as_str), digest, "632 posed the same problem");
@@ -1782,7 +1782,7 @@ fn an_incomplete_and_a_torn_and_a_bad_line_of_a_short_stretch_are_handled() {
 }
 
 /// The check of [`a_line_whose_score_is_not_the_results_is_refused`] on the game 1305, the cheapest past 1300 that needs
-/// a certificate: a score changed in the results' game, with the line right, is refused.
+/// a certificate: a score changed in the results, with the line right, is refused.
 #[test]
 #[cfg_attr(
     debug_assertions,
@@ -1797,7 +1797,7 @@ fn a_line_whose_score_is_not_the_results_game_is_refused() {
     let run = run_verify(&[&certs], &results, &upper_files(), &[]);
     assert_eq!(run.code, Some(1), "{}{}", run.stdout, run.stderr);
     let score = fixtures().known.score(n).unwrap();
-    let message = format!("line 1: n={n}: its score is {score}, that of the results' game {planted}");
+    let message = format!("line 1: n={n}: its score is {score}, that of the results' moves {planted}");
     assert!(run.stderr.contains(&message), "{}", run.stderr);
 }
 
@@ -1947,7 +1947,7 @@ fn number_at(json: &Json, keys: &[&str]) -> u64 {
 /// `same_problem` that names a game with no certified line before it (its line removed, its verdict changed, a game
 /// outside the window, a game with another problem) or has its `best`, `worth` or `digest` changed, a certified line
 /// with an entry in the counterexample file, a `build` without a commit, and a width that is not the one the problem
-/// takes.  (A wrong score in the results' game is in the next test.)
+/// takes.  (A wrong score in the results is in the next test.)
 #[test]
 #[cfg_attr(
     debug_assertions,
@@ -2035,7 +2035,7 @@ fn doctored_lines_are_refused_naming_the_line() {
     assert!(run.stderr.contains("ce.counterexample.jsonl has a counterexample for it"), "{}", run.stderr);
 }
 
-/// A score changed in the results' game, with the line right, is refused too: the line's score is the barred bounds',
+/// A score changed in the results, with the line right, is refused too: the line's score is the barred bounds',
 /// but not the results'.
 #[test]
 #[cfg_attr(
@@ -2060,7 +2060,7 @@ fn a_line_whose_score_is_not_the_results_is_refused() {
     let run = run_verify(&[&certs], &results, &upper_files(), &[]);
     assert_eq!(run.code, Some(1), "{}{}", run.stdout, run.stderr);
     let score = known.score(1314).unwrap();
-    let message = format!("line 3: n=1314: its score is {score}, that of the results' game {planted}");
+    let message = format!("line 3: n=1314: its score is {score}, that of the results' moves {planted}");
     assert!(run.stderr.contains(&message), "{}", run.stderr);
 
     // The real results pass, with one of the prover's files; and a proof of the prover's with another score than the
@@ -2073,7 +2073,7 @@ fn a_line_whose_score_is_not_the_results_is_refused() {
     let wrong = write_file(&dir, "exact_wrong.jsonl", proof);
     let run = run_verify(&[&certs], &real, &upper_files(), &["--exact", path(&wrong)]);
     assert_eq!(run.code, Some(1), "{}{}", run.stdout, run.stderr);
-    let message = format!("error: n=1314: the prover's proof is of the score 1, the results' game scores {score}");
+    let message = format!("error: n=1314: the prover's proof is of the score 1, the results' moves score {score}");
     assert!(run.stderr.contains(&message), "{}", run.stderr);
 }
 
@@ -2122,7 +2122,7 @@ fn incomplete_lines_are_counted_a_torn_last_line_is_ignored_and_a_bad_line_is_re
 /// A beaten game is verified too, with its counterexample.  A wrong score is planted in the results and, as the prover
 /// would have found them against it, in the barred bounds; `taxman certify` writes a `beaten` line and its
 /// counterexample, and `verify-certificates` passes both and lists the counterexample.  Without the counterexample's
-/// line, or with a game that does not beat the score, it refuses; and a board with a certified line in one place and a
+/// line, or with moves that do not beat the score, it refuses; and a board with a certified line in one place and a
 /// beaten line in another has contradictory verdicts, in two files and in one.
 #[test]
 #[cfg_attr(
@@ -2169,10 +2169,10 @@ fn a_beaten_line_is_verified(n: u32, beside: bool) {
     assert!(run.stdout.contains(&format!("{}: {counts}", beaten.display())), "{}", run.stdout);
     assert!(run.stdout.contains("boards certified: 0 (none)"), "{}", run.stdout);
     let found =
-        format!("n={n}: the recorded score {planted} is beaten by a game of {real} ({} line 1)", beaten.display());
+        format!("n={n}: the recorded score {planted} is beaten by moves worth {real} ({} line 1)", beaten.display());
     assert!(run.stdout.contains(&format!("counterexamples: 1\n  {found}")), "{}", run.stdout);
 
-    // Without its line in the counterexample file, and with a game that does not beat the score.
+    // Without its line in the counterexample file, and with moves that do not beat the score.
     let kept = fs::read_to_string(dir.join("beaten.counterexample.jsonl")).unwrap();
     fs::remove_file(dir.join("beaten.counterexample.jsonl")).unwrap();
     let run = verify(&[&beaten]);
@@ -2190,7 +2190,7 @@ fn a_beaten_line_is_verified(n: u32, beside: bool) {
     fs::write(dir.join("short.counterexample.jsonl"), &kept).unwrap();
     let run = verify(&[&shortfall]);
     assert_eq!(run.code, Some(1), "{}{}", run.stdout, run.stderr);
-    let message = format!("the game that beats it scores {real}, not the {planted} recorded");
+    let message = format!("the moves that beat it score {real}, not the {planted} recorded");
     assert!(run.stderr.contains(&message), "{}", run.stderr);
 
     if !beside {
@@ -2291,7 +2291,7 @@ fn a_proof_with_another_score_than_the_results_is_an_error() {
     let scores: BTreeMap<u32, u64> = [(1, 1), (2, 3), (3, 6)].into();
     let exact: BTreeMap<u32, ExactLine> = [(3, proof(5, 5, "skipped", false, "none"))].into();
     let e = frontier(&scores, &exact, &BTreeSet::new()).unwrap_err();
-    assert_eq!(e, "n=3: the prover's proof is of the score 5, the results' game scores 6");
+    assert_eq!(e, "n=3: the prover's proof is of the score 5, the results' moves score 6");
     // A proof of a board past the results' is of nothing the results have: ignored.
     let exact: BTreeMap<u32, ExactLine> = [(4, proof(6, 6, "skipped", false, "none"))].into();
     assert_eq!(frontier(&scores, &exact, &BTreeSet::new()).unwrap().through, 3);

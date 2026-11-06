@@ -34,7 +34,7 @@ done
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"; kill $(jobs -p) 2>/dev/null' EXIT
-# The scripts under test are a copy of the directory's, but for verify.sh, which replays the committed games
+# The scripts under test are a copy of the directory's, but for verify.sh, which replays the committed moves
 # (half a minute) every time a chain completes.
 cloud="$tmp/cloud"
 mkdir -p "$cloud"
@@ -335,14 +335,14 @@ its best" has_line "$tmp/s1.norm" \
         "$tmp/s1.norm" ' 36 0.0s 0.0s 0 34 recorded, score 360 (repeat, same_search of 34)'
     check "a game printed again is the last of its lines: a prime game, with no best sum" has_line "$tmp/s1.norm" \
         ' 37 0.0s 0.0s 0 - recorded, score 370 (prime, prime_formula)'
-    check "a line of an older solver has no times or best sum, and a known game has the words of its proof" \
+    check "a line of an older solver has no times or best sum, and a known game has the words of its proof kind" \
         has_line "$tmp/s1.norm" \
         ' 38 - - 0 - recorded, score 380 (known, known from the committed chain, optimal ok)'
     check "the proof ends at what the solver adds to it, and the fields come after it" has_line "$tmp/s1.norm" \
         ' 39 0.2s 0.0s 0 566,640 recorded, score 7,466,640 (search, cap)'
-    check "a recorded game's times are formatted as an in-flight game's, its best with commas" has_line \
+    check "a recorded line's times are formatted as an in-flight game's, its best with commas" has_line \
         "$tmp/s1.norm" ' 40 11m37s 6h11m58s 248,002,917 40,000 recorded, score 400 (search, exhausted)'
-    check "an incomplete line, with the fields or without, is not a recorded game" lacks "$tmp/s1.norm" 'score 410'
+    check "an incomplete line, with the fields or without, is not a recorded line" lacks "$tmp/s1.norm" 'score 410'
     check "no column has the time a game waited" lacks "$tmp/s1.norm" 'waited\|elapsed'
     check "none is in UTC" lacks "$tmp/s1.out" 'UTC\|[0-9]Z'
 
@@ -388,7 +388,7 @@ its best" has_line "$tmp/s1.norm" \
     "$status" --host "$host" --recorded 0 >"$tmp/r3.out" 2>&1
     check "--recorded 0 succeeds" equals $? 0
     sed 's/  */ /g' "$tmp/r3.out" >"$tmp/r3.norm"
-    check "it leaves the recorded games out" equals "$(table_games "$tmp/r3.norm")" '41 42 43 44 45 '
+    check "it leaves the recorded lines out" equals "$(table_games "$tmp/r3.norm")" '41 42 43 44 45 '
     check "and the heading is the games in flight's" has_line "$tmp/r3.out" '  games in flight (window 5):'
     check "no row says recorded" lacks "$tmp/r3.out" 'recorded, score'
     "$status" --host "$host" --recorded 100 >"$tmp/r4.out" 2>&1
@@ -442,7 +442,7 @@ its best" has_line "$tmp/s1.norm" \
     check "and has the note" matches "$tmp/e2.out" '^  no game in flight: the range to 40 is recorded$'
     check "without a table" lacks "$tmp/e2.out" ' active '
     check "or a heading" lacks "$tmp/e2.out" '^  the last .* recorded'
-    check "or a recorded game" lacks "$tmp/e2.out" 'recorded, score'
+    check "or a recorded line" lacks "$tmp/e2.out" 'recorded, score'
 
     # A chain before its first progress line: logs/chain.err is not there, and the status is whole.
     fake_chain 100
@@ -453,7 +453,7 @@ its best" has_line "$tmp/s1.norm" \
     check "and the games in flight have the note for it" equals "$(tail -n 1 "$tmp/b1.out")" '  no progress lines yet'
     check "in place of their rows" lacks "$tmp/b1.out" 'no search yet'
 
-    # No game recorded yet (only an incomplete line), and a progress line: the table has no recorded game, and its
+    # No game recorded yet (only an incomplete line), and a progress line: the table has no recorded line, and its
     # heading claims none.
     fake_chain 100
     fake_results 0
@@ -483,12 +483,12 @@ its best" has_line "$tmp/s1.norm" \
     check "one game is not games" has_line "$tmp/f2.norm" ' the last game recorded and the 5 in flight (window 5):'
     check "and it is the last recorded" equals "$(table_games "$tmp/f2.norm")" '3 4 5 6 7 8 '
 
-    # Games recorded and no progress lines: the recorded games, then the note for the games in flight.
+    # Games recorded and no progress lines: the recorded lines, then the note for the games in flight.
     rm -f "$work/logs/chain.err"
     "$status" --host "$host" >"$tmp/q1.out" 2>&1
-    check "recorded games and no chain.err succeeds" equals $? 0
+    check "recorded lines and no chain.err succeeds" equals $? 0
     sed 's/  */ /g' "$tmp/q1.out" >"$tmp/q1.norm"
-    check "the table has the recorded games only" equals "$(table_games "$tmp/q1.norm")" '1 2 3 '
+    check "the table has the recorded lines only" equals "$(table_games "$tmp/q1.norm")" '1 2 3 '
     check "under the heading of both" has_line "$tmp/q1.norm" \
         ' the last 3 games recorded and the 5 in flight (window 5):'
     check "and the note for the games in flight follows" equals "$(tail -n 1 "$tmp/q1.out")" \

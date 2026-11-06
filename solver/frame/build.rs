@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// The files the binary is compiled from, relative to the crate: its own, the gzip decoder's (`../gzip`) and the results
-/// file that is built in (the table of optimal games).
+/// file that is built in (the table of optimal moves).
 const SOURCES: [&str; 7] = [
     "src",
     "build.rs",

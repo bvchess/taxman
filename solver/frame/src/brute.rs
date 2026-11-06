@@ -15,12 +15,12 @@
 //!
 //! # How the tests use it
 //!
-//! * Here: it reproduces the table of optimal games for every board up to 40; it agrees with a naive solver on random
+//! * Here: it reproduces the table of optimal moves for every board up to 40; it agrees with a naive solver on random
 //!   sparse boards all the way up to 127 (which exercises the high 64 bits of the `u128`); and the hole semantics are
 //!   pinned on small cases.
 //!
 //! No test compares the solver's own answers with it directly.  The chain is: the solver reproduces the table of
-//! optimal games (to 1000), and this module reproduces it to 40; the Python certifier
+//! optimal moves (to 1000), and this module reproduces it to 40; the Python certifier
 //! `heuristics/evaluation/certify.py` is the exhaustive check that goes further (to 62).
 //!
 //! # Boards
@@ -34,17 +34,17 @@ use std::hash::{BuildHasherDefault, Hasher};
 /// The largest board [`solve`] handles: a pot is a `u128`.
 pub const MAX_N: u32 = 127;
 
-/// An optimal game on a board, and how much work it took.
+/// Optimal moves on a board, and how much work it took.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Exact {
     pub score: u64,
-    /// A game that scores `score`.
+    /// Moves that score `score`.
     pub moves: Vec<u32>,
     /// Distinct pot states evaluated.
     pub states: usize,
 }
 
-/// The best game on the board `1..=n` without `holes`.  Panics if `n > MAX_N`.
+/// The best moves on the board `1..=n` without `holes`.  Panics if `n > MAX_N`.
 pub fn solve(n: u32, holes: &[u32]) -> Exact {
     let mut solver = Solver::new(n, holes);
     let root = solver.normalize(solver.board);
@@ -261,7 +261,7 @@ mod tests {
         assert_eq!(solve(7, &[1]).score, 10);
         // Without 2, 4 can still pay with 1 (4 alone: 3 would take the 1 it needs).
         assert_eq!(solve(4, &[2]).moves, [4]);
-        // The game found is legal on the full board too, and never plays a hole.
+        // The moves found are legal on the full board too, and never play a hole.
         let exact = solve(30, &[6]);
         assert!(!exact.moves.contains(&6));
         assert_eq!(replay(30, &exact.moves), Ok(exact.score));

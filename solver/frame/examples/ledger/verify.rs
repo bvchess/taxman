@@ -73,12 +73,12 @@ fn check(task: &Task) -> Vec<(usize, String)> {
     }
 }
 
-/// The report on the store at `path` and whether it passed.  Every line is parsed; every lower bound's game replayed by
-/// the referee (`schedule::play_all`) at its value; every root bound recomputed; every repeat's bags and search problem
-/// compared with its source's; every relation's arithmetic checked against the line it cites (a line before it, or a
-/// game of the chain `strict`), with what it rests on; and every board of the chain against the file's bounds.  The
-/// bounds of searches (`exhausted`, `dual`, `floor`), the Lagrangian bounds over nogoods (`nogoods`) and given games
-/// are taken on their record, and listed.
+/// The report on the store at `path` and whether it passed.  Every line is parsed; every lower bound's moves replayed
+/// by the referee (`schedule::play_all`) at its value; every root bound recomputed; every repeat's bags and search
+/// problem compared with its source's; every relation's arithmetic checked against the line it cites (a line before it,
+/// or a line of the chain `strict`), with what it rests on; and every board of the chain against the file's bounds.
+/// The bounds of searches (`exhausted`, `dual`, `floor`), the Lagrangian bounds over nogoods (`nogoods`) and given
+/// moves are taken on their record, and listed.
 pub fn verify(path: &Path, strict: &Path, workers: usize) -> Result<(String, bool), String> {
     let (numbered, parse_problems) = Store::parse(path)?;
     let games = store::chain(strict)?;
@@ -136,8 +136,8 @@ pub fn verify(path: &Path, strict: &Path, workers: usize) -> Result<(String, boo
     let _ = writeln!(w, "lower bounds {}: {}", count(Side::Lower, &Rule::ALL), by_rule(Side::Lower));
     let _ = writeln!(
         w,
-        "  {} games replayed by the referee ({promoted} from promotion sets, {} from moves, {cited} carried from the game \
-         of another line), each legal, finished and at its value",
+        "  {} sets of moves replayed by the referee ({promoted} from promotion sets, {} from moves, {cited} carried \
+         from the moves of another line), each legal, finished and at its value",
         count(Side::Lower, &Rule::ALL),
         count(Side::Lower, &Rule::ALL) - promoted - cited,
     );
@@ -146,7 +146,7 @@ pub fn verify(path: &Path, strict: &Path, workers: usize) -> Result<(String, boo
     let _ = writeln!(
         w,
         "  {} root bounds recomputed; {relations} by relations, each checked against the line it cites (or the chain's \
-         game) and what it rests on; the {} repeats' bags and search problems recomputed",
+         line) and what it rests on; the {} repeats' bags and search problems recomputed",
         count(Side::Upper, &[Rule::Root]),
         count(Side::Upper, &[Rule::Repeat]),
     );
@@ -195,8 +195,8 @@ pub fn verify(path: &Path, strict: &Path, workers: usize) -> Result<(String, boo
 }
 
 /// Writes to `out` a line `{"n", "value", "moves"}` for every lower bound of the store at `path` that is a promotion
-/// set: the game that `solution_for_promotions` makes of it, replayed by the referee first.  The Python referee
-/// (solver/tools/check_bounds.py) reads them, as it cannot rebuild a game from promotions.  Returns how many.
+/// set: the moves that `solution_for_promotions` makes of it, replayed by the referee first.  The Python referee
+/// (solver/tools/check_bounds.py) reads them, as it cannot rebuild moves from promotions.  Returns how many.
 pub fn games(path: &Path, out: &mut impl std::io::Write, workers: usize) -> Result<usize, String> {
     let store = Store::read(path)?;
     let promoted: Vec<&Line> = store.lines.iter().filter(|l| matches!(l.game, Some(Game::Promotions(_)))).collect();

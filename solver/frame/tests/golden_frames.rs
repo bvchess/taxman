@@ -319,11 +319,11 @@ fn wide_boards_match_the_java() {
 // ---------------------------------------------------------------------------------------------------------
 // Where the previous game gives the answer
 
-/// For a prime, the shortcut gives the game that the Java accelerated, from the Java's game of the board before it: that
-/// game with its first move, the largest prime below n, replaced by n.  The Java's game of n − 1 is not in the golden data
-/// (a game of a composite there is in another order), so it is made from the Java's game of n, which the data has.  And
-/// from the committed chain's game of n − 1, which may be another optimal game, the shortcut gives a finished game of n
-/// that scores the table's score.
+/// For a prime, the shortcut gives the moves that the Java accelerated, from the Java's moves for the board before it:
+/// those moves with their first move, the largest prime below n, replaced by n.  The Java's moves for n − 1 are not in
+/// the golden data (the moves for a composite there are in another order), so they are made from the Java's moves for
+/// n, which the data has.  And from the committed chain's moves for n − 1, which may be other optimal moves, the
+/// shortcut gives finished moves for n that score the table's score.
 #[test]
 fn acceleration_matches_java() {
     let optimal = Optimal::built_in();
@@ -341,9 +341,9 @@ fn acceleration_matches_java() {
         let ours = prime_shortcut(n, optimal.moves(n - 1).expect("the table has n-1"));
         bad.check(
             n,
-            "the game from the committed chain's",
+            "the moves from the committed chain's",
             replay_finished(n, &ours),
-            optimal.score(n).ok_or_else(|| "no game".to_owned()),
+            optimal.score(n).ok_or_else(|| "no moves".to_owned()),
         );
     }
     println!("{primes} primes");
@@ -364,9 +364,9 @@ fn fixture_lines(name: &str, separator: &str) -> Vec<Vec<String>> {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// The game made of a set of promotions
+// The moves made of a set of promotions
 
-/// The final step of every solve: the promotions found become a game.
+/// The final step of every solve: the promotions found become moves.
 #[test]
 fn promotions_become_the_java_game() {
     let mut bad = Mismatches::default();
@@ -377,7 +377,7 @@ fn promotions_become_the_java_game() {
         let t = Tables::new(n);
         let solve = g.field("solve");
         let java_accelerated = solve.get("accelerated").and_then(Json::as_bool).unwrap();
-        // A prime's game is its predecessor's with one move changed; its promotions are the predecessor's.
+        // A prime's moves are its predecessor's with one move changed; its promotions are the predecessor's.
         if java_accelerated && t.is_prime(n) {
             continue;
         }
@@ -387,14 +387,14 @@ fn promotions_become_the_java_game() {
         bad.check(n, "moves", moves.clone(), ints(solve.get("moves").unwrap()));
         match replay(n, &moves) {
             Ok(score) => bad.check(n, "replayed score", score, solve.get("score").and_then(Json::as_u64).unwrap()),
-            Err(e) => bad.0.push(format!("n={n}: the game is illegal: {e}")),
+            Err(e) => bad.0.push(format!("n={n}: the moves are illegal: {e}")),
         }
     }
     assert!(checked > 200);
     bad.assert_none(checked);
 }
 
-/// The Java's game of the board's frames for sets of promotions that are not just the optimal ones (halves and random
+/// The Java's moves for the board's frames for sets of promotions that are not just the optimal ones (halves and random
 /// subsets of them, and sets at the edges of the set widths), for boards up to 2049: the same moves in the same order,
 /// which then score what the game with no promotions scores plus the promotions (the identity the search's incumbent
 /// value stands on).

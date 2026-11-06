@@ -29,7 +29,7 @@
 #   130/143  `exact` stopped by SIGINT/SIGTERM (128 + the signal), after pausing every search: the script ends
 #   124      the deadline (DEADLINE_HOURS) stopped it: the script ends
 #   1, 2, 101, 134
-#            the prover reported an error: a recorded game that does not replay, or (the finding to look for) a playable
+#            the prover reported an error: recorded moves that do not replay, or (the finding to look for) a playable
 #            set that BEATS a recorded optimum.  Nothing is retried; read prover.err
 #   other    a crash (the OOM killer): run again after 10 s; MAX_FAILS in a row with no new line end the script
 #

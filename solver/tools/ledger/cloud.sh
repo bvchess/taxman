@@ -20,7 +20,7 @@
 #   FLOOR_STEP  the points a floor step goes down below a board's upper bound, at the median slope of the cost of a search
 #               under a floor (the program's default, 150; 0: no floor steps, the ordinary searches whose limit doubles)
 #   FLOOR_SLACK a floor step's limit is this many times its forecast time (the program's default, 4)
-#   PROVEN      a results file whose proven games the run is given (default none: the truth stays hidden)
+#   PROVEN      a results file whose proven moves the run is given (default none: the truth stays hidden)
 #   BOUNDS      a bounds store (results/bounds.jsonl) whose best bounds the run starts from (default none); the run's
 #               ledger is exported to it afterwards with `ledger export` (solver/docs/runbook/ledger.md)
 #   KNOWN       the results file the report checks against (default results/optimal.jsonl.gz)
@@ -33,7 +33,7 @@
 #   POWEROFF=1  shut the machine down at the end
 #
 # The run goes on from OUT/run if it holds a ledger (after an interruption: the same command again).  The script exits
-# with the report's status: 1 if the check found a bound on the wrong side of a known optimum or a game that does not
+# with the report's status: 1 if the check found a bound on the wrong side of a known optimum or moves that do not
 # replay, which is a bug to report.
 
 set -u

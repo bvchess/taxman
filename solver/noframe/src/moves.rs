@@ -1,20 +1,20 @@
-//! The longest games: M(n), the most moves a game of n can have, on the whole board, to set against the optimal
-//! game's.
+//! The longest move sequences: M(n), the most moves that can be played on the whole board 1..=n, to set against the
+//! optimal moves.
 //!
-//! A game's moves are its picks, so M(n) is the size of the largest playable set of picks on the board 1..=n.
+//! Moves are picks, so M(n) is the size of the largest playable set of picks on the board 1..=n.
 //! Three proven facts bound it:
 //!
 //! * **The matching number.**  A playable S pays each pick with a distinct maximal factor outside S (the playability
 //!   theorem, P2, docs/theory/playability.md), so S is the pick side of a matching of the board's maximal-factor graph
 //!   (each number joined to its maximal factors): M(n) <= ν(n), that graph's matching number ([`matching_numbers`]).
-//! * **M(n − 1) <= M(n) <= M(n − 1) + 1.**  A game of n − 1 is a game of n (n divides nothing smaller), and a game
-//!   of n without its move n is a game of n − 1.
+//! * **M(n − 1) <= M(n) <= M(n − 1) + 1.**  Legal moves for n − 1 are legal for n (n divides nothing smaller),
+//!   and legal moves for n without the move n are legal for n − 1.
 //! * **M(n) = M(n − 1) for a prime n >= 3.**  A playable set holds at most one prime (primes pay only with 1); in
 //!   one holding n, swap n for p, the largest prime below n, which is no one's maximal factor on the board 1..=n − 1
 //!   (2p > n − 1 by Bertrand) and pays with 1 as n did: a set of n − 1 as large, and playable.
 //!
-//! Any legal game of n is a lower bound, the recorded optimal one among them; where it meets ν(n) it is a
-//! longest game.  Elsewhere [`longest`] decides M(n) with the branch and bound of [`crate::game`] under unit
+//! Any legal moves for n give a lower bound, the recorded optimal moves among them; where it meets ν(n) they are a
+//! longest sequence.  Elsewhere [`longest`] decides M(n) with the branch and bound of [`crate::game`] under unit
 //! weights, which asks whether some playable set has more picks than a target.
 
 use crate::game::{Board, Prover, Role, Verdict};
@@ -131,12 +131,12 @@ pub fn play_order(board: &Board, set: &[u32]) -> Option<Vec<u32>> {
 pub struct Longest {
     /// M(n), if the search finished within its budget.
     pub most: Option<u64>,
-    /// The longest playable set found with more picks than the game given (ascending), if any.
+    /// The longest playable set found with more picks than the moves given (ascending), if any.
     pub longer: Option<Vec<u32>>,
     pub nodes: u64,
 }
 
-/// The most moves of game n, given that a game of `at_least` moves exists: the unit-weight search from that
+/// The most moves of game n, given that a sequence of `at_least` moves exists: the unit-weight search from that
 /// target, raising it to each longer set it finds ([`Prover::optimize`]) until it proves that nothing is longer
 /// (or `budget` nodes run out).  `smaller`, upper bounds on M(m) for m = 0..n−1 (the matching numbers, say), turns
 /// on the segment cuts: a set with more than T picks has more than T − M(m) of them above m.
@@ -157,20 +157,20 @@ pub fn longest(board: &Board, at_least: u64, smaller: Option<&[u64]>, budget: u6
 /// What [`heaviest_longest`] found.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Heaviest {
-    /// The heaviest longest game's picks (ascending), if the search finished within its budget.
+    /// The heaviest longest sequence's picks (ascending), if the search finished within its budget.
     pub set: Option<Vec<u32>>,
     pub nodes: u64,
 }
 
-/// The heaviest longest game: the largest sum of a playable set of M(n) picks, given `witness`, a playable set of
+/// The heaviest longest sequence: the largest sum of a playable set of M(n) picks, given `witness`, a playable set of
 /// M(n) picks.  The search weighs the pick of c by K + c, K above every sum: as no playable set has more than M(n)
 /// picks, one outweighs K·M(n) + x exactly when it has M(n) picks and sums to more than x.  It starts from the
 /// witness's weight and raises the target to each heavier set it finds ([`Prover::optimize`]).  A search from a
-/// light witness is slow, so with `upper_first`, a set of numbers above n/2 (the optimal game's upper part, say),
+/// light witness is slow, so with `upper_first`, a set of numbers above n/2 (the optimal moves' upper part, say),
 /// it first searches the sets whose upper part that is (cheap: the upper half is fixed) and starts the whole
 /// search from the heaviest of those.  (At n = 833 the whole search takes 2.6 million nodes from that start, and
 /// had not finished 10 minutes from the witness of [`longest`]; segment cuts on K·M(m) + opt(m) pruned nothing
-/// there.)  Panics if it finds a set with more picks than the witness (which is then not a longest game).
+/// there.)  Panics if it finds a set with more picks than the witness (which is then not a longest sequence).
 pub fn heaviest_longest(board: &Board, witness: &[u32], upper_first: Option<&[u32]>, budget: u64) -> Heaviest {
     let n = u64::from(board.n);
     let k = n * (n + 1) / 2 + 1;
@@ -213,11 +213,11 @@ mod tests {
     use crate::jsonl::{committed_chain, recorded_games_to};
     use crate::primes::smallest_prime_factors;
 
-    /// The first game whose optimal game is not a longest one (solver/noframe/docs/longest-games.md): the recorded
-    /// game of 833 has 362 moves, and exchanging four of its moves below n/2 for five smaller ones gives a legal game
-    /// of 363, the most any game of 833 can have (ν(833) = 363), worth 29 less.  (That no game of 363 moves is worth
-    /// more is a search of 2.6 million nodes, `bin/moves`.)  The optimal set of 833 is unique
-    /// (solver/noframe/docs/uniqueness.md), so the committed chain's game is it.
+    /// The first game whose optimal moves are not a longest sequence (solver/noframe/docs/longest-games.md): the
+    /// recorded moves of 833 number 362, and exchanging four of them below n/2 for five smaller ones gives legal moves
+    /// of 363, the most that 833 can have (ν(833) = 363), worth 29 less.  (That no 363 moves are worth more is a
+    /// search of 2.6 million nodes, `bin/moves`.)  The optimal set of 833 is unique
+    /// (solver/noframe/docs/uniqueness.md), so the committed chain's moves are it.
     #[test]
     fn game_833_has_a_longer_game_than_its_optimal_one() {
         let (score, moves) = recorded_games_to(&[committed_chain()], 833)[&833].clone();
@@ -234,7 +234,7 @@ mod tests {
         assert_eq!(board.replay(&play_order(&board, &longer).unwrap()).map(|s| (longer.len(), s)), Ok((363, 218_197)));
     }
 
-    /// The moves of the committed chain's games to 400, in the order `play_order` gives them, replay by the rules to
+    /// The moves of the committed chain to 400, in the order `play_order` gives them, replay by the rules to
     /// the recorded scores; a set with an unplayable subset has no payments.
     #[test]
     fn play_order_replays_the_recorded_games() {
@@ -267,8 +267,8 @@ mod tests {
         }
     }
 
-    /// M(n) against brute force for n <= 22, from below (a smaller game given) and with the segment cuts; and the
-    /// proven relations between neighboring games.
+    /// M(n) against brute force for n <= 22, from below (smaller moves given) and with the segment cuts; and the
+    /// proven relations between neighboring boards.
     #[test]
     fn longest_against_brute_force() {
         let spf = smallest_prime_factors(100);
@@ -289,10 +289,10 @@ mod tests {
             for smaller in [None, Some(&nu[..n as usize])] {
                 let got = longest(&board, 0, smaller, u64::MAX);
                 assert_eq!(got.most, Some(brute), "n={n}");
-                let longer = got.longer.expect("a game longer than none");
+                let longer = got.longer.expect("moves longer than none");
                 assert_eq!(longer.len() as u64, brute);
             }
-            // The heaviest longest game, against brute force; and its moves replay by the rules in the order
+            // The heaviest longest sequence, against brute force; and its moves replay by the rules in the order
             // `play_order` gives.
             let heaviest_brute = (0u64..1 << (n - 1))
                 .filter(|bits| u64::from(bits.count_ones()) == brute)

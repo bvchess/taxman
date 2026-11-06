@@ -76,22 +76,22 @@ pub fn committed_results() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/optimal.jsonl.gz")
 }
 
-/// One game of the committed results: its score and moves.
+/// One line of the committed results: its score and moves.
 pub type StoredGames = BTreeMap<u32, (u64, Vec<u32>)>;
 
-/// The first games of the committed results, 1 to [`FIRST_GAMES`], by n: the games of the table built into the
-/// library, which decodes the members of the file that hold them and no others.  The tests that take their games from
+/// The first lines of the committed results, 1 to [`FIRST_GAMES`], by n: the lines of the table built into the
+/// library, which decodes the members of the file that hold them and no others.  The tests that take their moves from
 /// the chain use these, which assume nothing.
 pub fn stored_games() -> StoredGames {
     let table = Optimal::built_in();
-    let game = |n| (n, (table.score(n).expect("a committed game"), table.moves(n).expect("a committed game").to_vec()));
+    let game = |n| (n, (table.score(n).expect("committed moves"), table.moves(n).expect("committed moves").to_vec()));
     (1..=FIRST_GAMES).map(game).collect()
 }
 
-/// How many of the first games of the committed results the tests take from them.
+/// How many of the first lines of the committed results the tests take from them.
 pub const FIRST_GAMES: u32 = 1300;
 
-/// The game `n − 1` of the committed results as the previous game of `n`; the proof only matters to the results lines.
+/// The committed results' moves for `n − 1`, as the previous game of `n`; the proof only matters to the results lines.
 pub fn prev_of(games: &StoredGames, n: u32) -> Prev {
     let (score, moves) = &games[&(n - 1)];
     Prev { moves: moves.clone(), score: *score, source: PrevSource::Results, proof: None, assumes: Assumptions::new() }
@@ -238,7 +238,7 @@ pub fn kept_subsets(items: &[u32], keeps: &mut dyn FnMut(&[u32]) -> bool) -> BTr
     found
 }
 
-/// FNV-1a over the decimal text of the moves, each followed by a comma: the fingerprint of a game that the Java
+/// FNV-1a over the decimal text of the moves, each followed by a comma: the fingerprint of moves that the Java
 /// fixture `testdata/games_java.txt` records.
 pub fn fnv1a64(moves: &[u32]) -> u64 {
     let mut hash = 0xCBF2_9CE4_8422_2325u64;

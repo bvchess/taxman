@@ -1,5 +1,5 @@
 //! The window (`SolveOptions::window`, `--window`): the games of a range in flight at once.  A chain solved with any
-//! window has the scores, methods, proofs, repeats, assumptions and previous games of the committed chain (but that a
+//! window has the scores, methods, proofs, repeats, assumptions and previous moves of the committed chain (but that a
 //! game which reaches its ceiling is `start` in order and may be `search` in a window); with one
 //! thread the window is one, and the lines are those of a window of one but for the times and the build; a repeat of
 //! a game still in flight names it, on a later line; a range stopped by a limit stops at its first unfinished game with

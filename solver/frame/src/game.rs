@@ -1,29 +1,28 @@
-//! The rules of Taxman as an independent referee, and the table of optimal games.
+//! The rules of Taxman as an independent referee, and the table of optimal moves.
 //!
 //! # The rules
 //!
 //! The pot holds the numbers `1..=n`.  The player takes a number `m` that still has at least one proper divisor in
 //! the pot and scores `m`; the taxman takes `m` and every one of its divisors still in the pot (the *tax*).  The
-//! game is over when no number in the pot has a divisor left in the pot, and the taxman sweeps what remains.  A
-//! game is its list of moves, its score is their sum, and an *optimal game* of `n` scores the most (`opt(n)`, the
-//! Taxman sequence).  For `n = 4` the optimal game is `3, 4` (the taxman takes 1, then 2) and scores 7.
+//! game is over when no number in the pot has a divisor left in the pot, and the taxman sweeps what remains.  The
+//! moves played score their sum, and moves for `n` are *optimal* when they score the most (`opt(n)`, the Taxman
+//! sequence).  For `n = 4` the optimal moves are `3, 4` (the taxman takes 1, then 2) and score 7.
 //!
 //! # What is here
 //!
 //! * The **referee**: [`replay`] plays a list of moves and returns the score or says which move is illegal;
-//!   [`replay_finished`] also demands what every optimal game shows, that the game is over and opens with the
-//!   largest prime.  It is the last word on any game the crate produces: every solved game is replayed before it
-//!   counts ([`crate::solver`]), and `taxman verify-results` replays whole files.  It
-//!   deliberately shares no code with the solver's number-theory tables ([`crate::numtheory`]): it uses only
-//!   divisibility and a plain "is it still in the pot" array, so a bug in a table cannot make a wrong game look
-//!   legal.
-//! * [`Optimal`]: the table of optimal games, an optimal game for every `n` it reaches: the games of the committed
+//!   [`replay_finished`] also demands what all optimal moves show, that the game is over and opens with the largest
+//!   prime.  It is the last word on any moves the crate produces: all the moves it solves are replayed before it counts
+//!   ([`crate::solver`]), and `taxman verify-results` replays whole files.  It deliberately shares no code with the
+//!   solver's number-theory tables ([`crate::numtheory`]): it uses only divisibility and a plain "is it still in the
+//!   pot" array, so a bug in a table cannot make wrong moves look legal.
+//! * [`Optimal`]: the table of optimal moves, optimal moves for every `n` it reaches: the moves of the committed
 //!   chain, the file `results/optimal.jsonl.gz`, built into the binary ([`Optimal::built_in`]).  The solver and the
-//!   verifiers confirm every score they meet against it, and the solver can take the previous game from it when it
-//!   solves the board just past a game the table has.  It is a table, not a proof: it holds each line's score and moves
-//!   and not its proof, so a game taken from it is assumed optimal ([`crate::results`] records what such a game is
-//!   assumed to be), where the file read by path ([`read_results_text`]) brings the proofs.  The file is megabytes
-//!   compressed, so the binary decodes a member of it when a game of that member is asked for and no sooner (see
+//!   verifiers confirm every score they meet against it, and the solver can take the previous moves from it when it
+//!   solves the board just past the end of the table.  It is a table, not a proof: it holds each line's score and moves
+//!   and not its proof, so moves taken from it are assumed optimal ([`crate::results`] records what such moves are
+//!   assumed to be), where the file read by path ([`read_results_text`]) brings the proof kinds.  The file is megabytes
+//!   compressed, so the binary decodes a member of it when moves of that member are asked for and no sooner (see
 //!   [`Optimal::built_in`]).
 
 use crate::json::Json;
@@ -36,7 +35,7 @@ use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 ///
 /// A move is legal if it is a number on the board that is still in the pot and at least one of its proper
 /// divisors is still in the pot.  Making it removes the number and all of its divisors from the pot (the
-/// taxman takes the divisors).  The sequence need not be a complete game: legal moves may remain at the end.
+/// taxman takes the divisors).  The sequence need not be complete: legal moves may remain at the end.
 pub fn replay(n: u32, moves: &[u32]) -> Result<u64, String> {
     play(n, moves).map(|(score, _)| score)
 }
@@ -47,10 +46,10 @@ pub fn legal_moves_left(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
     play(n, moves).map(|(_, in_pot)| legal_in(n, &in_pot))
 }
 
-/// `moves` followed by legal moves for as long as there are any, the largest each time: the game over.  One descending
-/// pass finds them all, for a move only takes numbers out of the pot, so a number that is not legal now never
-/// becomes legal.  (After a game of n − 1 followed by n, or a game of n + 1 less its move n + 1, these are the
-/// completions of monotonicity (N3) and the ceiling lemma (N4), docs/theory/neighbors.md.)
+/// `moves` followed by legal moves for as long as there are any, the largest each time, until the game is over.  One
+/// descending pass finds them all, for a move only takes numbers out of the pot, so a number that is not legal now
+/// never becomes legal.  (After the moves for n − 1 followed by n, or the moves for n + 1 less the move n + 1, these
+/// are the completions of monotonicity (N3) and the ceiling lemma (N4), docs/theory/neighbors.md.)
 pub fn complete(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
     let (_, mut in_pot) = play(n, moves)?;
     let mut game = moves.to_vec();
@@ -75,12 +74,12 @@ fn legal_in(n: u32, in_pot: &[bool]) -> Vec<u32> {
     (1..=n).filter(|&m| legal[m as usize]).collect()
 }
 
-/// Referees `moves` as a finished game of `n` and returns its score.  Besides being legal, the game must have
-/// the two properties every optimal game has, which it can show by itself:
+/// Referees `moves` as finished moves for `n` and returns their score.  Besides being legal, they must have
+/// the two properties all optimal moves have, which it can show by itself:
 ///
 /// * it is over: no legal move is left (one more move would only add to the score);
 /// * for `n ≥ 2`, it opens with the largest prime `≤ n`.  A prime can be played only while 1 is in the pot, so
-///   only as the first move, and an optimal game plays the largest one (a short exchange argument, proved with
+///   only as the first move, and optimal moves play the largest one (a short exchange argument, proved with
 ///   the prime shortcut it supports in [`crate::accelerate::prime_shortcut`]).
 pub fn replay_finished(n: u32, moves: &[u32]) -> Result<u64, String> {
     let (score, in_pot) = play(n, moves)?;
@@ -135,7 +134,7 @@ fn play(n: u32, moves: &[u32]) -> Result<(u64, Vec<bool>), String> {
 
 /// The proper divisors of `m` (those below it that divide it), in no particular order: by trial division up to √m, each
 /// divisor found with its partner `m / d`.  Plain divisibility, as the rest of the referee, but a move costs √m
-/// divisions rather than m, which a board of thousands of numbers feels (the ledger replays a game per board).
+/// divisions rather than m, which a board of thousands of numbers feels (the ledger replays moves per board).
 fn proper_divisors(m: u32) -> impl Iterator<Item = u32> {
     (1..)
         .take_while(move |&d| u64::from(d) * u64::from(d) <= u64::from(m))
@@ -149,13 +148,13 @@ fn is_prime(p: u32) -> bool {
     p >= 2 && (2..).take_while(|q| q * q <= p).all(|q| !p.is_multiple_of(q))
 }
 
-/// Sanity bound on `n` when reading a file of games, so a corrupt file cannot request a huge allocation.
+/// Sanity bound on `n` when reading a file of results lines, so a corrupt file cannot request a huge allocation.
 const MAX_PLAUSIBLE_N: u32 = 1 << 20;
 
 /// The bytes of `results/optimal.jsonl.gz` when the crate was compiled: the file [`Optimal::built_in`] reads.
 pub const BUILT_IN: &[u8] = include_bytes!("../../../results/optimal.jsonl.gz");
 
-/// The score of a game and its moves.
+/// The score and the moves of a results line.
 type Recorded = (u64, Vec<u32>);
 
 /// Whether `path` names a gzip file: the committed results, `results/optimal.jsonl.gz`, are one.
@@ -181,37 +180,37 @@ pub fn read_results_text(path: &Path) -> Result<String, String> {
     String::from_utf8(text).map_err(|e| named(&e))
 }
 
-/// The known optimal games, by n: the table built into the program ([`built_in`](Self::built_in): the games of
-/// `results/optimal.jsonl.gz`), possibly overlaid with the completed games of results files
-/// ([`with_results`](Self::with_results)).  For each n, the best score and a game that achieves it.
+/// The known optimal moves, by n: the table built into the program ([`built_in`](Self::built_in): the moves of
+/// `results/optimal.jsonl.gz`), possibly overlaid with the completed lines of results files
+/// ([`with_results`](Self::with_results)).  For each n, the best score and moves that achieve it.
 #[derive(Clone, Default)]
 pub struct Optimal {
-    /// The games of the gzip file the table was built on (the built-in one, or a results file given by a name that ends
+    /// The lines of the gzip file the table was built on (the built-in one, or a results file given by a name that ends
     /// in `.gz`), each decoded and parsed when it is asked for.
     text: Option<Text<Recorded>>,
-    /// The games set over those of the text, by n; all the games of a table made of other parts.
+    /// The lines set over those of the text, by n; all the lines of a table made of other parts.
     overlay: BTreeMap<u32, Recorded>,
-    /// The table that this one is laid over: its games stand for the n that the text and the overlay have none of.
+    /// The table that this one is laid over: its lines stand for the n that the text and the overlay have none of.
     under: Option<Arc<Optimal>>,
-    /// Whether a game of the text is compared with the game of the same n in `under` when it is looked up, and a
+    /// Whether a line of the text is compared with the line of the same n in `under` when it is looked up, and a
     /// different score stops the lookup ([`with_results_files`](Self::with_results_files)).
     compared: bool,
 }
 
 /// How a [`Text`] reads one line of its file, given the line's number (from 1) and its text: the n of the game it
-/// records and the game, `None` for a line that records no completed game, or what is wrong with the line, which starts
-/// with ": " or " (" so that it follows "the line of game N".
+/// records and its moves, `None` for a line that is not a completed one, or what is wrong with the line, which
+/// starts with ": " or " (" so that it follows "the line of game N".
 pub(crate) type ParseLine<G> = fn(usize, &str) -> Result<Option<(u32, G)>, String>;
 
-/// The games of a gzip file of result lines, one game a line, the line of the game of n the nth line of the file.
-/// The file is decoded member by member, in order, only as far as a game that is asked for, and what is decoded is kept:
-/// a process that needs a few games of the file decodes the members that hold them, and one that needs none decodes
-/// nothing.  A clone shares what is decoded with the table it was cloned from.
+/// The lines of a gzip file of result lines, one for each game, the line of game n the nth line of the file.
+/// The file is decoded member by member, in order, only as far as a line that is asked for, and what is decoded is
+/// kept: a process that needs a few lines of the file decodes the members that hold them, and one that needs none
+/// decodes nothing.  A clone shares what is decoded with the table it was cloned from.
 ///
-/// The decoded members are a chain, each holding the one after it once that is decoded, so that a game is handed out as
-/// a reference that stays valid and any number of threads may ask for games at once.  What a game is, and so what its
-/// line is parsed into, is the reader's (`G`): the table's games are scores and moves, the committed chain's carry their
-/// proofs ([`crate::known`]).
+/// The decoded members are a chain, each holding the one after it once that is decoded, so that a line is handed out as
+/// a reference that stays valid and any number of threads may ask for lines at once.  What a line is, and so what its
+/// line is parsed into, is the reader's (`G`): the table's lines are scores and moves, the committed chain's carry
+/// their proof kinds ([`crate::known`]).
 pub(crate) struct Text<G: 'static> {
     file: Arc<GzFile<G>>,
 }
@@ -247,13 +246,13 @@ struct Member<G: 'static> {
     starts: Vec<usize>,
     /// The n of the member's first line: the lines before it, plus one.
     first_n: u32,
-    /// The games of the member's lines, parsed when asked for (none for a line that is no completed game).
+    /// The results of the member's lines, parsed when asked for (none for a line that is not a completed one).
     games: Vec<OnceLock<Result<Option<G>, String>>>,
     next: OnceLock<Link<G>>,
 }
 
 impl<G> GzFile<G> {
-    /// Decodes the next member of the file, whose first line is the game of `first_n`.
+    /// Decodes the next member of the file, whose first line is that of game `first_n`.
     fn decode_next(&self, first_n: u32) -> Link<G> {
         let mut undecoded = self.undecoded.lock().unwrap_or_else(PoisonError::into_inner);
         match undecoded.next() {
@@ -265,11 +264,11 @@ impl<G> GzFile<G> {
 }
 
 impl<G> Member<G> {
-    /// The member of decoded `bytes`, whose first line is the game of `first_n`.
+    /// The member of decoded `bytes`, whose first line is that of game `first_n`.
     ///
     /// # Errors
     ///
-    /// If the bytes are not text of whole lines, or a line is the game of an n that a table may not hold.
+    /// If the bytes are not text of whole lines, or a line is that of an n that a table may not hold.
     fn new(bytes: Vec<u8>, first_n: u32) -> Result<Member<G>, String> {
         let text = String::from_utf8(bytes).map_err(|e| format!("a member is not text: {e}"))?;
         if !text.is_empty() && !text.ends_with('\n') {
@@ -278,9 +277,7 @@ impl<G> Member<G> {
         let starts: Vec<usize> = std::iter::once(0).chain(text.match_indices('\n').map(|(at, _)| at + 1)).collect();
         let lines = starts.len() - 1;
         if lines > (MAX_PLAUSIBLE_N - first_n.min(MAX_PLAUSIBLE_N)) as usize {
-            return Err(format!(
-                "{lines} lines from the game of {first_n}, past the {MAX_PLAUSIBLE_N} that a table may hold"
-            ));
+            return Err(format!("{lines} lines from game {first_n}, past the {MAX_PLAUSIBLE_N} that a table may hold"));
         }
         let games = (0..lines).map(|_| OnceLock::new()).collect();
         Ok(Member { text, starts, first_n, games, next: OnceLock::new() })
@@ -291,8 +288,8 @@ impl<G> Member<G> {
         self.first_n + self.games.len() as u32
     }
 
-    /// The game of `n`, parsed from its line (the member's `n - first_n`th) by `parse`: none if the line is no completed
-    /// game.
+    /// The result for `n`, parsed from its line (the member's `n - first_n`th) by `parse`: none if the line is not
+    /// a completed one.
     fn read(&self, n: u32, parse: ParseLine<G>) -> Result<Option<G>, String> {
         let i = (n - self.first_n) as usize;
         let line = &self.text[self.starts[i]..self.starts[i + 1] - 1];
@@ -300,7 +297,7 @@ impl<G> Member<G> {
             return Ok(None);
         };
         if found != n {
-            return Err(format!("the line {n} of the file is the game of {found}"));
+            return Err(format!("the line {n} of the file is the line of game {found}"));
         }
         Ok(Some(game))
     }
@@ -340,8 +337,8 @@ impl<'a, G> Iterator for Walk<'a, G> {
 }
 
 impl<G> Text<G> {
-    /// The games of the members `members` of a gzip file called `label` in the errors, whose lines `parse` reads.
-    /// Nothing is decoded until a game is asked for.
+    /// The lines of the members `members` of a gzip file called `label` in the errors, whose lines `parse` reads.
+    /// Nothing is decoded until a line is asked for.
     pub(crate) fn new(
         label: impl Into<String>,
         members: taxman_gzip::Members<'static>,
@@ -351,7 +348,7 @@ impl<G> Text<G> {
         Text { file: Arc::new(file) }
     }
 
-    /// The games of the gzip file at `path`, which is read into memory now and decoded as the games are asked for,
+    /// The lines of the gzip file at `path`, which is read into memory now and decoded as the lines are asked for,
     /// but for its first member, which is decoded now so that a file that is no gzip file is refused at once.
     ///
     /// # Errors
@@ -373,7 +370,7 @@ impl<G> Text<G> {
         format!("{}: {e}", self.file.label)
     }
 
-    /// The largest n of the text, 0 if it has no game.  It decodes the whole file.
+    /// The largest n of the text, 0 if it has no line.  It decodes the whole file.
     ///
     /// # Errors
     ///
@@ -382,12 +379,12 @@ impl<G> Text<G> {
         self.walk().try_fold(0, |_, member| member.map(|member| member.end_n() - 1)).map_err(|e| self.named(e))
     }
 
-    /// The game of `n`, if the file has a completed one there, decoded and parsed the first time it is asked for: only
-    /// the members up to the one that holds the line are decoded.
+    /// The result for `n`, if the file has a completed line there, decoded and parsed the first time it is asked for:
+    /// only the members up to the one that holds the line are decoded.
     ///
     /// # Errors
     ///
-    /// If a member up to it fails to decode, or the line is not the line of the game of `n`; the message names the file.
+    /// If a member up to it fails to decode, or the line is not the line of game `n`; the message names the file.
     pub(crate) fn get(&self, n: u32) -> Result<Option<&G>, String> {
         if n == 0 {
             return Ok(None);
@@ -409,7 +406,7 @@ fn broken(e: &str) -> ! {
     panic!("{e}")
 }
 
-/// Reads one line of the file of a table: the n, the score and the moves of a completed game, none for any other line.
+/// Reads one line of the file of a table: the n, the score and the moves of a completed line, none for any other line.
 fn parse_game(_number: usize, line: &str) -> Result<Option<(u32, Recorded)>, String> {
     let json = Json::parse(line).map_err(|e| format!(": {e}"))?;
     if json.get("completed").and_then(Json::as_bool) != Some(true) {
@@ -420,14 +417,14 @@ fn parse_game(_number: usize, line: &str) -> Result<Option<(u32, Recorded)>, Str
 }
 
 impl Optimal {
-    /// The table of optimal games built into this binary: the games of `results/optimal.jsonl.gz` as they were when the
+    /// The table of optimal moves built into this binary: the lines of `results/optimal.jsonl.gz` as they were when the
     /// crate was compiled.  The solver and the verifiers confirm every score against it, wherever the binary runs; a
     /// changed file takes a rebuild (`build.rs` marks the build dirty until it is committed).
     ///
-    /// Nothing of the file is decoded until a game is asked for, and then the members of the file up to the one that holds
-    /// the game (the file is one gzip member for each batch of games, in order), and the game's line is parsed, once.  A
-    /// process that never uses the table pays nothing for it, and one that uses a few of the first games pays for the
-    /// first members.  What goes over every game ([`games`](Self::games) to its end, [`max_n`](Self::max_n)) decodes
+    /// Nothing of the file is decoded until a line is asked for, and then the members of the file up to the one that
+    /// holds the line (the file is one gzip member for each batch of lines, in order), and the line is parsed, once.  A
+    /// process that never uses the table pays nothing for it, and one that uses a few of the first lines pays for the
+    /// first members.  What goes over every line ([`games`](Self::games) to its end, [`max_n`](Self::max_n)) decodes
     /// it all.
     pub fn built_in() -> &'static Optimal {
         static TABLE: OnceLock<Optimal> = OnceLock::new();
@@ -438,18 +435,18 @@ impl Optimal {
         })
     }
 
-    /// The table with the completed games of the results files `results` added (they replace the table's moves for
+    /// The table with the completed lines of the results files `results` added (they replace the table's moves for
     /// the same values of n; an unfinished search's line is skipped): how a measurement (the probe, the ledger) gets the
-    /// previous game of a board past the table's end, to seed its search and give it a ceiling.
+    /// previous moves of a board past the table's end, to seed its search and give it a ceiling.
     ///
-    /// A file whose name ends in `.gz` is taken as [`with_results`](Self::with_results) takes it, decoded as its games are
-    /// asked for, so its games are compared with the known games where they are looked up, not all now (that would
-    /// read the whole file): a game that scores differently from the known game of the same n stops the lookup, naming
-    /// the file, n and both scores, as a fault in a member decoded later does.
+    /// A file whose name ends in `.gz` is taken as [`with_results`](Self::with_results) takes it, decoded as its lines
+    /// are asked for, so its lines are compared with the known moves where they are looked up, not all now (that would
+    /// read the whole file): a line that scores differently from the known moves for the same n stops the lookup,
+    /// naming the file, n and both scores, as a fault in a member decoded later does.
     ///
     /// # Errors
     ///
-    /// If a results file cannot be read, or a game of a plain one scores differently from one the games before it have.
+    /// If a results file cannot be read, or a line of a plain one scores differently from the moves before it.
     pub fn with_results_files(&self, results: &[PathBuf]) -> Result<Optimal, String> {
         let mut known = self.clone();
         for path in results {
@@ -458,12 +455,12 @@ impl Optimal {
                 continue;
             }
             let games = Self::completed_games(path)?;
-            // The first game, in ascending order of n, that the file scores differently from the games known so far.
+            // The first n, in ascending order, that the file scores differently from the moves known so far.
             let differs = games.iter().find_map(|(&n, &(now, _))| {
                 known.score(n).filter(|&before| before != now).map(|before| (n, now, before))
             });
             if let Some((n, now, before)) = differs {
-                return Err(format!("{}: n={n} scores {now}, but the known games have {before}", path.display()));
+                return Err(format!("{}: n={n} scores {now}, but the known moves score {before}", path.display()));
             }
             for (n, (score, moves)) in games {
                 known.set(n, score, moves);
@@ -472,10 +469,10 @@ impl Optimal {
         Ok(known)
     }
 
-    /// Reads a parsed JSON array of game objects, `{"n": .., "score": .., "moves": [..]}` each (a table of a few games for
+    /// Reads a parsed JSON array of objects, `{"n": .., "score": .., "moves": [..]}` each (a table of a few lines for
     /// a test); the error names the entry that is malformed, or an n that appears twice.
     pub fn from_json(json: &Json) -> Result<Optimal, String> {
-        let entries = json.as_arr().ok_or("expected an array of games")?;
+        let entries = json.as_arr().ok_or("expected an array of entries")?;
         let mut out = Optimal::default();
         for (i, entry) in entries.iter().enumerate() {
             let (n, score, moves) = Self::parse_entry(entry).map_err(|e| format!("entry {i}{e}"))?;
@@ -486,13 +483,13 @@ impl Optimal {
         Ok(out)
     }
 
-    /// These games with the completed games of the results file `path` (one JSON object per line, as `taxman
-    /// solve --out` writes them, or the committed results, `results/optimal.jsonl.gz`), which replace the games of the
+    /// This table with the completed lines of the results file `path` (one JSON object per line, as `taxman
+    /// solve --out` writes them, or the committed results, `results/optimal.jsonl.gz`), which replace the lines of the
     /// same values of n.  Lines of searches that did not complete are skipped.
     ///
     /// A file whose name ends in `.gz` is read as the built-in table's file is ([`built_in`](Self::built_in)): it must be
-    /// one game a line, the line of the game of n the nth, as the committed results are, and it is decoded only as far
-    /// as a game that is asked for, parsed when asked.  It is read into memory here, and its first member decoded, so a
+    /// one line for each game, the line of game n the nth, as the committed results are, and it is decoded only as far
+    /// as a line that is asked for, parsed when asked.  It is read into memory here, and its first member decoded, so a
     /// file that is not there, or is no gzip file, is refused now; a fault in a later member stops the program (naming
     /// the file) at the lookup that meets it, and a member that no lookup reaches is not read.  Any other file is read
     /// whole, and refused if it has a fault.
@@ -506,13 +503,14 @@ impl Optimal {
         Ok(self)
     }
 
-    /// This table with the gzip file `path` laid over it, `compared` with it or not where a game of the file is looked up.
+    /// This table with the gzip file `path` laid over it, `compared` with it or not where a line of the file is looked
+    /// up.
     fn laid_over_by_file(self, path: &Path, compared: bool) -> Result<Optimal, String> {
         let text = Text::of_file(path, parse_game)?;
         Ok(Optimal { text: Some(text), overlay: BTreeMap::new(), under: Some(Arc::new(self)), compared })
     }
 
-    /// The completed games of the results file `path` by n, the last of a game that the file has twice.
+    /// The completed lines of the results file `path` by n, the last of those for an n that the file has twice.
     fn completed_games(path: &Path) -> Result<BTreeMap<u32, Recorded>, String> {
         let text = read_results_text(path)?;
         let mut games = BTreeMap::new();
@@ -527,7 +525,7 @@ impl Optimal {
         Ok(games)
     }
 
-    /// The n, score and moves of one game object; the error says what is wrong after a ": " (or after " (n=…):
+    /// The n, score and moves of one object; the error says what is wrong after a ": " (or after " (n=…):
     /// " once n is known).
     fn parse_entry(entry: &Json) -> Result<(u32, u64, Vec<u32>), String> {
         let field = |name: &str| entry.get(name).ok_or_else(|| format!(": missing \"{name}\""));
@@ -537,43 +535,43 @@ impl Optimal {
         Ok((n, score, moves))
     }
 
-    /// Records game `n`, over the text's if it has one.
+    /// Records the moves for `n`, over the text's if it has one.
     fn set(&mut self, n: u32, score: u64, moves: Vec<u32>) {
         self.overlay.insert(n, (score, moves));
     }
 
-    /// Appends game `n`, which must be past every n the table has: a table is extended past its end, and its
-    /// games are never replaced.
+    /// Appends the moves for `n`, which must be past every n the table has: a table is extended past its end, and its
+    /// moves are never replaced.
     pub fn push(&mut self, n: u32, score: u64, moves: Vec<u32>) -> Result<(), String> {
         if n <= self.max_n() {
             return Err(format!("n={n} is not past the table's largest n, {}", self.max_n()));
         }
         if n > MAX_PLAUSIBLE_N {
-            return Err(format!("n={n} is more than the {MAX_PLAUSIBLE_N} that a table of games may hold"));
+            return Err(format!("n={n} is more than the {MAX_PLAUSIBLE_N} that a table may hold"));
         }
         self.set(n, score, moves);
         Ok(())
     }
 
-    /// The `(score, moves)` recorded for `n`, if any: a game set over the text's, else the text's, else that of the table
-    /// this one is laid over.  A game of the text that scores differently from the game of the table it is laid over
-    /// stops the program if the text is [`compared`](Self::with_results_files) with it.
+    /// The `(score, moves)` recorded for `n`, if any: a line set over the text's, else the text's, else that of the
+    /// table this one is laid over.  A line of the text that scores differently from the moves of the table it is laid
+    /// over stops the program if the text is [`compared`](Self::with_results_files) with it.
     fn entry(&self, n: u32) -> Option<&Recorded> {
         self.overlay.get(&n).or_else(|| self.text_entry(n)).or_else(|| self.under.as_ref()?.entry(n))
     }
 
-    /// The game of `n` in the text, if it has one, compared with the table it is laid over where that is asked for.
+    /// The entry for `n` in the text, if it has one, compared with the table it is laid over where that is asked for.
     fn text_entry(&self, n: u32) -> Option<&Recorded> {
         let text = self.text.as_ref()?;
         let game = text.get(n).unwrap_or_else(|e| broken(&e))?;
         let below = self.under.as_ref().filter(|_| self.compared).and_then(|under| under.entry(n));
         if let Some(&(before, _)) = below.filter(|known| known.0 != game.0) {
-            broken(&text.named(format!("n={n} scores {}, but the known games have {before}", game.0)));
+            broken(&text.named(format!("n={n} scores {}, but the known moves score {before}", game.0)));
         }
         Some(game)
     }
 
-    /// The largest n of a game set by hand in this table or in one it is laid over (0 if there is none): the games of a
+    /// The largest n set by hand in this table or in one it is laid over (0 if there is none): the lines of a
     /// file are one for every n from 1 to its end, and those are not counted.
     fn highest_set(&self) -> u32 {
         let own = self.overlay.keys().next_back().copied().unwrap_or(0);
@@ -585,15 +583,15 @@ impl Optimal {
         self.entry(n).map(|(score, _)| *score)
     }
 
-    /// An optimal game for `n`, if known.
+    /// Optimal moves for `n`, if known.
     pub fn moves(&self, n: u32) -> Option<&[u32]> {
         self.entry(n).map(|(_, moves)| moves.as_slice())
     }
 
-    /// Every entry as `(n, score, moves)`, ascending in `n`.  A game of a table built on a file is decoded and parsed
-    /// when the iterator reaches it, so taking the first games of the table decodes the first members of the file.
+    /// Every entry as `(n, score, moves)`, ascending in `n`.  A line of a table built on a file is decoded and parsed
+    /// when the iterator reaches it, so taking the first lines of the table decodes the first members of the file.
     pub fn games(&self) -> impl Iterator<Item = (u32, u64, &[u32])> + '_ {
-        // The file has a game for every n from 1 to its end, and the games set over it may reach past that end.
+        // The file has a line for every n from 1 to its end, and the lines set over it may reach past that end.
         let set_up_to = self.highest_set();
         (1..)
             .take_while(move |&n| n <= set_up_to || self.entry(n).is_some())
@@ -612,8 +610,8 @@ impl Optimal {
         self.overlay.keys().next_back().copied().unwrap_or(0).max(in_text).max(below)
     }
 
-    /// Replays every game and checks that it is legal and scores what the file says.  Returns the number of
-    /// games checked.
+    /// Replays every line's moves and checks that it is legal and scores what the file says.  Returns the number of
+    /// lines checked.
     pub fn verify_all(&self) -> Result<usize, String> {
         let mut checked = 0;
         for (n, score, moves) in self.games() {
@@ -640,7 +638,7 @@ mod tests {
         assert_eq!(replay(4, &[3, 4]), Ok(7));
         assert_eq!(replay(5, &[5, 4]), Ok(9));
         assert_eq!(replay(6, &[5, 4, 6]), Ok(15));
-        // Legal, and already a complete game: 4 takes 1 and 2, and 3 can no longer be played.
+        // Legal, and already finished: 4 takes 1 and 2, and 3 can no longer be played.
         assert_eq!(replay(4, &[4]), Ok(4));
         // A sequence need not be complete: 6 alone is legal even though 4 and 5 are left (4 has no tax left).
         assert_eq!(replay(6, &[6]), Ok(6));
@@ -686,7 +684,7 @@ mod tests {
         // Over, but opened with the wrong prime: 5 takes 1, so 7 can never be played.
         assert_eq!(legal_moves_left(7, &[5, 4, 6]), Ok(vec![]));
         assert!(replay_finished(7, &[5, 4, 6]).unwrap_err().contains("opens with 5, not with 7"));
-        // The game of 1 has no moves, and an empty game of 2 is not over.
+        // Board 1 has no moves, and playing nothing on board 2 is not over.
         assert_eq!(replay_finished(1, &[]), Ok(0));
         assert!(replay_finished(2, &[]).unwrap_err().contains("not over"));
         assert!(replay_finished(4, &[1]).unwrap_err().contains("pays no tax"));
@@ -715,7 +713,7 @@ mod tests {
     }
 
     /// [`play`] with the divisor sweep of every number below the move, as it was before: its scores, pots and errors
-    /// are the fast one's, on the games of the table and on those games with their moves swapped, dropped, repeated and
+    /// are the fast one's, on the moves of the table and on those moves swapped, dropped, repeated and
     /// replaced (most of them illegal).
     #[test]
     fn the_fast_referee_plays_as_the_slow_one_did() {
@@ -751,7 +749,7 @@ mod tests {
             (seed >> 33) as usize % bound
         };
         let (mut legal, mut illegal) = (0, 0);
-        // The games to 1300: the slow referee takes about n² a move.
+        // The moves to 1300: the slow referee takes about n² a move.
         for n in (2..=SMALL_GAMES).step_by(37).chain([60, 61, 64, 120]) {
             let game = opt.moves(n).unwrap().to_vec();
             let mut games = vec![game.clone(), game[..game.len() / 2].to_vec()];
@@ -777,11 +775,11 @@ mod tests {
                 }
             }
         }
-        assert!(legal > 100 && illegal > 100, "{legal} legal and {illegal} illegal games");
+        assert!(legal > 100 && illegal > 100, "{legal} legal and {illegal} illegal move lists");
     }
 
-    /// `complete` is the largest legal move, again and again: it finishes every prefix of a table game the way the
-    /// slow loop (the moves left, recomputed after each) does, to a game that is over.
+    /// `complete` is the largest legal move, again and again: it finishes every prefix of the table's moves the way the
+    /// slow loop (the moves left, recomputed after each) does, to moves that are over.
     #[test]
     fn a_game_is_completed_by_the_largest_legal_moves() {
         let opt = Optimal::built_in();
@@ -803,18 +801,18 @@ mod tests {
         assert!(complete(4, &[1]).is_err(), "an illegal prefix is refused");
     }
 
-    /// The games of the table that a test goes over every one of: 1 to 1300.  The file's members are decoded in order, so
-    /// these cost its first members only; a test of every game of the file is ignored in a debug build.
+    /// The lines of the table that a test goes over every one of: 1 to 1300.  The file's members are decoded in order,
+    /// so these cost its first members only; a test of every line of the file is ignored in a debug build.
     const SMALL_GAMES: u32 = 1300;
 
-    /// The first `count` games of the built-in table, by n: `(n, score, moves)`, each asked for by itself so that no
+    /// The first `count` lines of the built-in table, by n: `(n, score, moves)`, each asked for by itself so that no
     /// more of the file than their members is decoded.
     fn first_games(count: u32) -> impl Iterator<Item = (u32, u64, &'static [u32])> {
         let opt = Optimal::built_in();
-        (1..=count).map(move |n| (n, opt.score(n).expect("a game"), opt.moves(n).expect("a game")))
+        (1..=count).map(move |n| (n, opt.score(n).expect("an entry"), opt.moves(n).expect("an entry")))
     }
 
-    /// The line of the game of `n` in a table of a test: a result line with the fields a table reads, scoring ten times
+    /// The line of game `n` in a table of a test: a result line with the fields a table reads, scoring ten times
     /// `n` with the moves `n` and `n + 1`.
     fn line(n: u32) -> String {
         format!("{{\"n\":{n},\"score\":{},\"moves\":[{n},{}],\"completed\":true}}\n", u64::from(n) * 10, n + 1)
@@ -825,7 +823,7 @@ mod tests {
         range.map(line).collect()
     }
 
-    /// The games of a gzip file of the bytes `bytes`, as the table reads them.
+    /// The lines of a gzip file of the bytes `bytes`, as the table reads them.
     fn text_on(bytes: Vec<u8>) -> Text<Recorded> {
         Text::new("a test file", taxman_gzip::Members::owned(bytes), parse_game)
     }
@@ -879,8 +877,8 @@ mod tests {
         assert!(opt.score(top).is_some() && opt.moves(top).is_some_and(|moves| !moves.is_empty()));
     }
 
-    /// The built-in file has one game a line, every n from 1 to the end of the table, as the lookup of a game by its
-    /// line needs: the file has as many lines as the table has games, and each line is the game of its number.
+    /// The built-in file has one line for each game, every n from 1 to the end of the table, as the lookup of a line by
+    /// its line needs: the file has as many lines as the table has entries, and each line is the line of its number.
     #[test]
     #[cfg_attr(debug_assertions, ignore = "long: the quick check is the_built_in_table_answers_for_its_first_games")]
     fn the_built_in_file_has_every_n_from_1_to_its_end() {
@@ -890,26 +888,26 @@ mod tests {
         assert!(opt.sizes().eq(1..=opt.max_n()));
     }
 
-    /// The table decodes the members of the file that hold the games it is asked for, in order, and no others, and
-    /// parses a game once however often it is asked for.
+    /// The table decodes the members of the file that hold the lines it is asked for, in order, and no others, and
+    /// parses a line once however often it is asked for.
     #[test]
     fn the_table_decodes_the_members_it_is_asked_for_and_no_others() {
         let (first, second, third) = (lines(1..=3), lines(4..=4), lines(5..=9));
         let table = table_on(&[&first, &second, &third]);
         let text = table.text.as_ref().unwrap();
-        assert_eq!(text.decoded(), 0, "nothing is decoded before a game is asked for");
+        assert_eq!(text.decoded(), 0, "nothing is decoded before a line is asked for");
         assert_eq!(table.score(2), Some(20));
         assert_eq!(text.decoded(), 1);
         assert_eq!(table.moves(3), Some(&[3, 4][..]));
-        assert_eq!(text.decoded(), 1, "a game of a member decoded is a lookup");
+        assert_eq!(text.decoded(), 1, "a line of a member decoded is a lookup");
         // The member of 5 is the third, which the second is read to reach.
         assert_eq!(table.score(5), Some(50));
         assert_eq!(text.decoded(), 3);
         assert_eq!((table.score(0), table.score(0)), (None, None));
         assert_eq!(text.decoded(), 3);
-        // The same game is the same value, parsed once.
+        // The same line is the same value, parsed once.
         assert!(std::ptr::eq(table.moves(8).unwrap(), table.moves(8).unwrap()));
-        // A game past the end is found by decoding the rest.
+        // A line past the end is found by decoding the rest.
         assert_eq!(table.score(10), None);
         assert_eq!(table.max_n(), 9);
     }
@@ -924,7 +922,7 @@ mod tests {
         assert!(std::ptr::eq(table.moves(4).unwrap(), copy.moves(4).unwrap()));
     }
 
-    /// The games found in a file are those of a parse of the games: for members of different sizes, among them an empty
+    /// The lines found in a file are those of a parse of the lines: for members of different sizes, among them an empty
     /// one, and for every n from 0 past the end.
     #[test]
     fn the_games_found_in_a_file_are_those_of_a_parse_of_its_games() {
@@ -937,12 +935,12 @@ mod tests {
             assert_eq!((table.score(n), table.moves(n)), (eager.score(n), eager.moves(n)), "n={n}");
         }
         assert!(table.games().eq(eager.games()));
-        // A file of one empty member has no game; a file of no member is not a gzip file at all.
+        // A file of one empty member has no line; a file of no member is not a gzip file at all.
         assert_eq!(table_on(&[""]).text.as_ref().unwrap().max_n(), Ok(0));
         assert!(table_on(&[]).text.as_ref().unwrap().max_n().unwrap_err().contains("not a gzip file"));
     }
 
-    /// Many threads asking for games at once all get the games, and each member is decoded once.
+    /// Many threads asking for lines at once all get the lines, and each member is decoded once.
     #[test]
     fn threads_asking_for_games_at_once_get_the_same_games() {
         let texts: Vec<String> = (0..5).map(|k| lines(k * 20 + 1..=k * 20 + 20)).collect();
@@ -962,8 +960,8 @@ mod tests {
         assert_eq!(table.text.as_ref().unwrap().decoded(), 5);
     }
 
-    /// A file that is not one game a line, in order, is refused when its lines are asked for, rather than read wrong; and
-    /// what is damaged is the part of the file from the damage on, not the games before it.
+    /// A file that is not one line for each game, in order, is refused when its lines are asked for, rather than read
+    /// wrong; and what is damaged is the part of the file from the damage on, not the lines before it.
     #[test]
     fn a_file_that_is_not_one_game_a_line_is_refused() {
         let asked =
@@ -973,9 +971,9 @@ mod tests {
             assert!(err.contains(part), "{err}");
         };
         let (one, three) = (line(1), line(3));
-        // A line of another game than its number, a line cut off, a line that is not JSON, and one that is blank.
-        refused(asked(&[&format!("{one}{three}")], 2), "the line 2 of the file is the game of 3");
-        refused(asked(&[&lines(1..=2), &line(2)], 3), "the line 3 of the file is the game of 2");
+        // A line of another game than its position, a line cut off, a line that is not JSON, and one that is blank.
+        refused(asked(&[&format!("{one}{three}")], 2), "the line 2 of the file is the line of game 3");
+        refused(asked(&[&lines(1..=2), &line(2)], 3), "the line 3 of the file is the line of game 2");
         refused(asked(&[&format!("{one}{{\"n\":2")], 1), "does not end with a newline");
         refused(asked(&[&format!("{one}not json\n")], 2), "the line of game 2");
         refused(asked(&[&format!("{one}\n{three}")], 2), "the line of game 2");
@@ -983,7 +981,7 @@ mod tests {
         // Not a gzip file at all.
         refused(text_on(b"{\"n\":1}\n".to_vec()).get(1).map(|game| game.cloned()), "bad magic");
 
-        // A byte of the second member's text changed: the first member's games are read, the second's are not.
+        // A byte of the second member's text changed: the first member's lines are read, the second's are not.
         let first_member = gzip_stored(&[&lines(1..=2)]).len();
         let mut bytes = gzip_stored(&[&lines(1..=2), &lines(3..=4)]);
         bytes[first_member + 15] ^= 1;
@@ -1017,7 +1015,7 @@ mod tests {
         }
     }
 
-    /// The line of a completed game in a results file.
+    /// A completed line in a results file.
     fn result_line(n: u32, score: u64, moves: &str) -> String {
         format!("{{\"n\":{n},\"score\":{score},\"moves\":{moves},\"completed\":true}}\n")
     }
@@ -1030,7 +1028,7 @@ mod tests {
         fs::write(&results, result_line(4, 7, "[2,3,4]") + &result_line(5, 12, "[5,4,3]")).unwrap();
 
         let known = table.with_results_files(std::slice::from_ref(&results)).unwrap();
-        // The results file's game replaces the table's, and adds an n the table lacks.
+        // The results file's line replaces the table's, and adds an n the table lacks.
         assert_eq!((known.score(4), known.moves(4)), (Some(7), Some(&[2, 3, 4][..])));
         assert_eq!(known.score(5), Some(12));
         assert_eq!(table.with_results_files(&[]).unwrap().score(5), None);
@@ -1041,7 +1039,7 @@ mod tests {
         assert!(err.contains("results.jsonl") && err.contains("n=4 scores 9"), "{err}");
     }
 
-    /// The same for a table on a file: its games, read when asked for, are replaced and added to, and the table itself
+    /// The same for a table on a file: its lines, read when asked for, are replaced and added to, and the table itself
     /// stays as it was.
     #[test]
     fn a_table_on_a_file_takes_the_games_of_the_results_files_over_its_own() {
@@ -1061,11 +1059,11 @@ mod tests {
         assert_ne!(table.moves(10), Some(&[2, 3, 4][..]));
         assert_eq!((table.max_n(), table.score(13)), (12, None));
 
-        // The first game, in order of n, that the results score differently from the table is the one named.
+        // The first n, in order, that the results score differently from the table is the one named.
         let text = result_line(11, 1, "[]") + &result_line(10, score10 + 1, "[]");
         fs::write(&results, text).unwrap();
         let err = table.with_results_files(std::slice::from_ref(&results)).err().expect("a disagreement");
-        assert!(err.contains(&format!("n=10 scores {}, but the known games have {score10}", score10 + 1)), "{err}");
+        assert!(err.contains(&format!("n=10 scores {}, but the known moves score {score10}", score10 + 1)), "{err}");
     }
 
     /// A results file whose name ends in `.gz` is read through the decoder, every member of it, and any other as it is;
@@ -1079,7 +1077,7 @@ mod tests {
         fs::write(&zipped, gzip_stored(&[&lines(1..=2), &lines(3..=5)])).unwrap();
         assert_eq!(read_results_text(&plain), Ok(text.clone()));
         assert_eq!(read_results_text(&zipped), Ok(text));
-        // The games of a gzip file are the table's completed games, as those of a plain one are.
+        // The lines of a gzip file are the table's completed lines, as those of a plain one are.
         let known = Optimal::default().with_results(&zipped).unwrap();
         assert_eq!((known.max_n(), known.score(3)), (5, Some(30)));
 
@@ -1114,8 +1112,8 @@ mod tests {
         panic.downcast_ref::<String>().cloned().unwrap_or_default()
     }
 
-    /// A gzip results file is decoded as its games are asked for, so a fault in it stops the lookup that meets it,
-    /// naming the file and the fault, as a fault in the built-in table's does; the games before the fault are read, and
+    /// A gzip results file is decoded as its lines are asked for, so a fault in it stops the lookup that meets it,
+    /// naming the file and the fault, as a fault in the built-in table's does; the lines before the fault are read, and
     /// so is a file whose member after the fault nothing asks for.
     #[test]
     fn a_fault_in_a_gzip_results_file_stops_the_lookup_that_meets_it() {
@@ -1129,22 +1127,23 @@ mod tests {
         assert_eq!(known.score(2), Some(20));
         let message = stopped_by(|| known.score(3));
         assert!(message.contains("damaged.jsonl.gz") && message.contains("CRC-32"), "{message}");
-        // A line that is not the game of its number stops the lookup too.
+        // A line that is not that of its number stops the lookup too.
         let crossed = dir.join("crossed.jsonl.gz");
         fs::write(&crossed, gzip_stored(&[&(line(1) + &line(3))])).unwrap();
         let known = Optimal::default().with_results(&crossed).unwrap();
         let message = stopped_by(|| known.score(2));
-        assert!(message.contains("crossed.jsonl.gz") && message.contains("the line 2 of the file is the game of 3"));
+        assert!(message.contains("crossed.jsonl.gz"));
+        assert!(message.contains("the line 2 of the file is the line of game 3"));
     }
 
-    /// A gzip file taken by `with_results_files` is compared with the known games where its games are looked up: a game
-    /// that scores differently from the known game of its n stops the lookup of that n, naming the file, n and both
-    /// scores, and the games that agree, and those past the known games, are read.  `with_results` makes no comparison.
+    /// A gzip file taken by `with_results_files` is compared with the known moves where its lines are looked up: a line
+    /// that scores differently from the known moves for its n stops the lookup of that n, naming the file, n and both
+    /// scores, and the lines that agree, and those past the known moves, are read.  `with_results` makes no comparison.
     #[test]
     fn a_gzip_results_file_is_compared_with_the_known_games_where_its_games_are_looked_up() {
         let dir = crate::test_support::TempDir::new("results-gz-compared");
         let table = table_on(&[&lines(1..=4)]);
-        // The games 1 to 6, but the game of 3 scores 31 where the table's scores 30; 5 and 6 are past the table's end.
+        // Games 1 to 6, but the line of game 3 scores 31 where the table's scores 30; 5 and 6 are past the table's end.
         let text = line(1) + &line(2) + &result_line(3, 31, "[3,4]") + &line(4) + &line(5) + &line(6);
         let zipped = dir.join("games.jsonl.gz");
         fs::write(&zipped, gzip_stored(&[&text])).unwrap();
@@ -1155,20 +1154,21 @@ mod tests {
         }
         for message in [stopped_by(|| known.score(3)), stopped_by(|| known.moves(3))] {
             assert!(message.contains("games.jsonl.gz"), "{message}");
-            assert!(message.contains("n=3 scores 31, but the known games have 30"), "{message}");
+            assert!(message.contains("n=3 scores 31, but the known moves score 30"), "{message}");
         }
-        // The file's game stands where nothing compares it.
+        // The file's line stands where nothing compares it.
         assert_eq!(table.clone().with_results(&zipped).unwrap().score(3), Some(31));
     }
 
-    /// A results file whose name ends in `.gz` lies over the games before it as a plain file does, and is decoded only as
-    /// far as its games are asked for: its games replace the games before it, a line that is no completed game leaves the
-    /// game before it (the file's line of that game is the unfinished search's), and a file read after it lies over it.
+    /// A results file whose name ends in `.gz` lies over the lines before it as a plain file does, and is decoded only
+    /// as far as its lines are asked for: its lines replace the lines before it, a line that is not a completed one
+    /// leaves the game before it (the file's line of that game is the unfinished search's), and a file read after it
+    /// lies over it.
     #[test]
     fn a_gzip_results_file_lies_over_the_games_before_it_as_a_plain_file_does() {
         let dir = crate::test_support::TempDir::new("results-gz-over");
         let table = table_on(&[&lines(1..=4)]);
-        // The games 1 to 6, but for 3, a stopped search's line, and with another score and moves for 5.
+        // Games 1 to 6, but for 3, a stopped search's line, and with another score and moves for 5.
         let unfinished = "{\"n\":3,\"completed\":false}\n";
         let first = line(1) + &line(2);
         let rest = unfinished.to_owned() + &line(4) + &result_line(5, 7, "[5]") + &line(6);
@@ -1180,8 +1180,8 @@ mod tests {
         let from_plain = table.clone().with_results(&plain).unwrap();
         assert_eq!(from_gz.text.as_ref().unwrap().decoded(), 1, "the first member is decoded when the file is opened");
         assert_eq!(from_gz.score(2), Some(20));
-        assert_eq!(from_gz.text.as_ref().unwrap().decoded(), 1, "and no more for a game of it");
-        // The game of 3 is the table's, as it is with the plain file; the file's line of it was read to know that.
+        assert_eq!(from_gz.text.as_ref().unwrap().decoded(), 1, "and no more for a line of it");
+        // The line of game 3 is the table's, as it is with the plain file; the file's line of it was read to know that.
         assert_eq!(from_gz.score(3), Some(30));
         assert_eq!(from_gz.text.as_ref().unwrap().decoded(), 2);
         for n in 0..=8 {

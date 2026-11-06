@@ -50,7 +50,7 @@ pub enum CliError {
     Usage(String),
     /// The command ran and failed: print the message, exit 1.
     Failed(String),
-    /// `taxman certify` found a game that beats a recorded score: print the message, exit 2.
+    /// `taxman certify` found moves that beat a recorded score: print the message, exit 2.
     Counterexample(String),
 }
 

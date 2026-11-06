@@ -23,7 +23,7 @@
 //! * The candidate filter is needed: a back claim of `unzip` hides a use of its factor as tax by a number that could be
 //!   promoted into the frame, and only the filter keeps that number out of the candidates (the tests at the end).
 //!
-//! The oracle is itself tested first, against the rules of the game, the brute force and the table of optimal games.
+//! The oracle is itself tested first, against the rules of the game, the brute force and the table of optimal moves.
 
 mod common;
 
@@ -152,7 +152,7 @@ impl<const W: usize> Case<W> {
         assert!(lower.len() as u32 <= p.max_total, "n={n}: {what}: |L|={} > max_total={}", lower.len(), p.max_total);
     }
 
-    /// Asserts that the game the promotions `lower` make is legal and scores `in_the_bag` + ΣL.
+    /// Asserts that the moves the promotions `lower` make are legal and score `in_the_bag` + ΣL.
     fn assert_game_scores(&self, lower: &[u32], what: &str) {
         let n = self.n();
         let moves = solution_for_promotions::<W>(&self.board.tables, Bits::from_slice(lower));
@@ -166,8 +166,8 @@ impl<const W: usize> Case<W> {
 
 /// The exactness theorem (X7, docs/theory/exactness.md) on the board `1..=n`, on every set: the sets L with U\* ∪ L
 /// playable (family A) and the promotion sets (family B), each found by depth first search, are equal; the sets of A
-/// are promotion sets that make games of the right score; the sets of B are playable with U\*; and the largest ΣL is
-/// what the table of optimal games has for `n` less `in_the_bag`.  Returns the number of sets.
+/// are promotion sets that make moves of the right score; the sets of B are playable with U\*; and the largest ΣL is
+/// what the table of optimal moves has for `n` less `in_the_bag`.  Returns the number of sets.
 fn check_every_set(n: u32) -> usize {
     let case = Case::<8>::new(n);
     let mut scratch = Scratch::new();
@@ -251,7 +251,7 @@ impl Tally {
 ///
 /// *Soundness*: a random promotion set (the candidates in a random order, promoted one after the other from the root
 /// where they still can be, until a length drawn at random from `0..=max_total` is reached) is at most `max_total`
-/// long, can be promoted from the root, is playable with U\*, and makes a game that scores `in_the_bag` + ΣL.
+/// long, can be promoted from the root, is playable with U\*, and makes moves that score `in_the_bag` + ΣL.
 ///
 /// *Completeness*: a random maximal playable extension of U\* (the numbers up to n/2 in a random order, each kept if
 /// U\* with the ones kept and it is still playable) is made of candidates, can be promoted from the root, is at most
@@ -303,7 +303,7 @@ fn check_random<const W: usize>(n: u32, sets: usize, rng: &mut Rng) -> Tally {
         case.assert_promotion_set(&mut scratch, &lower, "a maximal playable extension of U*");
         if i < REPLAYED {
             case.assert_game_scores(&lower, "a maximal playable extension of U*");
-            // The oracle's own order for the whole set is a legal game of the right score too.
+            // The oracle's own order for the whole set plays legally to the right score too.
             let order = play_order(t, &set).expect("the extension is playable");
             let sum = set.iter().map(|&x| u64::from(x)).sum::<u64>();
             assert_eq!(game::replay(n, &order), Ok(sum), "n={n}: the oracle's order for U* ∪ L, L={lower:?}");
