@@ -1,12 +1,14 @@
 // The whole chain, n = 1 to the last game, from data/games.json: the player's share of the board, opt(n) / (1 + 2 + ...
-// + n); under it how each game was proven and the time of a search, each as one column for every stretch of 100 games.
-// All rows share the n axis, and the hover crosshair runs through all of them.
+// + n); under it how each game was proven, as a column for every stretch of 100 games, and the time of a search, as a
+// point for every stretch.  All rows share the n axis, and the hover crosshair runs through all of them.
 //
 // The share is drawn as the range of its values within each pixel's games, so the zigzag between neighboring games
 // shows as a band that narrows.  The proof row stacks the stretch's games by the three groups of js/proof.js (search,
-// repeats an earlier search, derived from n − 1) on a 0 to 100% scale.  The time row rises on a log scale to the
-// median of the stretch's searches.  A search is a game whose method is search (the chain's own searches, those that
-// ended at the ceiling included); its time is the time the game had at least one worker (tools/export.mjs).
+// repeats an earlier search, derived from n − 1) on a 0 to 100% scale.  The time row is a line through the median of
+// each stretch's searches, at the middle of its games, on a log scale: a line, since a log scale has no zero for a
+// column to stand on, and so it does not read as a fourth group of the row above.  A search is a game whose method is
+// search (the chain's own searches, those that ended at the ceiling included); its time is the time the game had at
+// least one worker (tools/export.mjs).
 
 import { duration, el, fmt } from '../js/vocab.js';
 import { GROUPS, ruleWords, settled } from '../js/proof.js';
@@ -178,16 +180,27 @@ export function mountChainChart(host, { games }) {
       name.textContent = grp.name;
     });
 
-    // The time of a search: a column a stretch, rising to the median of its searches on a log scale.
+    // The time of a search: a line through the median of each stretch's searches, on a log scale.
     rowName('time required to search', 'median per 100 games, log scale', timePlot, timeH);
     gridRow(TIME_TICKS, yTime);
+    const timePoint = (st) => (st.median === null ? null : {
+      x: (x(st.a) + x(st.b)) / 2, y: yTime(Math.min(TIME_HI, Math.max(TIME_LO, st.median))),
+    });
+    let line = '';
+    let pen = 'M';
     for (const st of stretches) {
-      if (st.median === null) continue;
-      const top = yTime(Math.min(TIME_HI, Math.max(TIME_LO, st.median)));
-      el('rect', {
-        x: colX(st), y: top, width: colW(st), height: yTime(TIME_LO) - top, style: 'fill: var(--search)',
-      }, svg);
+      const pt = timePoint(st);
+      if (pt === null) {
+        pen = 'M';
+        continue;
+      }
+      line += `${pen}${pt.x} ${pt.y}`;
+      pen = 'L';
     }
+    el('path', {
+      d: line, fill: 'none', 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+      style: 'stroke: var(--search)',
+    }, svg);
     const timeBase = timePlot + timeH + 0.5;
     el('line', { x1: m.l, x2: m.l + plotW, y1: timeBase, y2: timeBase, class: 'base' }, svg);
 
@@ -206,6 +219,9 @@ export function mountChainChart(host, { games }) {
     const dot = el('circle', {
       r: 4, 'stroke-width': 2, opacity: 0, style: 'fill: var(--player); stroke: var(--paper)',
     }, svg);
+    const timeDot = el('circle', {
+      r: 4, 'stroke-width': 2, opacity: 0, style: 'fill: var(--search); stroke: var(--paper)',
+    }, svg);
     const hit = el('rect', {
       x: m.l, y: m.t, width: plotW, height: axisY - m.t, fill: 'transparent', class: 'hit',
       'aria-label': 'Explore the chain with the arrow keys',
@@ -220,6 +236,12 @@ export function mountChainChart(host, { games }) {
       dot.setAttribute('cx', px);
       dot.setAttribute('cy', y(Math.max(lo, Math.min(hi, share[j]))));
       dot.setAttribute('opacity', n > 1 ? 1 : 0);
+      const tp = timePoint(st);
+      if (tp !== null) {
+        timeDot.setAttribute('cx', tp.x);
+        timeDot.setAttribute('cy', tp.y);
+      }
+      timeDot.setAttribute('opacity', tp === null ? 0 : 1);
       const rows = [
         `Game ${fmt(n)}`, ['opt(n)', fmt(c.score[j])], ['player’s share', pct(share[j], 2)],
         ['proven by', ruleWords(c, j)],
@@ -232,6 +254,7 @@ export function mountChainChart(host, { games }) {
     const hide = () => {
       cross.setAttribute('opacity', 0);
       dot.setAttribute('opacity', 0);
+      timeDot.setAttribute('opacity', 0);
       tip.hide();
     };
     hit.addEventListener('pointermove', (e) => {
