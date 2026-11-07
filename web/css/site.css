@@ -563,7 +563,8 @@ figure { margin: 30px 0 34px; }
 .fig-panel { max-width: 30rem; }
 .fig-panel .fig-controls { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
 .fig-panel .fig-controls output { font-weight: 700; font-size: 0.9rem; min-width: 8.5em; text-align: center; }
-.loop-status, .orders-status { font-size: 0.9rem; color: var(--ink-2); margin: 8px 2px 0; min-height: 4.6em; }
+.loop-status, .orders-status { font-size: 0.9rem; color: var(--ink-2); margin: 8px 2px 0; }
+.loop-status { min-height: 4.6em; }
 .loop-status strong, .orders-status strong { color: var(--ink); }
 #loop svg { max-width: 24rem; }
 #orders { max-width: var(--measure); }

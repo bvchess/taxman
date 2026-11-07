@@ -65,7 +65,8 @@ export function mountOrders(host, { small }) {
     k = (next + orders.length) % orders.length;
     out.textContent = `order ${k + 1} of ${orders.length}`;
     const opening = orders.every((o) => o[0] === orders[0][0]) ? ` Every one opens with ${orders[0][0]}.` : '';
-    status.innerHTML = `${orders[k].join(', ')}${k === 0 ? ', the recorded game' : ''}. `
+    // The drawing shows the order; a screen reader hears it.
+    status.innerHTML = `<span class="sr-only">${orders[k].join(', ')}. </span>`
       + `Of the ${fmt(factorial(game.moves.length))} orders of these ${game.moves.length} numbers, ${orders.length} are legal games, `
       + `and every one scores ${[...scores].join(' or ')}${samePay ? ', with each move taking the same tax' : ''}.${opening}`;
     const v = looks(k);
