@@ -188,7 +188,7 @@ export function mountChainChart(host, { games }) {
     });
 
     // The time of a search: a line through the median of each stretch's searches, on a log scale.
-    rowName('time required to search', 'median per 100 games, log scale', timePlot, timeH);
+    rowName('median time of a search', `each ${STRETCH} games, log scale`, timePlot, timeH);
     gridRow(timeTicks, yTime);
     const timePoint = (st) => (st.median === null ? null : {
       x: (x(st.a) + x(st.b)) / 2, y: yTime(Math.min(timeHi, Math.max(TIME_LO, st.median))),
