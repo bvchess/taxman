@@ -262,7 +262,7 @@ prover (its README and `proofs.md`).
 The checks that replay every game, the referee and the two verifiers, are not part of the story: chapter 8's "The data,
 and how to check it" gives the commands, and the repository documents them.
 
-### 8. The results
+### 8. Results
 
 **Point.**  Here are the games, how each was proven, and what they show.
 

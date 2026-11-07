@@ -16,7 +16,7 @@ export const STORY = [
   { n: 6, title: 'The bound', line: 'A quick test of even and odd bounds what a search can gain, and opt(n) itself.', href: 'bound.html' },
   { n: 7, title: 'Statement U', line: 'The one open statement the scores rest on, and the evidence for it.', href: 'statement-u.html' },
   {
-    n: 8, title: 'The results', line: 'The best scores, how each was proven, and what they show.', href: 'results.html',
+    n: 8, title: 'Results', line: 'The best scores, how each was proven, and what they show.', href: 'results.html',
   },
   { n: 9, title: 'Summary', line: 'The optimal games in brief, and the whole method on game 21.', href: 'summary.html' },
 ];
