@@ -20,23 +20,26 @@
 <header class="essay-head para">
   <p class="kicker">Chapter 5</p>
   <h1>The search</h1>
-  <p class="lede">A search tries sets of promotions a candidate at a time, and a bound proves when nothing better is
-  left.</p>
+  <p class="lede">A search tries sets of promotions one candidate at a time, and a bound proves when no more
+    searching is needed.</p>
 </header>
 
 <section class="chapter" id="repeat-check" data-toc="repeat-check" aria-label="A repeat">
   <p>Once the <a class="gloss" href="glossary.html#frame">frames</a> are set, all that is left to choose is which
   <a class="gloss" href="glossary.html#candidate">candidates</a> to <a class="gloss" href="glossary.html#promote">promote</a>.
   Before the <a class="gloss" href="glossary.html#frame-solver">frame solver</a> searches, it asks whether an earlier
-  game has chosen them already.  When game n poses the <a class="gloss" href="glossary.html#search-problem">search
+  game has seen this search scenario already.  When game n poses the <a class="gloss" href="glossary.html#search-problem">search
   problem</a> of one of the games just before it, game n is a <a class="gloss" href="glossary.html#repeat">repeat</a>
-  (<a href="chain.html#repeat">chapter 2</a>), and that game's promotions are game n's.  Game 39 is one.  The new
-  number lands in a <a class="gloss" href="glossary.html#closed">closed</a> frame, where descending greedy keeps 39
-  and drops 22, and the frames with freedoms and their candidates stay as they were in game 38.</p>
-  <p>Game 45 is not.  The maximal factors of 45 are 15, in frame 1, and 9, which with 27 made a closed frame of its
-  own in game 44.  45 joins the two frames into one, so frame 1 changes, and game 45 poses a problem of its own.  It
-  has <span data-tree="candidates">8</span> candidates, so <span data-tree="sets">256</span> sets of them, and only
-  some can be promoted together.  Game <span data-last-n>5,060</span> has
+  (<a href="chain.html#repeat">chapter 2</a>), and that game's promotions are the same as game n's.
+    That's what happens in game 39.  The new
+  number (39) lands in a <a class="gloss" href="glossary.html#closed">closed</a> frame, where descending greedy keeps 39
+  and drops 22, and the frames with freedoms and their candidates stay as they were in game 38. Because of that,
+  using the same promotions game 38 chose guarantees an optimal set of promotions in game 39.
+  </p>
+  <p>Game 45 isn't so lucky.  The maximal factors of 45 are 15, in frame 1, and 9, which with 27 made a closed frame of its
+  own in game 44.  45 joins the two frames into one, so frame 1 changes, and game 45 poses novel search problem.  It
+  has <span data-tree="candidates">8</span> candidates, so <span data-tree="sets">256</span> sets of them.
+    Game <span data-last-n>5,060</span> has
   <span data-last="candidates">1,380</span> candidates, and far too many sets to try one by one.</p>
 </section>
 
@@ -49,16 +52,19 @@
       <p class="precise"><span class="run">Precisely.</span>P ∪ X is a promotion set exactly when each member of X is a
       factor of its home in state(P), and every frame of state(P) stays winnable with X applied.</p>
     </aside>
-    <p>A <a class="gloss" href="glossary.html#search">search</a> tries the sets a candidate at a time.  At each step it
-    takes one candidate and splits in two: one branch promotes it, the other goes on without it.  Each point where it
+    <p>A <a class="gloss" href="glossary.html#search">search</a> tries the sets one candidate at a time.  At each step it
+    takes one candidate and splits the search tree: one branch promotes it, the other goes on without it.  Each point where it
     splits is a <a class="gloss" href="glossary.html#node">node</a>.  All the while the search keeps the best game it
-    has found, and at each node a <a class="gloss" href="glossary.html#bound">bound</a>: a limit on what the promotions
+    has found, and each node has a <a class="gloss" href="glossary.html#bound">bound</a>: a limit on what the promotions
     of that branch could still add.  A branch whose bound cannot beat the best game found is dropped, unexplored.  This
     way of searching is called branch and bound.</p>
   </div>
 
   <figure class="fig fig-panel search-tree-fig" id="tree">
+    <p class="chart-title">The search of game <span data-tree="n">45</span></p>
+    <div class="st-strip"></div>
     <svg role="img" aria-label="The search of game 45, node by node. The current step is described under the figure."></svg>
+    <ul class="st-key"></ul>
     <div class="fig-timeline"></div>
     <figcaption class="fig-caption"></figcaption>
   </figure>

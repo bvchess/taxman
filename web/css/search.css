@@ -1,20 +1,62 @@
 /* Chapter 5, the search: the search tree of game 45 and the chart of the searches' cost.  The tree is flat ink, as an
-   explanatory figure is: a node is a small chip with its bound, a dropped branch a dashed chip, the best game's leaf a
-   gray one.  The chart is one series of dots in ink. */
+   explanatory figure is, and grows from the root at the bottom: a node is a small chip with its bound, a dropped
+   branch a dashed chip, the best game's leaf a filled one.  Above it a strip of the candidates, below it a key, both
+   in HTML.  The chart is one series of dots in ink. */
 
-.search-tree-fig { max-width: 30rem; }
+.search-tree-fig { max-width: 30rem; position: relative; }
 .search-tree-fig .fig-caption { min-height: 6.2em; }
+
+/* The strip of candidates: a box for each, promoted, open or out at the node the search is at. */
+.st-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 6px 0 8px; font-size: 0.86rem; }
+.st-strip-label { color: var(--ink-2); }
+.st-cands { display: flex; gap: 4px; }
+.st-cand {
+  box-sizing: border-box; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--ink); border-radius: 6px; background: var(--paper); color: var(--ink);
+  font-size: 0.8rem; font-variant-numeric: tabular-nums lining-nums;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.st-cand[data-state="promoted"] { background: var(--kept); font-weight: 750; }
+.st-cand[data-state="out"] { border-style: dashed; border-color: var(--string); color: var(--ink-3); }
+.st-cand.is-named { font-weight: 750; }
+.st-cand.is-named[data-state="out"] { color: var(--ink); }
+.st-best { margin-left: auto; color: var(--ink-2); font-variant-numeric: tabular-nums lining-nums; }
+.st-best b { color: var(--ink); }
+
+/* The key: a sample of each kind of chip. */
+.st-key {
+  list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 6px 0 0; padding: 0; font-size: 0.8rem;
+  color: var(--ink-2);
+}
+.st-key li { display: flex; align-items: center; gap: 6px; }
+.st-sample {
+  box-sizing: border-box; min-width: 34px; height: 21px; padding: 0 5px; display: inline-flex; align-items: center;
+  justify-content: center; border: 1.5px solid var(--ink); border-radius: 6px; background: var(--paper);
+  color: var(--ink);
+  font-size: 0.78rem; font-weight: 600; font-variant-numeric: tabular-nums lining-nums;
+}
+.st-sample.is-cut { border-style: dashed; border-color: var(--ink-3); color: var(--ink-3); }
+.st-sample.is-best { background: var(--kept); }
+
+.search-tree-fig .chart-tip { width: max-content; max-width: 100%; }
 
 .search-tree .st-halo { stroke: var(--ink); stroke-width: 7px; }
 .search-tree .st-body { stroke-linejoin: round; }
+.search-tree .st-chip { cursor: default; }
 .search-tree .st-bound { font-family: var(--font); font-size: 13px; font-variant-numeric: tabular-nums lining-nums; }
+.search-tree .v-text { pointer-events: none; }
 .search-tree .v-text-label { font-size: 12px; fill: var(--ink-2); }
 .search-tree .v-text.is-named { font-weight: 750 !important; fill: var(--ink) !important; }
 
+@media (prefers-reduced-motion: reduce) {
+  .st-cand { transition: none; }
+}
+
+/* On a phone the figure is drawn at about three quarters of its size, so its words are set larger. */
 @media (max-width: 560px) {
-  .search-tree-fig .fig-caption { min-height: 10.5em; }
+  .search-tree-fig .fig-caption { min-height: 7.7em; }
   .v-figure.search-tree .st-bound { font-size: 15px; }
-  .v-figure.search-tree .v-text-label { font-size: 14px; }
+  .v-figure.search-tree .v-text-label { font-size: 15px; }
 }
 
 #cost-chart .cost-dots { stroke: var(--ink-2); stroke-opacity: 0.6; }
