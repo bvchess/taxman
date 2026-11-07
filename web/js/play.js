@@ -119,11 +119,11 @@ export function mountPlay(host, {
   // The caption's messages, built in one place so that reserve() can measure the longest of them.
   const tookWords = (x, tax) => `${you === 'You' ? 'You' : 'The player'} took ${x}; the taxman took ${listWords(tax)}.`;
   const endWords = (rest, mine, theirs) => (rest.length
-    ? ` No move is left, so the taxman takes the rest: ${listWords(rest)}.`
-    : ' No move is left, and the pot is empty.') + ` ${you} ${mine}, taxman ${theirs}. ${verdict(mine)}`;
+    ? ` No move remains, so the taxman takes the rest: ${listWords(rest)}.`
+    : ' No move remains, and the pot is empty.') + ` ${you} ${mine}, taxman ${theirs}. ${verdict(mine)}`;
   const refusal = (x) => (x === 1
-    ? '1 can’t be taken: it has no divisor below it, so the taxman would get nothing.'
-    : `${x} can’t be taken: none of its divisors is left in the pot, so the taxman would get nothing.`);
+    ? '1 isn’t a legal move: it has no divisor below it, so the taxman would get nothing.'
+    : `${x} isn’t a legal move: none of its divisors remains in the pot, so the taxman would get nothing.`);
   const takenBack = (mine) => `Taken back. ${mine.length ? `You have ${listWords(mine)}.` : 'Take a number.'}`;
 
   function take(x, { quiet = false } = {}) {

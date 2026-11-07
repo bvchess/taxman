@@ -102,7 +102,7 @@ function words(t, k, score) {
   const base = sum(uStar);
   if (k === nodes.length) {
     const promoted = listWords([...bestSet].sort((a, b) => b - a));
-    return `The search has searched or dropped every branch, so no set of promotions adds more than ${best}. ` +
+    return `The search has explored or dropped every branch, so no set of promotions adds more than ${best}. ` +
       `Game ${t.n}'s optimal game promotes ${promoted}, and scores ${fmt(base)} + ${best} = ${fmt(score)}.`;
   }
   const node = nodes[k];

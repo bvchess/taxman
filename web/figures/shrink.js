@@ -19,7 +19,7 @@ const POINTS = {
   game: 'A game is an order of moves.',
   1: 'Only the set matters, and a set is quick to check.',
   3: 'One greedy pass chooses the numbers above n/2.',
-  4: 'Only the promotions are left to choose.',
+  4: 'Only the promotions remain to choose.',
   5: 'A search with a sharp bound finishes.',
   2: 'Using the game before starts the search near opt(n).',
 };
@@ -105,7 +105,7 @@ export function mountShrink(host, { games }) {
       <span class="shrink-measure">${measure}</span>
     </li>`;
   }).join('');
-  host.innerHTML = `<p class="shrink-head"><span class="shrink-head-title">What is left to choose in game
+  host.innerHTML = `<p class="shrink-head"><span class="shrink-head-title">What remains to choose in game
     ${fmt(counts.n)}</span>
     <span class="shrink-head-sub">on a log scale: a bar is as long as its count has digits</span></p>
     <ol class="shrink-rows">${rows}</ol>`;

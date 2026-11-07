@@ -44,7 +44,7 @@
       <dt id="move">move</dt>
       <dd>A number you take.  It must still have a divisor in the pot, and you score it.</dd>
       <dt id="tax">tax</dt>
-      <dd>The divisors of a move still in the pot, which the taxman takes with it.  When no move is left, the taxman
+      <dd>The divisors of a move still in the pot, which the taxman takes with it.  When no move remains, the taxman
       takes the rest of the pot too.</dd>
       <dt id="score">score</dt>
       <dd>The sum of your moves.  You beat the taxman when your score is higher than the total he collects.</dd>
@@ -134,7 +134,7 @@
       <dd>n fits into an optimal set of game n − 1 when the set is still playable with n added.  Then game n is at
       its ceiling: 10 fits into game 9's optimal set, and 12 does not fit into game 11's.</dd>
       <dt id="search-problem">search problem</dt>
-      <dd>What is left to choose in a game once it has its frames: the frames, the candidates and how many of them
+      <dd>What remains to choose in a game once it has its frames: the frames, the candidates and how many of them
       the player may promote.  Two games that pose the same search problem have the same best promotions.</dd>
       <dt id="cofactor">cofactor</dt>
       <dd>n divided by its largest prime factor: 30 = 6 · 5 has the cofactor 6.  One can usually tell from it whether a
@@ -211,7 +211,7 @@
       where one of its maximal factors pays for it.  An optimal game of 21 promotes 9 from frame 1 into frame 0, where
       3 pays for it.</dd>
       <dt id="frame-model">frame model</dt>
-      <dd>The game as frames, with U* as its sources, so that the promotions are all that is left to choose.  Its
+      <dd>The game as frames, with U* as its sources, so that the promotions are all that remains to choose.  Its
       best score is the best score of the game wherever statement U holds.</dd>
       <dt id="closed">closed</dt>
       <dd>A frame with as many factors as moves, so it has none to spare.  It takes no part in the search.</dd>

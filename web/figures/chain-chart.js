@@ -158,7 +158,7 @@ export function mountChainChart(host, { games }) {
     endLabel.textContent = `${pct(endShare)} at game ${fmt(last)}`;
 
     // How each game was proven: a stacked column a stretch, from the bottom derived from n − 1, repeats, search.
-    rowName('how we proved each game', `each ${STRETCH} games, whole = 100%`, provTop + nameH, 24);
+    rowName('how we proved each score', `each ${STRETCH} games, whole = 100%`, provTop + nameH, 24);
     gridRow([[0, '0'], [0.5, '50%'], [1, '100%']], yProv);
     const stack = [...GROUPS].reverse();
     for (const st of stretches) {

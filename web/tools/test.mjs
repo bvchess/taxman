@@ -386,7 +386,7 @@ for (const [n, fits, below, words] of [[10, true, [7, 9, 6, 8, 10], '30 + 10 = 4
 }
 same('fitsFacts(12): the columns of both rows', fitsFacts(smallGames, 12).slots, [11, 9, 6, 10, 8, 12]);
 same('fitsWords(10) says what the game above leaves out', fitsWords(fitsFacts(smallGames, 10)),
-  "<strong>10 fits.</strong> Game 9's optimal game leaves 5 out, and 10 follows it, paid for by 5: 30 + 10 = 40, the ceiling.");
+  "<strong>10 fits.</strong> Game 9's optimal game leaves 5 out, and 10 follows it, with 5 paying for it: 30 + 10 = 40, the ceiling.");
 same('slipFacts(12): its maximal factors', slip12.factors, [4, 6]);
 const prime13 = primeFacts(smallGames, 13);
 same('primeFacts(13): q, the rows, what n takes', [prime13.q, prime13.above.moves, prime13.below.moves, prime13.tax],

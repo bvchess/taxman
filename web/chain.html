@@ -33,7 +33,7 @@
       <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  The moves of a legal game of n − 1, in their
       order, are a legal game of n, with the same taxes, and the moves of a game of n that does not play n are a legal
       game of n − 1.  Playing n in a game of n − 1, at its end if a maximal factor of n is still in the pot then, and
-      otherwise just before the move after which none is left, and leaving that move out if the player can no longer
+      otherwise just before the move after which none remains, and leaving that move out if the player can no longer
       play it, gives a game of n that scores more.  So opt(n − 1) < opt(n), every optimal game of n plays n, and a set
       without n is <a class="gloss" href="glossary.html#playable">playable</a> in game n exactly when it is playable in
       game n − 1.</p>
@@ -45,7 +45,7 @@
     So the best score cannot fall: <a class="gloss" href="glossary.html#opt">opt(n)</a> is at least opt(n − 1).</p>
     <p>In fact the best score always rises from one game to the next.  In a game of n − 1 played in game n, the player
     can play n as long as one of its <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a> is still
-    in the pot.  So play n just before the move that takes the last of them from the pot, or at the end if one is left,
+    in the pot.  So play n just before the move that takes the last of them from the pot, or at the end if one remains,
     and leave that move out if you can no longer play it.  Everything after it stays legal, and the game gains n and
     loses at most that move, which is smaller than n.  So the moves of a game of n − 1 are never an optimal game of n,
     and every optimal game of n plays n.</p>
@@ -54,7 +54,7 @@
     <span class="n" data-n="12">12</span> are <span class="n" data-n="4">4</span> and
     <span class="n" data-n="6">6</span>.  In that game, 6 is a move and the last move,
     <span class="n" data-n="8">8</span>, takes 4, so by the end both are gone, and 12 cannot simply come last.  It goes
-    just before 8 instead, and takes 4 itself.  Then nothing is left to pay for 8, whose only maximal factor is 4, so we
+    just before 8 instead, and takes 4 itself.  Then nothing remains to pay for 8, whose only maximal factor is 4, so we
     leave 8 out, and the new game scores <span data-opt="11">44</span> + 12 − 8 = 48.</p>
   </div>
 
@@ -76,10 +76,10 @@
     <p>An optimal game of n − 1 thus gives game n a lower bound, the score of the game we build from it.  It gives an
     upper bound too, since the best score never rises by more than n.  Take an optimal game of n and leave out its move
     n.  Everything n would have taken stays in the <a class="gloss" href="glossary.html#pot">pot</a>, so every other
-    move still has tax to take, and what is left is a game of n − 1.  It scores opt(n) − n, which is at most opt(n −
+    move still has tax to take, and what remains is a game of n − 1.  It scores opt(n) − n, which is at most opt(n −
     1).</p>
     <p>An optimal game of 12 scores <span data-opt="12">50</span>, and its move 12 takes 6.  Without 12, 6 stays in the
-    pot, and what is left is a game of 11 that scores 50 − 12 = 38, below game 11's best score of
+    pot, and what remains is a game of 11 that scores 50 − 12 = 38, below game 11's best score of
     <span data-opt="11">44</span>.</p>
     <p>So opt(n − 1) + n is the most that any game of n can score.  It is the
     <a class="gloss" href="glossary.html#ceiling"><em>ceiling</em></a> of game n, and a game that reaches it is
@@ -243,12 +243,12 @@
       <p class="precise"><span class="run">Precisely.</span>Let Π_n = Π_m, root problems of games n and m.  Every
       promotion set L makes a game of n worth Σ<a class="gloss" href="glossary.html#u-star">U*</a>(n) + ΣL, and, given
       <a class="gloss" href="glossary.html#statement-u">statement U</a> at n, a promotion set that makes an optimal game
-      of m makes an optimal game of n.  The first part does not need statement U.  The prover also proves every game up
-      to 2,530, without statement U.</p>
+      of m makes an optimal game of n.  The first part does not need statement U.  The prover also proves the score of
+      every game up to 2,530, without statement U.</p>
     </aside>
     <p>About a third of the games in which n neither fits nor is prime still need no search.  Before the
     <a class="gloss" href="glossary.html#frame-solver">frame solver</a> searches a game, rules settle most of it
-    (<a href="top-half.html">chapter 3</a> and <a href="frames.html">chapter 4</a>), and what is left is the game's
+    (<a href="top-half.html">chapter 3</a> and <a href="frames.html">chapter 4</a>), and what remains is the game's
     search problem: which few numbers up to n/2 to play as moves as well.  Often n does not change that problem at all.
     Then game n is a <a class="gloss" href="glossary.html#repeat"><em>repeat</em></a>, and the earlier game's answer to
     the problem is game n's answer too.  The solver looks for one as soon as it sets the problem up, before it searches
@@ -319,13 +319,13 @@
       <div class="note-head"><span class="note-name">What each rule rests on</span></div>
       <p>The ceiling and the prime formula prove the chain's game of n optimal wherever its game of n − 1 is.  A repeat
       rests on <a class="gloss" href="glossary.html#statement-u">statement U</a> at n too, and a search on the
-      <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is exact where statement U holds. The
-      <a class="gloss" href="glossary.html#prover">prover</a> also proves every game up to 2,530, on the whole board,
-      without statement U
+      <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is exact where statement U holds.  The
+      <a class="gloss" href="glossary.html#prover">prover</a> also proves the score of every game up to 2,530, on the
+      whole board, without statement U
       (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports
       the scores</a>).</p>
     </aside>
-    <p>Each game we prove without a search of its own rests on an earlier game, most often game n − 1, so the chain has
+    <p>Each game we settle without a search of its own rests on an earlier game, most often game n − 1, so the chain has
     to find its games in order, from game 1 up: the chain reaches game 5,000 by walking there.</p>
   </div>
 </section>
@@ -343,7 +343,7 @@
       its cofactor is 9.  The layer-2 corollary (J2) proves the first case; we measured the other two.</p>
     </aside>
     <p>The number n alone usually tells, before any work, whether a game needs a
-    <a class="gloss" href="glossary.html#search">search</a>.  Write n as its largest prime factor times what is left,
+    <a class="gloss" href="glossary.html#search">search</a>.  Write n as its largest prime factor times what remains,
     the <em>cofactor</em> of n: in game 3,002, n = 38 · 79 has the cofactor 38, and a prime has the cofactor 1.  From
     game 188 on, no game whose cofactor is 1, a prime, twice a prime or 9 needed a search.  Why it works for twice a
     prime and for 9 is still a mystery.</p>

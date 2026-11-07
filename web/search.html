@@ -105,8 +105,8 @@
     it that cause the trouble, often only one or two: the player cannot promote all of them together.  Any set the
     player can promote leaves at least one of them out, so the search splits on one of them: one branch promotes it, and
     the other goes on without it.</p>
-    <p>The solver remembers each dead end it finds.  A set of candidates that cannot promote together from the root
-    cannot promote anywhere in the tree, so once the solver finds such a set, no other branch tries it again.</p>
+    <p>The solver remembers each dead end it finds.  A set of candidates that the player cannot promote together at the
+    root stays that way everywhere in the tree, so once the solver finds such a set, no other branch tries it again.</p>
   </div>
 
   <div class="para">
@@ -179,12 +179,12 @@
       So a search with no branch left proves P*, the heaviest promotion set's sum, equal to its best.</p>
     </aside>
     <p>When the <a class="gloss" href="glossary.html#search">search</a> has explored all branches, it has proved that no
-    set of promotions beats its best one: it tried every set, or dropped it for a reason that shows it cannot do better:
-    a bound, a dead end, or a heavier mirror image.  So its best game is the best of the <a class="gloss"
-    href="glossary.html#frame-model">frame model</a>, which is an <a class="gloss"
-    href="glossary.html#optimal-game">optimal game</a> wherever <a class="gloss"
-    href="glossary.html#statement-u">statement U</a> holds.  This is how the search proved <span
-    data-proof="exhausted">1,612</span> games of the <a class="gloss" href="glossary.html#chain">chain</a>.</p>
+    set of promotions beats its best one: it either tried each set or dropped it for a reason that shows it cannot do
+    better: a bound, a dead end, or a heavier mirror image.  So its best game is the best of the
+    <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is an
+    <a class="gloss" href="glossary.html#optimal-game">optimal game</a> wherever
+    <a class="gloss" href="glossary.html#statement-u">statement U</a> holds.  This is how the search proved the scores
+    of <span data-proof="exhausted">1,612</span> games of the <a class="gloss" href="glossary.html#chain">chain</a>.</p>
     <p>A search can also stop early.  No game of n scores more than the best score of game n − 1 plus n, the <a
     class="gloss" href="glossary.html#ceiling">ceiling</a> (<a href="chain.html#ceiling">chapter 2</a>).  A search whose
     best game reaches the ceiling has nothing left to find, so it can stop.  That is how <span

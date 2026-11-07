@@ -67,7 +67,7 @@ export function fitsWords(f) {
   const { n, above, tax, uses, gaveUp, fits, prev, cur } = f;
   if (fits) {
     return `<strong>${n} fits.</strong> Game ${n - 1}'s optimal game leaves ${listWords(tax)} out, and ${n} `
-      + `follows it, paid for by ${listWords(tax)}: ${fmt(prev.score)} + ${n} = ${fmt(cur.score)}, the ceiling.`;
+      + `follows it, with ${listWords(tax)} paying for it: ${fmt(prev.score)} + ${n} = ${fmt(cur.score)}, the ceiling.`;
   }
   const how = uses.map((x) => standing(above, x)).join(' and ');
   const score = `${fmt(prev.score)} + ${n} − ${gaveUp.join(' − ')} = ${fmt(cur.score)}`;

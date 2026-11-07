@@ -33,7 +33,7 @@
     <aside class="note tech" aria-label="The rules, precisely">
       <div class="note-head"><span class="note-name">The rules, precisely</span></div>
       <p>Each move the player makes takes a number that still has a <a class="gloss" href="glossary.html#proper-divisor">proper divisor</a> in the pot,
-      then the taxman takes all of its divisors still in the pot.  When no move is left, the taxman takes the
+      then the taxman takes all of its divisors still in the pot.  When no move remains, the taxman takes the
       rest.  The best player score possible for game n is opt(n), and opt(1), opt(2), opt(3), … is the
       <a class="gloss" href="glossary.html#taxman-sequence">Taxman sequence</a>, <a href="https://oeis.org/A019312">A019312</a> in
       the OEIS.</p>
@@ -45,7 +45,7 @@
     <li>You take a number from the pot and score it.  That number is your <a class="gloss" href="glossary.html#move"><em>move</em></a>.</li>
     <li>The taxman then takes every divisor of your move still in the pot: its <a class="gloss" href="glossary.html#tax"><em>tax</em></a>.</li>
     <li>You may take only a number that has a divisor left in the pot, so the taxman always gets something.</li>
-    <li>When no number you could take is left, the taxman takes the rest.</li>
+    <li>When no number you could take remains, the taxman takes the rest.</li>
     <li>You beat the taxman when your total is higher than the total he collects.</li>
   </ul>
   <p>We write the best total you can reach in game n as <a class="gloss" href="glossary.html#opt">opt(n)</a>, and a game
@@ -82,7 +82,7 @@
       measured it (<a href="search.html#head-start">chapter 5</a>).</p>
     </aside>
     <p>You can put game <span data-last-n>n</span>'s numbers in about 10<sup data-orders-exp>…</sup> orders.  No
-    computer could try them all.  Each chapter of the story takes away part of the problem, until what is left is small
+    computer could try them all.  Each chapter of the story takes away part of the problem, until what remains is small
     enough for a <a class="gloss" href="glossary.html#search">search</a> to finish.</p>
   </div>
 
@@ -92,11 +92,11 @@
 <section class="chapter front-chain" id="chain" data-toc="chain" aria-labelledby="h-chain">
   <h2 id="h-chain">The chain</h2>
   <div class="para">
-    <aside class="note tech" aria-label="How we proved each game">
-      <div class="note-head"><span class="note-name">How we proved each game</span></div>
+    <aside class="note tech" aria-label="How we proved each score">
+      <div class="note-head"><span class="note-name">How we proved each score</span></div>
       <p>Each game counts in the first group that fits it.</p>
       <ul>
-        <li><b>Derived from game n&nbsp;−&nbsp;1.</b>  n is prime, and the
+        <li><b>Follows from game n&nbsp;−&nbsp;1.</b>  n is prime, and the
         <a class="gloss" href="glossary.html#prime-formula">prime formula</a> gives its score from game
         n&nbsp;−&nbsp;1’s.  Or it is at its <a class="gloss" href="glossary.html#ceiling">ceiling</a>: its score is
         n&nbsp;+&nbsp;opt(n&nbsp;−&nbsp;1), the most it can be.</li>
@@ -123,7 +123,7 @@
     <p>We solved the games in order, from game 1 up, each from an
     <a class="gloss" href="glossary.html#optimal-game">optimal game</a> of the one before, so they form a
     <a class="gloss" href="glossary.html#chain">chain</a>.  The chart shows every game of it: the share of the
-    <a class="gloss" href="glossary.html#board">board</a> that the player wins, how we proved each game, and how long a
+    <a class="gloss" href="glossary.html#board">board</a> that the player wins, how we proved each score, and how long a
     search took.</p>
   </div>
   <figure class="chart" id="chain-chart">

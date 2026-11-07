@@ -61,7 +61,7 @@ function settled(r) {
   const { n, score, prev } = r;
   switch (r.proof) {
     case 'exhausted':
-      return [lead, `The search explored ${plural(r.nodes, 'node')}, and no better set of promotions is left.`];
+      return [lead, `The search explored ${plural(r.nodes, 'node')}, and no better set of promotions remains.`];
     case 'cap': {
       if (score !== prev + n) throw new Error(`game ${n}: proof cap, but ${score} is not ${prev} + ${n}`);
       const how = r.method === 'start'
@@ -232,7 +232,7 @@ export function mountExplorer(host, { games, small }) {
       return `Move ${w.turn} of ${b.turns.length}: the player takes ${x}, and the taxman takes ${listWords(w.tax)}.${promo}`;
     }
     if (w.kind === 'tax') return `${x} goes to the taxman as tax on ${w.by}, move ${w.turn} of ${b.turns.length}.`;
-    return `${x} is left when no move is, so the taxman takes it with the rest of the pot, ${plural(b.rest.length, 'number')} in all.`;
+    return `${x} remains when no move does, so the taxman takes it with the rest of the pot, ${plural(b.rest.length, 'number')} in all.`;
   }
 
   function farText(r) {
