@@ -57,7 +57,9 @@
     </aside>
     <p>We call it the <a class="gloss" href="glossary.html#parity-test">parity test</a>: no group of a set's numbers
     may list every factor an even number of times.  This is linear algebra over GF(2), the arithmetic of even and odd,
-    so it is quick to check, and a classical algorithm finds the heaviest set that passes it.  That set's sum bounds what a branch can still add.  The solver applies the test to
+    so it is quick to check, and a classical algorithm finds the heaviest set that passes it.
+      That set's sum bounds what a branch can still add, so we call it
+      the <a class="gloss" href="glossary.html#parity-bound">parity bound</a>.  The solver applies the bound to
     the promotions frame by frame, at every <a class="gloss" href="glossary.html#node">node</a>.</p>
     <p>Some sets pass the test and still cannot be played, and they are all that the bound misses: the
     <a href="#odd-cores">odd cores</a>.</p>
@@ -77,8 +79,8 @@
     </aside>
     <p>The test needs no frames.  Applied to the numbers of the whole <a class="gloss"
     href="glossary.html#board">board</a>, rather than to the promotions of a frame, it bounds <a class="gloss"
-    href="glossary.html#opt">opt(n)</a> itself: no set heavier than the heaviest that passes it can be played.  We call
-    it the <a class="gloss" href="glossary.html#parity-bound">parity bound</a>.  At the root of a search, the frame
+    href="glossary.html#opt">opt(n)</a> itself: no set heavier than the heaviest that passes it can be played. At the
+      root of a search, the frame
     solver's bound with the weight of <a class="gloss" href="glossary.html#u-star">U*</a> added comes to the same number
     on every board from 2 to 8,191.  The parity bound is the bound of the
     <a class="gloss" href="glossary.html#prover">prover</a>, the second program of
