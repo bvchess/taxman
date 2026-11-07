@@ -10,7 +10,7 @@ import { fmt, standingBadge } from '../js/vocab.js';
 import { PROOFS, PROVER_TO } from '../js/proof.js';
 
 const GROUPS = [
-  { title: 'From the game before', kinds: ['cap', 'prime_formula'], rests: 'rests on game n − 1, which rests on its own proof' },
+  { title: 'From the game before', kinds: ['cap', 'prime_formula'], rests: 'rests on the score of game n − 1, and so on how that score was proven' },
   { title: 'By a search of the frame model', kinds: ['exhausted', 'same_search', 'trivial'], rests: 'rests on the frame model of game n, and a repeat on the game it repeats' },
 ];
 const NAMES = { ...Object.fromEntries(PROOFS.map((p) => [p.key, p.name])), trivial: 'nothing to choose' };

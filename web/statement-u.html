@@ -20,8 +20,8 @@
 <header class="essay-head para">
   <p class="kicker">Chapter 7</p>
   <h1>Statement U</h1>
-  <p class="lede">One open statement stands between the frame model and the best score.  It is proven in every game up
-  to 2,530.</p>
+  <p class="lede">The best scores past game 2,530 rest on one statement that is not proven in general.  Up to game
+  2,530 it is proven, one game at a time.</p>
 </header>
 
 <section class="chapter" id="what-supports-the-scores" data-toc="what-supports-the-scores" aria-labelledby="h-supports">
@@ -41,14 +41,16 @@
       at every game the prover proves
       (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">the evidence</a>).</p>
     </aside>
-    <p>The search of <a href="search.html">chapter 5</a> proves the best score of the
-    <a class="gloss" href="glossary.html#frame-model">frame model</a>: the best score of a game that plays every number
-    of <a class="gloss" href="glossary.html#u-star">U*</a>.  That is
-    <a class="gloss" href="glossary.html#opt">opt(n)</a> exactly when
-    <a class="gloss" href="glossary.html#statement-u">statement U</a> holds: when some optimal game plays every number
-    of U* with three or more prime factors.  For the numbers with one or two it is proved
-    (<a href="top-half.html#bottom-layers">chapter 3</a>).  For the rest it is open.  An optimal game might give one of
-    them up, free the factor that paid for it, and win the points back below n/2.</p>
+    <p>The search of <a href="search.html">chapter 5</a> finds the best score of the
+    <a class="gloss" href="glossary.html#frame-model">frame model</a>, in which every number of
+    <a class="gloss" href="glossary.html#u-star">U*</a> is played and only the promotions are chosen.  That score is
+    the score of a real game, so it is never above <a class="gloss" href="glossary.html#opt">opt(n)</a>.  It equals
+    opt(n) exactly when some optimal game plays all of U*.</p>
+    <p>Every optimal game plays the numbers of U* with one or two prime factors
+    (<a href="top-half.html#bottom-layers">chapter 3</a>).  For those with three or more, it is open.
+    <a class="gloss" href="glossary.html#statement-u">Statement U</a> says that some optimal game plays them all.  If
+    it failed, every optimal game would give one of them up, free the factor that paid for it, and win the points back
+    below n/2.</p>
   </div>
 
   <figure class="fig rests-fig" id="rests-on" aria-label="What each kind of proof in the chain's records rests on, with the number of games of each kind, and what makes the frame model's best score opt(n).">
@@ -57,13 +59,14 @@
 
   <div class="para">
     <p>A score at the <a class="gloss" href="glossary.html#ceiling">ceiling</a> or by the
-    <a class="gloss" href="glossary.html#prime-formula">prime formula</a> rests on the game before it.  A
-    <a class="gloss" href="glossary.html#search">search</a> rests on the frame model of its own game, and so does a
-    <a class="gloss" href="glossary.html#repeat">repeat</a>, which takes the answer of the earlier game that posed the
-    same search problem.  Followed down, every score rests on the frame model of some game.  Up to game 2,530 that
-    gives opt(n), proven.  Past it, the scores rest on statement U from game
-    <span data-rests="firstU">2,532</span> on, <span data-rests="onU">2,529</span> of them.  Game 2,531 follows from
-    game 2,530 by the prime formula, so its score is proven too.</p>
+    <a class="gloss" href="glossary.html#prime-formula">prime formula</a> rests on the score of the game before it.  A
+    score found by a <a class="gloss" href="glossary.html#search">search</a> rests on the frame model of its own game,
+    and so does a <a class="gloss" href="glossary.html#repeat">repeat</a>, which takes the answer of an earlier game
+    that posed the same search problem.  So, followed down, every score rests on the frame model of some game, and on
+    statement U in that game.</p>
+    <p>Up to game 2,530 that costs nothing: statement U is proven in each of those games.  Past it, the
+    <span data-rests="onU">2,529</span> scores from game <span data-rests="firstU">2,532</span> to the end of the chain
+    rest on statement U.  Game 2,531 follows from game 2,530 by the prime formula, so its score is proven too.</p>
   </div>
 </section>
 
@@ -78,15 +81,15 @@
       README</a>).  Its run of games 2 to 2,530 took 19 hours on a machine with 88 threads
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md">the proofs</a>).</p>
     </aside>
-    <p>Statement U can be settled one game at a time: find opt(n) without the frame model, and compare.  A second
-    program, the <a class="gloss" href="glossary.html#prover">prover</a>, does that.  It searches the whole
-    <a class="gloss" href="glossary.html#board">board</a>, sets of moves rather than promotions, with no frames.  Its
-    bound is the <a class="gloss" href="glossary.html#parity-bound">parity bound</a> of
-    <a href="bound.html#parity-bound">chapter 6</a>.  Wherever its opt(n) is the frame model's best score, statement U
-    holds.</p>
-    <p>It has proven every game up to 2,530.  In each one opt(n) is the score the
-    <a class="gloss" href="glossary.html#frame-solver">frame solver</a> found, so statement U holds there, and the score
-    is opt(n) with no assumption.</p>
+    <p>Statement U can be proven one game at a time: find opt(n) without the frame model, and compare it with the
+    frame model's best score.  If the two are equal, statement U holds in that game.  A second program, the
+    <a class="gloss" href="glossary.html#prover">prover</a>, does this.  It searches the whole
+    <a class="gloss" href="glossary.html#board">board</a>, choosing sets of moves rather than promotions, with no
+    frames, and its bound is the <a class="gloss" href="glossary.html#parity-bound">parity bound</a> of
+    <a href="bound.html#parity-bound">chapter 6</a>.</p>
+    <p>The prover has proven every game up to 2,530.  In each one, opt(n) is the score the
+    <a class="gloss" href="glossary.html#frame-solver">frame solver</a> found.  So statement U holds in those games,
+    and their scores rest on no open statement.</p>
   </div>
 </section>
 
@@ -106,27 +109,29 @@
     <p>What supports statement U past game 2,530:</p>
     <ul class="rules">
       <li>It holds in every game the prover reaches, up to game 2,530.</li>
-      <li>It is proved for the numbers with one or two prime factors: every optimal set holds those of U*.
-      Statement U asks the same of the numbers with three or more.</li>
+      <li>For the numbers of U* with one or two prime factors, the same statement is proved: every optimal game plays
+      them.</li>
       <li>Among the <a class="gloss" href="glossary.html#source">sources</a> alone, U* is the heaviest set that can be
-      played, in every game up to 100,000.</li>
+      played, in every game up to 100,000.  Within the top half, giving up a number of U* never pays.</li>
       <li>The prover can leave out one number of U* at a time and bound what any game without it could score.  For
-      about 85% of the numbers statement U asks about, in games 2,531 to 3,440, that bound is below the recorded
-      score, so a game that beats the score, if there is one, plays them.  In no game does it reach all of them.</li>
-      <li>At the start of the search of every game measured, up to game 3,440, the heaviest set that the parity bound
-      allows holds all of them.</li>
+      about 85% of the numbers statement U is about, in games 2,531 to 3,440, that bound is below the recorded score,
+      so a game that beats the score, if there is one, plays them.  In no game does it cover all of them; if it did,
+      that game's score would be proven.</li>
+      <li>In every game measured, up to game 3,440, the heaviest set that the parity bound allows on the whole board
+      plays all of them.</li>
     </ul>
   </div>
 </section>
 
 <section class="chapter" id="why-open" data-toc="why-open" aria-labelledby="h-why-open">
   <h2 id="h-why-open">Where a proof stops</h2>
-  <p>Suppose an optimal game leaves out some numbers of U* with three or more prime factors, and let d be the largest.
-  Adding d back would make the game heavier, so it must make it unplayable: d is caught in a set of numbers that
-  cannot all be played.  If giving up a smaller number frees d, the exchange beats the game, so no optimal game leaves
-  d out.  In layer 2 such an exchange always exists, which is how the numbers with two prime factors are proved.
-  Above layer 2, d can be caught in an <a class="gloss" href="glossary.html#odd-core">odd core</a>
-  (<a href="bound.html#odd-cores">chapter 6</a>), and there the argument stops
+  <p>Why is statement U hard to prove?  Suppose an optimal game leaves out some numbers of U* with three or more prime
+  factors, and let d be the largest of them.  Adding d would raise the score, so, since the game is optimal, its moves
+  with d added cannot all be played.  A proof would find a trade: give up a smaller number the game plays, so that d can
+  be played in its place, and the score rises, which an optimal game cannot allow.  In layer 2 such a trade always
+  exists, and that is how the numbers with two prime factors are proved.  Above layer 2, d can be caught in an
+  <a class="gloss" href="glossary.html#odd-core">odd core</a> (<a href="bound.html#odd-cores">chapter 6</a>), and there
+  the argument that works in layer 2 stops
   (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#where-a-proof-stops">a
   sketch</a>).</p>
 </section>

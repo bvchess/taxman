@@ -52,6 +52,18 @@ The rules the owner's reviews have set, on top of [docs/WRITING.md](../docs/WRIT
 * **Let the reader play the idea** wherever an idea can be played, as the game on the maximal-factor graph lets them
   play the lifting lemma.
 * **Link lightly.**  A glossary term links once a section, at its first use, with the quiet `gloss` style.
+* **Say what a fact means.**  A result comes with why it matters: "splitting the board into frames costs the bound
+  nothing" is what the equal bounds at the root mean.
+* **One topic a paragraph.**  A sentence on another subject gets a paragraph of its own, or goes.
+* **Name the thing.**  "Weighted matroid intersection", not "a classical algorithm".  One idea has one name, given
+  where the idea first appears, and the glossary defines every name a page relies on.
+* **Spell it out.**  No shorthand that makes the reader decode it: "one number lower", "some choice of factors gets
+  an odd number" and "the test of chapter 5" each say plainly what they mean instead.  Steps go in the order they
+  happen.
+* **Keep the words true to the pictures.**  A number is a node; the lines are its relations to its factors.  The text
+  takes a figure's examples in turn, the figure's heads say who decides, and its caption says what its marks are.
+* **Titles say what a part is for.**  "Comparing bounds", not "Counting payment schemes".  A chapter's subhead is
+  general enough to stand on its own, and a chapter goes from technique to results without turning back.
 
 ## The arc
 
@@ -67,7 +79,7 @@ the bound's work shows in the search's row:
 | a game is a set | a set of moves | 10^1,523 sets |
 | the top half | which numbers up to n/2 to play | 10^762 sets |
 | frames | which candidates to promote | 10^415 sets of 1,380 candidates |
-| the search | the nodes a search explores | 3.2 billion nodes |
+| the search | the nodes a search explores | 1.2 billion nodes |
 
 The chain settles 65% of the games with no search at all, which the chain's chart shows.  The figures are rough counts
 (n!, 2^n, 2^(n/2), 2^candidates) and say so in the right column; the last is the recorded search of game 5060.
