@@ -42,7 +42,7 @@
     from the <a class="gloss" href="glossary.html#loop">loop</a> of chapter 1.  List, for each number of a set, the
     maximal factors outside the set that could pay for it.  If some of the numbers, taken together, list every factor
     an even number of times, the set cannot be played.  For example, the loop 10, 14, 15 and 21 lists each of 2, 3, 5 and 7
-    twice, therefore it cannot be played</p>
+    twice, therefore it cannot be played.</p>
   </div>
 
   <div class="para">
@@ -109,13 +109,6 @@
     with the same factors, so each set has one group.</p>
   </div>
 
-  <figure class="fig wide ladder-fig" id="ladder">
-    <div class="ladder"></div>
-    <figcaption class="fig-caption">Circles are a set's numbers, and squares the factors outside it that could pay
-    for them.  Each drawing is one payment scheme: a thick line joins a number to the factor it pays with, a thin line
-    to a factor it could pay with.</figcaption>
-  </figure>
-
   <div class="para">
     <aside class="note card" aria-label="The counting theorem, proved">
       <div class="note-head"><span class="note-name">The counting theorem<span class="note-label">Theorem C2</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-counting-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
@@ -125,6 +118,27 @@
       T, the three conditions are per(S, T) ≥ 1, odd, or 1, for some T.  The odd count is independence over GF(2),
       since a permanent is its determinant mod 2.</p>
     </aside>
+    <p>Why would the parity test care how many schemes a set has?  Make a table for one group of schemes, with a row
+    for each number of the set and a column for each factor the group pays with, and write 1 where the number lists
+    the factor and 0 elsewhere.  A scheme picks a 1 in every row, no two in the same column, so the group's count is
+    the number of such picks.  The table's determinant, from algebra, adds up the same picks, each with a sign, plus
+    or minus.  Since +1 and −1 are both odd, the signs cannot change whether the total is even or odd, so the count is
+    odd exactly when the determinant is.</p>
+    <p>A determinant is even exactly when some of the table's rows add up to an even number in every column, that is,
+    when some of the set's numbers, taken together, list every factor an even number of times.  6, 10 and 15 list 2
+    and 3, 2 and 5, and 3 and 5, each factor twice, and they have two schemes.  As linear algebra shows, a set passes
+    the parity test exactly when some choice of columns makes its determinant odd.  So the parity bound allows a set
+    exactly when some group of its schemes has an odd count: the counting theorem.</p>
+  </div>
+
+  <figure class="fig wide ladder-fig" id="ladder">
+    <div class="ladder"></div>
+    <figcaption class="fig-caption">Circles are a set's numbers, and squares the factors outside it that could pay
+    for them.  Each drawing is one payment scheme: a thick line joins a number to the factor it pays with, a thin line
+    to a factor it could pay with.</figcaption>
+  </figure>
+
+  <div class="para">
     <p>6, 10 and 15 have two schemes, so Franklín and Moniot's bound allows them.  Two is even, so the parity bound
     does not, and it is right: whichever of the three is played first takes both of its primes as tax, and one of the
     other two is left with nothing to pay with.  The two schemes differ around a
