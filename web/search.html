@@ -158,10 +158,14 @@
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/design/gf2-bound.md#prime-exchanges">prime
       exchanges</a>).</p>
     </aside>
-    <p>Some pairs of primes play the same part in a game: exchanging the two in every number maps the
-    <a class="gloss" href="glossary.html#frame">frames</a> onto themselves.  Then every set of promotions has a mirror
-    image, which can be promoted exactly when it can, and which of the two is heavier is easy to tell.  So the search
-    tries only the heavier side of each mirror.</p>
+    <p>Some pairs of primes play the same part in a game.  In game 1,300, 41 and 43 are such a pair.  Its
+    <a class="gloss" href="glossary.html#candidate">candidates</a> include 41 times 4, 6, 8, 9, 10, 12, 14 and 15, and
+    43 times the same eight numbers, and swapping 41 and 43 in every number leaves the
+    <a class="gloss" href="glossary.html#frame">frames</a>, taken together, exactly as they were.  So every set of
+    promotions has a twin, made by the same swap, and the twin can be promoted exactly when the set can.  A set that
+    promotes 164 = 4 × 41 has a twin that promotes 172 = 4 × 43 in its place, 8 more.  Each swap trades a multiple of
+    41 for the same multiple of 43, or back, so it is easy to tell which twin is heavier, and the search tries only the
+    heavier one.</p>
   </div>
 </section>
 
@@ -194,7 +198,7 @@
       <p class="precise"><span class="run">Precisely.</span>Under three conditions against a game m, every completion
       of a node is a promotion set of m's root problem, worth at most a bound Z of its best.</p>
     </aside>
-    <p>Game n − 1 helps once more.  Where a branch of game n poses only part of the problem that game n − 1 posed, the
+    <p>Game n − 1 helps another way too.  Where a branch of game n poses only part of the problem that game n − 1 posed, the
     search can drop it, by the near-repeat lemma.  It is a <a class="gloss" href="glossary.html#repeat">repeat</a> in
     part: game n − 1’s search has already shown how much that part can add.</p>
   </div>
@@ -211,18 +215,18 @@
       search</a>, every promotion set heavier than the best found, and true to every mirror, lies in an open branch.
       So a search with no branch left proves P*, the heaviest promotion set's sum, equal to its best.</p>
     </aside>
-    <p>When no branch is left, the <a class="gloss" href="glossary.html#search">search</a> has proved that no set of
+    <p>When all branches have been explored, the <a class="gloss" href="glossary.html#search">search</a> has proved that no set of
     promotions beats its best one: every set was either tried or dropped by a bound that showed it could not do
     better.  So its best game is the best of the <a class="gloss" href="glossary.html#frame-model">frame model</a>,
     which is an <a class="gloss" href="glossary.html#optimal-game">optimal game</a> wherever
-    <a class="gloss" href="glossary.html#statement-u">statement U</a> holds.  That is how
+    <a class="gloss" href="glossary.html#statement-u">statement U</a> holds.  This is how
     <span data-proof="exhausted">1,612</span> games of the <a class="gloss" href="glossary.html#chain">chain</a> were
     proven.</p>
     <p>A search can also stop early.  No game of n scores more than the best score of game n − 1 plus n, the
     <a class="gloss" href="glossary.html#ceiling">ceiling</a> (<a href="chain.html#ceiling">chapter 2</a>).  A search
-    whose best game reaches the ceiling has nothing left to find, and it stops there.  That is how
+    whose best game reaches the ceiling has nothing left to find, so it can stop.  That is how
     <span data-start="cap">494</span> searches of the chain ended, <span data-start="capStart">490</span> of them at
-    their start, before a single step.</p>
+    their start, before a branch was explored.</p>
   </div>
 </section>
 
@@ -272,7 +276,7 @@
     </aside>
     <p>From game <span data-cost="lateFrom">4,500</span> on, half the searched games took more than
     <span data-cost="lateMedian">200 million</span> nodes, and we stopped where the next games no longer seemed worth
-    their time.  To go further, a search needs a tighter bound, which lowers every gap at once.</p>
+    the time.  To go further, a search needs a tighter bound, which lowers every gap at once.</p>
   </div>
 </section>
 

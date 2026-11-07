@@ -15,6 +15,7 @@ import {
 } from '../js/model.js';
 import { INTRO, STORY } from '../js/site.js';
 import { PROMOTION_SETS } from '../js/data.js';
+import { listWords, numberWord } from '../js/vocab.js';
 import { fitsFacts, fitsWords, primeFacts, primeWords } from '../figures/fits.js';
 import { slipFacts, slipOfRecord } from '../figures/slip.js';
 import { linkWords, linksFacts } from '../figures/links.js';
@@ -300,6 +301,18 @@ for (let n = 1; n <= FRAME_MODEL_UP_TO; n++) {
   const { limit } = promotionLimit(model);
   same(`game ${n}: the largest promotion set has the promotion limit's members`, largest, limit);
   same(`game ${n}: the recorded promotions number the promotion limit`, record.promotions.length, limit);
+}
+
+// Chapter 5's pair of primes: game 1,300's candidates that are multiples of 43 are 43 times the very numbers that its
+// multiples of 41 are 41 times, and search.html names those numbers and their count.
+{
+  const n = 1300;
+  const model = frameModel(n);
+  const cofactors = (p) => candidatesOf(model).filter((x) => x % p === 0).map((x) => x / p);
+  same(`game ${n}: its candidates' multiples of 41 and of 43 have the same cofactors`, cofactors(43), cofactors(41));
+  const page = readFileSync(join(repoRoot, 'web', 'search.html'), 'utf8').replace(/\s+/g, ' ');
+  const words = `41 times ${listWords(cofactors(41))}, and 43 times the same ${numberWord(cofactors(41).length)} numbers`;
+  same(`search.html: "${words}"`, page.includes(words), true);
 }
 
 // --- How each game was proven (js/proof.js) ---------------------------------------------------------------------
