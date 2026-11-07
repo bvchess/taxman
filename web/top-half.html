@@ -142,9 +142,9 @@
   <div class="para">
     <aside class="note tech" aria-label="Layer 2 as a graph">
       <div class="note-head"><span class="note-name">Layer 2 as a graph</span></div>
-      <p>The graph has a vertex for each prime up to n/2 and one more, g, and an edge for each number of layer 2: pq is
-      the edge p–q, and p² the edge p–g.  A set of such numbers can be paid for by the primes exactly when its edges
-      form a forest, a graph with no loop (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">the
+      <p>The graph joins each number of layer 2 to its prime factors: pq to p and q, and p² to p and to one more
+      vertex, g.  A set of such numbers can be paid for by the primes exactly when, with the primes and g, it forms a
+      forest, a graph with no loop (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">the
       loop rule</a>).  Game 100 has no square among its sources, since 7² = 49 is below 50 and 11² = 121 above 100.</p>
     </aside>
     <aside class="note card" aria-label="The square theorem, proved">
@@ -158,10 +158,10 @@
     </aside>
     <p>Layer 2 holds the numbers with two prime factors, and there chapter 1's <a class="gloss"
     href="glossary.html#loop">loop</a> does the work.  Drawn as a graph, a source such as <span class="n"
-    data-n="95">95</span> is an edge between its two maximal factors, the primes 5 and 19, as 10, 14, 15 and 21 were the
-    edges of <a href="sets.html#loop-section">a square on 2, 5, 3 and 7</a>.  Numbers like these can all be played
-    exactly when their edges contain no loop.  So greedy keeps a source of layer 2 exactly when it closes no loop with
-    the ones it kept.  Here it is on game 100, whose 17 sources with two prime factors lie on the 15 primes up to
+    data-n="95">95</span> sits between its two maximal factors, the primes 5 and 19, as 10, 14, 15 and 21 sat on the
+    sides of <a href="sets.html#loop-section">a square on 2, 5, 3 and 7</a>.  Numbers like these can all be played
+    exactly when they and their primes make no loop.  So greedy keeps a source of layer 2 exactly when it closes no
+    loop with the ones it kept.  Here it is on game 100, whose 17 sources with two prime factors lie on the 15 primes up to
     50.</p>
   </div>
 
@@ -175,10 +175,10 @@
   data-forest-at="58" data-state="15">58</a>, <a class="go" href="?forest=17#forest" data-fig="forest"
   data-forest-at="55" data-state="17">55</a> and <a class="go" href="?forest=18#forest" data-fig="forest"
   data-forest-at="51" data-state="18">51</a>, and each would close a loop of four, chapter 1's loop again.  What it
-  keeps joins all 15 primes with no loop: a tree.  Taking the edges from the heaviest down and refusing any that closes
-  a loop builds the heaviest tree, a classic fact, and here it settles the game: every optimal game plays exactly the
+  keeps joins all 15 primes with no loop: a tree.  Taking the sources from the heaviest down and refusing any that
+  closes a loop builds the heaviest tree, a classic fact, and here it settles the game: every optimal game plays exactly the
   sources of layer 2 that greedy keeps.</p>
-  <p>Game 100's tree has 14 edges, so it needs 14 of the 15 primes to pay for them, and one is to spare.  From game
+  <p>Game 100's tree holds 14 sources, so it needs 14 of the 15 primes to pay for them, and one is to spare.  From game
   187 on, no prime is ever left to spare: the sources greedy keeps in layer 2 need every prime up to n/2, so no other
   number of layer 2 can be played, and layer 2 is settled completely.</p>
 </section>
@@ -186,9 +186,9 @@
 <section class="chapter" id="above-layer-two" data-toc="above-layer-two" aria-labelledby="h-above">
   <h2 id="h-above">Above layer 2</h2>
   <p>From <a class="gloss" href="glossary.html#layer">layer</a> 3 up, a number can have more than two <a class="gloss"
-  href="glossary.html#maximal-factor">maximal factors</a>: 30 has three, 15, 10 and 6.  An edge has only two ends, so a
-  number like 30 cannot be drawn as an edge between its maximal factors, as the sources of layer 2 were, and the reason
-  greedy is safe in layer 2 is gone.</p>
+  href="glossary.html#maximal-factor">maximal factors</a>: 30 has three, 15, 10 and 6.  With three, a loop no longer
+  means that its numbers are stuck: 12, 20 and 30 make one, and all three can be played
+  (<a href="sets.html#loop-section">chapter 1</a>).  The reason greedy is safe in layer 2 is gone.</p>
 
   <div class="para">
     <aside class="note card" aria-label="Where exchange breaks, proved">
@@ -202,8 +202,8 @@
     </aside>
     <p>Here is why greedy is safe in layer 2: with only 2 layers, a set of <a class="gloss"
     href="glossary.html#source">sources</a> that can be played and has no room for another is a <a class="gloss"
-    href="glossary.html#forest">forest</a> on the primes, and every such forest has the same number of edges.  So once
-    nothing more fits, greedy has as many sources as any playable set can have: it is never stuck with too few.</p>
+    href="glossary.html#forest">forest</a> on the primes, and every such forest holds the same number of sources.  So
+    once nothing more fits, greedy has as many sources as any playable set can have: it is never stuck with too few.</p>
     <p>With more than two maximal factors, that can fail, and game 2,873 shows it with six of its sources, built from
     the primes 11, 13 and 17.  Taken in some orders, greedy keeps four of them, and then neither of the other two fits,
     though five of the six can be played together.  Taken in other orders, it keeps five.  No smaller game is known

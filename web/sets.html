@@ -197,26 +197,26 @@
   <div class="para">
     <aside class="note card" aria-label="The two-factor proposition, proved">
       <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Numbers that each have at most two maximal factors can all be played exactly when their edges
-      form no loop.</p>
+      <p class="plain">Numbers that each have at most two maximal factors can all be played exactly when they and their
+      maximal factors make no loop.</p>
       <p class="precise"><span class="run">Precisely.</span>An instance whose members each list at most two factors
-      is <a class="gloss" href="glossary.html#playable">playable</a> iff its lists are linearly independent over GF(2), iff its graph is a forest.  The graph's
-      vertices are the factors and one more, the ground, and each member is an edge, between the two factors it lists or
-      from the one it lists to the ground.</p>
+      is <a class="gloss" href="glossary.html#playable">playable</a> iff its lists are linearly independent over GF(2), iff its graph is a forest.  The graph
+      joins each member to the factors it lists, and a member that lists only one also to one more vertex, the
+      ground.</p>
     </aside>
     <p>Whatever order you choose, the first number takes both of its primes as <a class="gloss" href="glossary.html#tax">tax</a>.  That leaves two primes for the
     other three numbers, and one of them is always stuck.</p>
-    <p>The same holds for any numbers that each have at most two maximal factors.  Draw each one as an edge between
-    its two maximal factors, or, if it has only one, as an edge from that factor to the <em>ground</em>, one more point
-    that all such numbers share.  They can all be played exactly when their edges contain no loop.  The ground
-    matters: <span class="n" data-n="4">4</span> can pay only with 2, <span class="n" data-n="9">9</span> only with 3,
-    and <span class="n" data-n="6">6</span> needs one of the two, so one of the three is always stuck.  Their edges make
-    the loop ground – 2 – 3 – ground.</p>
+    <p>The same holds for any numbers that each have at most two maximal factors: they can all be played exactly when
+    they and their maximal factors make no loop.  A number with only one maximal factor is joined to the
+    <em>ground</em> as well, one more point that all such numbers share.  The ground matters:
+    <span class="n" data-n="4">4</span> can pay only with 2, <span class="n" data-n="9">9</span> only with 3, and
+    <span class="n" data-n="6">6</span> needs one of the two, so one of the three is always stuck.  They make the loop
+    ground – 4 – 2 – 6 – 3 – 9 – ground.</p>
     <p>Three maximal factors are too many for the rule.  With 4, 6, 10 and 15 left to pay with, the lines of
     <span class="n" data-n="12">12</span>, <span class="n" data-n="20">20</span> and
     <span class="n" data-n="30">30</span> close a loop, 30 – 6 – 12 – 4 – 20 – 10 – 30, yet all three can be played:
-    20, then 12, then 30.  A number with three maximal factors is not an edge, and for it the question goes back to
-    peel.</p>
+    20, then 12, then 30.  The rule holds only for numbers with at most two maximal factors, and for the others the
+    question goes back to peel.</p>
     <p>So the rule covers only part of the game, but an important part.  Every number with two prime factors, such as
     95 = 5 · 19 or 49 = 7 · 7, has at most two maximal factors, all of them primes.  These numbers make up layer 2 of
     the graph, and chapter 3 uses the rule to find exactly which of them above n/2 every optimal game plays.</p>

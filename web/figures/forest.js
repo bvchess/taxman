@@ -165,13 +165,13 @@ function states(f, places) {
 
 function captions(f) {
   const words = [
-    `Game ${f.n}'s ${f.scan.length} sources with two prime factors, each on the edge between its two primes. The ${f.primes.length} primes up to ${f.n / 2} are the squares.`,
+    `Game ${f.n}'s ${f.scan.length} sources with two prime factors, each between its two primes. The ${f.primes.length} primes up to ${f.n / 2} are the squares.`,
   ];
   let keptSoFar = 0;
   for (const step of f.steps) {
     if (step.keep) {
       keptSoFar++;
-      words.push(`${step.s} = ${product(step.s)} closes no loop with the edges kept, so greedy keeps it: ${keptSoFar} kept so far.`);
+      words.push(`${step.s} = ${product(step.s)} closes no loop with the sources kept, so greedy keeps it: ${keptSoFar} kept so far.`);
     } else {
       const k = step.loop.primes.length;
       words.push(`${step.s} = ${product(step.s)} would close a loop with ${listWords(step.loop.edges)}: ${COUNT[k] ?? k} numbers on ${COUNT[k] ?? k} primes, ${listWords(step.loop.primes)}, as in chapter 1's loop. Greedy refuses it.`);
@@ -182,7 +182,7 @@ function captions(f) {
 }
 
 const VIEW_WORDS = {
-  graph: 'as a graph, each source an edge between its two primes',
+  graph: 'as a graph, each source between its two primes',
   layers: 'in their layers, each source joined to its two primes',
 };
 const labelOf = (view) => `Layer 2 of game ${N}: the primes up to ${N / 2} and the sources with two prime factors, `
@@ -193,7 +193,7 @@ const labelOf = (view) => `Layer 2 of game ${N}: the primes up to ${N / 2} and t
 export function mountForest(host) {
   const f = forestFacts();
   for (const p of f.primes) if (!PRIME_AT[p]) throw new Error(`layer 2 of game ${N}: no place for the prime ${p}`);
-  for (const s of f.scan) if (M.primeFactors(s).length !== 2) throw new Error(`layer 2 of game ${N}: ${s} is a square, with no edge between two primes`);
+  for (const s of f.scan) if (M.primeFactors(s).length !== 2) throw new Error(`layer 2 of game ${N}: ${s} is a square, not a source between two primes`);
   const upright = host.clientWidth > 0 && host.clientWidth < 480;
   const graphBox = boxOf(upright);
   const layers = layerPlaces(f, graphBox.width);
@@ -212,7 +212,7 @@ export function mountForest(host) {
   holdHeight(caption, words);
   timeline(s, host.querySelector('.fig-timeline'), {
     stops: [
-      { at: 0, name: 'the edges' },
+      { at: 0, name: 'the sources' },
       { at: 1, until: last - 1, name: `from ${f.scan[0]} down` },
       { at: last, name: 'the tree' },
     ],
@@ -233,7 +233,7 @@ export function mountForest(host) {
     facts: f,
     /** The state, from 1, at which greedy decides source x. */
     stateOf: (x) => f.scan.indexOf(x) + 2,
-    stopName: (k) => (Number(k) === 1 ? 'the edges' : Number(k) === s.count ? 'the tree' : `greedy at ${f.scan[Number(k) - 2]}`),
+    stopName: (k) => (Number(k) === 1 ? 'the sources' : Number(k) === s.count ? 'the tree' : `greedy at ${f.scan[Number(k) - 2]}`),
     goState: (k) => s.go(Number(k) - 1),
     highlight: (n, on) => s.highlight(n, on),
   };
