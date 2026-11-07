@@ -69,7 +69,7 @@
     </aside>
     <dl class="glossary">
       <dt id="playable">playable</dt>
-      <dd>A set of numbers that you can all take as moves, in some order.  {9, 15} is playable on the board of game
+      <dd>A set of numbers that the player can take as moves, every one of them, in some order.  {9, 15} is playable on the board of game
       21: 9 first, then 15.</dd>
       <dt id="optimal-set">optimal set</dt>
       <dd>The set of moves of an optimal game: a playable set with the largest sum.  Most games have one; from game
@@ -198,7 +198,7 @@
       the front into a single frame, with one number.</dd>
       <dt id="in-front">in front of</dt>
       <dd>Frame A is in front of frame B when some number of B has a maximal factor in A, as 9 has 3 in game 21.
-      The player plays frames in front first, and in the figures they sit to the right.</dd>
+      A game plays the frames in front first, and in the figures they sit to the right.</dd>
       <dt id="freedom">freedom</dt>
       <dd>A factor that a frame can spare.  Each move of a frame needs a factor of its own to pay for it, so a frame
       has as many freedoms as it has factors beyond its moves: frame 0 of game 21 has four factors and three moves,
@@ -239,7 +239,7 @@
       <dd>A way of searching: split on one choice at a time, keep the best answer you have found, and drop every branch
       whose bound cannot beat it.</dd>
       <dt id="conflict">conflict</dt>
-      <dd>A few candidates that the player cannot all promote together at a node.  Any set the player can promote leaves
+      <dd>A few candidates that the player cannot promote all together at a node.  Any set the player can promote leaves
       at least one of them out, so the search splits on one of them.</dd>
       <dt id="nogood">nogood</dt>
       <dd>A set of candidates that the player cannot promote together from the start of a search, which the search
@@ -278,8 +278,8 @@
     <dd>A second program, which shares no proof code with the frame solver and proves the scores on the whole board,
     without frames.</dd>
       <dt id="proof-kind">proof kind</dt>
-      <dd>How the chain proves a game: by a search of the whole tree, at the ceiling, by the prime formula, as a repeat,
-      or with nothing to choose.  Each game's record names its own.</dd>
+      <dd>What proves a game's score: a search of the whole tree, the ceiling, the prime formula, a repeat, or nothing
+      to choose.  Each game's record names its own.</dd>
   </dl>
 </section>
 
