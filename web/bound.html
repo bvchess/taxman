@@ -104,8 +104,8 @@
     <p>Each way of handing out factors is a
     <a class="gloss" href="glossary.html#payment-scheme">payment scheme</a>, and counting a set's schemes shows what
     each bound allows.  Group the schemes by the factors they pay with, and count the groups.  Franklín and Moniot's
-    bound allows the set when some group has at least one scheme, and the parity bound when some group has an odd
-    number.  The set can be played exactly when some group has exactly one.  In the figure, each set's schemes all pay
+    bound allows the set when some group has at least one scheme, and the parity bound allows it when some group has an odd
+    number of schemes.  The set can be played when some group has exactly one.  In the figure, each set's schemes all pay
     with the same factors, so each set has one group.</p>
   </div>
 
@@ -117,12 +117,12 @@
   </figure>
 
   <div class="para">
-    <p>6, 10 and 15 have two schemes, so Franklín and Moniot's bound allows them.  Two is even, so the parity bound
+    <p>The numbers 6, 10 and 15 have two schemes, so Franklín and Moniot's bound allows them.  Two is even, so the parity bound
     does not, and it is right: whichever of the three is played first takes both of its primes as tax, and one of the
     other two is left with nothing to pay with.  The two schemes differ around a
     <a class="gloss" href="glossary.html#loop">loop</a>: the second is the first turned once around.  Swap 6 for 9 and
-    the loop opens: one scheme, and the set plays, 9 first.</p>
-    <p>12, 18, 20, 30 and 45 have three schemes, an odd number, so both bounds allow them.  Yet they cannot all be
+    there is no more loop; there's only one scheme, and the set plays, 9 first.</p>
+    <p>The numbers 12, 18, 20, 30 and 45 have three schemes, an odd number, so both bounds allow them.  Yet they cannot all be
     played: they are the first <a href="#odd-cores">odd core</a>.</p>
   </div>
 
@@ -138,7 +138,7 @@
     <p>Why would the parity test care how many schemes a set has?  Make a table for one group of schemes, with a row
     for each number of the set and a column for each factor the group pays with, and write 1 where the number lists
     the factor and 0 elsewhere.  A scheme picks a 1 in every row, no two in the same column, so the group's count is
-    the number of such picks.  The table's determinant, from algebra, adds up the same picks, each with a sign, plus
+    the number of such picks.  The table's determinant, from linear algebra, adds up the same picks, each with a sign, plus
     or minus.  Since +1 and −1 are both odd, the signs cannot change whether the total is even or odd, so the count is
     odd exactly when the determinant is.</p>
     <p>A determinant is even exactly when some of the table's rows add up to an even number in every column, that is,
