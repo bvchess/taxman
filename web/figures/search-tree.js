@@ -1,7 +1,7 @@
 // The search of game 45, node by node: a branch and bound over its promotions, run in the page.  The tree grows from
 // the root at the bottom, each node a chip with its bound, each branch labeled with the candidate it promotes ("21")
 // or goes on without ("no 21"), the leaves in the order the search visits them, left to right.  Above the tree a
-// strip of the candidates shows, for the node the search is at, which are promoted, which are still open, and which
+// strip of the candidates shows, for the node the search is at, which are promoted, which remain, and which
 // are out, with the best game found so far.  The time slider visits the nodes in the order the search does; a node
 // whose bound cannot beat the best game found is drawn dashed and labeled with why it was dropped, and the leaf that
 // gives the best game is filled.  Pointing at a node, or tapping it, tells what the search knows there.  Nothing is
@@ -21,15 +21,16 @@ import { el, fmt, listWords } from '../js/vocab.js';
 import { scene, timeline } from '../js/scene.js';
 
 export const N = 45;
-const COL = 64; // from one leaf to the next
+const COL = 76; // from one leaf to the next
 const ROW = 60; // from one depth to the next
-const PAD_X = 46; // from the first leaf's center to the figure's edge
-const TOP = 36; // from the top of the figure to the highest leaf's center, with its label above
+const PAD_X = 48; // from the first leaf's center to the figure's edge
+const TOP = 58; // from the top of the figure to the highest leaf's center, with its label above
 const BOTTOM = 22; // from the root's center to the bottom of the figure
-const CHIP = { w: 46, h: 26 };
-const LABEL_RISE = 24; // from a leaf's center to its label
+const CHIP = { w: 62, h: 26 }; // wide enough for "21, 18" at the phone's font size
+const LABEL_RISE = 25; // from a leaf's center to the lower line of its label
+const LINE = 17; // from one line of a label to the next
 const EDGE_GAP = 7; // from the middle of an edge to its label
-const CHAR = 7.4; // the width of a character of figure text at its largest size, for the check that all fits
+const CHAR = 8.4; // the width of a character of figure text at its largest size, for the check that all fits
 const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 
 /** The candidates of game n, largest first: the factors of the frames with freedoms that U* can take on alone. */
@@ -79,13 +80,13 @@ function written(xs, total) {
 }
 
 function leftWords(live) {
-  if (live.length === 0) return 'no candidate is left';
-  return live.length === 1 ? `only ${live[0]} is left` : `${listWords(live)} are left`;
+  if (live.length === 0) return 'no candidate remains';
+  return live.length === 1 ? `only ${live[0]} remains` : `${listWords(live)} remain`;
 }
 
 function withLeft(live) {
-  if (live.length === 0) return 'with no candidate left';
-  return live.length === 1 ? `with only ${live[0]} left` : `with ${listWords(live)} left`;
+  if (live.length === 0) return 'with no candidate remaining';
+  return live.length === 1 ? `with only ${live[0]} remaining` : `with ${listWords(live)} remaining`;
 }
 
 // The words under the figure, for state k.
@@ -99,16 +100,18 @@ function words(t, k, score) {
   }
   const node = nodes[k];
   if (!node.parent) {
-    return `The search starts at the root, at the bottom: nothing is promoted yet, and all ${cands.length} ` +
-      `candidates are open. A node's number is the most its branch can add to the ${fmt(base)} points of U*, the ` +
-      `sum of its promoted and open candidates: at the root, all ${cands.length} together, ${node.bound}.`;
+    return `The search starts at the root, at the bottom, with nothing promoted and all ${cands.length} candidates ` +
+      'remaining. Each node shows the candidates promoted on the way to it. Its bound is the most its branch can add ' +
+      `to the ${fmt(base)} points of U*, the sum of its promoted and remaining candidates: at the root, all ` +
+      `${cands.length} together, ${node.bound}.`;
   }
   const { x, promote } = node.edge;
   const parts = [];
   if (promote) parts.push(`Promote ${x}.`);
   else {
-    const back = node.parent.parent ? `Back at ${node.parent.bound}` : 'Back at the root';
-    parts.push(`${back}, go on without ${x}, ${withLeft(node.live)}.`);
+    const goOn = node.parent.parent ? `Back down where the search split on ${x}, go on without it`
+      : `Back at the root, go on without ${x}`;
+    parts.push(`${goOn}, ${withLeft(node.live)}.`);
   }
   if (node.dropped.length) {
     const withP = node.P.length === 1 ? 'it' : listWords(node.P);
@@ -117,8 +120,8 @@ function words(t, k, score) {
   const terms = [...node.P, ...node.live];
   if (node.kind === 'cut') {
     const than = node.bound < node.bestBefore ? 'less than' : 'no more than';
-    parts.push(`This branch adds at most ${written(terms, node.bound)}, ${than} the best so far, ${node.bestBefore}, ` +
-      'so the search drops it without looking further.');
+    parts.push(`Its bound is ${written(terms, node.bound)}, ${than} the best so far, ${node.bestBefore}, so no game ` +
+      'in this branch can beat it, and the search drops it without looking further.');
   } else if (node.kind === 'best') {
     parts.push(`Promoting ${listWords(node.P)} adds ${written(node.P, node.bound)}: the best game so far.`);
   } else if (node.bestBefore > 0) {
@@ -129,6 +132,9 @@ function words(t, k, score) {
   }
   return parts.join(' ');
 }
+
+// The promotions of a node, largest first.
+const promotedText = (node) => (node.P.length ? node.P.join(', ') : 'none');
 
 // A node's chip: a small rounded box with its bound, which a look draws.  halo: the node the search is at; dashed: a
 // dropped branch; kept: the leaf of the best game.
@@ -142,7 +148,7 @@ function chip(node) {
     x: -CHIP.w / 2, y: -CHIP.h / 2, width: CHIP.w, height: CHIP.h, rx: 6, class: 'st-body',
   }, g);
   const text = el('text', { 'text-anchor': 'middle', dy: '0.35em', class: 'st-bound' }, g);
-  text.textContent = String(node.bound);
+  text.textContent = promotedText(node);
   return { g, halo, body, text };
 }
 
@@ -159,11 +165,34 @@ function drawChip(parts, look) {
   parts.text.style.fontWeight = look.kept > 0.5 || look.halo > 0.5 ? 750 : 600;
 }
 
+// A leaf's label: two short lines centered above the leaf, so that neighbors' labels never meet.  A look may give
+// words, "best|so far", to change what a label says.
+function leafLabelMark(lines) {
+  const text = el('text', { class: 'v-text v-text-label', 'text-anchor': 'middle' });
+  const spans = lines.map(() => el('tspan', {}, text));
+  const say = (parts) => parts.forEach((part, i) => { spans[i].textContent = part; });
+  say(lines);
+  return {
+    node: text,
+    draw(look) {
+      if (look.words) say(look.words.split('|'));
+      spans.forEach((span, i) => {
+        span.setAttribute('x', String(look.x));
+        span.setAttribute('y', String(look.y - LINE * (spans.length - 1 - i)));
+      });
+      text.style.fontWeight = Math.round(500 + 250 * look.halo);
+      text.style.fill = look.halo > 0.5 ? 'var(--ink)' : 'var(--ink-2)';
+      text.style.opacity = look.opacity;
+      text.style.display = look.opacity < 0.002 ? 'none' : '';
+    },
+  };
+}
+
 // A chip drawn in HTML, as a sample for the key.
-function sampleChip(bound, kind) {
+function sampleChip(node, kind) {
   const c = document.createElement('span');
   c.className = `st-sample is-${kind}`;
-  c.textContent = String(bound);
+  c.textContent = promotedText(node);
   return c;
 }
 
@@ -184,10 +213,14 @@ function tipRows(t, node) {
   rows.push(['promoted', list(node.P)]);
   if (passed.length) rows.push(['passed over', list(cands.filter((x) => passed.includes(x)))]);
   if (ruledOut.length) rows.push(['ruled out', list(ruledOut)]);
-  rows.push(['open', list(node.live)], ['at most', written([...node.P, ...node.live], node.bound)]);
-  if (node.kind === 'branch') rows.push(`It splits on ${node.live[0]}: promote it, or go on without it.`);
-  else if (node.kind === 'cut') rows.push(`Dropped: at most ${node.bound}, and the best so far is ${node.bestBefore}.`);
-  else rows.push(`A game: promoting ${listWords(node.P)} adds ${node.bound}.`);
+  const terms = [...node.P, ...node.live];
+  rows.push(['remaining candidates', list(node.live)], ['bound', written(terms, node.bound)]);
+  const lead = 'Its bound is the most this branch can add.';
+  if (node.kind === 'branch') rows.push(`${lead} It splits on ${node.live[0]}: promote it, or go on without it.`);
+  else if (node.kind === 'cut') {
+    const than = node.bound < node.bestBefore ? 'less than' : 'no more than';
+    rows.push(`${lead} Dropped: its bound, ${node.bound}, is ${than} the best so far, ${node.bestBefore}.`);
+  } else rows.push(`${lead} A game: promoting ${listWords(node.P)} adds ${node.bound}, the best so far.`);
   return rows;
 }
 
@@ -221,15 +254,14 @@ export function mountSearchTree(host, { small }) {
   for (const node of nodes) node.y = TOP + ROW * (depth - node.depth);
 
   // Everything must fit: the chips with their halos, a leaf's label above it, an edge's label beside its middle.
-  const leafLabel = (node) => (node.kind === 'cut' ? `${node.bound < node.bestBefore ? '<' : '='} ${node.bestBefore}`
-    : 'best so far');
+  const leafLabel = (node) => (node.kind === 'cut' ? ['bound', String(node.bound)] : ['best', 'so far']);
   const edgeLabel = (node) => (node.edge.promote ? String(node.edge.x) : `no ${node.edge.x}`);
   const fits = (left, right, top, bottom) => left >= 0 && right <= W && top >= 0 && bottom <= H;
   for (const node of nodes) {
     let ok = fits(node.x - CHIP.w / 2 - 3, node.x + CHIP.w / 2 + 3, node.y - CHIP.h / 2 - 3, node.y + CHIP.h / 2 + 3);
     if (node.children.length === 0) {
-      const half = (CHAR * leafLabel(node).length) / 2;
-      ok = ok && fits(node.x - half, node.x + half, node.y - LABEL_RISE - 7, node.y);
+      const half = (CHAR * Math.max(...leafLabel(node).map((line) => line.length))) / 2;
+      ok = ok && fits(node.x - half, node.x + half, node.y - LABEL_RISE - LINE - 9, node.y);
     }
     if (node.parent) {
       const mid = (node.x + node.parent.x) / 2;
@@ -256,8 +288,13 @@ export function mountSearchTree(host, { small }) {
     s.line(`e${node.id}`, from, { x: node.x, y: node.y + CHIP.h / 2 }, 'branch');
     s.text(`l${node.id}`, edgeLabel(node), { anchor: node.edge.promote ? 'end' : 'start' });
     s.node(`l${node.id}`).dataset.n = String(node.edge.x);
-    if (node.kind === 'cut') s.text(`r${node.id}`, leafLabel(node), { anchor: 'middle' });
-    if (node.kind === 'best') s.text(`r${node.id}`, (pos, look) => look.words ?? '', { anchor: 'middle' });
+    if (node.kind === 'cut' || node.kind === 'best') {
+      const label = leafLabelMark(leafLabel(node));
+      s.custom(`r${node.id}`, label.node, (_, look) => label.draw(look), {
+        defaults: { x: 0, y: 0, opacity: 1, halo: 0, words: '' },
+        layer: 'text',
+      });
+    }
   }
 
   const last = nodes.length;
@@ -285,7 +322,7 @@ export function mountSearchTree(host, { small }) {
       if (node.kind === 'cut' || node.kind === 'best') {
         v[`r${i}`] = {
           x: node.x, y: node.y - LABEL_RISE, halo: node.kind === 'best' ? 1 : 0, ...(isNew ? { at: [0.6, 1] } : {}),
-          ...(node.kind === 'best' ? { words: k === last ? 'best game' : 'best so far' } : {}),
+          ...(node.kind === 'best' ? { words: `best|${k === last ? 'game' : 'so far'}` } : {}),
         };
       }
     }
@@ -293,7 +330,7 @@ export function mountSearchTree(host, { small }) {
   }
   s.states(states);
 
-  // The strip of candidates: for the node the search is at, promoted, open, or out.
+  // The strip of candidates: for the node the search is at, promoted, remaining, or out.
   const strip = host.querySelector('.st-strip');
   strip.setAttribute('aria-hidden', 'true');
   const boxes = new Map(t.cands.map((x) => {
@@ -314,9 +351,9 @@ export function mountSearchTree(host, { small }) {
   const showStrip = (k) => {
     const node = nodes[k]; // none in the last state, when the search is done
     const promoted = node ? node.P : t.bestSet;
-    const open = node ? node.live : [];
+    const remaining = node ? node.live : [];
     for (const [x, box] of boxes) {
-      box.dataset.state = promoted.includes(x) ? 'promoted' : open.includes(x) ? 'open' : 'out';
+      box.dataset.state = promoted.includes(x) ? 'promoted' : remaining.includes(x) ? 'remaining' : 'out';
     }
     const bestNow = node ? (node.kind === 'best' ? node.bound : node.bestBefore) : t.best;
     const value = Object.assign(document.createElement('b'), { textContent: String(bestNow) });
@@ -328,9 +365,10 @@ export function mountSearchTree(host, { small }) {
   const best = nodes.find((node) => node.kind === 'best');
   const key = host.querySelector('.st-key');
   for (const [sample, words] of [
-    [sampleChip(nodes[0].bound, 'branch'), 'a node: the most its branch can add to U*'],
-    [sampleChip(cut.bound, 'cut'), 'dropped: it can’t beat the best so far'],
-    [sampleChip(best.bound, 'best'), 'a game: every candidate decided'],
+    [sampleChip(nodes.find((node) => node.kind === 'branch' && node.P.length), 'branch'),
+      'a node: the candidates promoted on the way to it'],
+    [sampleChip(cut, 'cut'), "dropped: its bound can't beat the best so far"],
+    [sampleChip(best, 'best'), 'a game: every candidate decided'],
   ]) {
     const item = document.createElement('li');
     item.append(sample, words);

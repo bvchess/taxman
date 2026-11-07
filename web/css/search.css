@@ -1,12 +1,12 @@
 /* Chapter 5, the search: the search tree of game 45 and the chart of the searches' cost.  The tree is flat ink, as an
-   explanatory figure is, and grows from the root at the bottom: a node is a small chip with its bound, a dropped
+   explanatory figure is, and grows from the root at the bottom: a node is a small chip with its promotions, a dropped
    branch a dashed chip, the best game's leaf a filled one.  Above it a strip of the candidates, below it a key, both
    in HTML.  The chart is one series of dots in ink. */
 
 .search-tree-fig { max-width: 30rem; position: relative; }
 .search-tree-fig .fig-caption { min-height: 6.2em; }
 
-/* The strip of candidates: a box for each, promoted, open or out at the node the search is at. */
+/* The strip of candidates: a box for each, promoted, remaining or out at the node the search is at. */
 .st-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 6px 0 8px; font-size: 0.86rem; }
 .st-strip-label { color: var(--ink-2); }
 .st-cands { display: flex; gap: 4px; }
@@ -30,7 +30,7 @@
 }
 .st-key li { display: flex; align-items: center; gap: 6px; }
 .st-sample {
-  box-sizing: border-box; min-width: 34px; height: 21px; padding: 0 5px; display: inline-flex; align-items: center;
+  box-sizing: border-box; min-width: 44px; height: 21px; padding: 0 5px; display: inline-flex; align-items: center;
   justify-content: center; border: 1.5px solid var(--ink); border-radius: 6px; background: var(--paper);
   color: var(--ink);
   font-size: 0.78rem; font-weight: 600; font-variant-numeric: tabular-nums lining-nums;
@@ -55,8 +55,8 @@
 /* On a phone the figure is drawn at about three quarters of its size, so its words are set larger. */
 @media (max-width: 560px) {
   .search-tree-fig .fig-caption { min-height: 7.7em; }
-  .v-figure.search-tree .st-bound { font-size: 15px; }
-  .v-figure.search-tree .v-text-label { font-size: 15px; }
+  .v-figure.search-tree .st-bound { font-size: 17px; }
+  .v-figure.search-tree .v-text-label { font-size: 17px; }
 }
 
 #cost-chart .cost-dots { stroke: var(--ink-2); stroke-opacity: 0.6; }
