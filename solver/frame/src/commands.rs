@@ -272,6 +272,8 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     };
     let out = args.value("--out").map(Path::new);
     let out = out.ok_or_else(|| CliError::Usage("--unsound needs --out FILE, the file of its lines".into()))?;
+    // Before any thread starts: the neighborhoods of the rounds allocate and free a searcher's memory each.
+    finder::keep_freed_memory();
     if let Err(e) = engine::stop_on_signals() {
         errln!("warning: SIGINT and SIGTERM will kill the run instead of stopping it: {e}");
     }

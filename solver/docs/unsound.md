@@ -87,6 +87,11 @@ A `prime` or `repeat` game searches nothing, and keeps what the line it starts f
 moves for n − 1 are the run's line, else the file's, else the built-in table's, and `--from-known` takes the table's
 always.
 
+The setup does not depend on the moves for n − 1, so a run makes each game's setup while the game before it plays, on
+a thread of its own beside the threads of `--threads`, with the part of a searched game's start that depends on the
+board alone (its dive).  Both run on one thread, and on many threads they would otherwise be a large part of the time
+of a run at a low level of effort.
+
 A line depends on the game, its start, the moves it starts from, the level, the seed and the options, and not on the
 threads or the machine, but for its times and threads.
 
@@ -100,6 +105,12 @@ and k alone, and the best set of the round, the lowest k's among equals, is the 
 
 The steps of a neighborhood depend on its unit alone, so the rounds are the same on any number of threads.  A stop
 signal ends the run between rounds.
+
+The threads do not wait for a round to end.  They search the neighborhoods of the next few rounds from a guess of the
+incumbents those rounds start from, that the neighborhoods still running find nothing better, and search again any
+neighborhood whose guess proves wrong.  So a round on many threads takes about its share of the threads' time, not as
+long as its longest neighborhood, and it is the same round that it is on one thread
+([finder.rs](../frame/src/search/finder.rs), "Ahead of the end of a round").
 
 ### The level of effort
 
@@ -197,7 +208,7 @@ short, the fields regrouped and comments added:
 | `rounds`, `neighborhoods`, `steps`, `work` | the rounds done, their neighborhoods, the engine's steps in them, and their work (the steps and 32 for each neighborhood) |
 | `stage_rounds` | for a searched game, for each trajectory, the rounds it spent at each of the three stages of `--widen` (all at stage 0 without it); null on any other line |
 | `improvements` | for each round that raised the score: `round` (0: before any round, a trajectory that began heavier than the start), the `trajectory` (an index in `trajectories`) that made it and its `stage` in that round, the `neighborhoods`, the `steps` and the `work` of the rounds up to and including this one, the `seconds` until it ended, and the new `score` |
-| `seconds`, `start_seconds` | the game's wall time, from the start of its setup to its line, and the part of it before the rounds |
+| `seconds`, `start_seconds` | the game's wall time, from the end of the game before (or the start of the run) to its line, and the part of it before the rounds; a game's setup is made while the game before plays, so it counts only in the first game of a run |
 | `threads` | the threads it ran on |
 | `from_known` | true if `--from-known` started the game from the built-in table's moves for n − 1 |
 | `stop_at_known` | with `--stop-at-known`: `known`, the built-in table's score, and `round`, the round after which the game had that score (0: the start or the start of a trajectory, or a game that runs no round), or null if it never had; null without the flag |

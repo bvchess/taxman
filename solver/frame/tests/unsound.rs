@@ -465,6 +465,22 @@ fn a_run_resumes_from_its_file() {
     assert_eq!(fs::read_to_string(&file).unwrap().lines().count(), whole.len());
 }
 
+/// A run makes the setup of each game but its first while the game before plays, and that is the setup the game makes
+/// on its own: from the table's moves, each searched game of [`SECOND`] has the line it has alone, as the first game
+/// of a run, and 386 repeats the problem that 385's setup posed.
+#[test]
+fn a_setup_made_while_the_game_before_plays_is_the_one_the_game_makes() {
+    let (opts, plan) = (options(4, true), Plan { back: 3, ..from_table(1) });
+    let range = lines(SECOND, &opts, &plan, None);
+    let alone: Vec<Line> = range.iter().flat_map(|line| lines((line.n, line.n), &opts, &plan, None)).collect();
+    let searched: Vec<u32> = range.iter().filter(|line| line.method == Method::Search).map(|line| line.n).collect();
+    assert_eq!(searched, [384, 385, 387]);
+    for (in_range, alone) in range.iter().zip(&alone).filter(|(line, _)| line.method == Method::Search) {
+        assert_eq!(timeless(in_range), timeless(alone), "n={}", in_range.n);
+    }
+    assert_eq!((range[2].method, range[2].repeats), (Method::Repeat, Some(385)));
+}
+
 #[test]
 fn stop_at_known_ends_the_rounds_at_the_tables_score() {
     let optimal = Optimal::built_in();

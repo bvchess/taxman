@@ -94,6 +94,11 @@
 //! line of a proven run, as every reader of proven lines refuses an unsound one
 //! ([`refuse_unsound`](crate::game::refuse_unsound)).
 //!
+//! While a game plays, a thread of its own makes the setup of the next game to play, and its start's dive
+//! ([`SetUpAhead`]): neither depends on what the game in play scores, and on many threads both would otherwise be a
+//! large part of a game's time at a low level of effort, since they run on one thread.  A setup made ahead is the one
+//! the game would make, so the lines are the same.
+//!
 //! # Measuring
 //!
 //! Two options measure the mode on the games whose opt(n) is proven, and are refused for a game the built-in table
@@ -117,6 +122,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
+use std::thread;
 use std::time::Instant;
 
 /// The most effort a run may ask for: a budget of 2^31 rounds of work, far more than a game needs, and 2^47 work,
@@ -491,7 +497,9 @@ pub struct Line {
     pub stage_rounds: Option<Vec<[u64; STAGES]>>,
     /// Each round that raised the score, in order.
     pub improvements: Vec<Raised>,
-    /// The game's wall time, from the start of its setup to its line, and the part of it before the rounds.
+    /// The game's wall time, from the end of the game before (or the start of the run) to its line, and the part of it
+    /// before the rounds.  A setup made while the game before played (the module documentation, "A range") is not in
+    /// it.
     pub seconds: f64,
     pub start_seconds: f64,
     pub threads: usize,
@@ -790,8 +798,10 @@ pub fn solve_range(
     let mut summary = RangeSummary::default();
     // This run's lines of the games before, for as many as a game may begin a trajectory from.
     let mut run: BTreeMap<u32, Moves> = BTreeMap::new();
+    let mut ahead = SetUpAhead::new(opts);
     for n in lo..=hi {
-        if file.as_ref().is_some_and(|file| file.games.contains_key(&n)) {
+        let in_file = |m: u32| file.as_ref().is_some_and(|file| file.games.contains_key(&m));
+        if in_file(n) {
             summary.skipped += 1;
             continue;
         }
@@ -800,7 +810,11 @@ pub fn solve_range(
             break;
         }
         let past = moves_before(n, &run, file.as_ref(), plan, optimal);
-        let Some(line) = play(n, &past, opts, plan, &mut earlier, optimal)? else {
+        // The next game to play has the moves for its n − 1: this game's line, or the file's.
+        if let Some(next) = (n + 1..=hi).find(|&m| !in_file(m)) {
+            ahead.start(next);
+        }
+        let Some(line) = play(n, &past, opts, plan, &mut earlier, &mut ahead, optimal)? else {
             summary.stopped_at = Some(n);
             break;
         };
@@ -859,16 +873,73 @@ fn moves_before(
         .collect()
 }
 
+/// The setups of the games after the one in play, each made on a thread of its own while that game plays.  A game's
+/// setup ([`set_up`]) depends on the game, on whether it has moves for n − 1, and on the options, and not on the moves
+/// themselves, so it can be made before the game before it ends; with it goes the dive of a searched game's start
+/// (`Job::ready`), which depends on the board alone.
+struct SetUpAhead {
+    opts: SolveOptions,
+    /// The games whose setups are being made, with moves for n − 1, and the threads that make them.
+    making: Vec<(u32, thread::JoinHandle<Result<SetUp, Failure>>)>,
+}
+
+impl SetUpAhead {
+    /// No setup made ahead yet, for a run with `opts`.
+    fn new(opts: &SolveOptions) -> SetUpAhead {
+        SetUpAhead { opts: opts.clone(), making: Vec::new() }
+    }
+
+    /// Starts making the setup of game `n`, which will have moves for n − 1.
+    fn start(&mut self, n: u32) {
+        let opts = self.opts.clone();
+        let make = move || {
+            let set = set_up(n, &Before::Run, &opts)?;
+            if let SetUp::Search(set, _) = &set {
+                set.job.ready();
+            }
+            Ok(set)
+        };
+        self.making.push((n, thread::spawn(make)));
+    }
+
+    /// The setup of game `n`, with `given` for its moves for n − 1: the one made ahead if there is one and the game has
+    /// those moves, else one made now with `opts`.
+    fn take(&mut self, n: u32, given: &Before, opts: &SolveOptions) -> Result<SetUp, Failure> {
+        let made = self.making.iter().position(|&(m, _)| m == n).map(|i| self.making.swap_remove(i).1);
+        match made {
+            Some(making) if matches!(given, Before::Run) => {
+                making.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+            }
+            Some(making) => {
+                let _ = making.join();
+                set_up(n, given, opts)
+            }
+            None => set_up(n, given, opts),
+        }
+    }
+}
+
+/// A run that ends waits for the setups it started, so that no thread of it outlives it.
+impl Drop for SetUpAhead {
+    fn drop(&mut self) {
+        for (_, making) in self.making.drain(..) {
+            let _ = making.join();
+        }
+    }
+}
+
 /// Game `n` played in the unsound mode, from the moves for the games before it, `past` ([`moves_before`]: the first is
 /// the moves for `n − 1`, which the start is seeded with, and the others begin trajectories if `plan.back` asks; see
 /// the module documentation, "One game"), and its line, checked; `None` if a stop signal ended its rounds.  `earlier`
-/// has the lines a repeat may repeat, and is told of the problem of this game's board.  An error names the game.
+/// has the lines a repeat may repeat, and is told of the problem of this game's board.  The setup is the one `ahead`
+/// made, if it made this game's.  An error names the game.
 fn play(
     n: u32,
     past: &[Option<Moves>],
     opts: &SolveOptions,
     plan: &Plan,
     earlier: &mut Earlier<()>,
+    ahead: &mut SetUpAhead,
     optimal: &Optimal,
 ) -> Result<Option<Line>, String> {
     let began = Instant::now();
@@ -905,7 +976,7 @@ fn play(
         tactics: opts.tactics,
     };
     let known = plan.stop_at_known.then(|| optimal.score(n).expect("the range was checked against the table"));
-    match set_up(n, &given, opts).map_err(Failure::message)? {
+    match ahead.take(n, &given, opts).map_err(Failure::message)? {
         SetUp::Derived(Derived::Trivial { plain, in_the_bag, .. }) => {
             (line.method, line.moves, line.in_the_bag) = (Method::Trivial, plain, Some(in_the_bag));
         }

@@ -41,10 +41,11 @@
 //! its own, keyed by the seed, n, r and k alone ([`Options::rng_of`]), with a control of its own, so that what it finds
 //! and the steps it takes are a function of the incumbent and those four.  The threads take the round's neighborhoods
 //! in any order; once all are done, the best set they found becomes the incumbent, the lowest k's on a tie
-//! ([`Lns::round`]).  The rounds go on until their work reaches a budget, checked after each round (the work of a
-//! round is its steps and [`NEIGHBORHOOD_WORK`] for each neighborhood), so the incumbent after r rounds depends on the
-//! start, n, the seed and r alone, and a run of a larger budget does the rounds of a smaller one first.  These rounds
-//! are not those of the finder beside a search, which are timed.
+//! ([`Lns::round`]), and the threads go on to the next rounds before then ("Ahead of the end of a round", below).  The
+//! rounds go on until their work reaches a budget, checked after each round (the work of a round is its steps and
+//! [`NEIGHBORHOOD_WORK`] for each neighborhood), so the incumbent after r rounds depends on the start, n, the seed
+//! and r alone, and a run of a larger budget does the rounds of a smaller one first.  These rounds are not those of
+//! the finder beside a search, which are timed.
 //!
 //! The rounds may keep more than one incumbent, a *trajectory* each: the unsound mode keeps the start's, and one for
 //! each distinct set that survives of the moves for the games before ([`surviving`]), as the finder beside a search
@@ -69,16 +70,45 @@
 //! * **`widen`** moves a trajectory whose incumbent has not grown heavier in its last S rounds down a ladder of shares
 //!   fixed ([`LADDER`]), one stage for each S rounds without growth, and back to the first stage when it grows
 //!   ([`Standing::after`]).  A trajectory's stage in a round depends only on the rounds before it.
+//!
+//! # Ahead of the end of a round
+//!
+//! The threads do not wait for a round to end before they start the next.  A round ends when its last neighborhood
+//! does, and on many threads that is its longest: a tilted or widened neighborhood takes up to 13 times its round's
+//! mean time, so that on 64 threads or more a round lasts as long as its longest neighborhood, and most threads would
+//! wait for it.  So the threads search the neighborhoods of the next rounds from a guess of where they start, and the
+//! rounds stay what they are when each begins after the round before has ended.
+//!
+//! A trajectory's *view* in a round is what its neighborhoods start from: its incumbent and its standing on the ladder.
+//! The threads keep a few rounds *in flight*, from the first that has not ended ([`ahead`] says how many), and take
+//! their neighborhoods in the order of the rounds and of k ([`Ahead`]).  The views of the first round in flight are
+//! its own.  A later round opens with a guess of its views: what the round before gives if its neighborhoods that have
+//! not ended find nothing better, which is how most neighborhoods end.  Each time a neighborhood ends, the guess of its
+//! trajectory's view in the round after is made again, and where the guess changes, that trajectory's neighborhoods in
+//! the round after are searched again, the running ones stopped, and so in turn are those of each later round whose
+//! guess the change makes wrong.  A round is taken once its neighborhoods have all ended from its views, and by then
+//! the guesses of the round after it are that round's views.
+//!
+//! So every neighborhood that counts was searched from the views that it has when the rounds run one after another,
+//! and what it found is a function of those, the seed, n, the round and k: the rounds are those that [`Lns::round`]
+//! plays one at a time, on any number of threads.  A wrong guess costs time only: the neighborhoods searched again, and
+//! those of rounds past the last, which stop when the rounds end.  So that these are few, no round opens once the
+//! work so far of the rounds before it reaches the budget, which makes the last of them the last round.  With every
+//! thread busy, the memory that each neighborhood's searcher allocates and frees would go back to the kernel and
+//! return a page fault at a time, so the unsound mode has the allocator keep it ([`keep_freed_memory`]).  The
+//! measurements are the notebook's entry
+//! https://github.com/bvchess/taxman-notebook/blob/main/search/the-unsound-mode-on-all-threads-2026-11/README.md.
 
 use super::incumbent::surviving;
 use super::{best_so_far, offer_found, payload_of, set_of_payload, Prepared, SearchSpace, TaxSearcher, TaxUnit};
 use crate::bits::Bits;
 use crate::engine::{self, in_parallel, Control, EngineConfig, Start};
 use crate::rng::Rng;
+use std::collections::VecDeque;
 use std::fmt;
 use std::io::{self, Write};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, TryRecvError};
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -244,6 +274,24 @@ impl<const W: usize> Round<W> {
     pub fn work(&self) -> u64 {
         self.nodes + NEIGHBORHOODS * NEIGHBORHOOD_WORK
     }
+
+    /// The round from the incumbents `bases`, whose neighborhoods came to `ran`: neighborhood k, of the trajectory
+    /// k mod T, with what it came to, in the order of k.  A neighborhood that `ran` lacks counts as one that found
+    /// nothing better and took no step, so that the sets of a round whose neighborhoods have not all ended are what
+    /// they will be if the others find nothing better (the guess of [`Ahead`]).
+    fn of<'r>(bases: &[Bits<W>], ran: impl IntoIterator<Item = (usize, &'r Ran<W>)>) -> Round<W> {
+        let mut out = Round { sets: bases.to_vec(), nodes: 0, finished: 0 };
+        for (k, ran) in ran {
+            (out.nodes, out.finished) = (out.nodes + ran.nodes, out.finished + u64::from(ran.completed));
+            // The heaviest of a trajectory's, the first of equals: a later set replaces it only if it is strictly
+            // heavier.
+            let set = &mut out.sets[k % bases.len()];
+            if ran.set.sum() > set.sum() {
+                *set = ran.set;
+            }
+        }
+        out
+    }
 }
 
 /// A better set that a round of [`Lns::rounds`] found: the round (from 1; 0 is a start heavier than the first, before
@@ -282,6 +330,14 @@ impl Standing {
             Standing { stalled: self.stalled + 1, ..self }
         }
     }
+}
+
+/// What the neighborhoods of a trajectory start from in a round: its incumbent and its standing on the ladder of
+/// `widen`, as the round starts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct View<const W: usize> {
+    base: Bits<W>,
+    standing: Standing,
 }
 
 /// What [`Lns::rounds`] came to.
@@ -377,32 +433,49 @@ impl<const W: usize> Lns<'_, W> {
         Outcome { set: best, nodes, units, finished, improved, found }
     }
 
+    /// Neighborhood `k` of round `round` (counted from 1) of the rounds on many threads, a round of `trajectories`
+    /// trajectories, from `view`, the view of its trajectory, k mod T, as the round starts: drawn at the trajectory's
+    /// stage of the ladder ([`Options::at_stage`]) from [`Options::rng_of`], tilted or not as [`draws_tilted`] says of
+    /// `options.tilt`, and searched as a unit ([`unit`](Self::unit)) with `control`, a control of its own, since a
+    /// control passes the incumbent of one run on to the next.  What it finds and the steps it takes are a function of
+    /// `view`, the seed, n, the round and k alone.
+    fn neighborhood_k(
+        &self,
+        view: &View<W>,
+        trajectories: usize,
+        round: u64,
+        k: u64,
+        control: &Arc<Control>,
+    ) -> Ran<W> {
+        let at = Lns { options: self.options.at_stage(view.standing.stage), ..*self };
+        let tilted = draws_tilted(k, trajectories, self.options.tilt);
+        at.unit(&view.base, &mut self.options.rng_of(self.p.n, round, k), control, tilted)
+    }
+
+    /// The view of a trajectory in the round after one that it started from `view`, whose neighborhoods' heaviest set
+    /// was `best` (the view's incumbent unless one was heavier): `best`, and with `options.widen` the standing after a
+    /// round that grew heavier or not.
+    fn after(&self, view: &View<W>, best: Bits<W>) -> View<W> {
+        let grew = best.sum() > view.base.sum();
+        let standing = self.options.widen.map_or(view.standing, |widen| view.standing.after(grew, widen));
+        View { base: best, standing }
+    }
+
     /// Round `round` (counted from 1) of the rounds on many threads (see the module documentation, "On many threads,
     /// alone"), from the incumbents `bases`, at least one, on `threads` threads: the [`NEIGHBORHOODS`] neighborhoods,
     /// the kth of the incumbent `bases[k % bases.len()]`, at the stage of the ladder `stages[k % bases.len()]`
-    /// ([`Options::at_stage`]), drawn from [`Options::rng_of`], tilted or not as [`draws_tilted`] says of
-    /// `options.tilt`, and searched as a unit ([`unit`](Self::unit)) with a control of its own, since a control passes
-    /// the incumbent of one run on to the next.  The answer is the same on any number of threads.
+    /// ([`neighborhood_k`](Self::neighborhood_k)).  The answer is the same on any number of threads.  This is a round
+    /// on its own, which ends when its last neighborhood does; [`rounds`](Self::rounds) plays the same rounds with no
+    /// such wait between them.
     pub fn round(&self, bases: &[Bits<W>], stages: &[usize], round: u64, threads: usize) -> Round<W> {
         debug_assert_eq!(bases.len(), stages.len(), "a stage for each trajectory");
-        let n = self.p.n;
+        let standing = |stage| Standing { stage, stalled: 0 };
+        let views: Vec<View<W>> =
+            bases.iter().zip(stages).map(|(&base, &stage)| View { base, standing: standing(stage) }).collect();
         let ran = in_parallel(NEIGHBORHOODS as usize, threads, |k| {
-            let trajectory = k % bases.len();
-            let at = Lns { options: self.options.at_stage(stages[trajectory]), ..*self };
-            let tilted = draws_tilted(k as u64, bases.len(), self.options.tilt);
-            at.unit(&bases[trajectory], &mut self.options.rng_of(n, round, k as u64), &Control::new(), tilted)
+            self.neighborhood_k(&views[k % views.len()], views.len(), round, k as u64, &Control::new())
         });
-        let mut out = Round { sets: bases.to_vec(), nodes: 0, finished: 0 };
-        for (k, ran) in ran.into_iter().enumerate() {
-            (out.nodes, out.finished) = (out.nodes + ran.nodes, out.finished + u64::from(ran.completed));
-            // The heaviest of a trajectory's, the first of equals: a later set replaces it only if it is strictly
-            // heavier.
-            let set = &mut out.sets[k % bases.len()];
-            if ran.set.sum() > set.sum() {
-                *set = ran.set;
-            }
-        }
-        out
+        Round::of(bases, ran.iter().enumerate())
     }
 
     /// Rounds 1, 2, ... of the rounds on many threads ([`round`](Self::round)), from the incumbents `starts`, at least
@@ -417,6 +490,9 @@ impl<const W: usize> Lns<'_, W> {
     /// A start that is heavier than the first one makes the game's set before any round: an improvement of round 0.
     /// A stop signal ([`engine::stop_signal`]) ends the rounds before the next, or in the middle of one, whose units
     /// it stops: then the rounds are `interrupted`, and the round it stopped is not counted.
+    ///
+    /// The threads run the rounds ahead of their ends (the module documentation, "Ahead of the end of a round"), and
+    /// the rounds are those that [`round`](Self::round) plays one after another.
     pub fn rounds(
         &self,
         starts: &[Bits<W>],
@@ -425,8 +501,22 @@ impl<const W: usize> Lns<'_, W> {
         clock: &dyn Fn() -> f64,
         enough: &dyn Fn(u64) -> bool,
     ) -> Rounds<W> {
-        let mut incumbents = starts.to_vec();
-        let (trajectory, set) = heaviest(&incumbents);
+        self.rounds_in(starts, budget, threads, clock, enough, (ahead(threads), Order::Rounds))
+    }
+
+    /// [`rounds`](Self::rounds) with the threads running at most `depth` rounds at once and taking their neighborhoods
+    /// in `order`.
+    fn rounds_in(
+        &self,
+        starts: &[Bits<W>],
+        budget: u64,
+        threads: usize,
+        clock: &dyn Fn() -> f64,
+        enough: &dyn Fn(u64) -> bool,
+        (depth, order): (usize, Order),
+    ) -> Rounds<W> {
+        let mut views: Vec<View<W>> = starts.iter().map(|&base| View { base, standing: Standing::default() }).collect();
+        let (trajectory, set) = heaviest(starts);
         let mut out = Rounds {
             set,
             rounds: 0,
@@ -441,38 +531,393 @@ impl<const W: usize> Lns<'_, W> {
             let none = Improvement { round: 0, trajectory, stage: 0, steps: 0, work: 0, sum, seconds: clock() };
             out.improvements.push(none);
         }
-        let mut standing = vec![Standing::default(); starts.len()];
-        let signaled = || engine::stop_signal().is_some();
-        while out.work < budget && !enough(out.set.sum()) {
-            if signaled() {
-                out.interrupted = true;
-                break;
-            }
-            let round = out.rounds + 1;
-            let stages: Vec<usize> = standing.iter().map(|standing| standing.stage).collect();
-            let ran = self.round(&incumbents, &stages, round, threads);
-            // A signal in the middle of the round stopped some of its units.
-            if signaled() {
-                out.interrupted = true;
-                break;
-            }
-            (out.rounds, out.nodes, out.work) = (round, out.nodes + ran.nodes, out.work + ran.work());
-            for (t, &stage) in stages.iter().enumerate() {
-                out.stage_rounds[t][stage] += 1;
-                if let Some(widen) = self.options.widen {
-                    standing[t] = standing[t].after(ran.sets[t].sum() > incumbents[t].sum(), widen);
-                }
-            }
-            incumbents = ran.sets;
-            let (trajectory, set) = heaviest(&incumbents);
-            if set.sum() > out.set.sum() {
-                let (stage, steps, work, sum) = (stages[trajectory], out.nodes, out.work, set.sum());
-                out.improvements.push(Improvement { round, trajectory, stage, steps, work, sum, seconds: clock() });
-            }
-            out.set = set;
+        let more = |out: &Rounds<W>| out.work < budget && !enough(out.set.sum());
+        if !more(&out) {
+            return out;
         }
+        let ahead = Ahead::new(self, &views, budget, (depth, order));
+        thread::scope(|scope| {
+            // However the rounds end, the threads stop.
+            let _over = Over(&ahead);
+            for _ in 0..threads.max(1) {
+                scope.spawn(|| ahead.worker());
+            }
+            let signaled = || engine::stop_signal().is_some();
+            while more(&out) {
+                if signaled() {
+                    out.interrupted = true;
+                    break;
+                }
+                // None: a thread panicked, which the end of the scope raises again.
+                let Some(ran) = ahead.next() else { break };
+                // A signal in the middle of the round stopped some of its units.
+                if signaled() {
+                    out.interrupted = true;
+                    break;
+                }
+                let round = out.rounds + 1;
+                (out.rounds, out.nodes, out.work) = (round, out.nodes + ran.nodes, out.work + ran.work());
+                let stages: Vec<usize> = views.iter().map(|view| view.standing.stage).collect();
+                for (t, &stage) in stages.iter().enumerate() {
+                    out.stage_rounds[t][stage] += 1;
+                }
+                views = views.iter().zip(&ran.sets).map(|(view, &best)| self.after(view, best)).collect();
+                ahead.confirm(&views);
+                let (trajectory, set) = heaviest(&ran.sets);
+                if set.sum() > out.set.sum() {
+                    let (stage, steps, work, sum) = (stages[trajectory], out.nodes, out.work, set.sum());
+                    out.improvements.push(Improvement { round, trajectory, stage, steps, work, sum, seconds: clock() });
+                }
+                out.set = set;
+            }
+        });
         out
     }
+}
+
+/// The order in which the threads of [`Ahead`] take the neighborhoods that no thread searches.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Order {
+    /// By round, and by k within a round: the rounds as they come.
+    Rounds,
+    /// The last of the rounds in flight first, and a new round before any other: the tests' order, in which on one
+    /// thread every round but the first opens, and has its views guessed, before the round before it has ended, so
+    /// that a guess is wrong wherever that round improves.
+    #[cfg(test)]
+    Last,
+}
+
+/// The rounds of [`Lns::rounds`] on many threads, ahead of their ends (the module documentation, "Ahead of the end of a
+/// round"): rounds in flight, from the first that has not ended, whose neighborhoods the threads search as they come
+/// ([`Order`]).  The views of the first round are its own; those of a later one are a guess, made when it opens and
+/// again as each neighborhood of the round before ends: what the round before will give if its neighborhoods that have
+/// not ended find nothing better.  Where a guess changes, that trajectory's neighborhoods in the round are searched
+/// again ([`set_view`](Self::set_view)).
+struct Ahead<'l, 'a, const W: usize> {
+    lns: &'l Lns<'a, W>,
+    trajectories: usize,
+    /// The work that the rounds run until: no round opens that the rounds before it are sure to make unplayed.
+    budget: u64,
+    /// The most rounds in flight ([`ahead`]).
+    depth: usize,
+    order: Order,
+    flight: Mutex<Flight<W>>,
+    /// Told when a neighborhood that no thread searches appears, and when the rounds are over.
+    free: Condvar,
+    /// Told when a neighborhood ends, and when the rounds are over.
+    ended: Condvar,
+}
+
+/// The rounds of [`Ahead`] that have not ended.
+struct Flight<const W: usize> {
+    /// The number of the round at the front of `rounds`.
+    first: u64,
+    rounds: VecDeque<Pending<W>>,
+    /// The work of the rounds that have ended.
+    work: u64,
+    /// The rounds are over, or a thread panicked: the threads return.
+    over: bool,
+}
+
+/// A round in flight: the views of its trajectories, and its neighborhoods.
+struct Pending<const W: usize> {
+    views: Vec<View<W>>,
+    slots: Vec<Slot<W>>,
+}
+
+/// A neighborhood of a round in flight.
+struct Slot<const W: usize> {
+    /// What it came to, searched from its trajectory's view in the round as the view is.
+    done: Option<Ran<W>>,
+    /// The control of its search while one runs from that view, to stop it if the view changes.
+    running: Option<Arc<Control>>,
+    /// How many times the view it starts from has changed, so that a search started before a change is not taken.
+    epoch: u64,
+}
+
+/// A neighborhood a thread searches: its round, its k, the view it starts from, the slot's epoch when it started, and
+/// the control of its search.
+struct Task<const W: usize> {
+    round: u64,
+    k: usize,
+    view: View<W>,
+    epoch: u64,
+    control: Arc<Control>,
+}
+
+/// The most rounds that [`Ahead`] runs at once on `threads` threads: enough that the threads have neighborhoods to
+/// search while the longest of the first round runs.  The longest neighborhood of a round takes a median 3 times the
+/// mean of its round, and up to 13 times, so that in its time `threads` threads search about 4 × `threads`
+/// neighborhoods, and 1 + 4 × `threads` / 64 rounds in flight keep them busy.  A wrong guess costs the neighborhoods of
+/// its trajectory in the rounds after it, so there are no more.  The measurements are the notebook's entry
+/// https://github.com/bvchess/taxman-notebook/blob/main/search/the-unsound-mode-on-all-threads-2026-11/README.md.
+fn ahead(threads: usize) -> usize {
+    1 + (4 * threads).div_ceil(NEIGHBORHOODS as usize)
+}
+
+impl<const W: usize> Pending<W> {
+    /// A round from `views` whose neighborhoods have not been searched.
+    fn new(views: Vec<View<W>>) -> Pending<W> {
+        let slots = (0..NEIGHBORHOODS).map(|_| Slot { done: None, running: None, epoch: 0 }).collect();
+        Pending { views, slots }
+    }
+
+    /// The round as far as its neighborhoods have ended ([`Round::of`]).
+    fn so_far(&self) -> Round<W> {
+        let bases: Vec<Bits<W>> = self.views.iter().map(|view| view.base).collect();
+        Round::of(&bases, self.slots.iter().enumerate().filter_map(|(k, slot)| slot.done.as_ref().map(|ran| (k, ran))))
+    }
+}
+
+impl<const W: usize> Slot<W> {
+    /// A neighborhood that no thread searches and that has not been searched.
+    fn free(&self) -> bool {
+        self.done.is_none() && self.running.is_none()
+    }
+
+    /// Forgets what the neighborhood came to, or stops its search: the view it starts from has changed.
+    fn reset(&mut self) {
+        self.epoch += 1;
+        self.done = None;
+        if let Some(control) = self.running.take() {
+            control.stop();
+        }
+    }
+}
+
+impl<'l, 'a, const W: usize> Ahead<'l, 'a, W> {
+    /// The rounds of `lns` from `views`, the views of the trajectories in the first round, until their work reaches
+    /// `budget`, at most `depth` rounds at once, whose neighborhoods the threads take in `order`.
+    fn new(lns: &'l Lns<'a, W>, views: &[View<W>], budget: u64, (depth, order): (usize, Order)) -> Self {
+        let rounds = VecDeque::from([Pending::new(views.to_vec())]);
+        let flight = Flight { first: 1, rounds, work: 0, over: false };
+        Ahead {
+            lns,
+            trajectories: views.len(),
+            budget,
+            depth: depth.max(1),
+            order,
+            flight: Mutex::new(flight),
+            free: Condvar::new(),
+            ended: Condvar::new(),
+        }
+    }
+
+    fn lock(&self) -> MutexGuard<'_, Flight<W>> {
+        self.flight.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// A thread's part: it searches the neighborhoods that [`take`](Self::take) gives it, one at a time, until the
+    /// rounds are over.
+    fn worker(&self) {
+        // A thread that panics ends the rounds, so that no one waits for its neighborhood.
+        let _over = Over(self);
+        let mut flight = self.lock();
+        while !flight.over {
+            let Some(task) = self.take(&mut flight) else {
+                flight = self.free.wait(flight).unwrap_or_else(PoisonError::into_inner);
+                continue;
+            };
+            drop(flight);
+            let ran = self.lns.neighborhood_k(&task.view, self.trajectories, task.round, task.k as u64, &task.control);
+            flight = self.lock();
+            // A round that has ended has taken its neighborhoods' searches, and a slot whose view has changed takes
+            // none begun before.
+            let Some(i) = task.round.checked_sub(flight.first).map(|i| i as usize) else { continue };
+            let Some(round) = flight.rounds.get_mut(i) else { continue };
+            let slot = &mut round.slots[task.k];
+            if slot.epoch != task.epoch || slot.running.is_none() {
+                continue;
+            }
+            (slot.done, slot.running) = (Some(ran), None);
+            self.ended.notify_all();
+            // What it found may change the guess of its trajectory's view in the rounds after.
+            let t = task.k % self.trajectories;
+            if i + 1 < flight.rounds.len() {
+                let guess = self.guess(&flight.rounds[i], t);
+                if self.set_view(&mut flight, i + 1, t, guess) {
+                    self.free.notify_all();
+                }
+            }
+        }
+    }
+
+    /// Whether a round after those in flight may be played: unless the work of the rounds before it is sure to reach
+    /// the budget, so that the last of them is the last round.  Their work so far is a floor on it, which counts a
+    /// neighborhood that has not ended as one of no steps.
+    fn may_open(&self, flight: &Flight<W>) -> bool {
+        flight.work + flight.rounds.iter().map(|round| round.so_far().work()).sum::<u64>() < self.budget
+    }
+
+    /// The view of trajectory `t` in the round after `round`, if the neighborhoods of `round` that have not ended find
+    /// nothing better.
+    fn guess(&self, round: &Pending<W>, t: usize) -> View<W> {
+        self.lns.after(&round.views[t], round.so_far().sets[t])
+    }
+
+    /// Gives trajectory `t` the view `view` in round `i` of those in flight.  If that changes it, the trajectory's
+    /// neighborhoods in the round are searched again, and so, in turn, are those of each later round whose guess the
+    /// change makes wrong.  Returns whether it changed a view.
+    fn set_view(&self, flight: &mut Flight<W>, i: usize, t: usize, view: View<W>) -> bool {
+        let mut view = view;
+        let mut changed = false;
+        for round in flight.rounds.iter_mut().skip(i) {
+            if round.views[t] == view {
+                break;
+            }
+            (round.views[t], changed) = (view, true);
+            for slot in round.slots.iter_mut().skip(t).step_by(self.trajectories) {
+                slot.reset();
+            }
+            // None of the trajectory's neighborhoods of the round has ended now.
+            view = self.lns.after(&view, view.base);
+        }
+        changed
+    }
+
+    /// The next neighborhood to search, in the order of [`Order`], marked as searched by a thread: one of the rounds in
+    /// flight that no thread searches, else the first of a new round, if there is room for one and a round to
+    /// guess its views from.  None if there is none.
+    fn take(&self, flight: &mut Flight<W>) -> Option<Task<W>> {
+        let first = flight.first;
+        let open = |flight: &mut Flight<W>| {
+            let last = flight.rounds.back()?;
+            let views = (0..self.trajectories).map(|t| self.guess(last, t)).collect();
+            flight.rounds.push_back(Pending::new(views));
+            Some(flight.rounds.len() - 1)
+        };
+        let room = flight.rounds.len() < self.depth && self.may_open(flight);
+        let (i, k) = match self.order {
+            Order::Rounds => {
+                let free = flight
+                    .rounds
+                    .iter()
+                    .enumerate()
+                    .find_map(|(i, round)| round.slots.iter().position(Slot::free).map(|k| (i, k)));
+                match free {
+                    Some(at) => at,
+                    None if room => (open(flight)?, 0),
+                    None => return None,
+                }
+            }
+            #[cfg(test)]
+            Order::Last => match room.then(|| open(flight)).flatten() {
+                Some(i) => (i, NEIGHBORHOODS as usize - 1),
+                None => flight
+                    .rounds
+                    .iter()
+                    .enumerate()
+                    .rev()
+                    .find_map(|(i, round)| round.slots.iter().rposition(Slot::free).map(|k| (i, k)))?,
+            },
+        };
+        let pending = &mut flight.rounds[i];
+        let view = pending.views[k % self.trajectories];
+        let slot = &mut pending.slots[k];
+        let control = Control::new();
+        slot.running = Some(Arc::clone(&control));
+        Some(Task { round: first + i as u64, k, view, epoch: slot.epoch, control })
+    }
+
+    /// The first round in flight, once its neighborhoods have all ended, which it leaves: the round it was
+    /// ([`Round::of`]).  None if the rounds are over, which only a thread that panicked does while they run.
+    fn next(&self) -> Option<Round<W>> {
+        let mut flight = self.lock();
+        loop {
+            if flight.over {
+                return None;
+            }
+            if flight.rounds.front().is_some_and(|round| round.slots.iter().all(|slot| slot.done.is_some())) {
+                let round = flight.rounds.pop_front().expect("the first round in flight").so_far();
+                (flight.first, flight.work) = (flight.first + 1, flight.work + round.work());
+                self.free.notify_all();
+                return Some(round);
+            }
+            flight = self.ended.wait(flight).unwrap_or_else(PoisonError::into_inner);
+        }
+    }
+
+    /// The views of the trajectories in the round after the one [`next`](Self::next) gave last: the first round in
+    /// flight's ([`set_view`](Self::set_view)), or a round's that it opens if none is in flight.  The guesses are
+    /// made again as each neighborhood ends, so that once a round has ended, the guesses of the round after it are its
+    /// views, and these are the same.
+    fn confirm(&self, views: &[View<W>]) {
+        let mut flight = self.lock();
+        if flight.rounds.is_empty() {
+            flight.rounds.push_back(Pending::new(views.to_vec()));
+        }
+        for (t, &view) in views.iter().enumerate() {
+            self.set_view(&mut flight, 0, t, view);
+        }
+        self.free.notify_all();
+    }
+
+    /// Ends the rounds: the searches that run stop, and the threads return.
+    fn stop(&self) {
+        let mut flight = self.lock();
+        flight.over = true;
+        for slot in flight.rounds.iter_mut().flat_map(|round| &mut round.slots) {
+            if let Some(control) = slot.running.take() {
+                control.stop();
+            }
+        }
+        self.free.notify_all();
+        self.ended.notify_all();
+    }
+}
+
+/// Stops the rounds of an [`Ahead`] when it is dropped: at the end of the rounds, and when a thread panics.
+struct Over<'s, 'l, 'a, const W: usize>(&'s Ahead<'l, 'a, W>);
+
+impl<const W: usize> Drop for Over<'_, '_, '_, W> {
+    fn drop(&mut self) {
+        self.0.stop();
+    }
+}
+
+/// Has the allocator keep the memory that a thread frees for its next allocations: for the unsound mode, whose caller
+/// calls it once, before it starts a thread.  Each neighborhood of the rounds on many threads is a run of the engine
+/// with a searcher of its own, whose memory (its stack of nodes, its nogoods, its bound's tables) is allocated as the
+/// neighborhood starts and freed as it ends.  glibc's malloc gives such memory back to the kernel when it is freed, and
+/// takes it again, a page fault at a time, for the next neighborhood; on many threads the faults wait for one another
+/// on the process's map of its memory, and the threads spend much of their time in the kernel or waiting for it.  So
+/// the freed top of an arena is kept however large it is, and every allocation below the largest threshold glibc takes
+/// comes from an arena, not from a mapping of its own.  It changes no answer, only where memory comes from; the
+/// notebook's entry, linked in the module documentation, has what it saves.  Elsewhere than glibc it does nothing.
+pub fn keep_freed_memory() {
+    malloc::keep_freed_memory();
+}
+
+/// glibc's malloc ([`keep_freed_memory`]).
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+mod malloc {
+    use std::ffi::c_int;
+
+    /// The parameters `M_TRIM_THRESHOLD` and `M_MMAP_THRESHOLD` of glibc's `malloc.h`.
+    const M_TRIM_THRESHOLD: c_int = -1;
+    const M_MMAP_THRESHOLD: c_int = -3;
+    /// The largest threshold of a mapping of its own that glibc takes on a 64-bit machine, 32 MiB
+    /// (`DEFAULT_MMAP_THRESHOLD_MAX`): every allocation below it comes from an arena.
+    const LARGEST_MMAP_THRESHOLD: c_int = 32 << 20;
+
+    extern "C" {
+        fn mallopt(param: c_int, value: c_int) -> c_int;
+    }
+
+    pub fn keep_freed_memory() {
+        // SAFETY: `mallopt` has no preconditions: it sets two parameters of the allocator, and it is called before
+        // the process has other threads, which glibc asks of it.
+        unsafe {
+            mallopt(M_TRIM_THRESHOLD, c_int::MAX);
+            mallopt(M_MMAP_THRESHOLD, LARGEST_MMAP_THRESHOLD);
+        }
+    }
+}
+
+/// Another allocator than glibc's is left as it is.
+#[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+mod malloc {
+    pub fn keep_freed_memory() {}
 }
 
 /// The `count` promotions that the tilted share frees among `members`, the promotions of game `n` in ascending order:
@@ -824,6 +1269,60 @@ mod tests {
         for threads in [2, 4] {
             assert_eq!(rounds_of(&p, two, threads, None), one, "{threads} threads");
         }
+    }
+
+    /// The rounds on many threads of [`rounds_with`], on threads that run at most `depth` rounds at once and take their
+    /// neighborhoods in `order` (`flight`, the most rounds in flight and the order).
+    fn rounds_ahead(
+        p: &Prepared<W>,
+        options: Options,
+        starts: &[Bits<W>],
+        budget: u64,
+        threads: usize,
+        flight: (usize, Order),
+    ) -> Rounds<W> {
+        let space = SearchSpace::new(p);
+        let lns = Lns { p, space: &space, options };
+        lns.rounds_in(starts, budget, threads, &|| 0.0, &|_| false, flight)
+    }
+
+    /// The rounds that run ahead of their ends are the rounds one after another, which one round in flight plays: its
+    /// next round opens only once it has ended.  The order `Last` opens every round but the first, and guesses its
+    /// views, before the round before it has ended, so that the guesses are wrong wherever that round improves a
+    /// trajectory, and their neighborhoods are searched again; the rounds are the same.  The rounds of `options` from
+    /// `starts` on game 400, to the work of about two rounds.
+    fn check_the_rounds_ahead(options: Options, starts: impl Fn(&Prepared<W>) -> Vec<Bits<W>>) {
+        let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
+        let starts = starts(&p);
+        let first = rounds_ahead(&p, options, &starts, ONE_ROUND, 1, (1, Order::Rounds));
+        let budget = 2 * first.work;
+        let one_after_another = rounds_ahead(&p, options, &starts, budget, 1, (1, Order::Rounds));
+        assert!(one_after_another.rounds >= 2 && !one_after_another.improvements.is_empty(), "{one_after_another:?}");
+        for (threads, flight) in [(3, (3, Order::Rounds)), (1, (3, Order::Last))] {
+            let ahead = rounds_ahead(&p, options, &starts, budget, threads, flight);
+            assert_eq!(ahead, one_after_another, "{threads} threads, {flight:?}");
+        }
+        // A run of less work, ahead of the ends of its rounds, does the rounds of more first.
+        let less = rounds_ahead(&p, options, &starts, first.work, 1, (3, Order::Last));
+        assert_eq!(less.rounds, 1);
+        assert!(one_after_another.improvements.starts_with(&less.improvements), "{:?}", less.improvements);
+    }
+
+    /// Rounds 1 and 2 of game 400 improve the greedy set.
+    #[test]
+    fn the_rounds_ahead_of_their_ends_are_the_rounds_one_after_another() {
+        check_the_rounds_ahead(Options::default(), |p| vec![p.greedy]);
+    }
+
+    /// With `widen` of 1 a round without growth changes a trajectory's stage, and a second trajectory from half the
+    /// greedy set grows in the first rounds.
+    #[test]
+    fn the_rounds_ahead_of_their_ends_are_the_rounds_one_after_another_with_two_trajectories_and_widening() {
+        let widened = Options { widen: Some(1), tilt: 50, ..Options::default() };
+        check_the_rounds_ahead(widened, |p| {
+            let half = p.greedy.to_vec();
+            vec![p.greedy, half[..half.len() / 2].iter().copied().collect()]
+        });
     }
 
     #[test]

@@ -92,7 +92,6 @@ use crate::engine::{self, Control, Counters, EngineConfig, Spent, Stats};
 use crate::frames::BoardFrames;
 use crate::game::{replay, replay_finished, Optimal};
 use crate::json::Json;
-use crate::matchbound::MatchGraph;
 use crate::numtheory::Tables;
 use crate::results::{
     assumptions_json, assumptions_of, build_json, moves_digest, Assumptions, Proof, ResultsFile, SCHEMA,
@@ -935,7 +934,8 @@ trait Job: Send + Sync {
     /// promotion sum (the run's ceiling and the table's score are the caller's).  If the search takes a seed, the
     /// rounds follow a trajectory besides the start's from what survives of the moves in `back`, the games n − 1,
     /// n − 2, ... and their moves, for each that is not a set an earlier trajectory began from
-    /// ([`unsound::trajectories`]).  `clock` is the game's seconds so far.
+    /// ([`unsound::trajectories`]).  `clock` is the game's seconds so far.  The start's dive is the one
+    /// [`ready`](Job::ready) made, if it was called.
     fn improve(
         &self,
         seed: Option<&[u32]>,
@@ -945,6 +945,9 @@ trait Job: Send + Sync {
         clock: &dyn Fn() -> f64,
         enough: &dyn Fn(u64) -> bool,
     ) -> unsound::Improved;
+    /// Makes the dive of the unsound mode's start ([`search::start_dive`]) once, which depends on the board alone, so
+    /// that a run may make it while the game before plays.
+    fn ready(&self);
 }
 
 /// The [`Job`] of a board of set width `W`.
@@ -958,6 +961,8 @@ struct SearchJob<const W: usize> {
     branching: Arc<Branching>,
     /// The near-repeat cut, once it is armed ([`Job::arm`]): the search reads it from here.
     near: OnceLock<NearRepeat<W>>,
+    /// The dive of the unsound mode's start, once it is made ([`Job::ready`]).
+    dived: OnceLock<Bits<W>>,
 }
 
 impl<const W: usize> SearchJob<W> {
@@ -1082,9 +1087,9 @@ impl<const W: usize> Job for SearchJob<W> {
     ) -> unsound::Improved {
         let prepared = &self.prepared;
         let seed = self.seed_of(seed.filter(|_| self.seeds));
-        let graph = MatchGraph::new(&prepared.model, &prepared.root);
         // The job's control has no ceiling, and only takes the start's offers.
-        let start = search::start_incumbent(prepared, &graph, &self.control, threads, seed.as_ref());
+        let dived = || *self.dived.get_or_init(|| search::start_dive(prepared));
+        let start = search::start_incumbent_with(prepared, &self.control, threads, seed.as_ref(), dived);
         let start_seconds = clock();
         // The other trajectories, if there are any, begin from what survives of the moves for the games before, as the
         // finder's seed rounds begin from what survives of the seed.  The start is at least as heavy as the survivors
@@ -1111,6 +1116,10 @@ impl<const W: usize> Job for SearchJob<W> {
             improvements: ran.improvements,
             interrupted: ran.interrupted,
         }
+    }
+
+    fn ready(&self) {
+        self.dived.get_or_init(|| search::start_dive(&self.prepared));
     }
 }
 
@@ -1199,8 +1208,8 @@ fn set_up_with_width<const W: usize>(n: u32, before: &Before, opts: &SolveOption
     // The branching settings the searchers start with: the tactics' (checked above to be the game's), and the gate, which
     // is no tactic, the run's (`--gate`) if it has one, else the default.
     let branching = Arc::new(Branching::new(BranchSettings::of(&prepared.tactics).with_gate(opts.gate)));
-    let (control, near) = (Control::new(), OnceLock::new());
-    let job = Arc::new(SearchJob { board, prepared, control, resuming, seeds, branching, near });
+    let (control, near, dived) = (Control::new(), OnceLock::new(), OnceLock::new());
+    let job = Arc::new(SearchJob { board, prepared, control, resuming, seeds, branching, near, dived });
     Ok(SetUp::Search(SearchSetUp { job, setup, in_the_bag, frames, greedy }, problem))
 }
 
