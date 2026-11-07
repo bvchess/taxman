@@ -193,14 +193,6 @@ function leafLabelMark(lines) {
   };
 }
 
-// A chip drawn in HTML, as a sample for the key.
-function sampleChip(node, kind) {
-  const c = document.createElement('span');
-  c.className = `st-sample is-${kind}`;
-  c.textContent = promotedText(node);
-  return c;
-}
-
 // The candidates passed over on the way to a node: the x of every "no x" branch from the root.
 function passedOver(node) {
   const out = [];
@@ -234,7 +226,7 @@ function tipRows(t, node, done) {
   return rows;
 }
 
-/** Mount the figure in host, which holds a .st-strip, an <svg>, a .st-key, .fig-timeline and .fig-caption.  Returns
+/** Mount the figure in host, which holds a .st-strip, an <svg>, .fig-timeline and .fig-caption.  Returns
  *  the figure's api and the facts the page's prose quotes. */
 export function mountSearchTree(host, { small }) {
   const t = searchTree(N);
@@ -385,20 +377,7 @@ export function mountSearchTree(host, { small }) {
     bestText.replaceChildren(k === last ? 'best: ' : 'best so far: ', value);
   };
 
-  // The key: a sample of each kind of chip, with the numbers of the search.
-  const cut = nodes.find((node) => node.kind === 'cut');
   const best = nodes.find((node) => node.kind === 'best');
-  const key = host.querySelector('.st-key');
-  for (const [sample, words] of [
-    [sampleChip(nodes.find((node) => node.kind === 'branch' && node.P.length), 'branch'),
-      'a node: the candidates promoted on the way to it'],
-    [sampleChip(cut, 'cut'), "dropped: its bound can't beat the best so far"],
-    [sampleChip(best, 'best'), 'a game: every candidate decided'],
-  ]) {
-    const item = document.createElement('li');
-    item.append(sample, words);
-    key.appendChild(item);
-  }
 
   // The tooltip: what the search knows at a node, for the nodes the state shows.
   let state = 0;
