@@ -47,7 +47,7 @@ const NO_MODEL = ['ceiling', 'prime'];
 export const GROUPS = [
   { key: 'search', name: 'search', rules: ['search'] },
   { key: 'repeat', name: 'repeats an earlier search', rules: ['repeat'] },
-  { key: 'before', name: 'derived from game n − 1', rules: ['prime', 'ceiling'] },
+  { key: 'before', name: 'follows from game n − 1', rules: ['prime', 'ceiling'] },
 ];
 export const GROUP = Object.fromEntries(GROUPS.map((g) => [g.key, g]));
 const GROUP_OF_RULE = Object.fromEntries(GROUPS.flatMap((g) => g.rules.map((r) => [r, g.key])));

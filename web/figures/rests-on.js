@@ -10,7 +10,7 @@ import { fmt, standingBadge } from '../js/vocab.js';
 import { PROVER_TO, RULE, RULES, foundationOf, ruleOf } from '../js/proof.js';
 
 const GROUPS = [
-  { title: 'From the game before', rules: ['ceiling', 'prime'], rests: 'rests on the score of game n − 1, and so on how that score was proven' },
+  { title: 'From the game before', rules: ['ceiling', 'prime'], rests: 'rests on the score of game n − 1, and so on how the chain proves that score' },
   { title: 'By a search of the frame model', rules: ['repeat', 'search'], rests: 'rests on the frame model of game n, and a repeat on the game it repeats' },
 ];
 

@@ -65,11 +65,11 @@
       <div class="note-head"><span class="note-name">Sets, precisely</span></div>
       <p>The maximal factors of x are x/p for each prime p dividing x.  A payment scheme of a set S gives each member
       a distinct maximal factor outside S, and a set is playable iff it has a scheme whose precedence, which says what
-      must be played before what, has no cycle.  S*(n) is an optimal set of game n, and ΣS the sum of a set S.</p>
+      the player must play before what, has no cycle.  S*(n) is an optimal set of game n, and ΣS the sum of a set S.</p>
     </aside>
     <dl class="glossary">
       <dt id="playable">playable</dt>
-      <dd>A set of numbers that can all be taken as moves, in some order.  {9, 15} is playable on the board of game
+      <dd>A set of numbers that you can all take as moves, in some order.  {9, 15} is playable on the board of game
       21: 9 first, then 15.</dd>
       <dt id="optimal-set">optimal set</dt>
       <dd>The set of moves of an optimal game: a playable set with the largest sum.  Most games have one; from game
@@ -81,31 +81,31 @@
       <dd>A number divided by one of its primes.  12 has the maximal factors 6 and 4, 9 has only 3, and a prime has
       only 1.  A move is legal exactly when one of its maximal factors is still in the pot.</dd>
       <dt id="maximal-factor-graph">maximal-factor graph</dt>
-      <dd>The board drawn as a directed graph, with an edge from each number to each of its maximal factors.  Every
-      edge leads to a smaller number, so the figures draw the edges as lines without arrowheads.  Each number taken
-      leaves the graph with its edges.  A move is legal exactly when it still has an edge, and its tax is everything
-      it still reaches along its edges.</dd>
+      <dd>The board as a directed graph, with an edge from each number to each of its maximal factors.  Every
+      edge leads to a smaller number, so the figures draw the edges as lines without arrowheads.  Each number the player
+      takes leaves the graph with its edges.  A move is legal exactly when it still has an edge, and its tax is
+      everything it still reaches along its edges.</dd>
       <dt id="pays-for">pays for</dt>
-      <dd>A maximal factor of a move, still in the pot when the move is made, <em>pays for</em> it.  Two moves can
-      never share a payment.</dd>
+      <dd>A maximal factor of a move, still in the pot when the player makes the move, <em>pays for</em> it.  Two moves
+      can never share a payment.</dd>
       <dt id="payment-scheme">payment scheme</dt>
       <dd>A choice of a maximal factor to pay for each number of a set, no two the same.</dd>
       <dt id="peel">peel</dt>
       <dd>The quick test of whether a set is playable.  It pairs numbers with their payments one at a time by two
       safe steps: a number with only one maximal factor left to pay with takes it (a <em>front move</em>), and a
       factor that only one number can still use goes to that number (a <em>back move</em>).  The set is playable
-      exactly when every number gets paired.</dd>
+      exactly when peel pairs every number.</dd>
       <dt id="loop">loop</dt>
-      <dd>A ring of numbers and the maximal factors they could pay with, each joined to the next by a line, that comes
+      <dd>A ring of numbers and the maximal factors they could pay with, with a line from each to the next, that comes
       back to where it started.  10, 15, 21 and 14 make one with their primes: 2 – 10 – 5 – 15 – 3 – 21 – 7 – 14 – 2.
-      Numbers with at most two such factors each cannot all be played if they make a loop: here the first one played
-      takes two of the four primes as tax, which leaves two for the other three.  A number with only one such factor
-      also joins the <em>ground</em>, one extra point that all such numbers share.  4 pays only with 2 and 9 only with
-      3, and with 6 they make the loop ground – 4 – 2 – 6 – 3 – 9 – ground.</dd>
+      Numbers with at most two such factors each are not playable if they make a loop: here the first one the player
+      plays takes two of the four primes as tax, which leaves two for the other three.  A number with only one such
+      factor also joins the <em>ground</em>, one extra point that all such numbers share.  4 pays only with 2 and 9 only
+      with 3, and with 6 they make the loop ground – 4 – 2 – 6 – 3 – 9 – ground.</dd>
       <dt id="forest">forest</dt>
-      <dd>Numbers and the maximal factors they could pay with, joined by lines, with no loop among them.  Numbers with
-      at most two such factors each can all be played exactly when they form a forest with those factors.  10, 15 and 21
-      alone make 2 – 10 – 5 – 15 – 3 – 21 – 7, with no loop, and they can be played: 10, then 15, then 21.</dd>
+      <dd>Numbers and the maximal factors they could pay with, with lines between them and no loop among them.  Numbers
+      with at most two such factors each are playable exactly when they form a forest with those factors.  10, 15 and 21
+      alone make 2 – 10 – 5 – 15 – 3 – 21 – 7, with no loop, and they are playable: 10, then 15, then 21.</dd>
     </dl>
   </div>
 </section>
@@ -120,7 +120,7 @@
     </aside>
     <dl class="glossary">
       <dt id="chain">chain</dt>
-      <dd>The games from game 1 up, solved in order, each from an optimal game of the one before.</dd>
+      <dd>The games from game 1 up, which we solve in order, each from an optimal game of the one before.</dd>
       <dt id="ceiling">ceiling</dt>
       <dd>n more than the best score of game n − 1.  No score in game n can beat it, so a game that reaches it is
       optimal.</dd>
@@ -131,13 +131,14 @@
       <dd>A game that poses exactly the search problem of an earlier game, so the earlier game's answer carries
       over.</dd>
       <dt id="fits">fits</dt>
-      <dd>n fits into an optimal set of game n − 1 when the set can still be played with n added.  Then game n is at
+      <dd>n fits into an optimal set of game n − 1 when the set is still playable with n added.  Then game n is at
       its ceiling: 10 fits into game 9's optimal set, and 12 does not fit into game 11's.</dd>
       <dt id="search-problem">search problem</dt>
-      <dd>What is left to choose in a game once its frames are set: the frames, the candidates and how many of them
-      may be promoted.  Two games that pose the same search problem have the same best promotions.</dd>
+      <dd>What is left to choose in a game once it has its frames: the frames, the candidates and how many of them
+      the player may promote.  Two games that pose the same search problem have the same best promotions.</dd>
       <dt id="cofactor">cofactor</dt>
-      <dd>n divided by its largest prime factor: 30 = 6 · 5 has the cofactor 6.  Whether a game needs a search can usually be told from it.</dd>
+      <dd>n divided by its largest prime factor: 30 = 6 · 5 has the cofactor 6.  One can usually tell from it whether a
+      game needs a search.</dd>
     </dl>
   </div>
 </section>
@@ -162,19 +163,19 @@
       <dd>A number's count of prime factors, with repeats.  12 = 2 · 2 · 3 is in layer 3, every prime is in layer 1,
       and 1 alone is in layer 0.</dd>
       <dt id="descending-greedy">descending greedy</dt>
-      <dd>The pass that chooses the sources: from the largest down, it keeps each source that can still be played with
-      the ones kept before it.</dd>
+      <dd>The pass that chooses the sources: from the largest down, it keeps each source that is still playable with
+      the ones it has kept.</dd>
       <dt id="u-star">U*</dt>
       <dd>The sources that descending greedy keeps.  In game 21, U* is 12, 14, 15, 16, 18, 19, 20 and 21.</dd>
       <dt id="statement-u">statement U</dt>
       <dd>The one open statement between our model of the game and the game itself: that some optimal game plays
-      every number of U* with three or more prime factors.  It is proven in every game the prover reaches, and open
-      in general.</dd>
+      every number of U* with three or more prime factors.  The prover proves it in every game it reaches, and it is
+      open in general.</dd>
       <dt id="top-half">top half</dt>
       <dd>The numbers above n/2, the sources, and the part of the score they make.  In the games that need a search, it is about 93% of the score.</dd>
       <dt id="exchange-property">exchange property</dt>
       <dd>What makes a greedy choice safe in general: whenever one playable set is smaller than another, some member
-      of the larger one can be added to the smaller one, and the result can still be played.  The playable sets of
+      of the larger one can join the smaller one, and the result is still playable.  The playable sets of
       sources lack it in game 2,873.</dd>
     </dl>
   </div>
@@ -186,18 +187,18 @@
     <aside class="note tech" aria-label="Frames, precisely">
       <div class="note-head"><span class="note-name">Frames, precisely</span></div>
       <p>A frame is a connected component of the graph that joins each source to its maximal factors.  A frame's
-      freedoms are its factors less its moves.  A promotion set is a set of candidates that can be promoted together,
-      keeping every frame winnable.</p>
+      freedoms are its factors less its moves.  A promotion set is a set of candidates that the player can promote
+      together, keeping every frame winnable.</p>
     </aside>
     <dl class="glossary">
       <dt id="frame">frame</dt>
       <dd>A group of sources with every factor that can pay for them: a small game inside the big one.  Game 21 has
-      four.  The frames with freedoms are numbered from the front, frame 0 first: in game 21, frame 0 holds 14, 15 and
-      21, and frame 1 holds 12, 18 and 20.  In a larger game, frames with freedoms at the same distance from the front
-      are collapsed into a single frame, with one number.</dd>
+      four.  We number the frames with freedoms from the front, frame 0 first: in game 21, frame 0 holds 14, 15 and
+      21, and frame 1 holds 12, 18 and 20.  In a larger game, we collapse frames with freedoms at the same distance from
+      the front into a single frame, with one number.</dd>
       <dt id="in-front">in front of</dt>
       <dd>Frame A is in front of frame B when some number of B has a maximal factor in A, as 9 has 3 in game 21.
-      Frames in front are played first, and in the figures they sit to the right.</dd>
+      The player plays frames in front first, and in the figures they sit to the right.</dd>
       <dt id="freedom">freedom</dt>
       <dd>A factor that a frame can spare.  Each move of a frame needs a factor of its own to pay for it, so a frame
       has as many freedoms as it has factors beyond its moves: frame 0 of game 21 has four factors and three moves,
@@ -210,12 +211,13 @@
       where one of its maximal factors pays for it.  An optimal game of 21 promotes 9 from frame 1 into frame 0, where
       3 pays for it.</dd>
       <dt id="frame-model">frame model</dt>
-      <dd>The game seen as frames, with the sources fixed to U*, so that only the promotions are left to choose.  Its
+      <dd>The game as frames, with U* as its sources, so that the promotions are all that is left to choose.  Its
       best score is the best score of the game wherever statement U holds.</dd>
       <dt id="closed">closed</dt>
       <dd>A frame with as many factors as moves, so it has none to spare.  It takes no part in the search.</dd>
       <dt id="promotion-set">promotion set</dt>
-      <dd>A set of candidates that can all be promoted together, with every frame still able to play all of its moves.</dd>
+      <dd>A set of candidates that the player can promote together, with every frame still able to play all of its
+      moves.</dd>
     </dl>
   </div>
 </section>
@@ -225,21 +227,23 @@
   <dl class="glossary">
     <dt id="search">search</dt>
     <dd>The program's way of choosing the promotions: it tries promoting each candidate or not, and drops any branch
-    that cannot beat the best game found.</dd>
+    that cannot beat the best game it has found.</dd>
     <dt id="node">node</dt>
-    <dd>One point of a search: some promotions decided, the rest still open.</dd>
+    <dd>One point of a search: where it has decided some promotions and left the rest open.</dd>
     <dt id="bound">bound</dt>
-    <dd>An upper limit on what a node could still gain.  A node whose bound cannot beat the best game found is
-    dropped.</dd>
+    <dd>An upper limit on what a node could still gain.  The search drops a node whose bound cannot beat the best game
+    it has found.</dd>
     <dt id="gap">gap</dt>
-    <dd>How far a bound is above the best game found.  The larger the gap, the larger the search.</dd>
+    <dd>How far a bound is above the best game the search has found.  The larger the gap, the larger the search.</dd>
       <dt id="branch-and-bound">branch and bound</dt>
-      <dd>A way of searching: split on one choice at a time, keep the best answer found, and drop every branch whose bound cannot beat it.</dd>
+      <dd>A way of searching: split on one choice at a time, keep the best answer you have found, and drop every branch
+      whose bound cannot beat it.</dd>
       <dt id="conflict">conflict</dt>
-      <dd>A few candidates that cannot all be promoted together at a node.  Any set that can be promoted leaves at
-      least one of them out, so the search splits on one of them.</dd>
+      <dd>A few candidates that the player cannot all promote together at a node.  Any set the player can promote leaves
+      at least one of them out, so the search splits on one of them.</dd>
       <dt id="nogood">nogood</dt>
-      <dd>A set of candidates that cannot be promoted together from the start of a search, which the search remembers, so that no branch tries it again.</dd>
+      <dd>A set of candidates that the player cannot promote together from the start of a search, which the search
+      remembers, so that no branch tries it again.</dd>
   </dl>
 </section>
 
@@ -251,15 +255,16 @@
       the set that could pay for it.  The set fails when some of its numbers, taken together, list every factor an
       even number of times: 10, 14, 15 and 21 list each of 2, 3, 5 and 7 twice.</dd>
       <dt id="parity-bound">parity bound</dt>
-      <dd>The weight of the heaviest set that passes the parity test.  Applied frame by frame, it limits what the
-      promotions of a node can add; applied to the whole board, it bounds opt(n), and it is the prover's bound.  In
-      the games measured, its gap above opt(n) on the whole board is about a tenth of the gap of Franklín and Moniot's
-      bound.</dd>
+      <dd>The weight of the heaviest set that passes the parity test.  Frame by frame, it limits what the
+      promotions of a node can add; on the whole board, it bounds opt(n), and it is the prover's bound.  In
+      the games we measured, its gap above opt(n) on the whole board is about a tenth of the gap of Franklín and
+      Moniot's bound.</dd>
       <dt id="fm-bound">Franklín and Moniot's bound</dt>
-      <dd>An upper bound on opt(n): the heaviest set whose numbers can each be given a maximal factor of their own, from outside the set, to pay with.</dd>
+      <dd>An upper bound on opt(n): the heaviest set whose numbers can each take a maximal factor of their own, from
+      outside the set, to pay with.</dd>
       <dt id="odd-core">odd core</dt>
-      <dd>A set that passes the parity test yet cannot be played, and holds no smaller such set.  Every set that passes
-      the test but cannot be played holds one.  The first is on the board of game 45: 12, 18, 20, 30 and 45.  Odd cores
+      <dd>A set that passes the parity test yet is not playable, and holds no smaller such set.  Every set that passes
+      the test but is not playable holds one.  The first is on the board of game 45: 12, 18, 20, 30 and 45.  Odd cores
       are all that the search's bound misses.</dd>
   </dl>
 </section>
@@ -273,7 +278,8 @@
     <dd>A second program, which shares no proof code with the frame solver and proves the scores on the whole board,
     without frames.</dd>
       <dt id="proof-kind">proof kind</dt>
-      <dd>How a game of the chain was proven: by a search of the whole tree, at the ceiling, by the prime formula, as a repeat, or with nothing to choose.  Each game's record names its own.</dd>
+      <dd>How the chain proves a game: by a search of the whole tree, at the ceiling, by the prime formula, as a repeat,
+      or with nothing to choose.  Each game's record names its own.</dd>
   </dl>
 </section>
 

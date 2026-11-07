@@ -83,7 +83,7 @@ function settled(r) {
     case 'trivial':
       return [lead, n === 1
         ? 'Game 1 has no move: the taxman takes the 1.'
-        : 'No factor can be promoted, so the game that promotes nothing is the only one.'];
+        : 'The player can promote no factor, so the game that promotes nothing is the only one.'];
     default:
       throw new Error(`game ${n}: no words for proof ${r.proof}`);
   }
@@ -180,7 +180,7 @@ export function mountExplorer(host, { games, small }) {
         </div>
         <p class="ex-share" data-f="share" aria-live="polite"></p>
         <dl class="ex-words">
-          <dt>How it was settled</dt><dd data-f="settled"></dd>
+          <dt>How the chain settled it</dt><dd data-f="settled"></dd>
           <dt>What it rests on</dt><dd data-f="rests"></dd>
         </dl>
         <dl class="ex-stats"></dl>
@@ -228,7 +228,7 @@ export function mountExplorer(host, { games, small }) {
   function aboutNumber(g, b, x) {
     const w = b.who.get(x);
     if (w.kind === 'move') {
-      const promo = b.promotions.includes(x) ? ` It is up to n/2, so it is a promotion: a factor played as a move.` : '';
+      const promo = b.promotions.includes(x) ? ` It is up to n/2, so it is a promotion: a factor the player plays as a move.` : '';
       return `Move ${w.turn} of ${b.turns.length}: the player takes ${x}, and the taxman takes ${listWords(w.tax)}.${promo}`;
     }
     if (w.kind === 'tax') return `${x} goes to the taxman as tax on ${w.by}, move ${w.turn} of ${b.turns.length}.`;
@@ -236,7 +236,7 @@ export function mountExplorer(host, { games, small }) {
   }
 
   function farText(r) {
-    return `The board of game ${fmt(r.n)} holds ${fmt(r.n)} numbers.  Its ${fmt(r.moves)} moves, in the order played, are on line ${fmt(r.n)} of the results file:`;
+    return `The board of game ${fmt(r.n)} holds ${fmt(r.n)} numbers.  Its ${fmt(r.moves)} moves, in the order of play, are on line ${fmt(r.n)} of the results file:`;
   }
 
   // ---- the room each line of words needs ---------------------------------------------------------------------
