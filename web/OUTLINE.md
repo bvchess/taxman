@@ -188,9 +188,9 @@ to show the scale.
 
 **Asides.**  *Two optimal sets:* every game to 424 has one optimal set; game 425 has two.
 
-### 5. The search
+### 5. Search
 
-**Point.**  A search tries promotion sets, and an upper bound proves when nothing better is left.
+**Point.**  A search tries promotion sets until it proves that none beats the best one found.
 
 * A repeat first: once the frames are set, a game whose search problem an earlier game posed takes that game's
   promotions (game 39, whose new number lands in a closed frame); game 45 changes frame 1 and needs a search.

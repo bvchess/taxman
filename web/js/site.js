@@ -12,7 +12,7 @@ export const STORY = [
   { n: 2, title: 'Walking up the chain', line: 'Most games are easy if you know an optimal game of the one before.', href: 'chain.html' },
   { n: 3, title: 'The top half', line: 'One greedy pass chooses the numbers above n/2.', href: 'top-half.html' },
   { n: 4, title: 'Frames', line: 'What is left splits into frames, and only the promotions are left to choose.', href: 'frames.html' },
-  { n: 5, title: 'The search', line: 'A search tries promotion sets, and a bound proves when nothing better is left.', href: 'search.html' },
+  { n: 5, title: 'Search', line: 'A search tries promotion sets until it proves that none beats the best one found.', href: 'search.html' },
   { n: 6, title: 'The bound', line: 'A quick test of even and odd bounds what a search can gain, and opt(n) itself.', href: 'bound.html' },
   { n: 7, title: 'Statement U', line: 'The one open statement the scores rest on, and the evidence for it.', href: 'statement-u.html' },
   {
