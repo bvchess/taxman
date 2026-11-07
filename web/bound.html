@@ -79,12 +79,10 @@
     </aside>
     <p>The test needs no frames.  Applied to the numbers of the whole <a class="gloss"
     href="glossary.html#board">board</a>, rather than to the promotions of a frame, it bounds <a class="gloss"
-    href="glossary.html#opt">opt(n)</a> itself: no set heavier than the heaviest that passes it can be played. At the
-      root of a search, the frame
-    solver's bound with the weight of <a class="gloss" href="glossary.html#u-star">U*</a> added comes to the same number
-    on every board from 2 to 8,191.  The parity bound is the bound of the
-    <a class="gloss" href="glossary.html#prover">prover</a>, the second program of
-    <a href="statement-u.html#prover">chapter 7</a>.</p>
+    href="glossary.html#opt">opt(n)</a> itself: no set heavier than the heaviest that passes it can be played.</p>
+    <p>On every board from 2 to 8,191, splitting the board into frames costs the bound nothing.  At the root of a
+    search, the parity bound of the frames limits what the promotions can add, and that limit plus the weight of
+    <a class="gloss" href="glossary.html#u-star">U*</a> is exactly the parity bound of the whole board.</p>
   </div>
 </section>
 
