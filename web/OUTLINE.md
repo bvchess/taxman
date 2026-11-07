@@ -58,7 +58,8 @@ The rules the owner's reviews have set, on top of [docs/WRITING.md](../docs/WRIT
 The story starts with the introduction, the front page, which explains the game and gives the headline.  The chapters
 after it explain how we found optimal games past 5000, a chapter a page.  Each chapter takes away part of the problem.
 The introduction shows one game's problem shrinking, for game 5060, in the chapters that shrink it; its rows carry the
-chapters' titles but no numbers, since the chain, statement U and the results do not shrink one game's problem:
+chapters' titles but no numbers, since the chain, statement U and the results do not shrink one game's problem, and
+the bound's work shows in the search's row:
 
 | step | what is left to choose | about |
 |---|---|---|
@@ -89,7 +90,7 @@ chain's end, and this site explains how.
 * **Check it yourself:** the data, the programs and the theory on GitHub.
 * **Right column:** the rules precisely, opt(n) and the Taxman sequence (OEIS A019312); the heuristics' claims and how
   they were measured (`heuristics/README.md`); how to check the chain; what supports the scores (proven outright to
-  2530, given statement U past it), beside "Check it yourself" and not at the top, until chapter 6 gives it its home;
+  2530, given statement U past it), beside "Check it yourself" and not at the top, until chapter 7 gives it its home;
   how to cite the site.
 
 ## The story
@@ -195,8 +196,9 @@ to show the scale.
   promotions (game 39, whose new number lands in a closed frame); game 45 changes frame 1 and needs a search.
 * Branch and bound: promote a candidate or not; a bound says how much a branch could still gain; a branch that cannot
   beat the best game found is dropped.
-* The bound: a quick test that every playable set of promotions passes, though some unplayable sets pass it too.  The
-  heaviest set that passes bounds what a branch can gain.
+* The bound: the figure's simple one, the sum of every candidate that could be promoted alone, is loose (107 at game
+  45's root, where the best adds 39).  The frame solver's is of the same kind, the heaviest set that passes a test
+  every legal set passes, and far sharper (chapter 6).
 * Learning from dead ends: a set of promotions that fails is remembered, so no branch tries it again, and promotions
   that differ only by exchanging two primes are tried once.
 * A head start: the search starts from game n − 1's optimal set, near the best (game 5060, measured), and the
@@ -204,22 +206,39 @@ to show the scale.
 * A game is proven when the whole tree is explored, or when the best game reaches the ceiling, some at their start.
 * What it costs: the search grows steeply with the gap between the bound and the best game, and that is why the chain
   stops where it does.
-* The parity bound: the same test needs no frames, and on the whole board it bounds opt(n); at the root, the frame
-  bound plus ΣU* equals it on every board from 2 to 8191 (measured).  Its gap is about a tenth of Franklín and
-  Moniot's, as a count of payment schemes shows (at least one, an odd number, exactly one).  It is exact to 77 and
-  first misses at 78, where an odd core weighs in (measured).  It is the prover's bound (chapter 6).
 
 **Figures.**  A small search tree, with the bound and the best game at each node.  The gap and the cost of each
-searched game against n.  The ladder of three conditions, at least one, an odd number, exactly one payment scheme, on
-small examples.  Game 78's odd core.
+searched game against n.
 
-**Right column.**  The state lemma (R1), the signed frame theorem (B1) and the frame bound (B2) over GF(2), the odd
-cores that are all the bound misses (measured), the prime-exchange theorem (R2), the dual-bound lemma (R4), the
-near-repeat lemma (R7); how a subtree grows with the gap (measured); what was tried and did not help (the notebook's
-register); the design (`solver/docs/DESIGN.md`, `search.md`, `gf2-bound.md`, `tactics.md`); the parity bound (W1), the
-two gaps (measured), the counting theorem (C2), the first odd core (C3), the parity bound exact to 77 (measured).
+**Right column.**  The state lemma (R1), the prime-exchange theorem (R2), the dual-bound lemma (R4), the near-repeat
+lemma (R7); how a subtree grows with the gap (measured); what was tried and did not help (the notebook's register);
+the design (`solver/docs/DESIGN.md`, `search.md`, `gf2-bound.md`, `tactics.md`).
 
-### 6. Statement U
+### 6. The bound
+
+**Point.**  A quick test of even and odd rules out most sets that cannot be played; it bounds what a search can gain,
+and on the whole board it bounds opt(n).
+
+* The test: list, for each number of a set, the maximal factors outside the set that could pay for it; if some of the
+  numbers list every factor an even number of times, the set cannot be played (the loop of chapter 1).  It is linear
+  algebra over GF(2), quick to check, and the solver applies it to the promotions frame by frame, at every node.  Odd
+  cores are all it misses.
+* The whole board: the same test needs no frames, and on the whole board it bounds opt(n), the parity bound; at the
+  root, the frame bound plus ΣU* equals it on every board from 2 to 8191 (measured).  It is the prover's bound
+  (chapter 7).
+* Counting payment schemes: Franklín and Moniot's bound is looser, its gap about ten times the parity bound's
+  (measured); a set is allowed by theirs, by the parity bound, or playable when some set of factors gets at least one,
+  an odd number, or exactly one scheme.
+* Odd cores: game 45's is the first; the parity bound is exact to 77 and first misses at 78, where an odd core weighs
+  in (measured).
+
+**Figures.**  The ladder of three conditions, at least one, an odd number, exactly one payment scheme, on small
+examples.  Game 78's odd core.
+
+**Right column.**  The signed frame theorem (B1) and the frame bound (B2) over GF(2), the parity bound (W1), the two
+gaps (measured), the counting theorem (C2), the first odd core (C3), the parity bound exact to 77 (measured).
+
+### 7. Statement U
 
 **Point.**  One open statement stands between the frame model and the best score, and it is proven in every game up
 to 2530.
@@ -230,7 +249,7 @@ to 2530.
   rest on statement U from the first game that needs a search (2532 today; 2531 follows from 2530 by the prime
   formula).
 * The prover settles statement U one game at a time: it finds opt(n) on the whole board, with no frames, bounded by
-  the parity bound of chapter 5, and has proven every game up to 2530.
+  the parity bound of chapter 6, and has proven every game up to 2530.
 * The evidence past 2530: the lower layers (F4), the sources conjecture to 100,000, the barred bounds (about 85% of the
   numbers U asks about, in 2531 to 3440), and the root's heaviest set, which holds them all in every game measured.
 * Where a proof stops: the exchange that settles layer 2 fails at an odd core.
@@ -240,10 +259,10 @@ to 2530.
 **Right column.**  The corollary of statement U (X8), statement U and its evidence (`docs/theory/evidence.md`), the
 prover (its README and `proofs.md`).
 
-The checks that replay every game, the referee and the two verifiers, are not part of the story: chapter 7's "The data,
+The checks that replay every game, the referee and the two verifiers, are not part of the story: chapter 8's "The data,
 and how to check it" gives the commands, and the repository documents them.
 
-### 7. The results
+### 8. The results
 
 **Point.**  Here are the games, how each was proven, and what they show.
 
@@ -258,7 +277,7 @@ and how to check it" gives the commands, and the repository documents them.
 **Right column.**  Hensley (1988), Franklín and Moniot (2023), OEIS A019312, `results/README.md`, the verifiers'
 commands, the open questions (`docs/theory/statements.md#open-questions`).
 
-### 8. Summary
+### 9. Summary
 
 **Point.**  The optimal games in brief, for a reader who wants them now; the chapters before it never need it.  The
 introduction offers it at its top: "In a hurry? Go straight to the summary."
@@ -296,5 +315,5 @@ page, a guide for those who build the site, is not linked.
 * Whether the heuristics deserve more than the front page's paragraph and an aside.
 * Whether the explorer is in the first version of the site.
 * How many pages: one a chapter for now, merged or split once the pages' lengths are known.  Statement U stays after
-  the search.
+  the search and the bound.
 * Where the theory's proofs are read: on GitHub, as now, or as pages of the site in the same style.

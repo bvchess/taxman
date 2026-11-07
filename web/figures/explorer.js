@@ -1,4 +1,4 @@
-// The explorer of chapter 7: any game of the chain, with what the chain records for it, and, for the games of
+// The explorer of chapter 8: any game of the chain, with what the chain records for it, and, for the games of
 // data/small.json, the optimal game itself on its board.
 //
 // The record is data/games.json's.  The game is data/small.json's, replayed with js/model.js, which gives each move's

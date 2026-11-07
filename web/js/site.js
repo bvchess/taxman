@@ -13,11 +13,12 @@ export const STORY = [
   { n: 3, title: 'The top half', line: 'One greedy pass chooses the numbers above n/2.', href: 'top-half.html' },
   { n: 4, title: 'Frames', line: 'What is left splits into frames, and only the promotions are left to choose.', href: 'frames.html' },
   { n: 5, title: 'The search', line: 'A search tries promotion sets, and a bound proves when nothing better is left.', href: 'search.html' },
-  { n: 6, title: 'Statement U', line: 'The one open statement the scores rest on, and the evidence for it.', href: 'statement-u.html' },
+  { n: 6, title: 'The bound', line: 'A quick test of even and odd bounds what a search can gain, and opt(n) itself.', href: 'bound.html' },
+  { n: 7, title: 'Statement U', line: 'The one open statement the scores rest on, and the evidence for it.', href: 'statement-u.html' },
   {
-    n: 7, title: 'The results', line: 'The best scores, how each was proven, and what they show.', href: 'results.html',
+    n: 8, title: 'The results', line: 'The best scores, how each was proven, and what they show.', href: 'results.html',
   },
-  { n: 8, title: 'Summary', line: 'The optimal games in brief, and the whole method on game 21.', href: 'summary.html' },
+  { n: 9, title: 'Summary', line: 'The optimal games in brief, and the whole method on game 21.', href: 'summary.html' },
 ];
 
 /** The findings along the way, the story chapter each belongs beside, and, once written, where it is.  The navigation
@@ -48,7 +49,7 @@ export const ALONG = [
      but game 425 has two, which differ in three numbers and score the same.`,
   },
   {
-    title: 'The player\u2019s share', where: 'every game', id: 'share', at: 7, href: 'results.html#share',
+    title: 'The player\u2019s share', where: 'every game', id: 'share', at: 8, href: 'results.html#share',
     line: `As n grows, the best game wins the player an almost steady share of the board, which Hensley proved lies
       between 50% and about 73%.  It seems to converge to ~<span data-share>62.9%</span>.`,
   },

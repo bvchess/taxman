@@ -1,8 +1,9 @@
 // The problem shrinking, step by step, for the last game of the chain: one row a step, with its title (a link once the
 // chapter is written), the point it makes, and a bar for what is left to choose after it, on a log scale, labeled with
 // its count.  The rows of chapters not yet written are quieter.  Chapter 2's row gives, in words, how near the best the
-// game before starts the search (a measurement, from js/data.js).  Chapters 6 and 7 are about the whole chain, not one
-// game's problem, and have no row.
+// game before starts the search (a measurement, from js/data.js).  Chapter 6's bound is the search's, so chapter 5's
+// row counts what it leaves; chapters 7 and 8 are about the whole chain, not one game's problem.  None of the three
+// has a row.
 //
 // The chapters come from js/site.js; every count is computed from data/games.json.  The counts are rough sizes, as the
 // page's note says: n! orders, 2^n sets, 2^(n/2) sets of the numbers up to n/2, 2^c sets of the c candidates, and the
