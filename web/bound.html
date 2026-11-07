@@ -77,7 +77,7 @@
       both parities of the layer.  So opt(n) is at most the heaviest set independent at both parities.  Weighted
       matroid intersection finds it, and a weight split checks its value.</p>
     </aside>
-    <p>The test needs no frames.  Applied to the numbers of the whole <a class="gloss"
+    <p>The parity bound needs no frames.  Applied to the numbers of the whole <a class="gloss"
     href="glossary.html#board">board</a>, rather than to the promotions of a frame, it bounds <a class="gloss"
     href="glossary.html#opt">opt(n)</a> itself: no set heavier than the heaviest that passes it can be played.</p>
     <p>On every board from 2 to 8,191, splitting the board into frames costs the bound nothing.  At the root of a
@@ -98,7 +98,7 @@
       the paper proves</a>).</p>
     </aside>
     <p>Franklín and Moniot's paper gives a looser bound: the heaviest set whose numbers can each be given a maximal
-    factor of their own, from outside the set, to pay with.  Every set that passes the parity test passes theirs, and
+    factor of their own, from outside the set, to pay with.  Every set that passes the parity test passes theirs, but
     the parity bound comes far closer to opt(n): its gap is about a tenth of theirs.</p>
     <p>Why one is stricter than the other shows in a count.  A
     <a class="gloss" href="glossary.html#payment-scheme">payment scheme</a> gives each number of a set a maximal factor
