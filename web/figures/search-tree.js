@@ -25,7 +25,9 @@ const COL = 76; // from one leaf to the next, at least
 const ROW = 60; // from one depth to the next
 const PAD_X = 48; // from the first leaf's center to the figure's edge
 const TOP = 58; // from the top of the figure to the highest leaf's center, with its label above
-const BOTTOM = 22; // from the root's center to the bottom of the figure
+const BOTTOM = 40; // from the root's center to the bottom of the figure, with its label below
+const ROOT_DROP = 27; // from the root's center to the middle of its label
+const ROOT = 'root'; // the root's label
 const CHIP = { w: 62, h: 26 }; // wide enough for "21, 18" at the phone's font size
 const LABEL_RISE = 25; // from a leaf's center to the lower line of its label
 const LINE = 17; // from one line of a label to the next
@@ -279,6 +281,10 @@ export function mountSearchTree(host, { small }) {
     }
     if (!ok) throw new Error(`search tree: node ${node.id} does not fit the figure`);
   }
+  const root = nodes[0];
+  if (!fits(root.x - (DIGIT * ROOT.length) / 2, root.x + (DIGIT * ROOT.length) / 2, 0, root.y + ROOT_DROP + LINE / 2)) {
+    throw new Error('search tree: the root\'s label does not fit the figure');
+  }
   // Labels of leaves in one row must keep apart.
   const leaves = nodes.filter((node) => node.children.length === 0);
   for (const a of leaves) {
@@ -314,10 +320,12 @@ export function mountSearchTree(host, { small }) {
     }
   }
 
+  s.text('root', ROOT, { anchor: 'middle' });
+
   const last = nodes.length;
   const states = [];
   for (let k = 0; k <= last; k++) {
-    const v = {};
+    const v = { root: { x: root.x, y: root.y + ROOT_DROP } };
     for (const node of nodes) {
       const i = node.id;
       if (i > k) {
