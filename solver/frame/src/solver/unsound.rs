@@ -79,7 +79,8 @@
 //! # The defaults
 //!
 //! `back` is [`DEFAULT_BACK`], `tilt` [`DEFAULT_TILT`] and `widen` [`DEFAULT_WIDEN`], so that a user names a level of
-//! effort and nothing else; `--back 0`, `--tilt 0` and `--widen 0` turn each off, and `fix` is the finder's share.  The
+//! effort and nothing else; `--back 0`, `--tilt 0` and `--widen 0` turn each off, and `fix` is the finder's share.
+//! `unseeded_every` is [`DEFAULT_UNSEEDED_EVERY`] ("Games played twice", below), and `--unseeded-every 0` turns it off.  The
 //! three are the setting that two races chose on the 251 hard games of 3441-5060: `--back 8 --tilt 25 --widen 4`
 //! reaches the score that the built-in table has in 87.3, 91.2, 94.0, 95.2, 96.8 and 97.6% of them at the levels 1 to
 //! 6, against 78.1, 79.7, 81.3, 82.9, 86.1 and 89.6% with no option.  The first race is the notebook's entry
@@ -147,16 +148,39 @@
 //!   E from the same moves, as before; in a range the repair can change the moves that later games start from, as a
 //!   level does.
 //!
+//! # Games played twice
+//!
+//! The repair can pull a short line up only from a line above it that does better, and in a run the lines above a
+//! short game are made from it: they start from it, copy it or stop at the ceiling it sets.  A game that takes nothing
+//! from the games below escapes that.  So `unseeded_every` K plays a game whose n is a multiple of K twice: as any game
+//! is played, then *unseeded*, searched on the same board with no seed, no trajectory of `back` and no run's ceiling
+//! (the trajectories of `above` as given), as `unseeded` plays every game.  The line is the better play's, the seeded
+//! one on a tie, with what the other came to (`other`), so the games above start from it and the repair walks down
+//! from it as from any line.  A prime has no board, and its unseeded play sets one up; a trivial game is played once.
+//!
+//! * **The work.**  The unseeded play runs the rounds of the level to its budget, as a game does, so a game played
+//!   twice does up to twice a level's work; with no ceiling, its rounds stop only at the budget (or the table's score
+//!   with `--stop-at-known`).  The line's `work` is its own play's and `other` has the other's.
+//! * **What a line depends on.**  Which games are played twice depends on n alone, and each play on what a game's
+//!   line depends on, so a line still depends on nothing but the game, its start, the moves it starts from, the level,
+//!   the seed and the options, never on the threads.  Each play of a level runs the rounds of the levels below first.
+//! * **The default**, [`DEFAULT_UNSEEDED_EVERY`], was chosen on two chains of 200 games at level 3:
+//!   solver/docs/unsound.md ("Games played twice") says what it gained and cost, and the notebook's entry
+//!   https://github.com/bvchess/taxman-notebook/blob/main/search/unseeded-games-above-a-short-game-2026-11/README.md has
+//!   the measurement.
+//!
 //! # Measuring
 //!
 //! Two options measure the mode on the games whose opt(n) is proven, and are refused for a game the built-in table
 //! lacks.  `--stop-at-known` ends a game's rounds as soon as its score is the table's (or reaches the run's ceiling, if
 //! that comes first), and the line records the round at which it was the table's, or that it never was.  `--from-known`
 //! seeds every game with the table's moves for n − 1, not with this run's line, so that the run's ceiling is the proven
-//! one.  solver/docs/unsound.md has the keys of the line ("An unsound line").
+//! one.  A third, `--unseeded`, plays every game unseeded alone (above), to measure what a game makes of its board with
+//! nothing from the games below.  solver/docs/unsound.md has the keys of the line ("An unsound line").
 
 use super::{
-    prime_game, set_up, Before, Derived, Earlier, Failure, Job, Method, RangeSummary, SearchSetup, SetUp, SolveOptions,
+    prime_game, set_up, Before, Derived, Earlier, Failure, Job, Method, RangeSummary, SearchSetUp, SearchSetup, SetUp,
+    SolveOptions,
 };
 use crate::bits::Bits;
 use crate::engine;
@@ -206,6 +230,10 @@ pub const DEFAULT_TILT: u32 = 25;
 /// [`DEFAULT_BACK`] and [`DEFAULT_TILT`]; the module documentation, "The defaults", has the races).
 pub const DEFAULT_WIDEN: u64 = 4;
 
+/// The default of `unseeded_every`: every eighth game is played twice (the module documentation, "Games played twice",
+/// says how it was chosen).
+pub const DEFAULT_UNSEEDED_EVERY: u32 = 8;
+
 /// The work of one round, which level L budgets 2^L times ([`Plan::budget`]): the steps of a round whose neighborhoods
 /// all take the step limit of a unit, [`finder::UNIT_STEPS`].  (The work of such a round is a little more,
 /// [`finder::NEIGHBORHOOD_WORK`] for each neighborhood.)
@@ -248,11 +276,19 @@ pub struct Plan {
     /// The repair, on unless `--no-repair`: a line that what survives of a line above it beats is replaced (the module
     /// documentation, "The repair").
     pub repair: bool,
+    /// `--unseeded`: every game takes nothing from the moves for the games below it.  It is searched, never played by
+    /// the prime formula or as a repeat; its start has no seed, its rounds follow no trajectory of `back`, and it has
+    /// no run's ceiling (the module documentation, "Measuring").  No game is played twice.
+    pub unseeded: bool,
+    /// `--unseeded-every K` ([`DEFAULT_UNSEEDED_EVERY`] by default): a game whose n is a multiple of K is played twice,
+    /// as any game is and unseeded, as `unseeded` plays every game, and its line is the better play's (the module
+    /// documentation, "Games played twice").  0 plays no game twice.
+    pub unseeded_every: u32,
 }
 
 /// The least effort, the finder's seed and share fixed, the defaults of `tilt`, `back` and `widen` ([`DEFAULT_TILT`],
-/// [`DEFAULT_BACK`], [`DEFAULT_WIDEN`]), no trajectory from above, the stop at the run's ceiling, the repair, and no
-/// measuring option.
+/// [`DEFAULT_BACK`], [`DEFAULT_WIDEN`]), no trajectory from above, the stop at the run's ceiling, the repair, every
+/// eighth game played twice ([`DEFAULT_UNSEEDED_EVERY`]), and no measuring option.
 impl Default for Plan {
     fn default() -> Plan {
         let finder::Options { fix, seed, .. } = finder::Options::default();
@@ -269,6 +305,8 @@ impl Default for Plan {
             from_known: false,
             past_ceiling: false,
             repair: true,
+            unseeded: false,
+            unseeded_every: DEFAULT_UNSEEDED_EVERY,
         }
     }
 }
@@ -610,9 +648,70 @@ pub struct Line {
     /// What `--stop-at-known` recorded, if it was given.
     pub known: Option<Known>,
     pub tactics: Tactics,
+    /// The line is of a play that took nothing from the games below ([`Plan::unseeded`], or the unseeded play of a game
+    /// played twice).
+    pub unseeded: bool,
+    /// For a game played twice ([`Plan::unseeded_every`]), the play that this line is not: the line is the better of
+    /// the two, the seeded play on a tie.
+    pub other: Option<OtherPlay>,
+}
+
+/// What the play that a line of a game played twice is not came to ([`Line::other`]): whether it was the unseeded one,
+/// its method, its score, and its rounds, steps, work and seconds.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OtherPlay {
+    pub unseeded: bool,
+    pub method: Method,
+    pub score: u64,
+    pub rounds: u64,
+    pub steps: u64,
+    pub work: u64,
+    pub seconds: f64,
+}
+
+impl OtherPlay {
+    /// What `line` came to.
+    fn of(line: &Line) -> OtherPlay {
+        let Line { unseeded, method, score, rounds, steps, work, seconds, .. } = *line;
+        OtherPlay { unseeded, method, score, rounds, steps, work, seconds }
+    }
 }
 
 impl Line {
+    /// The line of game `n` before it is played, with `plan`, the threads and tactics of `opts`, and `ceiling`, the
+    /// run's ceiling.
+    fn blank(n: u32, plan: &Plan, opts: &SolveOptions, ceiling: Option<u64>) -> Line {
+        Line {
+            n,
+            score: 0,
+            moves: Vec::new(),
+            promotions: Vec::new(),
+            method: Method::Search,
+            in_the_bag: None,
+            prev: None,
+            ceiling,
+            at_ceiling: false,
+            repeats: None,
+            setup: None,
+            plan: *plan,
+            start: None,
+            trajectories: None,
+            survivor_scores: None,
+            rounds: 0,
+            steps: 0,
+            work: 0,
+            stage_rounds: None,
+            improvements: Vec::new(),
+            seconds: 0.0,
+            start_seconds: 0.0,
+            threads: opts.threads,
+            known: None,
+            tactics: opts.tactics,
+            unseeded: plan.unseeded,
+            other: None,
+        }
+    }
+
     /// The line as one JSON object.
     pub fn to_json(&self) -> Json {
         let prev = self.prev.as_ref().map_or(Json::Null, |p| {
@@ -657,6 +756,17 @@ impl Line {
         let known = self.known.map_or(Json::Null, |known| {
             Json::object([("known", Json::from(known.score)), ("round", known.round.map_or(Json::Null, Json::from))])
         });
+        let other = self.other.map_or(Json::Null, |other| {
+            Json::object([
+                ("unseeded", Json::Bool(other.unseeded)),
+                ("method", Json::from(other.method.as_str())),
+                ("score", Json::from(other.score)),
+                ("rounds", Json::from(other.rounds)),
+                ("steps", Json::from(other.steps)),
+                ("work", Json::from(other.work)),
+                ("seconds", Json::Num(other.seconds)),
+            ])
+        });
         Json::object([
             (UNSOUND, Json::Bool(true)),
             ("n", Json::from(self.n)),
@@ -678,6 +788,8 @@ impl Line {
             ("back", Json::from(self.plan.back)),
             ("above", Json::from(self.plan.above)),
             ("widen", self.plan.widen.map_or(Json::Null, Json::from)),
+            ("unseeded_every", Json::from(self.plan.unseeded_every)),
+            ("unseeded", Json::Bool(self.unseeded)),
             ("start", self.start.map_or(Json::Null, Json::from)),
             ("trajectories", trajectories),
             ("survivor_scores", survivor_scores),
@@ -687,6 +799,7 @@ impl Line {
             ("work", Json::from(self.work)),
             ("stage_rounds", stage_rounds),
             ("improvements", Json::array(improvements)),
+            ("other", other),
             ("seconds", Json::Num(self.seconds)),
             ("start_seconds", Json::Num(self.start_seconds)),
             ("threads", Json::from(self.threads)),
@@ -702,7 +815,7 @@ impl Line {
 
     /// One line for a person: n, score, method, the rounds and how many raised the score, the time, `unsound`, and what
     /// `--stop-at-known` recorded, whether the game is at the run's ceiling and a line of n − 1 that this one proves
-    /// short, if anything.
+    /// short, if anything, and for a game played twice what its unseeded play scored.
     pub fn summary_line(&self) -> String {
         let known = match self.known {
             None => String::new(),
@@ -715,8 +828,15 @@ impl Line {
             .as_ref()
             .filter(|prev| prev.short_by > 0)
             .map_or_else(String::new, |prev| format!("  n-1 short by {} at least", prev.short_by));
+        let twice = match self.other {
+            None => String::new(),
+            Some(other) if self.unseeded => {
+                format!("  unseeded play kept, +{} on the seeded", self.score - other.score)
+            }
+            Some(other) => format!("  unseeded play {}", other.score),
+        };
         format!(
-            "n={:<5} score={:<9} {:<7} rounds={:<6} improved={:<3} {:>9.3} s  unsound{known}{ceiling}{short}",
+            "n={:<5} score={:<9} {:<7} rounds={:<6} improved={:<3} {:>9.3} s  unsound{known}{ceiling}{short}{twice}",
             self.n,
             self.score,
             self.method.as_str(),
@@ -1068,9 +1188,9 @@ pub fn solve_range(
         }
         let past = moves_before(n, &run.recent, &run.lines, plan, optimal);
         let above = moves_above(n, &run.recent, &run.lines, plan, optimal);
-        // The next game to play has the moves for its n − 1: this game's line, or the file's.
+        // The next game to play has the moves for its n − 1, this game's line or the file's, unless it takes none.
         if let Some(next) = (n + 1..=hi).find(|m| !run.lines.games.contains_key(m)) {
-            run.boards.start(next);
+            run.boards.start(next, !plan.unseeded);
         }
         let played = play(n, &past, &above, opts, plan, &mut run.earlier, &mut run.boards, optimal)?;
         let Some((line, board)) = played else {
@@ -1085,12 +1205,21 @@ pub fn solve_range(
     Ok(run.summary)
 }
 
-/// A board that the run set up for a searched or repeat game, which the repair weighs lines on: the game's job, and
-/// what the game with no promotions scores.
+/// A board that the run set up for a searched or repeat game, which the repair weighs lines on and the unseeded play of
+/// a game played twice searches: the game's job, what the game with no promotions scores, and what the board was set
+/// up with.
 #[derive(Clone)]
 struct KeptBoard {
     job: Arc<dyn Job>,
     in_the_bag: u64,
+    setup: SearchSetup,
+}
+
+impl KeptBoard {
+    /// The board of `set`.
+    fn of(set: &SearchSetUp) -> KeptBoard {
+        KeptBoard { job: Arc::clone(&set.job), in_the_bag: set.in_the_bag, setup: set.setup }
+    }
 }
 
 /// A run of the unsound mode as it goes: its lines, the lines a repeat may repeat, its own lines of the games a game
@@ -1327,10 +1456,17 @@ fn moves_above(n: u32, run: &BTreeMap<u32, Moves>, file: &UnsoundFile, plan: &Pl
 /// the run keeps its board for the repair.
 struct Boards {
     opts: SolveOptions,
-    /// The games whose setups are being made, with moves for n − 1, and the threads that make them.
-    making: Vec<(u32, thread::JoinHandle<Result<SetUp, Failure>>)>,
+    /// The setups being made.
+    making: Vec<Making>,
     /// The boards of the run's searched and repeat games, of the last [`REPAIR_REACH`] games it played.
     kept: BTreeMap<u32, KeptBoard>,
+}
+
+/// A setup being made ahead: the game's, with moves for n − 1 if `seeded`, and the thread that makes it.
+struct Making {
+    n: u32,
+    seeded: bool,
+    thread: thread::JoinHandle<Result<SetUp, Failure>>,
 }
 
 impl Boards {
@@ -1339,29 +1475,29 @@ impl Boards {
         Boards { opts: opts.clone(), making: Vec::new(), kept: BTreeMap::new() }
     }
 
-    /// Starts making the setup of game `n`, which will have moves for n − 1.
-    fn start(&mut self, n: u32) {
+    /// Starts making the setup of game `n`, which will have moves for n − 1 if `seeded`, else none.
+    fn start(&mut self, n: u32, seeded: bool) {
         let opts = self.opts.clone();
         let make = move || {
-            let set = set_up(n, &Before::Run, &opts)?;
+            let set = set_up(n, if seeded { &Before::Run } else { &Before::None }, &opts)?;
             if let SetUp::Search(set, _) = &set {
                 set.job.ready();
             }
             Ok(set)
         };
-        self.making.push((n, thread::spawn(make)));
+        self.making.push(Making { n, seeded, thread: thread::spawn(make) });
     }
 
-    /// The setup of game `n`, with `given` for its moves for n − 1: the one made ahead if there is one and the game has
-    /// those moves, else one made now with `opts`.
+    /// The setup of game `n`, with `given` for its moves for n − 1: the one made ahead if there is one with the same
+    /// `given`, else one made now with `opts`.
     fn take(&mut self, n: u32, given: &Before, opts: &SolveOptions) -> Result<SetUp, Failure> {
-        let made = self.making.iter().position(|&(m, _)| m == n).map(|i| self.making.swap_remove(i).1);
+        let made = self.making.iter().position(|making| making.n == n).map(|i| self.making.swap_remove(i));
         match made {
-            Some(making) if matches!(given, Before::Run) => {
-                making.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+            Some(making) if making.seeded == matches!(given, Before::Run) => {
+                making.thread.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))
             }
             Some(making) => {
-                let _ = making.join();
+                let _ = making.thread.join();
                 set_up(n, given, opts)
             }
             None => set_up(n, given, opts),
@@ -1383,7 +1519,7 @@ impl Boards {
             return Ok(Some(board.clone()));
         }
         Ok(match set_up(k, &Before::None, &self.opts).map_err(Failure::message)? {
-            SetUp::Search(set, _) => Some(KeptBoard { job: set.job, in_the_bag: set.in_the_bag }),
+            SetUp::Search(set, _) => Some(KeptBoard::of(&set)),
             SetUp::Derived(_) => None,
         })
     }
@@ -1392,8 +1528,8 @@ impl Boards {
 /// A run that ends waits for the setups it started, so that no thread of it outlives it.
 impl Drop for Boards {
     fn drop(&mut self) {
-        for (_, making) in self.making.drain(..) {
-            let _ = making.join();
+        for making in self.making.drain(..) {
+            let _ = making.thread.join();
         }
     }
 }
@@ -1418,38 +1554,15 @@ fn play(
 ) -> Result<Option<(Line, Option<KeptBoard>)>, String> {
     let began = Instant::now();
     let clock = || began.elapsed().as_secs_f64();
+    // An unseeded game takes nothing from the games below it: no prime formula, no seed, no trajectory of `back` and no
+    // ceiling, and (below) no repeat.
+    let past = if plan.unseeded { &[] } else { past };
     let before = past.first().and_then(Option::as_ref);
     // The moves for n − 1 are a seed and the prime shortcut's moves, which nothing checks again: the run's and the
     // file's lines were replayed before they were kept, and the table's are proven.
     let given = if before.is_some() { Before::Run } else { Before::None };
     let ceiling = before.filter(|_| !plan.past_ceiling).map(|before| ceiling_over(n, before));
-    let mut line = Line {
-        n,
-        score: 0,
-        moves: Vec::new(),
-        promotions: Vec::new(),
-        method: Method::Search,
-        in_the_bag: None,
-        prev: None,
-        ceiling,
-        at_ceiling: false,
-        repeats: None,
-        setup: None,
-        plan: *plan,
-        start: None,
-        trajectories: None,
-        survivor_scores: None,
-        rounds: 0,
-        steps: 0,
-        work: 0,
-        stage_rounds: None,
-        improvements: Vec::new(),
-        seconds: 0.0,
-        start_seconds: 0.0,
-        threads: opts.threads,
-        known: None,
-        tactics: opts.tactics,
-    };
+    let mut line = Line::blank(n, plan, opts, ceiling);
     let known = plan.stop_at_known.then(|| optimal.score(n).expect("the range was checked against the table"));
     let mut board = None;
     match boards.take(n, &given, opts).map_err(Failure::message)? {
@@ -1462,11 +1575,12 @@ fn play(
             (line.moves, line.promotions) = prime_game(n, &candidates, &before.moves);
         }
         SetUp::Search(set, problem) => {
-            let repeated = opts.tactics.same_search.then(|| earlier.find(n, &problem)).flatten();
+            let repeats = opts.tactics.same_search && !plan.unseeded;
+            let repeated = repeats.then(|| earlier.find(n, &problem)).flatten();
             earlier.remember(n, problem);
             line.setup = Some(set.setup);
             line.in_the_bag = Some(set.in_the_bag);
-            board = Some(KeptBoard { job: Arc::clone(&set.job), in_the_bag: set.in_the_bag });
+            let kept = KeptBoard::of(&set);
             if let Some(m) = repeated {
                 let promotions = earlier.promotions(m).expect("a game that find found").to_vec();
                 (line.method, line.repeats) = (Method::Repeat, Some(m));
@@ -1483,36 +1597,91 @@ fn play(
                 // The games a trajectory may begin from, from n − 1 down, then from n + 1 up.
                 let back = past.iter().take(plan.back as usize).flatten();
                 let others: Vec<(u32, &[u32])> = back.chain(above).map(|m| (m.n, m.moves.as_slice())).collect();
-                let improved = set.job.improve(seed, &others, plan, opts.threads, &clock, &enough);
-                if improved.interrupted {
+                if !searched(&mut line, &kept, seed, &others, &clock, &enough) {
                     return Ok(None);
                 }
-                line.start = Some(bag + improved.start);
-                line.start_seconds = improved.start_seconds;
-                line.trajectories = Some(improved.trajectories);
-                line.survivor_scores = Some(improved.survivors.iter().map(|&(game, sum)| (game, bag + sum)).collect());
-                (line.rounds, line.steps, line.work) = (improved.rounds, improved.nodes, improved.work);
-                line.stage_rounds = Some(improved.stage_rounds);
-                line.improvements = improved
-                    .improvements
-                    .iter()
-                    .map(|i| Raised {
-                        round: i.round,
-                        trajectory: i.trajectory,
-                        stage: i.stage,
-                        steps: i.steps,
-                        work: i.work,
-                        seconds: i.seconds,
-                        score: bag + i.sum,
-                    })
-                    .collect();
-                (line.moves, line.promotions) = (improved.moves, improved.promotions);
             }
+            board = Some(kept);
         }
     }
     conclude(&mut line, before, known, optimal).map_err(|e| format!("n={n}: {e}"))?;
     line.seconds = clock();
-    Ok(Some((line, board)))
+    if !plays_twice(n, plan) || line.method == Method::Trivial {
+        return Ok(Some((line, board)));
+    }
+    // The unseeded play of a game played twice, on the game's board; a prime has none, and sets one up with no moves for
+    // n − 1.
+    let board = match board {
+        Some(board) => board,
+        None => match set_up(n, &Before::None, opts).map_err(Failure::message)? {
+            SetUp::Search(set, problem) => {
+                earlier.remember(n, problem);
+                KeptBoard::of(&set)
+            }
+            SetUp::Derived(_) => return Ok(Some((line, None))),
+        },
+    };
+    let began = Instant::now();
+    let clock = || began.elapsed().as_secs_f64();
+    let mut unseeded = Line { unseeded: true, ..Line::blank(n, plan, opts, None) };
+    (unseeded.setup, unseeded.in_the_bag) = (Some(board.setup), Some(board.in_the_bag));
+    let bag = board.in_the_bag;
+    let enough = |sum: u64| known.is_some_and(|known| bag + sum >= known);
+    let others: Vec<(u32, &[u32])> = above.iter().map(|m| (m.n, m.moves.as_slice())).collect();
+    if !searched(&mut unseeded, &board, None, &others, &clock, &enough) {
+        return Ok(None);
+    }
+    conclude(&mut unseeded, None, known, optimal).map_err(|e| format!("n={n}, unseeded: {e}"))?;
+    unseeded.seconds = clock();
+    let seconds = line.seconds + unseeded.seconds;
+    let (kept, other) = if unseeded.score > line.score { (unseeded, line) } else { (line, unseeded) };
+    Ok(Some((Line { other: Some(OtherPlay::of(&other)), seconds, ..kept }, Some(board))))
+}
+
+/// Whether game `n` is played twice ([`Plan::unseeded_every`]): n is a multiple of K, and the run is not unseeded
+/// already.  A trivial game, whose line is optimal, is played once whatever this says.
+fn plays_twice(n: u32, plan: &Plan) -> bool {
+    !plan.unseeded && plan.unseeded_every > 0 && n.is_multiple_of(plan.unseeded_every)
+}
+
+/// The search of a game on `board` into `line`: the start, seeded with the moves `seed` for n − 1 if any, and the rounds
+/// of `line.plan` on `line.threads` threads, with trajectories from what survives of the moves of `others`, ended once
+/// `enough` says so of the promotion sum ([`Job::improve`]); `clock` is the play's seconds so far.  Fills in what the
+/// line records of the search, and its moves and promotions; false if a stop signal ended the rounds.
+fn searched(
+    line: &mut Line,
+    board: &KeptBoard,
+    seed: Option<&[u32]>,
+    others: &[(u32, &[u32])],
+    clock: &dyn Fn() -> f64,
+    enough: &dyn Fn(u64) -> bool,
+) -> bool {
+    let bag = board.in_the_bag;
+    let improved = board.job.improve(seed, others, &line.plan, line.threads, clock, enough);
+    if improved.interrupted {
+        return false;
+    }
+    line.start = Some(bag + improved.start);
+    line.start_seconds = improved.start_seconds;
+    line.trajectories = Some(improved.trajectories);
+    line.survivor_scores = Some(improved.survivors.iter().map(|&(game, sum)| (game, bag + sum)).collect());
+    (line.rounds, line.steps, line.work) = (improved.rounds, improved.nodes, improved.work);
+    line.stage_rounds = Some(improved.stage_rounds);
+    line.improvements = improved
+        .improvements
+        .iter()
+        .map(|i| Raised {
+            round: i.round,
+            trajectory: i.trajectory,
+            stage: i.stage,
+            steps: i.steps,
+            work: i.work,
+            seconds: i.seconds,
+            score: bag + i.sum,
+        })
+        .collect();
+    (line.moves, line.promotions) = (improved.moves, improved.promotions);
+    true
 }
 
 /// The run's ceiling on the score of game `n` that starts from the moves `before` for n − 1: n + their score, which no
@@ -1584,6 +1753,8 @@ mod tests {
         assert_eq!((plan.tilt, plan.back, plan.widen, plan.round_work), (25, 8, Some(4), ROUND_WORK));
         assert!(!plan.stop_at_known && !plan.from_known && !plan.past_ceiling, "the stop at the ceiling is on");
         assert!(plan.repair && plan.above == 0, "the repair is on, and no trajectory begins from above");
+        let twice = (DEFAULT_UNSEEDED_EVERY, plan.unseeded_every, plan.unseeded);
+        assert_eq!(twice, (8, 8, false), "every eighth game is played twice, and no game unseeded alone");
         // The rounds search with the plan's seed, tilt and widening, and the finder's other options.
         let lns = plan.lns();
         let default = finder::Options::default();

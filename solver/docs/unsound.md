@@ -12,6 +12,7 @@ README](../frame/README.md) says how to build it), and the words of the search a
 * [The flags](#the-flags)
 * [How a game is played](#how-a-game-is-played)
 * [The repair](#the-repair)
+* [Games played twice](#games-played-twice)
 * [An unsound line](#an-unsound-line)
 
 ## What it is and is not
@@ -46,8 +47,9 @@ the games FILE has, and from where the repair was.
 
 The summary line on stdout gives n, the score, the method, the rounds, how many of them raised the score and the
 seconds, then `unsound`, what `--stop-at-known` recorded, "at ceiling" if the game stopped at the run's ceiling, and
-"n-1 short by" a number of points if this game's score proves the line of n − 1 short by at least that many.  A line
-that the repair replaces has a summary line of its own: n, the new score, the method of the line replaced, the game its
+"n-1 short by" a number of points if this game's score proves the line of n − 1 short by at least that many, and for a
+[game played twice](#games-played-twice) what its unseeded play scored, or that it was kept.  A line that the repair
+replaces has a summary line of its own: n, the new score, the method of the line replaced, the game its
 moves came from and how much they gain, and the seconds.  The run ends with the number of lines the repair replaced and
 the seconds its walks took, those that replaced nothing included.
 
@@ -67,13 +69,15 @@ reference](REFERENCE.md#1-the-flags-of-solve)), and refuses the flags of the pro
 | `--tilt P` | P from 0 to 100, default 25: P percent of a round's neighborhoods free the small promotions more often.  0: none |
 | `--widen S` | S ≥ 1, default 4: a trajectory that has not grown heavier in S rounds moves to larger neighborhoods.  0: no widening |
 | `--fix LO,HI` | the share of the incumbent's promotions that each neighborhood keeps fixed, drawn at random from LO to HI, 0 ≤ LO ≤ HI ≤ 1 (default 0.7,0.9).  It turns widening off, and is refused with `--widen S` of 1 or more |
+| `--unseeded-every K` | K ≥ 0, default 8: a game whose n is a multiple of K is played twice, also unseeded, and keeps the better line ([games played twice](#games-played-twice)).  0: none |
 | `--past-ceiling` | no stop at the [run's ceiling](#the-runs-ceiling) |
 | `--no-repair` | no [repair](#the-repair) of the lines below a line |
 | `--stop-at-known`, `--from-known` | to measure the mode on the games whose opt(n) the built-in table has, and refused for any other: end a game's rounds as soon as its score is the table's, and start every game from the table's moves for n − 1 |
+| `--unseeded` | to measure what a game makes of its board alone: every game is played [unseeded](#games-played-twice), and none twice |
 
 The options `--back`, `--tilt` and `--widen` shape the rounds ([the options](#the-options-that-shape-the-rounds)), and
-are on unless given 0, so that a user names a level of effort and nothing else; `--above` shapes them too, and is off
-unless given.  The three were chosen together by
+are on unless given 0, as `--unseeded-every` is, so that a user names a level of effort and nothing else; `--above`
+shapes them too, and is off unless given.  The three were chosen together by
 two races on the hard games of 3441-5060, at equal work ([the first
 race](https://github.com/bvchess/taxman-notebook/blob/main/search/tilted-back-and-wider-rounds-2026-11/README.md), [the
 second](https://github.com/bvchess/taxman-notebook/blob/main/search/a-share-of-tilted-neighborhoods-2026-11/README.md)).
@@ -94,7 +98,7 @@ A game is set up as a proven run sets it up: the board and its frames.  Four met
 
 A `prime` or `repeat` game searches nothing, and keeps what the line it starts from falls short by, if it does.  The
 moves for n − 1 are the run's line, else the file's, else the built-in table's, and `--from-known` takes the table's
-always.
+always.  A [game played twice](#games-played-twice) is also searched with nothing from the games below it.
 
 The setup does not depend on the moves for n − 1, so a run makes each game's setup while the game before it plays, on
 a thread of its own beside the threads of `--threads`, with the part of a searched game's start that depends on the
@@ -248,6 +252,35 @@ A line depends on the repair as on any option (`repair` in the line), and `--no-
 game at a level begin with those of the levels below, from the same moves, as before; in a range the repair can change
 the moves that later games start from, as a level does.
 
+## Games played twice
+
+A game played twice is played as any game is and again *unseeded*, and its line is the better of the two plays.  It is
+how a run gets past a short line that the repair cannot pull up.  The repair replaces a short line only from a line
+above it that does better, and in a run the lines above a short game are made from it: a prime and a repeat copy it,
+and a searched game starts from it and stops at the ceiling it sets.  An unseeded play takes nothing from the games
+below, so the short line does not hold it down; once it does better, the games above start from it and the repair walks
+down from it.
+
+* **Which games.**  With `--unseeded-every K`, a game whose n is a multiple of K, unless it is trivial: with the
+  default, K = 8, games 4952, 4960, 4968 and so on.  Which games depends on n alone.
+* **The unseeded play.**  It is searched on the game's board, never played by the prime formula or as a repeat: its
+  start has no seed, its rounds follow the start's trajectory alone (and those of `--above`, if given), and it has no
+  run's ceiling.  A prime, which has no board, sets one up for it.  `--unseeded` plays every game this way and none
+  twice, to measure what a game makes of its board alone.
+* **The line.**  The better play's, the seeded one on a tie, as that play alone writes it, with `other`, what the other
+  play came to.  A line of the unseeded play has no `prev` and no ceiling.  Its `seconds` are those of both plays.
+* **The work.**  The unseeded play runs its rounds to the level's budget, as a searched game does that is not stopped
+  at a ceiling, so a game played twice does up to twice a level's work: each play counts against a budget of its own.
+  Each play of a level runs the rounds of the levels below first, and a line depends on nothing that it did not depend
+  on before.
+* **What it gains.**  A streak of short games ends within K games of where it starts, if the unseeded play there
+  reaches a better score: in the chain of 4861-5060 at level 3 (524,288 work), the default took the games at opt(n)
+  from 182 to 198 of 200, since the unseeded play of 4952 ended the streak that the stuck 4950 starts after 2 games,
+  not 18.  No score was lower, and on 5061-5260 no score changed.  It cost 24% more time and 33 to 38% more work on both chains ([the
+  measurement](https://github.com/bvchess/taxman-notebook/blob/main/search/unseeded-games-above-a-short-game-2026-11/README.md)).
+  An unseeded play alone is weaker than a seeded one, and reaches opt(n) less often; it pays only where the seeded
+  play is held down.
+
 ## An unsound line
 
 An unsound line holds legal moves for n and their score, a lower bound on opt(n) that nothing proves.  Here is the line
@@ -262,6 +295,7 @@ short, the fields regrouped and comments added:
  "repeats":null,                          # a repeat names the line whose promotions it plays here
  "setup":{"frames":6,"candidates":141,"max_total":33,"greedy_sum":8396,"digest":"c6fe37bd55f2b043"},
  "effort":3, "budget":524288, "seed":1, "fix":[0.7,0.9], "tilt":25, "back":8, "above":0, "widen":4,
+ "unseeded_every":8, "unseeded":false,
  "start":110839,                          # the start fell 21 short of the table's score
  "trajectories":["start",594,593,591],    # the moves for 592 and for 590 to 587 gave a set one of these began from
  "survivor_scores":[[594,110682],[593,110489],[592,110489],[591,110303],...,[587,110303]],
@@ -269,6 +303,7 @@ short, the fields regrouped and comments added:
  "stage_rounds":[[1,0,0],[1,0,0],[1,0,0],[1,0,0]],
  "improvements":[{"round":1,"trajectory":1,"stage":0,"neighborhoods":64,"steps":699,"work":2747,"seconds":0.0433,
                   "score":110860}],
+ "other":null,                            # a game played twice says what its other play came to
  "seconds":0.0454, "start_seconds":0.0158, "threads":4,
  "from_known":true, "stop_at_known":{"known":110860,"round":1},   # so level 1 would have reached it
  "repair":true, "repaired":null,          # a line the repair wrote again says what replaced its moves
@@ -296,20 +331,22 @@ the same way, each from the line above it.
 | `n`, `score`, `moves`, `promotions` | the game, its score, its moves, and the promoted numbers, ascending |
 | `method` | `trivial`, `prime`, `repeat` or `search` |
 | `in_the_bag` | what the game with no promotions scores (null for the prime formula, which sets no board up) |
-| `prev` | the moves for n − 1 the game started from: `n`, `score`, `source` (`run`: this run's, `results`: the file's, or `table`: the built-in table's), `moves_digest`, and `short_by`, the points by which they fall short of opt(n − 1) at least, as this game's score proves (its score less n + score(n − 1), where that is above 0); null if there were none |
-| `ceiling`, `at_ceiling` | the run's ceiling on the score (null without moves for n − 1, and with `--past-ceiling`), and whether the score reached it |
+| `prev` | the moves for n − 1 the game started from: `n`, `score`, `source` (`run`: this run's, `results`: the file's, or `table`: the built-in table's), `moves_digest`, and `short_by`, the points by which they fall short of opt(n − 1) at least, as this game's score proves (its score less n + score(n − 1), where that is above 0); null if there were none, and on a line of an unseeded play |
+| `ceiling`, `at_ceiling` | the run's ceiling on the score (null without moves for n − 1, with `--past-ceiling`, and on a line of an unseeded play), and whether the score reached it |
 | `repeats` | for a repeat, the n of the line whose promotions it plays; null otherwise |
 | `setup` | as in [a results line](REFERENCE.md#a-results-line---out-schema-5), without `cap`; null on a `trivial` or `prime` line |
 | `effort`, `budget`, `seed` | the level of effort, the work its rounds run until, and the seed of the rounds' random choices |
 | `fix`, `tilt` | the range of `--fix` (the lowest and the highest share of the incumbent's promotions a neighborhood keeps fixed; a game that widens takes the ladder's shares instead, and this is the default range), and `--tilt`'s P (0 without it) |
 | `back`, `above`, `widen` | `--back`'s J (0 without it), `--above`'s J (0 without it), and `--widen`'s S (null without it) |
+| `unseeded_every`, `unseeded` | `--unseeded-every`'s K (0 without it), and whether the line is of an [unseeded play](#games-played-twice) (as `--unseeded` plays every game) |
 | `start` | the score of a searched game's start; null on any other line |
 | `trajectories` | for a searched game, what each incumbent its rounds kept began from: `"start"`, then the games whose survivors it began from, such as `["start",4231,4224]`; null on any other line |
 | `survivor_scores` | for a searched game, each game whose moves a trajectory could begin from, in the order of `trajectories`, with the score of what survives of its moves here, whether or not it began one, such as `[[594,110682],[593,110489]]`; null on any other line |
 | `rounds`, `neighborhoods`, `steps`, `work` | the rounds done, their neighborhoods, the engine's steps in them, and their work (the steps and 32 for each neighborhood) |
 | `stage_rounds` | for a searched game, for each trajectory, the rounds it spent at each of the three stages of `--widen` (all at stage 0 without it); null on any other line |
 | `improvements` | for each round that raised the score: `round` (0: before any round, a trajectory that began heavier than the start), the `trajectory` (an index in `trajectories`) that made it and its `stage` in that round, the `neighborhoods`, the `steps` and the `work` of the rounds up to and including this one, the `seconds` until it ended, and the new `score` |
-| `seconds`, `start_seconds` | the game's wall time, from the end of the game before and of the repair's walk after it (or the start of the run) to its line, and the part of it before the rounds; a game's setup is made while the game before plays, so it counts only in the first game of a run |
+| `other` | for a [game played twice](#games-played-twice), the play this line is not: `unseeded`, whether it was the unseeded play, and its `method`, `score`, `rounds`, `steps`, `work` and `seconds`; null on any other line |
+| `seconds`, `start_seconds` | the game's wall time, from the end of the game before and of the repair's walk after it (or the start of the run) to its line (both plays of a game played twice), and the part of its play before the rounds; a game's setup is made while the game before plays, so it counts only in the first game of a run |
 | `threads` | the threads it ran on |
 | `from_known` | true if `--from-known` started the game from the built-in table's moves for n − 1 |
 | `stop_at_known` | with `--stop-at-known`: `known`, the built-in table's score, and `round`, the round after which the game had that score (0: the start or the start of a trajectory, or a game that runs no round), or null if it never had; null without the flag |

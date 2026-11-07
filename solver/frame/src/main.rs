@@ -13,8 +13,8 @@ use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, gate_trial, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
 use taxman::solver::unsound::{
-    DEFAULT_BACK, DEFAULT_TILT, DEFAULT_WIDEN, MAX_ABOVE, MAX_BACK, MAX_EFFORT, MAX_TILT, MIN_EFFORT, REPAIR_REACH,
-    ROUND_WORK,
+    DEFAULT_BACK, DEFAULT_TILT, DEFAULT_UNSEEDED_EVERY, DEFAULT_WIDEN, MAX_ABOVE, MAX_BACK, MAX_EFFORT, MAX_TILT,
+    MIN_EFFORT, REPAIR_REACH, ROUND_WORK,
 };
 use taxman::tactics::Tactics;
 
@@ -99,6 +99,9 @@ commands:
       --widen S                with --unsound: an incumbent that has not grown heavier for S rounds (S >= 1, default
                                {widen}) moves its neighborhoods down a ladder of the shares fixed,
                                {ladder}.  0: no widening
+      --unseeded-every K       with --unsound: play each game whose n is a multiple of K twice, as any game and also
+                               unseeded, as --unseeded plays it, and keep the better line (default {unseeded_every}).
+                               0: no game twice
       --past-ceiling           with --unsound: do not end a game's rounds at the run's ceiling, n + the score of the
                                moves for n-1 it starts from (which they do by default, when it has such moves)
       --no-repair              with --unsound: do not repair lines: by default, what survives of each line in each of
@@ -106,6 +109,8 @@ commands:
                                so on down, with the line appended again
       --stop-at-known          with --unsound: end a game's rounds once its score is the built-in table's
       --from-known             with --unsound: start every game from the built-in table's moves for n-1
+      --unseeded               with --unsound: take nothing from the games below: search every game, with no seed,
+                               no trajectory of --back and no run's ceiling (for measuring)
   regress [--from A] [--to N] [--threads K] [--window K] [--tactic ...]
                           solve A..N (default 1..400) in memory and check every score against the built-in table
   verify-results [--threads K] FILE...
@@ -150,6 +155,7 @@ fn usage() -> String {
         .replace("{back}", &DEFAULT_BACK.to_string())
         .replace("{max_above}", &MAX_ABOVE.to_string())
         .replace("{repair_reach}", &REPAIR_REACH.to_string())
+        .replace("{unseeded_every}", &DEFAULT_UNSEEDED_EVERY.to_string())
         .replace("{widen}", &DEFAULT_WIDEN.to_string())
         .replace("{ladder}", &ladder.join(" -> "))
 }

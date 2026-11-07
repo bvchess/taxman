@@ -156,13 +156,16 @@ const SOLVE_FLAGS: [&str; 10] = [
 ];
 
 /// The flags of the unsound mode that take a value, besides `--out` and the solver's: the level of effort, the seed,
-/// and the options that shape the rounds (the share fixed, the share tilted, the games before and above that the
-/// trajectories begin from, the widening), of which `--tilt`, `--back` and `--widen` have defaults that 0 turns off.
-const UNSOUND_FLAGS: [&str; 7] = ["--effort", "--seed", "--fix", "--tilt", "--back", "--above", "--widen"];
+/// the options that shape the rounds (the share fixed, the share tilted, the games before and above that the
+/// trajectories begin from, the widening), of which `--tilt`, `--back` and `--widen` have defaults that 0 turns off,
+/// and the games played twice.
+const UNSOUND_FLAGS: [&str; 8] =
+    ["--effort", "--seed", "--fix", "--tilt", "--back", "--above", "--widen", "--unseeded-every"];
 
 /// The switches of the unsound mode: the mode itself, the end of the stop at the run's ceiling, the end of the repair,
-/// and its measuring options.
-const UNSOUND_SWITCHES: [&str; 5] = ["--unsound", "--past-ceiling", "--no-repair", "--stop-at-known", "--from-known"];
+/// and its measuring options, of which the last plays every game unseeded.
+const UNSOUND_SWITCHES: [&str; 6] =
+    ["--unsound", "--past-ceiling", "--no-repair", "--stop-at-known", "--from-known", "--unseeded"];
 
 /// `solve N|A-B [options]`: solves game N or a range, each from the one before (`solver::solve_range_each`); with
 /// `--unsound`, plays them in the unsound mode ([`solve_unsound`]).
@@ -236,7 +239,8 @@ fn proof_search_flags() -> impl Iterator<Item = &'static str> {
 }
 
 /// `solve A-B --unsound --effort L --out FILE [--seed S] [--fix LO,HI] [--tilt P] [--back J] [--above J] [--widen S]
-/// [--past-ceiling] [--no-repair] [--stop-at-known] [--from-known]`, with `--threads`, `--tactic` and `--show`: plays
+/// [--unseeded-every K] [--past-ceiling] [--no-repair] [--stop-at-known] [--from-known] [--unseeded]`, with
+/// `--threads`, `--tactic` and `--show`: plays
 /// the games in the unsound mode (`solver::unsound::solve_range`), with no proof, and appends their unsound lines to
 /// FILE, and the lines that the repair replaces.  An option not given has its default ([`Plan::default`]); `--fix`
 /// turns widening off (`unsound::widening`).  It stops on SIGINT and SIGTERM between rounds, the game in play
@@ -269,6 +273,8 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
         from_known: args.has("--from-known"),
         past_ceiling: args.has("--past-ceiling"),
         repair: !args.has("--no-repair"),
+        unseeded: args.has("--unseeded"),
+        unseeded_every: args.parsed("--unseeded-every")?.unwrap_or(default.unseeded_every),
         ..default
     };
     let out = args.value("--out").map(Path::new);

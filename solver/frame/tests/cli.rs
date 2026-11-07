@@ -42,10 +42,12 @@ fn help_lists_the_commands_and_every_tactic() {
             "--back J",
             "--above J",
             "--widen S",
+            "--unseeded-every K",
             "--past-ceiling",
             "--no-repair",
             "--stop-at-known",
             "--from-known",
+            "--unseeded ",
             "tables N K...",
         ] {
             assert!(run.stdout.contains(text), "{args:?}: no {text:?}");
@@ -485,7 +487,7 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         let message = format!("{} is a flag of the proof search, which --unsound does not run", flag[0]);
         assert_usage_error(&[&base[..], flag].concat(), &message);
     }
-    let unsound_only: [&[&str]; 11] = [
+    let unsound_only: [&[&str]; 13] = [
         &["--effort", "1"],
         &["--seed", "2"],
         &["--fix", "0.5,0.7"],
@@ -493,10 +495,12 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         &["--back", "2"],
         &["--above", "2"],
         &["--widen", "3"],
+        &["--unseeded-every", "8"],
         &["--past-ceiling"],
         &["--no-repair"],
         &["--stop-at-known"],
         &["--from-known"],
+        &["--unseeded"],
     ];
     for flag in unsound_only {
         let message = format!("{} is a flag of the unsound mode: give --unsound with it", flag[0]);
@@ -615,7 +619,8 @@ const RAISED_BY_THE_DEFAULTS: [u32; 2] = [539, 544];
 /// The same, in three rounds or more with `--back 0 --tilt 0 --widen 0`.
 const RAISED_WITH_THE_OPTIONS_OFF: [u32; 2] = [375, 680];
 
-/// An unsound line without what varies from run to run: the build, and the times (the game's and each improvement's).
+/// An unsound line without what varies from run to run: the build, and the times (the game's, each improvement's and
+/// those of the other play of a game played twice).
 fn without_times(line: &Json) -> Json {
     let pairs = |json: &Json| json.as_obj().expect("an object").to_vec();
     let kept = |json: &Json, vary: &[&str]| -> Vec<(String, Json)> {
@@ -626,6 +631,9 @@ fn without_times(line: &Json) -> Json {
         if key == "improvements" {
             let raised = value.as_arr().expect("an array").iter();
             *value = Json::array(raised.map(|raised| Json::object(kept(raised, &["seconds"]))));
+        }
+        if key == "other" && *value != Json::Null {
+            *value = Json::object(kept(value, &["seconds"]));
         }
     }
     Json::object(line)
@@ -648,14 +656,15 @@ fn unsound_lines(dir: &TempDir, tag: &str, games: &[u32], effort: u32, extra: &[
         .collect()
 }
 
-/// With no option, `--unsound` plays the rounds of `--back 8 --tilt 25 --widen 4`: the lines are the same, but for the
-/// build and the times.
+/// With no option, `--unsound` plays the rounds of `--back 8 --tilt 25 --widen 4 --unseeded-every 8`: the lines are the
+/// same, but for the build and the times.
 #[test]
-fn the_defaults_are_the_three_options_given_by_name() {
+fn the_defaults_are_the_options_given_by_name() {
     let dir = TempDir::new("unsound-defaults");
     let games = &RAISED_BY_THE_DEFAULTS;
     let by_default = unsound_lines(&dir, "default", games, 1, &[]);
-    let by_name = unsound_lines(&dir, "named", games, 1, &["--back", "8", "--tilt", "25", "--widen", "4"]);
+    let named = ["--back", "8", "--tilt", "25", "--widen", "4", "--unseeded-every", "8"];
+    let by_name = unsound_lines(&dir, "named", games, 1, &named);
     assert_eq!(by_default, by_name);
     for line in &by_default {
         let count = |key: &str| line.get(key).and_then(Json::as_arr).map(<[Json]>::len);
@@ -711,4 +720,32 @@ fn past_ceiling_takes_the_stop_at_the_runs_ceiling_away() {
     assert_eq!((past.get("ceiling"), past.get("at_ceiling")), (Some(&Json::Null), Some(&Json::Bool(false))));
     assert!(past.get("rounds").and_then(Json::as_u64) >= Some(1), "the game searches its budget: {past:?}");
     assert_eq!(past.get("score"), stopped.get("score"));
+}
+
+/// `--unseeded` plays a game with nothing from the games below it, and `--unseeded-every K` plays a game whose n is a
+/// multiple of K twice, and says what the other play came to: game 18, from the table's moves for 17, its rounds ending
+/// at the table's score, which an unseeded play has no ceiling to stop at.
+#[test]
+fn unseeded_plays_a_game_alone_and_unseeded_every_plays_it_twice() {
+    let dir = TempDir::new("unsound-unseeded");
+    let play = |name: &str, extra: &[&str]| {
+        let file = dir.join(name);
+        let args = ["solve", "18", "--unsound", "--effort", "1", "--from-known", "--stop-at-known", "--threads", "1"];
+        let args = [&args[..], &["--out", path(&file)]].concat();
+        let run = taxman(&[&args[..], extra].concat());
+        assert_eq!(run.code, Some(0), "{}", run.stderr);
+        let line = fs::read_to_string(&file).unwrap();
+        (run.stdout, Json::parse(line.lines().next().unwrap()).unwrap())
+    };
+    let (_, once) = play("once.jsonl", &["--unseeded-every", "0"]);
+    assert_eq!((once.get("unseeded"), once.get("other")), (Some(&Json::Bool(false)), Some(&Json::Null)));
+    let (_, alone) = play("alone.jsonl", &["--unseeded"]);
+    assert_eq!((alone.get("unseeded"), alone.get("method")), (Some(&Json::Bool(true)), Some(&Json::from("search"))));
+    assert_eq!((alone.get("prev"), alone.get("ceiling")), (Some(&Json::Null), Some(&Json::Null)));
+    let (summary, twice) = play("twice.jsonl", &["--unseeded-every", "9"]);
+    assert!(summary.contains("  unseeded play"), "{summary}");
+    assert_eq!(twice.get("unseeded_every"), Some(&Json::from(9u32)));
+    let other = twice.get("other").expect("the other play");
+    assert_eq!(other.get("unseeded"), Some(&Json::Bool(true)), "the seeded play is kept on a tie: {twice}");
+    assert_eq!((other.get("score"), twice.get("score")), (alone.get("score"), once.get("score")));
 }

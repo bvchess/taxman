@@ -2,7 +2,8 @@
 //! are the same on one thread and on four, run the rounds of a lower level first, resume, and end their rounds at the
 //! table's score with `--stop-at-known`; and the wall between its lines and proven ones holds both ways.  The options
 //! that shape the rounds (`fix`, `tilt`, `back`, `widen`) change the line, and each of them, the last three together
-//! and the defaults of the last three keep all of the above.
+//! and the defaults of the last three keep all of the above.  The repair pulls a short line up from the lines above
+//! it, an unseeded game takes nothing from the games below it, and a game played twice keeps its better play.
 //!
 //! Most tests play the rounds with `tilt`, `back` and `widen` off (`plain`, the form of the mode before they had
 //! defaults), so that each keeps testing what it tested; the options are given by name where a test is about them, and
@@ -24,7 +25,7 @@ use taxman::game::{replay, Optimal};
 use taxman::json::Json;
 use taxman::results::{verify_files, ResultsFile};
 use taxman::search::finder::{NEIGHBORHOODS, NEIGHBORHOOD_WORK};
-use taxman::solver::unsound::{self, Line, Origin, Plan, Previous, Raised, Repair, Source};
+use taxman::solver::unsound::{self, Line, Origin, OtherPlay, Plan, Previous, Raised, Repair, Source};
 use taxman::solver::{solve_range, Method, SolveOptions};
 
 /// The work of a round in these tests, which level L budgets 2^L times: about half the work of a round of the small
@@ -32,10 +33,11 @@ use taxman::solver::{solve_range, Method, SolveOptions};
 /// rounds and level L a few rounds more than level L − 1.
 const WORK: u64 = 1_100;
 
-/// The plan of a run at level `effort`, with the default seed and no measuring option, and with `tilt`, `back`, `widen`
-/// and the repair off: the mode as it was before those options had defaults.
+/// The plan of a run at level `effort`, with the default seed and no measuring option, and with `tilt`, `back`, `widen`,
+/// the repair and the games played twice off: the mode as it was before those options had defaults.
 fn plan(effort: u32) -> Plan {
-    Plan { effort, round_work: WORK, tilt: 0, back: 0, widen: None, repair: false, ..Plan::default() }
+    let off = Plan { tilt: 0, back: 0, widen: None, repair: false, unseeded_every: 0, ..Plan::default() };
+    Plan { effort, round_work: WORK, ..off }
 }
 
 /// The plan of a run at level `effort` with the defaults of `tilt`, `back` and `widen`.
@@ -95,10 +97,11 @@ fn lines(range: (u32, u32), opts: &SolveOptions, plan: &Plan, out: Option<&Path>
     played(range, opts, plan, out).0
 }
 
-/// `line` without what varies from run to run: its times and its threads.
+/// `line` without what varies from run to run: its times (and those of its other play) and its threads.
 fn timeless(line: &Line) -> Line {
     let improvements = line.improvements.iter().map(|raised| Raised { seconds: 0.0, ..*raised }).collect();
-    Line { seconds: 0.0, start_seconds: 0.0, threads: 0, improvements, ..line.clone() }
+    let other = line.other.map(|other| OtherPlay { seconds: 0.0, ..other });
+    Line { seconds: 0.0, start_seconds: 0.0, threads: 0, improvements, other, ..line.clone() }
 }
 
 /// The lines without what varies from run to run.
@@ -204,8 +207,19 @@ fn the_rounds_of_a_level_run_until_their_work_reaches_its_budget_and_the_round_t
 }
 
 /// Games whose rounds, from a start made with the table's moves for n − 1, find different sets under the options that
-/// shape the rounds, and each starts from the table's moves, so it is the same game whatever the lines before it.
+/// shape the rounds, and each starts from the table's moves, so it is the same game whatever the lines before it.  With
+/// the defaults, 544 and 680 are played twice, and at level 3 their seeded plays are kept.
 const SHAPED: [u32; 4] = [375, 539, 544, 680];
+
+/// The games of [`SHAPED`] that the defaults play once, neither a multiple of 8 ([`unsound::DEFAULT_UNSEEDED_EVERY`]).
+/// The line of a game played twice is the better play's, which can be the other play at the next level, so a level
+/// runs the rounds of the levels below first in each play, not in the line: the seeded play is the game played once,
+/// and the unseeded play is the game played unseeded alone (`a_game_played_twice_has_the_line_of_the_better_play_...`).
+const PLAYED_ONCE: [u32; 2] = [375, 539];
+
+/// The games of [`SHAPED`] but 544, the dearest to play twice, which keeps the check of the threads inside its CPU limit:
+/// 680 is played twice under the defaults.
+const ON_THREADS: [u32; 3] = [375, 539, 680];
 
 /// The plans of the options at level `effort`, for the games [`SHAPED`] from the table's moves: a share fixed other than
 /// the default's, the tilted share, trajectories from the 8 games before, the widening after a round without growth,
@@ -223,10 +237,10 @@ fn shaped(effort: u32) -> [(&'static str, Plan); 7] {
     ]
 }
 
-/// The lines of the games [`SHAPED`] played with `plan`, which starts them from the table's moves.
-fn shaped_lines(opts: &SolveOptions, plan: &Plan) -> Vec<Line> {
+/// The lines of `games` (of [`SHAPED`]) played with `plan`, which starts them from the table's moves.
+fn shaped_lines(games: &[u32], opts: &SolveOptions, plan: &Plan) -> Vec<Line> {
     assert!(plan.from_known);
-    SHAPED.iter().flat_map(|&n| lines((n, n), opts, plan, None)).collect()
+    games.iter().flat_map(|&n| lines((n, n), opts, plan, None)).collect()
 }
 
 #[test]
@@ -235,7 +249,7 @@ fn with_the_options_off_the_rounds_are_these() {
     // neighborhood's draws or to the budget goes unseen: the neighborhoods of the finder's default are pinned beside, in
     // `search::finder`.
     let plan = Plan { from_known: true, ..plan(3) };
-    let lines = shaped_lines(&options(4, true), &plan);
+    let lines = shaped_lines(&SHAPED, &options(4, true), &plan);
     let now: Vec<_> = lines.iter().map(|line| (line.n, line.score, line.rounds, line.steps, raised(line))).collect();
     let was = [
         (375, 44328, 5, 394, vec![(2, 44327), (3, 44328)]),
@@ -290,22 +304,23 @@ macro_rules! for_each_option {
     };
 }
 
-/// The lines of the games [`SHAPED`] under option `shape` of [`shaped`] are the same on one thread and on four.
+/// The lines of the games [`ON_THREADS`] under option `shape` of [`shaped`] are the same on one thread and on four.
 fn check_same_on_one_thread_and_on_four(shape: usize) {
     let shape = shaped(3)[shape].1;
-    let one = shaped_lines(&options(1, true), &shape);
-    let four = shaped_lines(&options(4, true), &shape);
+    let one = shaped_lines(&ON_THREADS, &options(1, true), &shape);
+    let four = shaped_lines(&ON_THREADS, &options(4, true), &shape);
     assert_eq!(timeless_all(&one), timeless_all(&four));
     assert!(one.iter().all(|line| line.threads == 1) && four.iter().all(|line| line.threads == 4));
 }
 for_each_option!(same_on_one_thread_and_on_four, check_same_on_one_thread_and_on_four);
 
-/// Under option `shape` of [`shaped`], the improvements of the games [`SHAPED`] at level 1 are a prefix of those at
-/// level 2, and those at level 2 of those at level 3: the rounds, the trajectories, the stages, the steps and the
+/// Under option `shape` of [`shaped`], the improvements of the games [`PLAYED_ONCE`] at level 1 are a prefix of those
+/// at level 2, and those at level 2 of those at level 3: the rounds, the trajectories, the stages, the steps and the
 /// scores.
 fn check_lower_level_first(shape: usize) {
     let by_level: Vec<Vec<Line>> =
-        (1..=3).map(|effort| shaped_lines(&options(4, true), &shaped(effort)[shape].1)).collect();
+        (1..=3).map(|effort| shaped_lines(&PLAYED_ONCE, &options(4, true), &shaped(effort)[shape].1)).collect();
+    assert!(by_level.iter().flatten().all(|line| line.other.is_none()), "each game is played once");
     for (less, more) in by_level.iter().zip(&by_level[1..]) {
         for (less, more) in less.iter().zip(more) {
             let (n, raised) = (less.n, (raised_by(less), raised_by(more)));
@@ -323,7 +338,7 @@ for_each_option!(lower_level_first, check_lower_level_first);
 /// each stage, and what each improvement says of both.
 fn check_what_the_line_records(shape: usize) {
     let (what, shape) = shaped(3)[shape];
-    let lines = shaped_lines(&options(4, true), &shape);
+    let lines = shaped_lines(&SHAPED, &options(4, true), &shape);
     for line in &lines {
         let (n, json) = (line.n, line.to_json());
         assert_eq!(line.plan, shape, "{what}");
@@ -332,6 +347,9 @@ fn check_what_the_line_records(shape: usize) {
         assert_eq!(json.get("back"), Some(&Json::from(shape.back)), "n={n}");
         assert_eq!(json.get("widen"), Some(&shape.widen.map_or(Json::Null, Json::from)), "n={n}");
         assert_eq!(json.get("budget"), Some(&Json::from(shape.budget())), "n={n}");
+        assert_eq!(json.get("unseeded_every"), Some(&Json::from(shape.unseeded_every)), "n={n}");
+        let twice = shape.unseeded_every > 0 && n.is_multiple_of(shape.unseeded_every);
+        assert_eq!(line.other.is_some(), twice, "n={n}: played twice if a multiple of K");
         let (origins, stages) = (line.trajectories.as_ref().unwrap(), line.stage_rounds.as_ref().unwrap());
         assert_eq!(origins[0], Origin::Start, "n={n}");
         assert_eq!(stages.len(), origins.len(), "n={n}: the rounds of each trajectory");
@@ -362,7 +380,7 @@ fn back_adds_a_trajectory_for_each_distinct_set_that_survives_of_the_games_befor
     let known = Plan { from_known: true, ..plan(1) };
     let origins = |back| -> Vec<Vec<Origin>> {
         let shape = Plan { back, ..known };
-        shaped_lines(&options(4, true), &shape).into_iter().map(|line| line.trajectories.unwrap()).collect()
+        shaped_lines(&SHAPED, &options(4, true), &shape).into_iter().map(|line| line.trajectories.unwrap()).collect()
     };
     let (none, one, eight) = (origins(0), origins(1), origins(8));
     assert!(none.iter().all(|origins| origins == &[Origin::Start]));
@@ -925,4 +943,85 @@ fn a_file_holds_a_second_line_of_a_game_only_as_a_repair_that_scores_more() {
     refused(format!("{played_395}\n{}\n", was(1)), "line 2: a repair of a line of n=395 that scored 1, not");
     let score = Json::parse(repair_395).unwrap().get("score").and_then(Json::as_u64).unwrap();
     refused(format!("{played_395}\n{}\n", was(score)), "line 2: (n=395) it records a repair, and scores");
+}
+
+/// Games 383 to 387, which a run that takes the moves below plays as a prime (383), searches and a repeat of 385
+/// (386).
+const UNSEEDED: (u32, u32) = (383, 387);
+
+#[test]
+fn an_unseeded_game_takes_nothing_from_the_games_below() {
+    let opts = options(4, true);
+    let seeded = lines(UNSEEDED, &opts, &Plan { back: 8, ..plan(1) }, None);
+    let methods: Vec<Method> = seeded.iter().map(|line| line.method).collect();
+    assert_eq!(methods, [Method::Prime, Method::Search, Method::Search, Method::Repeat, Method::Search]);
+    // Unseeded, every game is searched, from its start alone, with no moves for n − 1 and no ceiling.
+    let unseeded = Plan { unseeded: true, back: 8, ..plan(1) };
+    let range = lines(UNSEEDED, &opts, &unseeded, None);
+    for line in &range {
+        let n = line.n;
+        assert_eq!((line.method, line.unseeded, line.other), (Method::Search, true, None), "n={n}");
+        assert_eq!((&line.prev, line.ceiling), (&None, None), "n={n}");
+        assert_eq!(line.trajectories, Some(vec![Origin::Start]), "n={n}");
+        assert_eq!(line.to_json().get("unseeded"), Some(&Json::Bool(true)), "n={n}");
+    }
+    // Its line is the one it has alone, as the first game of a run, and the one it has after the table's games.
+    let alone: Vec<Line> = range.iter().flat_map(|line| lines((line.n, line.n), &opts, &unseeded, None)).collect();
+    let known = lines(UNSEEDED, &opts, &Plan { from_known: true, ..unseeded }, None);
+    let planless =
+        |lines: &[Line]| lines.iter().map(|line| Line { plan: unseeded, ..timeless(line) }).collect::<Vec<_>>();
+    assert_eq!(planless(&range), planless(&alone));
+    assert_eq!(planless(&range), planless(&known));
+}
+
+/// The plan of a run at effort 1 that repairs and plays every game whose n is a multiple of `every` twice.
+fn twice(every: u32) -> Plan {
+    Plan { unseeded_every: every, ..repairing(1) }
+}
+
+/// The score of each game of the file `path` (its last line), less the table's.
+fn short_in(path: &Path) -> Vec<u64> {
+    let table = Optimal::built_in();
+    let score =
+        |(n, line): (u64, Json)| table.score(n as u32).unwrap() - line.get("score").and_then(Json::as_u64).unwrap();
+    games_of(path, false).into_iter().map(score).collect()
+}
+
+#[test]
+fn a_game_played_twice_has_the_line_of_the_better_play_and_the_repair_walks_down_from_it() {
+    let (dir, opts) = (TempDir::new("unsound-twice"), options(4, false));
+    // Played once, the games of `WALKED` hand 390's shortfall of 7 on to 395; from 396, the repair takes 5 of it back.
+    let once = dir.join("once.jsonl");
+    played(WALKED, &opts, &twice(0), Some(&once));
+    assert_eq!(short_in(&once), [2, 2, 2, 2, 2, 2, 0]);
+    // Played twice, the even games: the unseeded play of 392 is not held to 391's ceiling, and reaches the table's
+    // score, 7 above the seeded play, which stopped there.  It is kept, the repair walks down from it to 390, and the
+    // games above start from it.
+    let file = dir.join("twice.jsonl");
+    let (lines, repairs) = played(WALKED, &opts, &twice(2), Some(&file));
+    assert_eq!(short_in(&file), [0; 7]);
+    for line in &lines {
+        assert_eq!(line.other.is_some(), line.n % 2 == 0, "n={}", line.n);
+    }
+    let game = &lines[2];
+    let other = game.other.expect("392 is played twice");
+    assert_eq!(
+        (game.n, game.unseeded, other.unseeded, other.method, game.score - other.score),
+        (392, true, false, Method::Search, 7)
+    );
+    assert_eq!((&game.prev, game.ceiling, game.trajectories.clone()), (&None, None, Some(vec![Origin::Start])));
+    assert_eq!(repairs.iter().map(|r| (r.n, r.from)).collect::<Vec<_>>(), [(391, 392), (390, 391)]);
+    // Elsewhere the seeded play is kept, on a tie too (390 and 396), and the line says what the unseeded play scored.
+    for line in lines.iter().filter(|line| line.n != 392 && line.other.is_some()) {
+        let other = line.other.unwrap();
+        assert!(!line.unseeded && other.unseeded && other.score <= line.score, "n={}: {other:?}", line.n);
+    }
+    // The unseeded play is the game played unseeded alone.
+    let alone = self::lines((392, 392), &opts, &Plan { unseeded: true, ..repairing(1) }, None).remove(0);
+    let play = |line: &Line| (line.score, line.moves.clone(), line.rounds, line.work, raised_by(line));
+    assert_eq!(play(game), play(&alone));
+    // On one thread, the same file.
+    let one = dir.join("one.jsonl");
+    played(WALKED, &options(1, false), &twice(2), Some(&one));
+    assert_eq!(file_lines(&one, false), file_lines(&file, false));
 }
