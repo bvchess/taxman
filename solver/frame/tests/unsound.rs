@@ -465,6 +465,135 @@ fn stop_at_known_ends_the_rounds_at_the_tables_score() {
     );
 }
 
+/// The plan of a run at `effort` from the table's moves for n − 1, so that the run's ceiling is the proven one.
+fn from_table(effort: u32) -> Plan {
+    Plan { from_known: true, ..plan(effort) }
+}
+
+/// The proven ceiling of game `n`: n + the table's score for n − 1.
+fn proven_ceiling(n: u32) -> u64 {
+    Optimal::built_in().score(n - 1).unwrap() + u64::from(n)
+}
+
+/// Games whose start from the table's moves for n − 1 is at the run's ceiling: the proven mode finds each with no
+/// search (method `start`, proof `cap`).
+const AT_CEILING_AT_THE_START: [u32; 4] = [18, 28, 33, 42];
+
+/// Games whose start, made without the moves for n − 1 (`options(_, false)`), falls short of the run's ceiling, and the
+/// round in which the rounds reach it: 378 in its third, 385 in its second and 387 in its first.
+const AT_CEILING_IN_A_ROUND: [(u32, u64); 3] = [(378, 3), (385, 2), (387, 1)];
+
+#[test]
+fn a_game_whose_start_reaches_the_runs_ceiling_stops_before_any_round() {
+    let opts = options(4, true);
+    for n in AT_CEILING_AT_THE_START {
+        let ceiling = proven_ceiling(n);
+        // The start is at the ceiling, whatever the effort: no round and no work.
+        for effort in [0, 3] {
+            let line = &lines((n, n), &opts, &from_table(effort), None)[0];
+            assert_eq!((line.method, line.start, line.score), (Method::Search, Some(ceiling), ceiling), "n={n}");
+            assert_eq!((line.ceiling, line.at_ceiling), (Some(ceiling), true), "n={n} at effort {effort}");
+            assert_eq!((line.rounds, line.steps, line.work), (0, 0, 0), "n={n} at effort {effort}");
+            assert!(line.improvements.is_empty(), "n={n}");
+            let json = line.to_json();
+            assert_eq!(json.get("ceiling"), Some(&Json::from(ceiling)), "n={n}");
+            assert_eq!(json.get("at_ceiling"), Some(&Json::Bool(true)), "n={n}");
+        }
+        // With --past-ceiling the game searches its budget, and finds nothing above the proven ceiling.
+        let past = Plan { past_ceiling: true, ..from_table(3) };
+        let line = &lines((n, n), &opts, &past, None)[0];
+        assert_eq!((line.ceiling, line.at_ceiling, line.score), (None, false, ceiling), "n={n}");
+        assert!(line.rounds >= 1 && line.work >= past.budget(), "n={n}: {} rounds, {} work", line.rounds, line.work);
+        assert!(line.improvements.is_empty(), "n={n}");
+        let json = line.to_json();
+        assert_eq!((json.get("ceiling"), json.get("at_ceiling")), (Some(&Json::Null), Some(&Json::Bool(false))));
+    }
+}
+
+#[test]
+fn a_game_that_reaches_the_runs_ceiling_in_a_round_stops_after_that_round() {
+    let opts = options(4, false);
+    for (n, round) in AT_CEILING_IN_A_ROUND {
+        let ceiling = proven_ceiling(n);
+        let stopped = &lines((n, n), &opts, &from_table(3), None)[0];
+        assert_eq!((stopped.ceiling, stopped.at_ceiling, stopped.score), (Some(ceiling), true, ceiling), "n={n}");
+        assert!(stopped.start.unwrap() < ceiling, "n={n}: the start falls short of it");
+        // The round that reaches it is the last, well before the budget.
+        assert_eq!((stopped.rounds, raised(stopped).last()), (round, Some(&(round, ceiling))), "n={n}");
+        assert!(stopped.work < from_table(3).budget(), "n={n}: {} work", stopped.work);
+        // A higher level of effort stops at the same round, and a lower one is at the ceiling only if its budget lets it
+        // do those rounds.
+        for effort in [2, 4] {
+            let more = &lines((n, n), &opts, &from_table(effort), None)[0];
+            let shown =
+                |line: &Line| (line.rounds, line.steps, line.work, line.score, raised_by(line), line.at_ceiling);
+            assert_eq!(shown(more), shown(stopped), "n={n} at effort {effort}");
+        }
+        let less = &lines((n, n), &opts, &from_table(1), None)[0];
+        assert!(less.rounds <= stopped.rounds, "n={n}");
+        assert_eq!(less.at_ceiling, less.rounds == stopped.rounds, "n={n}");
+        // Without the stop the game goes on to its budget, and the rounds before the stop are the same.
+        let past = &lines((n, n), &opts, &Plan { past_ceiling: true, ..from_table(3) }, None)[0];
+        assert_eq!((past.ceiling, past.at_ceiling, past.score), (None, false, ceiling), "n={n}");
+        assert!(past.rounds > stopped.rounds && past.work >= from_table(3).budget(), "n={n}: {} rounds", past.rounds);
+        assert_eq!(raised_by(past), raised_by(stopped), "n={n}");
+    }
+}
+
+/// The lines of game 395 and then of game 396, played from a file that holds a short line of 395, on `threads` threads:
+/// 395 by its start alone, made without the moves for 394 (the table's, with `--from-known`), falls 7 short of the table's
+/// score; 396 then reads the file's line, not the table's, and stops at the lower ceiling that the line gives.
+fn from_a_short_line(threads: usize, past_ceiling: bool) -> (Line, Line) {
+    let (dir, opts) = (TempDir::new("unsound-short"), options(threads, false));
+    let file = dir.join("short.jsonl");
+    let short = lines((395, 395), &opts, &Plan { from_known: true, ..plan(0) }, Some(&file)).remove(0);
+    let game = lines((396, 396), &opts, &Plan { past_ceiling, ..plan(1) }, Some(&file)).remove(0);
+    (short, game)
+}
+
+#[test]
+fn a_game_seeded_with_a_short_line_for_n_minus_1_stops_at_the_lower_ceiling_of_those_moves() {
+    let (short, stopped) = from_a_short_line(4, false);
+    let table = Optimal::built_in();
+    assert_eq!(short.score + 7, table.score(395).unwrap(), "395's line is 7 short of optimal");
+    let prev = stopped.prev.as_ref().unwrap();
+    assert_eq!((prev.n, prev.score, prev.source), (395, short.score, Source::Results));
+    // The ceiling is that of the moves in the file, below the proven one, and the game stops at it.
+    let ceiling = 396 + short.score;
+    assert_eq!((stopped.ceiling, stopped.at_ceiling), (Some(ceiling), true));
+    assert!(ceiling < proven_ceiling(396));
+    assert!(stopped.start.unwrap() < ceiling, "the start falls short of it");
+    assert_eq!((stopped.rounds, raised(&stopped).len()), (1, 1), "the first round reaches it");
+    assert!(stopped.work < plan(1).budget(), "{} work: it stopped before its budget", stopped.work);
+    // That round passes the ceiling, which proves the line of 395 short by as much at least.
+    assert!(stopped.score > ceiling);
+    assert_eq!(prev.short_by, stopped.score - ceiling);
+    // Without the stop the game goes on to its budget.
+    let (_, past) = from_a_short_line(4, true);
+    assert_eq!((past.ceiling, past.at_ceiling), (None, false));
+    assert!(past.rounds > stopped.rounds && past.work >= plan(1).budget());
+    assert!(past.score >= stopped.score && past.score <= table.score(396).unwrap());
+}
+
+#[test]
+fn the_lines_that_stop_at_the_ceiling_are_the_same_on_one_thread_and_on_four() {
+    let played = |threads| {
+        let mut played = Vec::new();
+        for n in AT_CEILING_AT_THE_START {
+            played.extend(lines((n, n), &options(threads, true), &from_table(3), None));
+        }
+        for (n, _) in AT_CEILING_IN_A_ROUND {
+            played.extend(lines((n, n), &options(threads, false), &from_table(3), None));
+        }
+        played.push(from_a_short_line(threads, false).1);
+        played
+    };
+    let (one, four) = (played(1), played(4));
+    assert_eq!(timeless_all(&one), timeless_all(&four));
+    assert!(one.iter().all(|line| line.at_ceiling));
+    assert!(one.iter().all(|line| line.threads == 1) && four.iter().all(|line| line.threads == 4));
+}
+
 #[test]
 fn the_measuring_options_take_the_tables_games_only() {
     let past = Optimal::built_in().max_n() + 1;

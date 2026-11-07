@@ -928,13 +928,14 @@ trait Job: Send + Sync {
     /// The search, from the go (the game's third phase), and the moves its promotions make.  The game's checkpoint is
     /// left in place, for the caller to delete once the result is safe ([`discard_checkpoint`]).
     fn search(&self, go: Go, opts: &SolveOptions) -> Result<Outcome, String>;
-    /// The unsound mode's search ([`unsound`]) on `threads` threads, with no ceiling: the start that a search makes
-    /// ([`search::start_incumbent`]), from the promotions of `seed`, the moves for `n − 1`, if the search takes a seed,
-    /// then the rounds of LNS on many threads that `plan` asks for ([`finder::Lns::rounds`]), which end once their
-    /// work reaches the plan's budget ([`unsound::Plan::budget`]) or `enough` says so of the game's promotion sum.  If
-    /// the search takes a seed, the rounds follow a trajectory besides the start's from what survives of the moves in
-    /// `back`, the games n − 1, n − 2, ... and their moves, for each that is not a set an earlier trajectory began
-    /// from ([`unsound::trajectories`]).  `clock` is the game's seconds so far.
+    /// The unsound mode's search ([`unsound`]) on `threads` threads, with no ceiling in its control: the start that a
+    /// search makes ([`search::start_incumbent`]), from the promotions of `seed`, the moves for `n − 1`, if the search
+    /// takes a seed, then the rounds of LNS on many threads that `plan` asks for ([`finder::Lns::rounds`]), which end
+    /// once their work reaches the plan's budget ([`unsound::Plan::budget`]) or `enough` says so of the game's
+    /// promotion sum (the run's ceiling and the table's score are the caller's).  If the search takes a seed, the
+    /// rounds follow a trajectory besides the start's from what survives of the moves in `back`, the games n − 1,
+    /// n − 2, ... and their moves, for each that is not a set an earlier trajectory began from
+    /// ([`unsound::trajectories`]).  `clock` is the game's seconds so far.
     fn improve(
         &self,
         seed: Option<&[u32]>,

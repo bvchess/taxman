@@ -39,6 +39,7 @@ fn help_lists_the_commands_and_every_tactic() {
             "--tilt P",
             "--back J",
             "--widen S",
+            "--past-ceiling",
             "--stop-at-known",
             "--from-known",
             "tables N K...",
@@ -462,13 +463,14 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         let message = format!("{} is a flag of the proof search, which --unsound does not run", flag[0]);
         assert_usage_error(&[&base[..], flag].concat(), &message);
     }
-    let unsound_only: [&[&str]; 8] = [
+    let unsound_only: [&[&str]; 9] = [
         &["--effort", "1"],
         &["--seed", "2"],
         &["--fix", "0.5,0.7"],
         &["--tilt", "50"],
         &["--back", "2"],
         &["--widen", "3"],
+        &["--past-ceiling"],
         &["--stop-at-known"],
         &["--from-known"],
     ];
@@ -562,4 +564,31 @@ fn the_options_that_shape_the_rounds_are_checked_and_the_line_records_them() {
     );
     let known = line.get("stop_at_known").expect("what --stop-at-known recorded");
     assert_eq!(known.get("round"), Some(&Json::from(1u64)));
+}
+
+/// A searched game stops at the run's ceiling unless `--past-ceiling` is given, and the line says what the ceiling was
+/// and whether the game is at it: game 18 from the table's moves starts at its ceiling, 18 + the table's score for 17.
+#[test]
+fn past_ceiling_takes_the_stop_at_the_runs_ceiling_away() {
+    let dir = TempDir::new("unsound-ceiling");
+    let ceiling = Optimal::built_in().score(17).unwrap() + 18;
+    let play = |name: &str, extra: &[&str]| {
+        let file = dir.join(name);
+        let args =
+            ["solve", "18", "--unsound", "--effort", "1", "--from-known", "--threads", "1", "--out", path(&file)];
+        let run = taxman(&[&args[..], extra].concat());
+        assert_eq!(run.code, Some(0), "{}", run.stderr);
+        let line = fs::read_to_string(&file).unwrap();
+        (run.stdout, Json::parse(line.lines().next().unwrap()).unwrap())
+    };
+    let (summary, stopped) = play("stop.jsonl", &[]);
+    assert!(summary.contains("  at ceiling"), "{summary}");
+    assert_eq!(stopped.get("ceiling"), Some(&Json::from(ceiling)));
+    assert_eq!(stopped.get("at_ceiling"), Some(&Json::Bool(true)));
+    assert_eq!((stopped.get("rounds"), stopped.get("work")), (Some(&Json::from(0u64)), Some(&Json::from(0u64))));
+    let (summary, past) = play("past.jsonl", &["--past-ceiling"]);
+    assert!(!summary.contains("at ceiling"), "{summary}");
+    assert_eq!((past.get("ceiling"), past.get("at_ceiling")), (Some(&Json::Null), Some(&Json::Bool(false))));
+    assert!(past.get("rounds").and_then(Json::as_u64) >= Some(1), "the game searches its budget: {past:?}");
+    assert_eq!(past.get("score"), stopped.get("score"));
 }

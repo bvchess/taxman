@@ -160,8 +160,9 @@ const SOLVE_FLAGS: [&str; 10] = [
 /// widening).
 const UNSOUND_FLAGS: [&str; 6] = ["--effort", "--seed", "--fix", "--tilt", "--back", "--widen"];
 
-/// The switches of the unsound mode: the mode itself, and its measuring options.
-const UNSOUND_SWITCHES: [&str; 3] = ["--unsound", "--stop-at-known", "--from-known"];
+/// The switches of the unsound mode: the mode itself, the end of the stop at the run's ceiling, and its measuring
+/// options.
+const UNSOUND_SWITCHES: [&str; 4] = ["--unsound", "--past-ceiling", "--stop-at-known", "--from-known"];
 
 /// `solve N|A-B [options]`: solves game N or a range, each from the one before (`solver::solve_range_each`); with
 /// `--unsound`, plays them in the unsound mode ([`solve_unsound`]).
@@ -235,9 +236,9 @@ fn proof_search_flags() -> impl Iterator<Item = &'static str> {
 }
 
 /// `solve A-B --unsound --effort E --out FILE [--seed S] [--fix LO,HI] [--tilt P] [--back J] [--widen S]
-/// [--stop-at-known] [--from-known]`, with `--threads`, `--tactic` and `--show`: plays the games in the unsound mode
-/// (`solver::unsound::solve_range`), with no proof, and appends their unsound lines to FILE.  It stops on SIGINT and
-/// SIGTERM between rounds, the game in play unrecorded.
+/// [--past-ceiling] [--stop-at-known] [--from-known]`, with `--threads`, `--tactic` and `--show`: plays the games in
+/// the unsound mode (`solver::unsound::solve_range`), with no proof, and appends their unsound lines to FILE.  It stops
+/// on SIGINT and SIGTERM between rounds, the game in play unrecorded.
 fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     if let Some(flag) = proof_search_flags().find(|flag| args.has(flag)) {
         return Err(CliError::Usage(format!("{flag} is a flag of the proof search, which --unsound does not run")));
@@ -267,6 +268,7 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
         widen,
         stop_at_known: args.has("--stop-at-known"),
         from_known: args.has("--from-known"),
+        past_ceiling: args.has("--past-ceiling"),
         ..default
     };
     let out = args.value("--out").map(Path::new);

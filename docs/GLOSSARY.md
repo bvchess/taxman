@@ -83,6 +83,8 @@ changed"](https://github.com/bvchess/taxman-notebook/blob/main/terms-changed.md)
   the optimal sets there).  As a bound on the promotion sum, the ceiling is n + score(n − 1) − `in_the_bag`, which the
   results lines and a tactic call `cap`: the proof kind `cap`, the fields `reached_cap` and `setup.cap`, the tactic
   `prev_cap`.
+* **the run's ceiling**: in the unsound mode, n + score(n − 1) of the moves a game starts from, which is the ceiling if
+  those moves are optimal; a searched game stops there ([the reference](../solver/docs/REFERENCE.md#an-unsound-line)).
 * **prime formula**: for a prime n, opt(n) = n + opt(n − 1) − q, with q the largest prime below n.  The optimal game
   of n is that of n − 1 with its first move, q, replaced by n.  For game 7: 7 + 15 − 5 = 17.  The tactic is
   `prime_shortcut`, the proof kind `prime_formula`, and the theory proves the formula ([the prime formula

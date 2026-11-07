@@ -18,10 +18,15 @@
 //!   ([`start_incumbent`](crate::search::start_incumbent)), seeded with the moves for n − 1, and then the rounds of its
 //!   level ([`Plan::budget`]) of LNS on every thread, whose answer is the same on any number of threads
 //!   ([`Lns::rounds`](crate::search::finder::Lns::rounds)).
-//! * There is no ceiling.  The proven mode's, n + score(n − 1) − in_the_bag, holds only when the moves for n − 1 are
-//!   optimal, which nothing here says, so nothing stops at it, is held below it or is skipped by it.  A score above
-//!   n + score(n − 1) proves the line of n − 1 short: the line records by how much at least (`prev.short_by`), and the
-//!   run goes on.
+//! * The run's ceiling is n + score(n − 1) of the moves the game starts from.  A searched game stops there: its rounds
+//!   end once its score reaches it, before the first round if the start does, else after the round that does (effort 0
+//!   is the start alone, and a game with no moves for n − 1 has no ceiling).  When those moves are optimal, it is the
+//!   proven mode's ceiling, n + opt(n − 1), which no play of game n exceeds, and the stop loses nothing.  Nothing here
+//!   says they are optimal.  When they fall short, a game could score above the ceiling, which would prove the line of
+//!   n − 1 short (`prev.short_by`, as before); the stop gives that chance up, for the rounds it saves in every other
+//!   game.  So the stop is a heuristic and no proof: the line stays unsound, and records the ceiling and whether the game
+//!   is at it (`ceiling`, `at_ceiling`).  A game is not held below the ceiling, and a round that reaches it may pass it.
+//!   `--past-ceiling` takes the stop away, to measure what it costs.
 //! * The moves are replayed before they count ([`replay`]), and a score above the built-in table's, which is proven, is
 //!   a hard error.
 //!
@@ -77,9 +82,10 @@
 //! # Measuring
 //!
 //! Two options measure the mode on the games whose opt(n) is proven, and are refused for a game the built-in table
-//! lacks.  `--stop-at-known` ends a game's rounds as soon as its score is the table's, and the line records the round
-//! at which it was, or that it never was.  `--from-known` seeds every game with the table's moves for n − 1, not with
-//! this run's line.  solver/docs/REFERENCE.md has the keys of the line ("An unsound line").
+//! lacks.  `--stop-at-known` ends a game's rounds as soon as its score is the table's (or reaches the run's ceiling, if
+//! that comes first), and the line records the round at which it was the table's, or that it never was.  `--from-known`
+//! seeds every game with the table's moves for n − 1, not with this run's line, so that the run's ceiling is the proven
+//! one.  solver/docs/REFERENCE.md has the keys of the line ("An unsound line").
 
 use super::{
     prime_game, set_up, Before, Derived, Earlier, Failure, Method, RangeSummary, SearchSetup, SetUp, SolveOptions,
@@ -139,9 +145,12 @@ pub struct Plan {
     pub stop_at_known: bool,
     /// `--from-known`: every game starts from the built-in table's moves for n − 1.
     pub from_known: bool,
+    /// `--past-ceiling`: a game's rounds do not end at the run's ceiling, n + score(n − 1) of the moves it starts from.
+    pub past_ceiling: bool,
 }
 
-/// Effort 0, the finder's seed and share fixed, the start's trajectory alone, and no measuring option.
+/// Effort 0, the finder's seed and share fixed, the start's trajectory alone, the stop at the run's ceiling, and no
+/// measuring option.
 impl Default for Plan {
     fn default() -> Plan {
         let finder::Options { fix, seed, .. } = finder::Options::default();
@@ -155,6 +164,7 @@ impl Default for Plan {
             round_work: ROUND_WORK,
             stop_at_known: false,
             from_known: false,
+            past_ceiling: false,
         }
     }
 }
@@ -407,9 +417,16 @@ pub struct Line {
     /// What the moves with no promotions score; `None` for a prime game, which sets no board up.
     pub in_the_bag: Option<u64>,
     pub prev: Option<Previous>,
+    /// The run's ceiling on the game's score, n + score(n − 1) of the moves it started from ([`ceiling_over`]); `None`
+    /// with no such moves, and with `--past-ceiling`.
+    pub ceiling: Option<u64>,
+    /// The game's score reached its `ceiling`: a searched game's rounds stopped there (and had none to run if the
+    /// start was there).
+    pub at_ceiling: bool,
     /// For a repeat, the n of the line whose promotions it plays.
     pub repeats: Option<u32>,
-    /// What a searched or repeat game was set up with (its `cap` is always `None`: there is no ceiling).
+    /// What a searched or repeat game was set up with (its `cap` is always `None`: the proven mode's ceiling on the
+    /// promotion sum is the line's `ceiling` here).
     pub setup: Option<SearchSetup>,
     pub plan: Plan,
     /// The score of a searched game's start.
@@ -486,6 +503,8 @@ impl Line {
             ("method", Json::from(self.method.as_str())),
             ("in_the_bag", self.in_the_bag.map_or(Json::Null, Json::from)),
             ("prev", prev),
+            ("ceiling", self.ceiling.map_or(Json::Null, Json::from)),
+            ("at_ceiling", Json::Bool(self.at_ceiling)),
             ("repeats", self.repeats.map_or(Json::Null, Json::from)),
             ("setup", setup),
             ("effort", Json::from(self.plan.effort)),
@@ -514,20 +533,22 @@ impl Line {
     }
 
     /// One line for a person: n, score, method, the rounds and how many raised the score, the time, `unsound`, and what
-    /// `--stop-at-known` recorded and a line of n − 1 that this one proves short, if anything.
+    /// `--stop-at-known` recorded, whether the game is at the run's ceiling and a line of n − 1 that this one proves
+    /// short, if anything.
     pub fn summary_line(&self) -> String {
         let known = match self.known {
             None => String::new(),
             Some(Known { round: Some(round), .. }) => format!("  known reached in round {round}"),
             Some(Known { round: None, .. }) => "  known not reached".to_owned(),
         };
+        let ceiling = if self.at_ceiling { "  at ceiling" } else { "" };
         let short = self
             .prev
             .as_ref()
             .filter(|prev| prev.short_by > 0)
             .map_or_else(String::new, |prev| format!("  n-1 short by {} at least", prev.short_by));
         format!(
-            "n={:<5} score={:<9} {:<7} rounds={:<6} improved={:<3} {:>9.3} s  unsound{known}{short}",
+            "n={:<5} score={:<9} {:<7} rounds={:<6} improved={:<3} {:>9.3} s  unsound{known}{ceiling}{short}",
             self.n,
             self.score,
             self.method.as_str(),
@@ -808,6 +829,7 @@ fn play(
     // The moves for n − 1 are a seed and the prime shortcut's moves, which nothing checks again: the run's and the
     // file's lines were replayed before they were kept, and the table's are proven.
     let given = if before.is_some() { Before::Run } else { Before::None };
+    let ceiling = before.filter(|_| !plan.past_ceiling).map(|before| ceiling_over(n, before));
     let mut line = Line {
         n,
         score: 0,
@@ -816,6 +838,8 @@ fn play(
         method: Method::Search,
         in_the_bag: None,
         prev: None,
+        ceiling,
+        at_ceiling: false,
         repeats: None,
         setup: None,
         plan: *plan,
@@ -854,7 +878,11 @@ fn play(
                 line.promotions = promotions;
             } else {
                 let bag = set.in_the_bag;
-                let enough = |sum: u64| known.is_some_and(|known| bag + sum >= known);
+                // The rounds end at the table's score (`--stop-at-known`) or the run's ceiling, whichever comes first.
+                let enough = |sum: u64| {
+                    let score = bag + sum;
+                    known.is_some_and(|known| score >= known) || ceiling.is_some_and(|ceiling| score >= ceiling)
+                };
                 let seed = before.map(|before| before.moves.as_slice());
                 // The games a trajectory may begin from, from n − 1 down.
                 let back: Vec<(u32, &[u32])> =
@@ -890,9 +918,15 @@ fn play(
     Ok(Some(line))
 }
 
+/// The run's ceiling on the score of game `n` that starts from the moves `before` for n − 1: n + their score, which no
+/// play of game n exceeds if they are optimal (the module documentation, "One game").
+fn ceiling_over(n: u32, before: &Moves) -> u64 {
+    before.score + u64::from(n)
+}
+
 /// The checks of the moves of `line` before they count (the module documentation, "One game"), and what they give the
-/// line: its score, its record of the moves for n − 1 it started from, `before`, and what `--stop-at-known` recorded,
-/// if it was given (`known`, the table's score).
+/// line: its score, whether that is at its ceiling, its record of the moves for n − 1 it started from, `before`, and
+/// what `--stop-at-known` recorded, if it was given (`known`, the table's score).
 fn conclude(line: &mut Line, before: Option<&Moves>, known: Option<u64>, optimal: &Optimal) -> Result<(), String> {
     let n = line.n;
     let method = line.method.as_str();
@@ -911,12 +945,13 @@ fn conclude(line: &mut Line, before: Option<&Moves>, known: Option<u64>, optimal
             line.promotions
         ));
     }
+    line.at_ceiling = line.ceiling.is_some_and(|ceiling| score >= ceiling);
     line.prev = before.map(|before| Previous {
         n: n - 1,
         score: before.score,
         source: before.source,
         moves_digest: moves_digest(&before.moves),
-        short_by: score.saturating_sub(before.score + u64::from(n)),
+        short_by: score.saturating_sub(ceiling_over(n, before)),
     });
     line.known = known.map(|known| {
         // The round after which the score was the table's: the first improvement's that reached it, else the start's.
@@ -949,7 +984,7 @@ mod tests {
         let plan = Plan::default();
         assert_eq!((plan.effort, plan.seed, plan.fix, plan.tilt), (0, 1, (0.7, 0.9), 0));
         assert_eq!((plan.back, plan.widen, plan.round_work), (0, None, ROUND_WORK));
-        assert!(!plan.stop_at_known && !plan.from_known);
+        assert!(!plan.stop_at_known && !plan.from_known && !plan.past_ceiling, "the stop at the ceiling is on");
         let lns = plan.lns();
         let default = finder::Options::default();
         assert_eq!((lns.fix, lns.unit_nodes, lns.seed), (default.fix, default.unit_nodes, default.seed));

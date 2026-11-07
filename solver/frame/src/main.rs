@@ -89,6 +89,8 @@ commands:
                                from the ones before, each with its share of a round's neighborhoods
       --widen S                with --unsound: an incumbent that has not grown heavier for S rounds (S >= 1) moves its
                                neighborhoods down a ladder of the shares fixed, {ladder}; refused with --fix
+      --past-ceiling           with --unsound: do not end a game's rounds at the run's ceiling, n + the score of the
+                               moves for n-1 it starts from (which they do by default, when it has such moves)
       --stop-at-known          with --unsound: end a game's rounds once its score is the built-in table's
       --from-known             with --unsound: start every game from the built-in table's moves for n-1
   regress [--from A] [--to N] [--threads K] [--window K] [--tactic ...]
