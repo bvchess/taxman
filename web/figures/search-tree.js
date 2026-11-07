@@ -102,13 +102,13 @@ function words(t, k, score) {
   const base = sum(uStar);
   if (k === nodes.length) {
     const promoted = listWords([...bestSet].sort((a, b) => b - a));
-    return `Every branch has been searched or dropped, so no set of promotions adds more than ${best}. ` +
+    return `The search has searched or dropped every branch, so no set of promotions adds more than ${best}. ` +
       `Game ${t.n}'s optimal game promotes ${promoted}, and scores ${fmt(base)} + ${best} = ${fmt(score)}.`;
   }
   const node = nodes[k];
   if (!node.parent) {
     return `The search starts at the root, at the bottom, with nothing promoted and all ${cands.length} candidates ` +
-      'remaining. Each node shows the candidates promoted on the way to it. Its bound is the most its branch can add ' +
+      'remaining. Each node shows the candidates the search promoted on the way to it. Its bound is the most its branch can add ' +
       `to the ${fmt(base)} points of U*, the sum of its promoted and remaining candidates: at the root, all ` +
       `${cands.length} together, ${node.bound}.`;
   }
@@ -122,7 +122,7 @@ function words(t, k, score) {
   }
   if (node.dropped.length) {
     const withP = node.P.length === 1 ? 'it' : listWords(node.P);
-    parts.push(`With ${withP}, ${listWords(node.dropped)} can no longer be promoted, so ${leftWords(node.live)}.`);
+    parts.push(`With ${withP}, the player can no longer promote ${listWords(node.dropped)}, so ${leftWords(node.live)}.`);
   }
   const terms = [...node.P, ...node.live];
   if (node.kind === 'cut') {
@@ -297,7 +297,7 @@ export function mountSearchTree(host, { small }) {
 
   const s = scene(host.querySelector(':scope > svg'), {
     width: W, height: H, className: 'is-dense search-tree',
-    label: `The search of game ${N}, node by node. The current step is described under the figure.`,
+    label: `The search of game ${N}, node by node. The text under the figure describes the current step.`,
   });
   const chips = new Map();
   for (const node of nodes) {

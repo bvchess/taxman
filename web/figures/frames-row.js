@@ -177,7 +177,7 @@ function draw(box, tip, data, width) {
     hit.addEventListener('pointerenter', () => {
       const counts = countsOf(p.u.frames);
       const lines = [nameOf(p.u, true)];
-      lines.push(['sources', fmt(counts.sources)], ['kept by greedy', fmt(counts.kept)],
+      lines.push(['sources', fmt(counts.sources)], ['greedy keeps', fmt(counts.kept)],
         ['factors', fmt(counts.factors)], ['freedoms', p.u.closed ? 'none: closed' : fmt(counts.freedoms)]);
       tip.show(lines, x0 + p.w / 2, top + 20);
     });

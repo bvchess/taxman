@@ -409,9 +409,9 @@ function captions(f) {
   return {
     pot: `The pot holds the numbers 1 to ${N}.`,
     layers: 'Each number stands in the column of its layer, its count of prime factors, with layer 1 at the right. A line runs rightward from each number to each of its maximal factors: 12 to 6 and 4.',
-    sources: `Each column cut at n/2. Below the line are the sources, ${M.sources(N)[0]} to ${N}: they divide no other number on the board, so each is a move or nothing. Above it are the factors, 1 to ${half}.`,
-    greedy: `From ${N} down, descending greedy keeps ${listWords(f.keptDown)}, each still playable with those kept before it. It rejects ${listWords(f.rejectedDown)}: their one maximal factor, 1, already pays for ${f1.kept[0]}. U* scores ${f.inTheBag}.`,
-    layered: 'Game 21 as descending greedy left it, in its layers cut at n/2: the sources it kept in gray, those it ' +
+    sources: `The line cuts each column at n/2. Below it are the sources, ${M.sources(N)[0]} to ${N}: they divide no other number on the board, so each is a move or nothing. Above it are the factors, 1 to ${half}.`,
+    greedy: `From ${N} down, descending greedy keeps ${listWords(f.keptDown)}, each still playable with those it kept before. It rejects ${listWords(f.rejectedDown)}: their one maximal factor, 1, already pays for ${f1.kept[0]}. U* scores ${f.inTheBag}.`,
+    layered: 'Game 21 as descending greedy left it, in its layers, with a line cutting them at n/2: the sources it kept in gray, those it ' +
       'rejected dashed. The lines of each source run to factors one layer down, in the column to its right.',
     frames:
       `The ${numberWord(f.frames.length)} frames side by side: each source with the factors ` +
@@ -421,21 +421,21 @@ function captions(f) {
     freedoms:
       `The ${numberWord(closed.length)} frames at the ends are closed, with as many factors as moves, and drop out. ` +
       `The other ${numberWord(f.open.length)} have one freedom each: frame ${f.open[0].number} at the right and ` +
-      `frame ${f.open[1].number} behind it, numbered from the front. The candidates are ${listWords(f.candidates)}, ` +
+      `frame ${f.open[1].number} behind it, counting from the front. The candidates are ${listWords(f.candidates)}, ` +
       `with a dotted line from each to its maximal factor in the frame in front.`,
     promote:
       `${f.promoted[0]} hops rightward: it leaves the factors of frame ${fp.number} and becomes a move of ` +
-      `frame ${M.promotedInto(f.frames, f.promoted[0])}, paid for by ${payer}. The freedoms allow only one promotion, and ` +
+      `frame ${M.promotedInto(f.frames, f.promoted[0])}, and ${payer} pays for it. The freedoms allow only one promotion, and ` +
       `${f.promoted[0]} is the larger. The score: ${f.inTheBag} + ${f.promoted.join(' + ')} = ${f.score}.`,
   };
 }
 
 function gameWords(f, done) {
-  if (done === 0) return `The game itself, played from the right: the moves ${listWords(f.game.moves)}, each paid for by the factor its thick line marks.`;
+  if (done === 0) return `The game itself, which the player plays from the right: the moves ${listWords(f.game.moves)}, and the factor its thick line marks pays for each.`;
   const turns = f.turns.slice(0, done);
   const player = turns.reduce((s, t) => s + t.move, 0);
   const taxman = turns.reduce((s, t) => s + t.tax[0], 0);
-  if (done > f.turns.length) return `No move is left, so the taxman takes the rest, ${listWords(f.rest)}. The player scores ${f.player}, the taxman ${f.taxman}.`;
+  if (done > f.turns.length) return `No move remains, so the taxman takes the rest, ${listWords(f.rest)}. The player scores ${f.player}, the taxman ${f.taxman}.`;
   const t = turns[done - 1];
   return `Move ${done}: the player takes ${t.move}, and the taxman takes ${t.tax[0]}. ${player} to ${taxman}.`;
 }
@@ -457,7 +457,7 @@ export function mountGame21(host, { small, states = STOPS, param = 'fig21', labe
   const f = facts21(small);
   const s = scene(host.querySelector('svg'), {
     width: W, height: H, className: 'is-dense',
-    label: label ?? 'Game 21, a state at a time. The current state is described under the figure.',
+    label: label ?? 'Game 21, a state at a time. The text under the figure describes the current state.',
   });
   for (const x of numbers) s.number(x, x);
   for (const x of f.promoted) {

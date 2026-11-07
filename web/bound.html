@@ -28,21 +28,21 @@
   <div class="para">
     <aside class="note card" aria-label="The signed frame theorem, proved">
       <div class="note-head"><span class="note-name">The signed frame theorem<span class="note-label">Theorem B1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-bounds.md#the-signed-frame-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Promotions that can be made together pass the test in every frame.</p>
+      <p class="plain">Promotions the player can make together pass the test in every frame.</p>
       <p class="precise"><span class="run">Precisely.</span>Give each move of a <a class="gloss" href="glossary.html#frame">frame</a>,
       and each number promoted into it, the vector of its <a class="gloss" href="glossary.html#maximal-factor">maximal
       factors</a> there, and each number promoted out of it its unit vector.  A promotion set makes them linearly
       independent in every frame, over every field.</p>
     </aside>
-    <p>A <a class="gloss" href="glossary.html#search">search</a> drops a branch when its
-    <a class="gloss" href="glossary.html#bound">bound</a> cannot beat the best game found
-    (<a href="search.html#the-bound">chapter 5</a>).  The <a class="gloss" href="glossary.html#frame-solver">frame
-    solver</a>'s bound is the heaviest set of <a class="gloss" href="glossary.html#candidate">candidates</a> that passes
-    a test: one that every set of legal promotions will pass, though some that cannot be made pass it too.  It grows
-    from the <a class="gloss" href="glossary.html#loop">loop</a> of chapter 1.  List, for each number of a set, the
-    maximal factors outside the set that could pay for it.  If some of the numbers, taken together, list every factor
-    an even number of times, the set cannot be played.  For example, the loop 10, 14, 15 and 21 lists each of 2, 3, 5 and 7
-    twice, therefore it cannot be played.</p>
+    <p>A <a class="gloss" href="glossary.html#search">search</a> drops a branch when its <a class="gloss"
+    href="glossary.html#bound">bound</a> cannot beat the best game found (<a href="search.html#the-bound">chapter
+    5</a>).  The <a class="gloss" href="glossary.html#frame-solver">frame solver</a>'s bound is the heaviest set of <a
+    class="gloss" href="glossary.html#candidate">candidates</a> that passes a test: one that every set of legal
+    promotions will pass, though some sets of promotions the player cannot make pass it too.  It grows from the <a
+    class="gloss" href="glossary.html#loop">loop</a> of chapter 1.  List, for each number of a set, the maximal factors
+    outside the set that could pay for it.  If some of the numbers, together, list every factor an even number of times,
+    the set is not playable.  For example, the loop 10, 14, 15 and 21 lists each of 2, 3, 5 and 7 twice, therefore it is
+    not playable.</p>
   </div>
 
   <div class="para">
@@ -52,8 +52,8 @@
       add.</p>
       <p class="precise"><span class="run">Precisely.</span>At a node with the promotions P and the candidates C, every
       completion P ∪ X has ΣX at most the heaviest ΣI, I ⊆ C independent in every frame together with P, within the
-      node's promotion limit.  The solver calls it the GF(2) bound.  The only sets it lets through that cannot be
-      promoted hold an odd core in some frame.</p>
+      node's promotion limit.  The solver calls it the GF(2) bound.  The only sets it lets through that the player
+      cannot promote hold an odd core in some frame.</p>
     </aside>
     <p>We call it the <a class="gloss" href="glossary.html#parity-test">parity test</a>: no group of a set's numbers
     may list every factor an even number of times.  This is linear algebra over GF(2), the arithmetic of even and odd,
@@ -62,7 +62,7 @@
       That set's sum bounds what a branch can still add, so we call it
       the <a class="gloss" href="glossary.html#parity-bound">parity bound</a>.  The solver applies the bound to
     the promotions frame by frame, at every <a class="gloss" href="glossary.html#node">node</a>.</p>
-    <p>Some sets pass the test and still cannot be played.  Each holds an <a href="#odd-cores">odd core</a>, and odd
+    <p>Some sets pass the test and still are not playable.  Each holds an <a href="#odd-cores">odd core</a>, and odd
     cores are all that the bound misses.</p>
   </div>
 </section>
@@ -78,9 +78,9 @@
       both parities of the layer.  So opt(n) is at most the heaviest set independent at both parities.  Weighted
       matroid intersection finds it, and a weight split checks its value.</p>
     </aside>
-    <p>The parity bound needs no frames.  Applied to the numbers of the whole <a class="gloss"
-    href="glossary.html#board">board</a>, rather than to the promotions of a frame, it bounds <a class="gloss"
-    href="glossary.html#opt">opt(n)</a> itself: no set heavier than the heaviest that passes it can be played.</p>
+    <p>The parity bound needs no frames.  Apply it to the numbers of the whole <a class="gloss"
+    href="glossary.html#board">board</a>, rather than to the promotions of a frame, and it bounds <a class="gloss"
+    href="glossary.html#opt">opt(n)</a> itself: no playable set is heavier than the heaviest that passes it.</p>
     <p>A computation on every board from 2 to 8,191 shows that splitting the board into frames costs the bound nothing.
     At the root of a search, the parity bound of the frames limits what the promotions can add, and that limit plus the
     weight of <a class="gloss" href="glossary.html#u-star">U*</a> is exactly the parity bound of the whole board.</p>
@@ -98,13 +98,13 @@
       (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#what-the-paper-proves">what
       the paper proves</a>).</p>
     </aside>
-    <p>Franklín and Moniot's paper gives a looser bound: the heaviest set whose numbers can each be given a maximal
-    factor of their own, from outside the set, to pay with.  Every set that passes the parity test passes theirs, but
-    the parity bound comes far closer to opt(n): its gap is about a tenth of theirs.</p>
+    <p>Franklín and Moniot's paper gives a looser bound: the heaviest set whose numbers can each have a maximal factor
+    of their own, from outside the set, to pay with.  Every set that passes the parity test passes theirs, but the
+    parity bound comes far closer to opt(n): its gap is about a tenth of theirs.</p>
     <p>Each way of handing out factors is a <a class="gloss" href="glossary.html#payment-scheme">payment scheme</a>, and
     counting a set's schemes shows what each bound allows.  Group the schemes by the factors they pay with, and count
     the schemes in each group.  Franklín and Moniot's bound allows the set when some group has at least one scheme, and
-    the parity bound allows it when some group has an odd number of schemes.  The set can be played exactly when some
+    the parity bound allows it when some group has an odd number of schemes.  The set is playable exactly when some
     group has a single scheme.  In the figure, each set's schemes all pay with the same factors, so each set has one
     group.</p>
   </div>
@@ -117,20 +117,20 @@
   </figure>
 
   <div class="para">
-    <p>The numbers 6, 10 and 15 have two schemes, so Franklín and Moniot's bound allows them.  Two is even, so the parity bound
-    does not, and it is right: whichever of the three is played first takes both of its primes as tax, and one of the
-    other two is left with nothing to pay with.  The two schemes differ around a
-    <a class="gloss" href="glossary.html#loop">loop</a>: the second is the first turned once around.  Swap 6 for 9 and
-    there is no more loop; there's only one scheme, and the set plays, 9 first.</p>
-    <p>The numbers 12, 18, 20, 30 and 45 have three schemes, an odd number, so both bounds allow them.  Yet they cannot all be
-    played: they are the first <a href="#odd-cores">odd core</a>.</p>
+    <p>The numbers 6, 10 and 15 have two schemes, so Franklín and Moniot's bound allows them.  Two is even, so the
+    parity bound does not, and it is right: whichever of the three the player plays first takes both of its primes as
+    tax, and that leaves one of the other two with nothing to pay with.  The two schemes differ around a <a
+    class="gloss" href="glossary.html#loop">loop</a>: the second turns the first once around.  Swap 6 for 9 and there is
+    no more loop; there's only one scheme, and the set plays, 9 first.</p>
+    <p>The numbers 12, 18, 20, 30 and 45 have three schemes, an odd number, so both bounds allow them.  Yet they are not
+    playable: they are the first <a href="#odd-cores">odd core</a>.</p>
   </div>
 
   <div class="para">
     <aside class="note card" aria-label="The counting theorem, proved">
       <div class="note-head"><span class="note-name">The counting theorem<span class="note-label">Theorem C2</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-counting-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Group a set's schemes by the factors they pay with.  The set has a scheme, passes the parity
-      test, or can be played exactly when some group has at least one, an odd number, or exactly one scheme.</p>
+      test, or is playable exactly when some group has at least one, an odd number, or exactly one scheme.</p>
       <p class="precise"><span class="run">Precisely.</span>With per(S, T) the number of schemes of S onto the factors
       T, the three conditions are per(S, T) ≥ 1, odd, or 1, for some T.  The odd count is independence over GF(2),
       since a permanent is its determinant mod 2.</p>
@@ -142,65 +142,60 @@
     or minus.  Since +1 and −1 are both odd, the signs cannot change whether the total is even or odd, so the count is
     odd exactly when the determinant is.</p>
     <p>A determinant is even exactly when some of the table's rows add up to an even number in every column, that is,
-    when some of the set's numbers, taken together, list each of the group's factors an even number of times.  In the
-    table of 6, 10 and 15, all three rows add up to even in every column, and there are two picks.  In the table of 9,
-    10 and 15, no group of rows does, and there is one.  As linear algebra shows, a set passes the parity test exactly
-    when some choice of columns makes its determinant odd.  So the parity bound allows a set exactly when some group of
-    its schemes has an odd count: the counting theorem.</p>
+    when some of the set's numbers, together, list each of the group's factors an even number of times.  In the table of
+    6, 10 and 15, all three rows add up to even in every column, and there are two picks.  In the table of 9, 10 and 15,
+    no group of rows does, and there is one.  As linear algebra shows, a set passes the parity test exactly when some
+    choice of columns makes its determinant odd.  So the parity bound allows a set exactly when some group of its
+    schemes has an odd count: the counting theorem.</p>
   </div>
 
   <figure class="fig parity-table-fig" id="parity-table" aria-label="The tables of 6, 10 and 15 and of 9, 10 and 15: a row for each number, a column for each of the factors 2, 3 and 5, and a 1 where the number can pay with the factor.">
-    <div class="parity-tables"></div>
-    <figcaption class="fig-caption">A 1 marks a factor the number can pay with.  A pick, outlined, takes a 1 in every
-    row, no two in the same column: it is one payment scheme.  Choose rows to add them up; the bottom row says whether
-    each column comes out even or odd.</figcaption>
-  </figure>
-</section>
-
-<section class="chapter" id="odd-cores" data-toc="odd-cores" aria-labelledby="h-odd-cores">
-  <h2 id="h-odd-cores">Odd cores</h2>
-  <div class="para">
-    <aside class="note card" aria-label="The first odd core, proved">
-      <div class="note-head"><span class="note-name">The first odd core<span class="note-label">Proposition C3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-first-odd-core">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Below game 45 every set that passes the parity test can be played.</p>
+    <div class="parity-tables"></div> <figcaption class="fig-caption">A 1 marks a factor the number can pay with.  A
+    pick, which the figure outlines, takes a 1 in every row, no two in the same column: it is one payment scheme.
+    Choose rows to add them up; the bottom row says whether each column comes out even or odd.</figcaption> </figure>
+    </section>  <section class="chapter" id="odd-cores" data-toc="odd-cores" aria-labelledby="h-odd-cores"> <h2
+    id="h-odd-cores">Odd cores</h2> <div class="para"> <aside class="note card" aria-label="The first odd core, proved">
+    <div class="note-head"><span class="note-name">The first odd core<span class="note-label">Proposition
+    C3</span></span><a class="standing is-proved"
+    href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-first-odd-core">proved<span
+    class="sr-only">, proof on GitHub</span></a></div> <p class="plain">Below game 45 every set that passes the parity
+    test is playable.</p>
       <p class="precise"><span class="run">Precisely.</span>Every S ⊆ {2, …, 44} independent with its own coordinates
       over GF(2) is playable, so the parity bound is opt(n) for n ≤ 44, and {12, 18, 20, 30, 45} is an odd core.</p>
     </aside>
-    <p>The five numbers 12, 18, 20, 30 and 45 pass the parity test, yet they cannot all be played, because
-    <a class="gloss" href="glossary.html#peel">peel</a>, which decides whether a set can be played, cannot even begin.
-    Every number has at least two factors to pay with, and every factor at least two numbers that could use it, so peel
-    has no safe first step.  A set like this, which passes the test, cannot be played, and holds no smaller such set, is
-    an <a class="gloss" href="glossary.html#odd-core">odd core</a>.  Game 45 is the first board with one.</p>
+    <p>The five numbers 12, 18, 20, 30 and 45 pass the parity test, yet they are not playable, because <a class="gloss"
+    href="glossary.html#peel">peel</a>, which decides whether a set is playable, cannot even begin. Every number has at
+    least two factors to pay with, and every factor at least two numbers that could use it, so peel has no safe first
+    step.  A set like this, which passes the test, is not playable, and holds no smaller such set, is an <a
+    class="gloss" href="glossary.html#odd-core">odd core</a>.  Game 45 is the first board with one.</p>
   </div>
 
   <div class="para">
     <p>What lets an odd core exist?  A number's maximal factors are the number divided by each of its primes, so a
-    number with two different primes has two, and a number with three has three: 30 = 2 · 3 · 5, with 15, 10 and 6,
-    is the smallest.  Numbers that each list at most two factors can be played exactly when they pass the parity test
-    (the <a href="sets.html#loop-section">loop rule</a> of chapter 1), so a set of them is never an odd core.  One
-    number with three is enough.  In game 45's core, 12, 18, 20 and 45 each list two factors and make a chain,
-    10 – 20 – 4 – 12 – 6 – 18 – 9 – 45 – 15, and 30 joins it at 6, 10 and 15.  Whichever of the three 30 pays with,
-    the rest of the chain has just one way to pay, so the set has three schemes: an odd number, but never exactly
-    one.</p>
+    number with two different primes has two, and a number with three has three: 30 = 2 · 3 · 5, with 15, 10 and 6, is
+    the smallest.  Numbers that each list at most two factors are playable exactly when they pass the parity test (the
+    <a href="sets.html#loop-section">loop rule</a> of chapter 1), so a set of them is never an odd core.  One number
+    with three is enough.  In game 45's core, 12, 18, 20 and 45 each list two factors and make a chain, 10 – 20 – 4 – 12
+    – 6 – 18 – 9 – 45 – 15, and 30 joins it at 6, 10 and 15.  Whichever of the three 30 pays with, the rest of the chain
+    has just one way to pay, so the set has three schemes: an odd number, but never exactly one.</p>
   </div>
 
   <div class="para">
     <aside class="note card" aria-label="The exactness of the parity bound to game 77, measured">
       <div class="note-head"><span class="note-name">Exact to game 77</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#what-the-parity-bound-misses">measured<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">The parity bound equals opt(n) for every game up to 77, and exceeds it at game 78.</p>
-      <p class="precise"><span class="run">Precisely.</span>The prover's run on games 2 to 2,530 records each bound,
-      checked by its weight split: at game 78 it is 1,992 against opt(78) = 1,991
-      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#observations">the evidence</a>).
-      U* with <span data-78="promotions">28, 30, 36 and 39</span> passes the test at that weight; the nine numbers drawn
-      are what peel leaves of it.</p>
+      <p class="precise"><span class="run">Precisely.</span>The prover's run on games 2 to 2,530 records each bound and
+      checks it by its weight split: at game 78 it is 1,992 against opt(78) = 1,991 (<a
+      href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#observations">the evidence</a>). U*
+      with <span data-78="promotions">28, 30, 36 and 39</span> passes the test at that weight; the nine numbers the
+      figure draws are what peel leaves of it.</p>
     </aside>
-    <p>An odd core makes the bound miss only when no heaviest set that passes the test can be played.  Up to game 77
-    that never happens, and the parity bound is exactly opt(n): below game 45 no board has an odd core, and in each of
-    games 45 to 77 some heaviest set that passes the test can be played.  Game 78 is the first where it happens, and
-    the bound misses by one point: <span data-78="bound">1,992</span> against
-    opt(78) = <span data-78="opt">1,991</span>.  Take an optimal set of game 78 and put <span data-78="inn">28</span>
-    in place of <span data-78="out">27</span>.  The set gains a point and still passes the test, but these nine of its
-    numbers cannot all be played.</p>
+    <p>An odd core makes the bound miss only when no heaviest set that passes the test is playable.  Up to game 77 that
+    never happens, and the parity bound is exactly opt(n): below game 45 no board has an odd core, and in each of games
+    45 to 77 some heaviest set that passes the test is playable.  Game 78 is the first where it happens, and the bound
+    misses by one point: <span data-78="bound">1,992</span> against opt(78) = <span data-78="opt">1,991</span>.  Take an
+    optimal set of game 78 and put <span data-78="inn">28</span> in place of <span data-78="out">27</span>.  The set
+    gains a point and still passes the test, but these nine of its numbers are not playable.</p>
   </div>
 
   <figure class="fig exact-78-fig" id="exact-78">

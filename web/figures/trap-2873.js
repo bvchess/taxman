@@ -104,7 +104,7 @@ export function mountTrap(host) {
   const s = scene(host.querySelector('svg'), {
     ...boxes[view],
     label: 'Six sources of game 2,873 and their maximal factors, and the sets that descending greedy keeps in two '
-      + 'orders. The current state is described under the figure.',
+      + 'orders. The text under the figure describes the current state.',
   });
   for (const src of SIX) for (const x of M.maximalFactors(src)) s.line(`e${src}-${x}`, src, x, 'thin');
   for (const src of SIX) for (const x of M.maximalFactors(src)) s.line(`p${src}-${x}`, src, x, 'pay');
@@ -143,10 +143,10 @@ export function mountTrap(host) {
   const threeFactors = listWords([...M.maximalFactors(2431)].sort((a, b) => a - b));
   const refusedIn = (kept) => SIX.filter((x) => !kept.includes(x)).sort((a, b) => b - a);
   const words = [
-    `Six sources of game 2,873, each joined to its maximal factors. Most have two; 2431 has three, ${threeFactors}, `
+    `Six sources of game 2,873, each with lines to its maximal factors. Most have two; 2431 has three, ${threeFactors}, `
       + `and 2197 has one, ${M.maximalFactors(2197)[0]}.`,
-    `Taken in the order ${listWords(f.trap.order)}, greedy keeps the first ${COUNT[f.trap.kept.length]}, and then neither ${f.trapLast[0]} nor ${f.trapLast[1]} fits: ${COUNT[f.trap.kept.length]} sources, ${fmt(sum(f.trap.kept))}. Every order that puts those two last does the same.`,
-    `From the largest down, greedy keeps ${listWords(f.best)} and refuses ${listWords(refusedIn(f.best))}: ${COUNT[f.best.length]} sources, ${fmt(sum(f.best))}, the heaviest set of the six that can be played.`,
+    `In the order ${listWords(f.trap.order)}, greedy keeps the first ${COUNT[f.trap.kept.length]}, and then neither ${f.trapLast[0]} nor ${f.trapLast[1]} fits: ${COUNT[f.trap.kept.length]} sources, ${fmt(sum(f.trap.kept))}. Every order that puts those two last does the same.`,
+    `From the largest down, greedy keeps ${listWords(f.best)} and refuses ${listWords(refusedIn(f.best))}: ${COUNT[f.best.length]} sources, ${fmt(sum(f.best))}, the heaviest playable set of the six.`,
   ];
   const caption = host.querySelector('.fig-caption');
   holdHeight(caption, words);

@@ -171,7 +171,7 @@ function captions(f) {
   for (const step of f.steps) {
     if (step.keep) {
       keptSoFar++;
-      words.push(`${step.s} = ${product(step.s)} closes no loop with the sources kept, so greedy keeps it: ${keptSoFar} kept so far.`);
+      words.push(`${step.s} = ${product(step.s)} closes no loop with the sources greedy has kept, so greedy keeps it: ${keptSoFar} so far.`);
     } else {
       const k = step.loop.primes.length;
       words.push(`${step.s} = ${product(step.s)} would close a loop with ${listWords(step.loop.edges)}: ${COUNT[k] ?? k} numbers on ${COUNT[k] ?? k} primes, ${listWords(step.loop.primes)}, as in chapter 1's loop. Greedy refuses it.`);
@@ -183,11 +183,11 @@ function captions(f) {
 
 const VIEW_WORDS = {
   graph: 'as a graph, each source between its two primes',
-  layers: 'in their layers, each source joined to its two primes',
+  layers: 'in their layers, each source with lines to its two primes',
 };
 const labelOf = (view) => `Layer 2 of game ${N}: the primes up to ${N / 2} and the sources with two prime factors, `
   + `which descending greedy takes from the largest down, ${VIEW_WORDS[view]}. `
-  + 'The current state is described under the figure.';
+  + 'The text under the figure describes the current state.';
 
 /** Mount the figure in host, which holds an <svg>, .fig-timeline and .fig-caption. */
 export function mountForest(host) {
