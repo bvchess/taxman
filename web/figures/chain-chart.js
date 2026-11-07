@@ -66,8 +66,7 @@ export function mountChainChart(host, { games }) {
   const endShare = share[count - 1];
   host.querySelector('.chart-sub').textContent =
     `For games 1 to ${fmt(last)}, in stretches of ${STRETCH} games. The player’s share of the board ` +
-    `settles near ${pct(endShare)}; game ${fmt(last)} scores ${fmt(c.score[count - 1])} of ` +
-    `${fmt((last * (last + 1)) / 2)}. Under it, how the games of each stretch were proven, and the median time ` +
+    `settles near ${pct(endShare)}. Under it, how the games of each stretch were proven, and the median time ` +
     'of its searches.';
 
   responsive(box, (width) => {
