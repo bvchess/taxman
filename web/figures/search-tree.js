@@ -222,14 +222,15 @@ function tipRows(t, node, done) {
   const than = node.bound < node.bestBefore ? 'less than' : 'no more than';
   const so = `the best so far, ${node.bestBefore}`;
   const game = `No candidate remains, so this is a game: promoting ${listWords(node.P)} adds ${node.bound}`;
+  let note;
   if (node.kind === 'branch') {
-    rows.push(`This branch can add at most ${node.bound}, more than ${so}, so the search goes on. ` +
-      `Next it decides ${node.live[0]}: promote it, or go on without it.`);
+    note = `This branch can add at most ${node.bound}, more than ${so}, so the search goes on. ` +
+      `Next it decides ${node.live[0]}: promote it, or go on without it.`;
   } else if (node.kind === 'cut' && node.live.length) {
-    rows.push(`This branch can add at most ${node.bound}, ${than} ${so}, so the search drops it without looking ` +
-      'further.');
-  } else if (node.kind === 'cut') rows.push(`${game}, ${than} ${so}, so the search moves on.`);
-  else rows.push(`${game}, ${done ? 'and no other game adds more' : 'the best so far'}.`);
+    note = `This branch can add at most ${node.bound}, ${than} ${so}, so the search drops it without looking further.`;
+  } else if (node.kind === 'cut') note = `${game}, ${than} ${so}, so the search moves on.`;
+  else note = `${game}, ${done ? 'and no other game adds more' : 'the best so far'}.`;
+  rows.push({ note });
   return rows;
 }
 

@@ -27,7 +27,7 @@ export function freshSVG(host, width, height, label) {
 }
 
 /** A tooltip inside host.  show(rows, x, y) places it near (x, y) in the host's coordinates: a head, then rows
- *  [key, value] and, for a string after the head, a subhead. */
+ *  [key, value], for a string after the head a subhead, and for { note } a sentence in plain text. */
 export function tooltip(host) {
   const tip = document.createElement('div');
   tip.className = 'chart-tip';
@@ -46,6 +46,13 @@ export function tooltip(host) {
           sub.className = 'tip-sub';
           sub.textContent = item;
           tip.appendChild(sub);
+          continue;
+        }
+        if (item.note) {
+          const note = document.createElement('p');
+          note.className = 'tip-note';
+          note.textContent = item.note;
+          tip.appendChild(note);
           continue;
         }
         const [k, v] = item;
