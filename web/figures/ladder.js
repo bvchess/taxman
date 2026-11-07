@@ -27,11 +27,11 @@ export const SETS = [
   { set: [9, 10, 15], w: 180, h: 160, at: { ...TRIANGLE, 9: [54, 80], 10: [126, 80], 15: [90, 142] } },
 ];
 
-/** The rungs, from the loosest test to the game itself, and the bound whose heaviest set meets each. */
+/** The rungs, from the loosest test to the game itself: who decides, and the count of schemes it asks for. */
 export const RUNGS = [
-  { key: 'some', name: 'at least one', bound: 'Franklín and Moniot’s bound allows it' },
-  { key: 'odd', name: 'an odd number', bound: 'the parity bound allows it' },
-  { key: 'one', name: 'exactly one', bound: 'it can be played' },
+  { key: 'some', name: 'Franklín and Moniot’s bound', rule: 'at least one scheme' },
+  { key: 'odd', name: 'The parity bound', rule: 'an odd number of schemes' },
+  { key: 'one', name: 'Playable', rule: 'exactly one scheme' },
 ];
 
 /** The factors each member of a set can pay with: its maximal factors outside the set. */
@@ -129,7 +129,7 @@ export function mountLadder(host) {
   const grid = host.querySelector('.ladder');
   const head = document.createElement('div');
   head.className = 'ladder-head';
-  head.innerHTML = `<span class="ladder-corner">schemes onto the same factors:</span>${RUNGS.map((r) => `<span class="rung-head"><b>${r.name}</b><span>${r.bound}</span></span>`).join('')}`;
+  head.innerHTML = `<span class="ladder-corner"></span>${RUNGS.map((r) => `<span class="rung-head"><b>${r.name}</b><span>${r.rule}</span></span>`).join('')}`;
   grid.append(head);
   const marks = [];
   for (const spec of SETS) {

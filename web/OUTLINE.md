@@ -226,7 +226,7 @@ a quick test of even and odd, on the frames of a search or on the whole board.
 * The whole board: the same test needs no frames, and on the whole board it bounds opt(n), the parity bound; at the
   root, the frame bound plus ΣU* equals it on every board from 2 to 8191 (measured).  It is the prover's bound
   (chapter 7).
-* Counting payment schemes: Franklín and Moniot's bound is looser, its gap about ten times the parity bound's
+* Comparing bounds: Franklín and Moniot's bound is looser, its gap about ten times the parity bound's
   (measured); a set is allowed by theirs, by the parity bound, or playable when some set of factors gets at least one,
   an odd number, or exactly one scheme.
 * Odd cores: game 45's is the first; the parity bound is exact to 77 and first misses at 78, where an odd core weighs
