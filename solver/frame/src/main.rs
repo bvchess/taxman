@@ -12,7 +12,7 @@ use cli::{errln, outln, CliError, CliResult};
 use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, gate_trial, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
-use taxman::solver::unsound::{Plan, MAX_BACK, MAX_EFFORT, MAX_TILT, ROUND_WORK};
+use taxman::solver::unsound::{DEFAULT_BACK, DEFAULT_TILT, DEFAULT_WIDEN, MAX_BACK, MAX_EFFORT, MAX_TILT, ROUND_WORK};
 use taxman::tactics::Tactics;
 
 /// The usage text with its `{...}` parts to fill in by [`usage`].
@@ -73,22 +73,26 @@ commands:
       --unsound                play each game as well as --effort finds, with no proof, on all the threads: each
                                line, appended to --out (needed), holds legal moves and their score, a lower bound,
                                and is marked unsound, which every reader of proven lines refuses.  It takes
-                               --threads, --tactic, --show and the flags below, and refuses the others
+                               --threads, --tactic, --show and the flags below, and refuses the others.  The rounds
+                               are shaped by --tilt, --back and --widen, which are on unless given 0
       --effort E               with --unsound: the level of effort, from 0 (the search's start alone) to {max_effort}.
                                Level E runs rounds of {neighborhoods} neighborhoods of the finder's search until
                                their work (their steps and {neighborhood_work} for each neighborhood) reaches
                                2^(E-1) x {round_work}; a higher level does the rounds of a lower one first
       --seed S                 with --unsound: the seed of the rounds' random choices (default {seed})
       --fix LO,HI              with --unsound: the share of the incumbent's promotions that each neighborhood keeps
-                               fixed, drawn from LO to HI, 0 <= LO <= HI <= 1 (default {fix})
+                               fixed, drawn from LO to HI, 0 <= LO <= HI <= 1 (default {fix}); turns widening off,
+                               and is refused with --widen S of 1 or more
       --tilt P                 with --unsound: P percent of a round's neighborhoods (P from 0 to {max_tilt}, default
                                {tilt}), the same share of each incumbent's, free the small promotions more often than
-                               the large ones (the number freed is the same); the others draw uniformly
+                               the large ones (the number freed is the same); the others draw uniformly.  0: none
       --back J                 with --unsound: besides the start's, follow an incumbent from what survives of the moves
                                for each of the games n-1 .. n-J (J from 0 to {max_back}, default {back}) that differs
-                               from the ones before, each with its share of a round's neighborhoods
-      --widen S                with --unsound: an incumbent that has not grown heavier for S rounds (S >= 1) moves its
-                               neighborhoods down a ladder of the shares fixed, {ladder}; refused with --fix
+                               from the ones before, each with its share of a round's neighborhoods.  0: the start's
+                               alone
+      --widen S                with --unsound: an incumbent that has not grown heavier for S rounds (S >= 1, default
+                               {widen}) moves its neighborhoods down a ladder of the shares fixed,
+                               {ladder}.  0: no widening
       --past-ceiling           with --unsound: do not end a game's rounds at the run's ceiling, n + the score of the
                                moves for n-1 it starts from (which they do by default, when it has such moves)
       --stop-at-known          with --unsound: end a game's rounds once its score is the built-in table's
@@ -131,9 +135,10 @@ fn usage() -> String {
         .replace("{seed}", &finder::Options::default().seed.to_string())
         .replace("{fix}", &format!("{lo},{hi}"))
         .replace("{max_tilt}", &MAX_TILT.to_string())
-        .replace("{tilt}", &Plan::default().tilt.to_string())
+        .replace("{tilt}", &DEFAULT_TILT.to_string())
         .replace("{max_back}", &MAX_BACK.to_string())
-        .replace("{back}", &Plan::default().back.to_string())
+        .replace("{back}", &DEFAULT_BACK.to_string())
+        .replace("{widen}", &DEFAULT_WIDEN.to_string())
         .replace("{ladder}", &ladder.join(" -> "))
 }
 

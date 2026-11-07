@@ -1,10 +1,10 @@
 //! The unsound mode, `taxman solve LO-HI --unsound --effort E --out FILE`: each game played as well as a level of
-//! effort finds, with no proof that its score is opt(n).
+//! effort finds, with no proof that its score is opt(n).  The user's guide to it is solver/docs/unsound.md.
 //!
 //! The proof of a hard game past 5060 takes hours, and nearly all of it goes to proving a set that the search found
 //! early.  The unsound mode keeps the finding and drops the proof.  Its line holds legal moves and their score, a lower
 //! bound on opt(n), and is marked unsound ([`UNSOUND`]), so that no reader of proven lines takes one.  The user names a
-//! level of effort: more effort costs more time and gives a better chance that each score is opt(n).
+//! level of effort and nothing else: more effort costs more time and gives a better chance that each score is opt(n).
 //!
 //! # One game
 //!
@@ -43,9 +43,9 @@
 //!
 //! # The shape of the rounds
 //!
-//! Four options of the plan change what the rounds search, and so the line; none changes the default.  Every value of
-//! them, alone or together, keeps what the rounds guarantee: a line depends on the game, its start, the moves it starts
-//! from, the level, the seed and the options only, never on the threads, and a run at E + 1 does the rounds of E first.
+//! Four options of the plan change what the rounds search, and so the line.  Every value of them, alone or together,
+//! keeps what the rounds guarantee: a line depends on the game, its start, the moves it starts from, the level, the
+//! seed and the options only, never on the threads, and a run at E + 1 does the rounds of E first.
 //!
 //! * **`fix`** is the range from which each neighborhood draws the share of the incumbent's promotions it keeps fixed
 //!   ([`Options::fix`](crate::search::finder::Options::fix)).  A smaller share frees more of the game to a
@@ -62,12 +62,27 @@
 //!   start's on a tie ([`Lns::rounds`](crate::search::finder::Lns::rounds)).  The line says which games the
 //!   trajectories began from (`trajectories`).  What survives of an earlier game may be heavier than the start; the
 //!   game's score is then that of the survivors from the first, which the line records as an improvement of round 0,
-//!   and at effort 0 the score is the heaviest of the trajectories' starts.
+//!   and at effort 0 the score is the heaviest of the trajectories' starts.  0 gives the start's trajectory alone.
 //! * **`widen`** S moves the neighborhoods of a trajectory whose incumbent has not grown heavier in S rounds down the
 //!   ladder of the share kept fixed ([`LADDER`](crate::search::finder::LADDER)), and back to its first stage when it
 //!   grows ([`Options::widen`](crate::search::finder::Options::widen)).  The line records the rounds each trajectory
-//!   spent at each stage (`stage_rounds`) and the stage of each improvement.  The ladder replaces `fix`, so the two are
-//!   refused together.
+//!   spent at each stage (`stage_rounds`) and the stage of each improvement.  The ladder replaces `fix`, so a plan
+//!   that widens has the default `fix`, and `--fix` turns widening off ([`widening`]).  `None` is no widening.
+//!
+//! # The defaults
+//!
+//! `back` is [`DEFAULT_BACK`], `tilt` [`DEFAULT_TILT`] and `widen` [`DEFAULT_WIDEN`], so that a user names a level of
+//! effort and nothing else; `--back 0`, `--tilt 0` and `--widen 0` turn each off, and `fix` is the finder's share.  The
+//! three are the setting that two races chose on the 251 hard games of 3441-5060: `--back 8 --tilt 25 --widen 4`
+//! reaches the score that the built-in table has in 35.9, 78.1, 87.3, 91.2, 94.0, 95.2, 96.8 and 97.6% of them at the
+//! levels 0 to 7, against 35.1, 74.1, 78.1, 79.7, 81.3, 82.9, 86.1 and 89.6% with no option.  The first race is the
+//! notebook's entry
+//! https://github.com/bvchess/taxman-notebook/blob/main/search/tilted-back-and-wider-rounds-2026-11/README.md; the
+//! second, the race R1, is
+//! https://github.com/bvchess/taxman-notebook/blob/main/search/a-share-of-tilted-neighborhoods-2026-11/README.md.  At
+//! level 2 and up, `--tilt 25` and `--tilt 50` (with `--back 8 --widen 4`) are within two games of each other, so 25 is
+//! chosen for its lead at the low levels, not by a significant margin.  The finder beside a proof search never tilts,
+//! widens or goes back, and its options ([`finder::Options::default`]) are not these.
 //!
 //! # A range
 //!
@@ -85,7 +100,7 @@
 //! lacks.  `--stop-at-known` ends a game's rounds as soon as its score is the table's (or reaches the run's ceiling, if
 //! that comes first), and the line records the round at which it was the table's, or that it never was.  `--from-known`
 //! seeds every game with the table's moves for n − 1, not with this run's line, so that the run's ceiling is the proven
-//! one.  solver/docs/REFERENCE.md has the keys of the line ("An unsound line").
+//! one.  solver/docs/unsound.md has the keys of the line ("An unsound line").
 
 use super::{
     prime_game, set_up, Before, Derived, Earlier, Failure, Method, RangeSummary, SearchSetup, SetUp, SolveOptions,
@@ -114,6 +129,18 @@ pub const MAX_BACK: u32 = 8;
 /// The most percent of a round's neighborhoods that may draw tilted: all of them.
 pub const MAX_TILT: u32 = 100;
 
+/// The default of `back`: a trajectory from each distinct set that survives of the moves for the 8 games before.  The
+/// races that chose it, with [`DEFAULT_TILT`] and [`DEFAULT_WIDEN`], are in the module documentation, "The defaults".
+pub const DEFAULT_BACK: u32 = 8;
+
+/// The default of `tilt`: 25 percent of a round's neighborhoods draw tilted (chosen with [`DEFAULT_BACK`] and
+/// [`DEFAULT_WIDEN`]; the module documentation, "The defaults", has the races).
+pub const DEFAULT_TILT: u32 = 25;
+
+/// The default of `widen`: a trajectory that has not grown heavier in 4 rounds moves down the ladder (chosen with
+/// [`DEFAULT_BACK`] and [`DEFAULT_TILT`]; the module documentation, "The defaults", has the races).
+pub const DEFAULT_WIDEN: u64 = 4;
+
 /// The budget of effort 1 ([`Plan::budget`]), in work: the steps of one round whose neighborhoods all take the step
 /// limit of a unit, [`finder::UNIT_STEPS`].  (The work of such a round is a little more, [`finder::NEIGHBORHOOD_WORK`]
 /// for each neighborhood.)
@@ -127,16 +154,18 @@ pub struct Plan {
     pub effort: u32,
     pub seed: u64,
     /// `--fix LO,HI`: the share of the incumbent's promotions that each neighborhood keeps fixed is drawn from this
-    /// range, 0 ≤ LO ≤ HI ≤ 1 ([`check_fix`]).
+    /// range, 0 ≤ LO ≤ HI ≤ 1 ([`check_fix`]).  A plan that widens takes the shares from the ladder instead, and keeps
+    /// the default here.
     pub fix: (f64, f64),
-    /// `--tilt P`, P from 0 to [`MAX_TILT`]: P percent of a round's neighborhoods free the small promotions more often
-    /// than the large ones, and the rest draw uniformly.
+    /// `--tilt P`, P from 0 to [`MAX_TILT`] ([`DEFAULT_TILT`] by default): P percent of a round's neighborhoods free
+    /// the small promotions more often than the large ones, and the rest draw uniformly.  0 tilts none.
     pub tilt: u32,
-    /// `--back J`, J from 0 to [`MAX_BACK`]: a game follows a trajectory from each distinct set that survives of the
-    /// moves for the games n − 1, ..., n − J, beside the start's.
+    /// `--back J`, J from 0 to [`MAX_BACK`] ([`DEFAULT_BACK`] by default): a game follows a trajectory from each
+    /// distinct set that survives of the moves for the games n − 1, ..., n − J, beside the start's.  0 follows the
+    /// start's alone.
     pub back: u32,
-    /// `--widen S`, S ≥ 1: a trajectory that has not grown heavier in S rounds moves its neighborhoods down the ladder
-    /// of the share fixed.
+    /// `--widen S`, S ≥ 1 ([`DEFAULT_WIDEN`] by default): a trajectory that has not grown heavier in S rounds moves its
+    /// neighborhoods down the ladder of the share fixed.  `None` (`--widen 0`) is no widening, and takes `fix`.
     pub widen: Option<u64>,
     /// The work that effort 1 budgets, [`ROUND_WORK`] unless a test or a measurement lowers it: no flag sets it, and a
     /// line records the budget it gave (`budget`).
@@ -149,8 +178,8 @@ pub struct Plan {
     pub past_ceiling: bool,
 }
 
-/// Effort 0, the finder's seed and share fixed, the start's trajectory alone, the stop at the run's ceiling, and no
-/// measuring option.
+/// Effort 0, the finder's seed and share fixed, the defaults of `tilt`, `back` and `widen` ([`DEFAULT_TILT`],
+/// [`DEFAULT_BACK`], [`DEFAULT_WIDEN`]), the stop at the run's ceiling, and no measuring option.
 impl Default for Plan {
     fn default() -> Plan {
         let finder::Options { fix, seed, .. } = finder::Options::default();
@@ -158,9 +187,9 @@ impl Default for Plan {
             effort: 0,
             seed,
             fix,
-            tilt: 0,
-            back: 0,
-            widen: None,
+            tilt: DEFAULT_TILT,
+            back: DEFAULT_BACK,
+            widen: Some(DEFAULT_WIDEN),
             round_work: ROUND_WORK,
             stop_at_known: false,
             from_known: false,
@@ -250,26 +279,45 @@ fn back_error(got: &str) -> String {
     format!("--back takes J, a whole number from 0 to {MAX_BACK}: got {got:?}")
 }
 
-/// Reads the value of `--widen`, S: a whole number of rounds, at least 1.
+/// Reads the value of `--widen`, S: a whole number of rounds, `None` for 0 (no widening) and `Some(S)` for S at least 1.
 ///
 /// # Errors
 ///
 /// What `text` should have been.
-pub fn parse_widen(text: &str) -> Result<u64, String> {
-    text.parse().ok().filter(|&widen| widen >= 1).ok_or_else(|| widen_error(text))
+pub fn parse_widen(text: &str) -> Result<Option<u64>, String> {
+    let widen: u64 = text.parse().map_err(|_| widen_error(text))?;
+    Ok((widen >= 1).then_some(widen))
 }
 
-/// The message of a `--widen` that is not a whole number of rounds from 1, quoting what it was given.
+/// The message of a `--widen` that is not a whole number of rounds, quoting what it was given.
 fn widen_error(got: &str) -> String {
-    format!("--widen takes S, a whole number of rounds, at least 1: got {got:?}")
+    format!("--widen takes S, a whole number of rounds, or 0 for no widening: got {got:?}")
 }
 
 /// The message of a plan that widens the neighborhoods and also gives the share fixed: the ladder is the share fixed.
-pub const WIDEN_WITH_FIX: &str = "--widen takes the share fixed from its own ladder, so --fix is refused with it";
+pub const WIDEN_WITH_FIX: &str =
+    "--widen S of 1 or more takes the share fixed from its own ladder, so --fix is refused with it; --fix alone, or with \
+     --widen 0, turns widening off";
+
+/// The widening of a plan from the command line: `fix_given` says whether `--fix` was, and `widen` is the value of
+/// `--widen` ([`parse_widen`]) if it was.  Without either, it is the default, [`DEFAULT_WIDEN`].  The ladder of the
+/// widening replaces the share fixed, so `--fix` turns widening off.
+///
+/// # Errors
+///
+/// [`WIDEN_WITH_FIX`], for `--fix` with a `--widen` of 1 or more.
+pub fn widening(fix_given: bool, widen: Option<Option<u64>>) -> Result<Option<u64>, String> {
+    match (fix_given, widen) {
+        (true, Some(Some(_))) => Err(WIDEN_WITH_FIX.to_owned()),
+        (true, _) => Ok(None),
+        (false, Some(widen)) => Ok(widen),
+        (false, None) => Ok(Plan::default().widen),
+    }
+}
 
 /// Checks the plan's options: an effort of at most [`MAX_EFFORT`], `fix` ([`check_fix`]), `tilt` of at most
-/// [`MAX_TILT`], `back` of at most [`MAX_BACK`], `widen` of at least 1 and not with a `fix` other than the default, and
-/// a step budget of effort 1 above 0.
+/// [`MAX_TILT`], `back` of at most [`MAX_BACK`], `widen` (if any) of at least 1 and not with a `fix` other than the
+/// default, and a step budget of effort 1 above 0.
 ///
 /// # Errors
 ///
@@ -287,7 +335,7 @@ pub fn check_plan(plan: &Plan) -> Result<(), String> {
     }
     if let Some(widen) = plan.widen {
         if widen < 1 {
-            return Err(widen_error(&widen.to_string()));
+            return Err(format!("the plan widens after {widen} rounds: no widening is `None`, as --widen 0 gives"));
         }
         if plan.fix != Plan::default().fix {
             return Err(WIDEN_WITH_FIX.to_owned());
@@ -403,7 +451,7 @@ pub struct Raised {
     pub score: u64,
 }
 
-/// An unsound line: a game as the unsound mode played it (the module documentation; solver/docs/REFERENCE.md, "An
+/// An unsound line: a game as the unsound mode played it (the module documentation; solver/docs/unsound.md, "An
 /// unsound line", has its keys).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Line {
@@ -705,8 +753,8 @@ fn read_line(json: &Json, optimal: &Optimal) -> Result<(u32, Stored), String> {
 /// # Errors
 ///
 /// A range that is empty or starts below 1; a plan that [`check_plan`] refuses (an effort above [`MAX_EFFORT`], a `fix`
-/// that [`check_fix`] refuses, a `tilt` above [`MAX_TILT`], a `back` above [`MAX_BACK`], a `widen` of 0 or with a
-/// `fix`);
+/// that [`check_fix`] refuses, a `tilt` above [`MAX_TILT`], a `back` above [`MAX_BACK`], a `widen` of `Some(0)` or with
+/// a `fix`);
 /// `--stop-at-known` or `--from-known` for a game the built-in table lacks; a file that cannot be opened or written, or
 /// holds a line it may not ([`UnsoundFile::open`]); and a game whose moves fail a check (the module documentation, "One
 /// game").
@@ -980,16 +1028,35 @@ mod tests {
     }
 
     #[test]
-    fn the_default_plan_searches_as_the_first_form_did() {
+    fn the_default_plan_tilts_goes_back_and_widens_as_the_races_chose() {
         let plan = Plan::default();
-        assert_eq!((plan.effort, plan.seed, plan.fix, plan.tilt), (0, 1, (0.7, 0.9), 0));
-        assert_eq!((plan.back, plan.widen, plan.round_work), (0, None, ROUND_WORK));
+        assert_eq!((DEFAULT_TILT, DEFAULT_BACK, DEFAULT_WIDEN), (25, 8, 4));
+        assert_eq!((plan.effort, plan.seed, plan.fix), (0, 1, (0.7, 0.9)));
+        assert_eq!((plan.tilt, plan.back, plan.widen, plan.round_work), (25, 8, Some(4), ROUND_WORK));
         assert!(!plan.stop_at_known && !plan.from_known && !plan.past_ceiling, "the stop at the ceiling is on");
+        // The rounds search with the plan's seed, tilt and widening, and the finder's other options.
         let lns = plan.lns();
         let default = finder::Options::default();
         assert_eq!((lns.fix, lns.unit_nodes, lns.seed), (default.fix, default.unit_nodes, default.seed));
-        assert!(lns.tilt == 0 && lns.widen.is_none());
+        assert_eq!((lns.tilt, lns.widen), (25, Some(4)));
         assert_eq!(check_plan(&plan), Ok(()));
+        // The finder beside a proof search never tilts or widens, whatever the defaults of the unsound mode are.
+        assert!(default.tilt == 0 && default.widen.is_none());
+        // Each is turned off with 0.
+        let off = Plan { tilt: 0, back: 0, widen: None, ..plan };
+        assert_eq!((off.lns().tilt, off.lns().widen, check_plan(&off)), (0, None, Ok(())));
+    }
+
+    #[test]
+    fn a_fix_turns_widening_off_and_is_refused_with_a_widening() {
+        assert_eq!(widening(false, None), Ok(Some(DEFAULT_WIDEN)));
+        assert_eq!(widening(false, Some(Some(2))), Ok(Some(2)));
+        assert_eq!(widening(false, Some(None)), Ok(None), "--widen 0 turns it off");
+        assert_eq!(widening(true, None), Ok(None), "--fix alone turns it off");
+        assert_eq!(widening(true, Some(None)), Ok(None), "--fix with --widen 0 is the same");
+        for widen in [1, 4, 30] {
+            assert_eq!(widening(true, Some(Some(widen))), Err(WIDEN_WITH_FIX.to_owned()), "--fix with --widen {widen}");
+        }
     }
 
     #[test]
@@ -1008,10 +1075,14 @@ mod tests {
             let err = parse_back(text).unwrap_err();
             assert!(err.starts_with("--back takes J, a whole number from 0 to 8"), "{text:?}: {err}");
         }
-        assert_eq!((parse_widen("1"), parse_widen("30")), (Ok(1), Ok(30)));
-        for text in ["0", "-1", "", "a", "2.5", "1,2", " 3"] {
+        assert_eq!((parse_widen("1"), parse_widen("30")), (Ok(Some(1)), Ok(Some(30))));
+        assert_eq!(parse_widen("0"), Ok(None), "0 is no widening");
+        for text in ["-1", "", "a", "2.5", "1,2", " 3"] {
             let err = parse_widen(text).unwrap_err();
-            assert!(err.starts_with("--widen takes S, a whole number of rounds, at least 1"), "{text:?}: {err}");
+            assert!(
+                err.starts_with("--widen takes S, a whole number of rounds, or 0 for no widening"),
+                "{text:?}: {err}"
+            );
         }
     }
 
@@ -1024,7 +1095,7 @@ mod tests {
         assert!(refused(Plan { fix: (0.9, 0.7), ..Plan { widen: None, ..plan } }).starts_with("--fix takes LO,HI"));
         assert!(refused(Plan { tilt: MAX_TILT + 1, ..plan }).starts_with("--tilt takes P"));
         assert!(refused(Plan { back: MAX_BACK + 1, ..plan }).starts_with("--back takes J"));
-        assert!(refused(Plan { widen: Some(0), ..plan }).starts_with("--widen takes S"));
+        assert!(refused(Plan { widen: Some(0), ..plan }).starts_with("the plan widens after 0 rounds"));
         assert_eq!(refused(Plan { fix: (0.5, 0.7), ..plan }), WIDEN_WITH_FIX);
         assert!(refused(Plan { round_work: 0, ..plan }).contains("is 0"));
     }

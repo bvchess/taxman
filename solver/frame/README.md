@@ -7,7 +7,8 @@ is the frame solver.
 
 This page is its guide: what it computes, how to build and run it, and the common tasks.  [The
 reference](../docs/REFERENCE.md) has every flag and command, how to read the output, and why the answers can be
-trusted.  [DESIGN.md](../docs/DESIGN.md) explains how the solver works and why, the [lab
+trusted.  [The unsound mode](../docs/unsound.md) plays games with no proof, for scores fast.
+[DESIGN.md](../docs/DESIGN.md) explains how the solver works and why, the [lab
 notebook](https://github.com/bvchess/taxman-notebook/blob/main/README.md) holds the measurements behind it, and the
 [glossary](../../docs/GLOSSARY.md) defines the project's words.  A second program, [the prover](../noframe/README.md),
 checks the solver's answers on the whole board, without the frame model.
@@ -263,7 +264,8 @@ The ignored tests are for large machines and long runs:
 [REFERENCE.md](../docs/REFERENCE.md) the other commands.  A [tactic](../../docs/GLOSSARY.md#the-search) is set with
 `--tactic NAME=VALUE`, which is repeatable; `taxman help` and
 [solver/docs/design/tactics.md](../docs/design/tactics.md) give the names, values and defaults, and switching one never
-changes the answer.  [The reference](../docs/REFERENCE.md#1-the-flags-of-solve) has every flag of `solve`.
+changes the answer.  [The reference](../docs/REFERENCE.md#1-the-flags-of-solve) has every flag of `solve` but those of
+the unsound mode, which [unsound.md](../docs/unsound.md#the-flags) has.
 
 ### Solve one game
 

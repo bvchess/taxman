@@ -157,7 +157,7 @@ const SOLVE_FLAGS: [&str; 10] = [
 
 /// The flags of the unsound mode that take a value, besides `--out` and the solver's: the level of effort, the seed,
 /// and the options that shape the rounds (the share fixed, the share tilted, the games the trajectories begin from, the
-/// widening).
+/// widening), of which the last three have defaults that 0 turns off.
 const UNSOUND_FLAGS: [&str; 6] = ["--effort", "--seed", "--fix", "--tilt", "--back", "--widen"];
 
 /// The switches of the unsound mode: the mode itself, the end of the stop at the run's ceiling, and its measuring
@@ -237,8 +237,9 @@ fn proof_search_flags() -> impl Iterator<Item = &'static str> {
 
 /// `solve A-B --unsound --effort E --out FILE [--seed S] [--fix LO,HI] [--tilt P] [--back J] [--widen S]
 /// [--past-ceiling] [--stop-at-known] [--from-known]`, with `--threads`, `--tactic` and `--show`: plays the games in
-/// the unsound mode (`solver::unsound::solve_range`), with no proof, and appends their unsound lines to FILE.  It stops
-/// on SIGINT and SIGTERM between rounds, the game in play unrecorded.
+/// the unsound mode (`solver::unsound::solve_range`), with no proof, and appends their unsound lines to FILE.  An
+/// option not given has its default ([`Plan::default`]); `--fix` turns widening off (`unsound::widening`).  It stops on
+/// SIGINT and SIGTERM between rounds, the game in play unrecorded.
 fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     if let Some(flag) = proof_search_flags().find(|flag| args.has(flag)) {
         return Err(CliError::Usage(format!("{flag} is a flag of the proof search, which --unsound does not run")));
@@ -256,9 +257,7 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     let tilt = args.value("--tilt").map(unsound::parse_tilt).transpose().map_err(CliError::Usage)?;
     let back = args.value("--back").map(unsound::parse_back).transpose().map_err(CliError::Usage)?;
     let widen = args.value("--widen").map(unsound::parse_widen).transpose().map_err(CliError::Usage)?;
-    if args.has("--fix") && widen.is_some() {
-        return Err(CliError::Usage(unsound::WIDEN_WITH_FIX.into()));
-    }
+    let widen = unsound::widening(fix.is_some(), widen).map_err(CliError::Usage)?;
     let plan = Plan {
         effort,
         seed: args.parsed("--seed")?.unwrap_or(default.seed),

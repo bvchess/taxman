@@ -1,8 +1,13 @@
 //! The unsound mode (`taxman::solver::unsound`): its lines replay to their scores and never beat the built-in table,
 //! are the same on one thread and on four, run the rounds of a lower level first, resume, and end their rounds at the
 //! table's score with `--stop-at-known`; and the wall between its lines and proven ones holds both ways.  The options
-//! that shape the rounds (`fix`, `tilt`, `back`, `widen`) change no line unless they are given, and each of them, and
-//! the last three together, keep all of the above.
+//! that shape the rounds (`fix`, `tilt`, `back`, `widen`) change the line, and each of them, the last three together
+//! and the defaults of the last three keep all of the above.
+//!
+//! Most tests play the rounds with `tilt`, `back` and `widen` off (`plain`, the form of the mode before they had
+//! defaults), so that each keeps testing what it tested; the options are given by name where a test is about them, and
+//! the defaults are one of the shapes that `shaped` plays.  What the command line does with the defaults is in
+//! `cli.rs`.
 //!
 //! A level of effort budgets 2^(E−1) × `round_work` work of rounds.  The tests lower `round_work` from the 65,536 of a
 //! round of full neighborhoods to the work of a round or two of the small games they play, so that a level is a few
@@ -26,8 +31,14 @@ use taxman::solver::{solve_range, Method, SolveOptions};
 /// than effort E − 1.
 const WORK: u64 = 2_200;
 
-/// The plan of a run at `effort`, with the default seed and no measuring option.
+/// The plan of a run at `effort`, with the default seed and no measuring option, and with `tilt`, `back` and `widen`
+/// off: the rounds as they were before those options had defaults.
 fn plan(effort: u32) -> Plan {
+    Plan { effort, round_work: WORK, tilt: 0, back: 0, widen: None, ..Plan::default() }
+}
+
+/// The plan of a run at `effort` with the defaults of `tilt`, `back` and `widen`.
+fn by_default(effort: u32) -> Plan {
     Plan { effort, round_work: WORK, ..Plan::default() }
 }
 
@@ -168,8 +179,8 @@ const SHAPED: [u32; 4] = [375, 539, 544, 680];
 
 /// The plans of the options at `effort`, for the games [`SHAPED`] from the table's moves: a share fixed other than the
 /// default's, the tilted share, trajectories from the 8 games before, the widening after a round without growth, the
-/// last three together, and half the neighborhoods tilted.
-fn shaped(effort: u32) -> [(&'static str, Plan); 6] {
+/// last three together, half the neighborhoods tilted, and the defaults of the last three.
+fn shaped(effort: u32) -> [(&'static str, Plan); 7] {
     let known = Plan { from_known: true, ..plan(effort) };
     [
         ("fix", Plan { fix: (0.4, 0.6), ..known }),
@@ -178,6 +189,7 @@ fn shaped(effort: u32) -> [(&'static str, Plan); 6] {
         ("widen", Plan { widen: Some(1), ..known }),
         ("tilt, back and widen", Plan { tilt: 100, back: 8, widen: Some(1), ..known }),
         ("half tilt", Plan { tilt: 50, ..known }),
+        ("the defaults", Plan { from_known: true, ..by_default(effort) }),
     ]
 }
 
@@ -188,9 +200,10 @@ fn shaped_lines(opts: &SolveOptions, plan: &Plan) -> Vec<Line> {
 }
 
 #[test]
-fn without_the_options_the_rounds_are_these() {
-    // The lines of this form of the mode at effort 3, to see that no change to a neighborhood's draws or to the budget
-    // goes unseen: the neighborhoods of the default are pinned beside, in `search::finder`.
+fn with_the_options_off_the_rounds_are_these() {
+    // The lines of this form of the mode at effort 3 (`--back 0 --tilt 0 --widen 0`), to see that no change to a
+    // neighborhood's draws or to the budget goes unseen: the neighborhoods of the finder's default are pinned beside, in
+    // `search::finder`.
     let plan = Plan { from_known: true, ..plan(3) };
     let lines = shaped_lines(&options(4, true), &plan);
     let now: Vec<_> = lines.iter().map(|line| (line.n, line.score, line.rounds, line.steps, raised(line))).collect();
@@ -209,8 +222,9 @@ fn without_the_options_the_rounds_are_these() {
     }
 }
 
-/// The module `$module` of six tests, `fix`, `tilt`, `back`, `widen`, `all_three` and `half_tilt`, each calling `$check`
-/// with the index of that option in [`shaped`]: one test of all six would use more CPU than a test may.
+/// The module `$module` of seven tests, `fix`, `tilt`, `back`, `widen`, `all_three`, `half_tilt` and `defaults`, each
+/// calling `$check` with the index of that shape in [`shaped`]: one test of all seven would use more CPU than a test
+/// may.
 macro_rules! for_each_option {
     ($module:ident, $check:ident) => {
         mod $module {
@@ -237,6 +251,10 @@ macro_rules! for_each_option {
             #[test]
             fn half_tilt() {
                 super::$check(5);
+            }
+            #[test]
+            fn defaults() {
+                super::$check(6);
             }
         }
     };
@@ -299,7 +317,9 @@ fn check_what_the_line_records(shape: usize) {
     }
     let trajectories: Vec<usize> = lines.iter().map(|line| line.trajectories.as_ref().unwrap().len()).collect();
     assert_eq!(trajectories, if shape.back > 0 { vec![2, 3, 4, 4] } else { vec![1; 4] }, "{what}");
-    if shape.widen.is_some() {
+    // With a widening of 4 rounds, the few rounds of this level may not reach a stage below the first, so only a quicker
+    // widening is held to it.
+    if shape.widen.is_some_and(|rounds| rounds <= 2) {
         // A trajectory that stalls widens its neighborhoods: some game spends rounds at the second stage.
         let widened: u64 = lines.iter().flat_map(|line| line.stage_rounds.as_ref().unwrap()).map(|r| r[1] + r[2]).sum();
         assert!(widened > 0, "{what}: no round at a stage below the first");
@@ -410,7 +430,8 @@ fn a_plan_with_an_option_out_of_range_is_refused() {
     for back in [9, 100] {
         assert!(refused(Plan { back, ..plan(1) }).starts_with("--back takes J, a whole number from 0 to 8"), "{back}");
     }
-    assert!(refused(Plan { widen: Some(0), ..plan(1) }).starts_with("--widen takes S"));
+    // No widening is `None` (`--widen 0`), and a plan that widens after no rounds is refused.
+    assert!(refused(Plan { widen: Some(0), ..plan(1) }).starts_with("the plan widens after 0 rounds"));
     // The ladder of the widening replaces the share fixed.
     for fix in [(0.5, 0.7), (0.4, 0.6)] {
         assert_eq!(refused(Plan { widen: Some(2), fix, ..plan(1) }), unsound::WIDEN_WITH_FIX, "{fix:?}");

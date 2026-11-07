@@ -8,6 +8,8 @@ use std::path::Path;
 use taxman::game::Optimal;
 use taxman::json::Json;
 use taxman::search::MAX_GATE;
+use taxman::solver::unsound::{self, Plan};
+use taxman::solver::SolveOptions;
 
 /// A usage error: exit code 2, the message and then the usage on stderr, nothing on stdout.
 fn assert_usage_error(args: &[&str], message: &str) {
@@ -47,6 +49,20 @@ fn help_lists_the_commands_and_every_tactic() {
             assert!(run.stdout.contains(text), "{args:?}: no {text:?}");
         }
         assert!(!run.stdout.contains("--survivors"), "{args:?}: --back replaced --survivors");
+        // The help says what the defaults of the options that shape the rounds are, and how to turn each off.
+        let help = run.stdout.split_whitespace().collect::<Vec<_>>().join(" ");
+        for text in [
+            "--tilt P with --unsound: P percent of a round's neighborhoods (P from 0 to 100, default 25)",
+            "(J from 0 to 8, default 8)",
+            "(S >= 1, default 4)",
+            "0: none",
+            "0: the start's alone",
+            "0: no widening",
+            "which are on unless given 0",
+            "turns widening off, and is refused with --widen S of 1 or more",
+        ] {
+            assert!(help.contains(text), "{args:?}: no {text:?}");
+        }
         for name in taxman::tactics::Tactics::names() {
             assert!(run.stdout.contains(name), "{args:?}: the help does not name the tactic {name}");
         }
@@ -483,10 +499,10 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
 }
 
 /// `--fix LO,HI` takes two numbers with 0 <= LO <= HI <= 1, `--tilt P` a whole number from 0 to 100, `--back J` a whole
-/// number from 0 to 8 and `--widen S` a whole number from 1, `--widen` is refused with `--fix`, and the line records the
-/// options.
+/// number from 0 to 8 and `--widen S` a whole number (0 is no widening), and `--widen` of 1 or more is refused with
+/// `--fix`.
 #[test]
-fn the_options_that_shape_the_rounds_are_checked_and_the_line_records_them() {
+fn the_options_that_shape_the_rounds_are_checked() {
     let dir = TempDir::new("unsound-fix");
     let file = dir.join("fix.jsonl");
     let base = ["solve", "12", "--unsound", "--effort", "0", "--threads", "1", "--out", path(&file)];
@@ -504,40 +520,56 @@ fn the_options_that_shape_the_rounds_are_checked_and_the_line_records_them() {
         let message = format!("--back takes J, a whole number from 0 to 8: got {back:?}");
         assert_usage_error(&[&base[..], &["--back", back]].concat(), &message);
     }
-    for widen in ["0", "-1", "", "a", "2.5"] {
-        let message = format!("--widen takes S, a whole number of rounds, at least 1: got {widen:?}");
+    for widen in ["-1", "", "a", "2.5"] {
+        let message = format!("--widen takes S, a whole number of rounds, or 0 for no widening: got {widen:?}");
         assert_usage_error(&[&base[..], &["--widen", widen]].concat(), &message);
     }
-    // The widening has a ladder of its own for the share fixed, whatever the value of the share.
-    for fix in ["0.7,0.9", "0.4,0.6"] {
-        let message = "--widen takes the share fixed from its own ladder, so --fix is refused with it";
-        assert_usage_error(&[&base[..], &["--widen", "2", "--fix", fix]].concat(), message);
+    // The widening has a ladder of its own for the share fixed, whatever the value of the share, and whatever S is.
+    for (widen, fix) in [("2", "0.7,0.9"), ("2", "0.4,0.6"), ("4", "0.5,0.7"), ("1", "0.7,0.9")] {
+        let message = "--widen S of 1 or more takes the share fixed from its own ladder, so --fix is refused with it; \
+                       --fix alone, or with --widen 0, turns widening off";
+        assert_usage_error(&[&base[..], &["--widen", widen, "--fix", fix]].concat(), message);
+        assert_usage_error(&[&base[..], &["--fix", fix, "--widen", widen]].concat(), message);
     }
     assert!(!file.exists(), "a refused run plays no game");
-    let options = ["--fix", "0.4,0.6", "--tilt", "30", "--back", "1"];
-    let run = taxman(&[&base[..], &options].concat());
-    assert_eq!(run.code, Some(0), "{}", run.stderr);
-    let line = Json::parse(fs::read_to_string(&file).unwrap().lines().next().unwrap()).unwrap();
-    assert_eq!(line.get("fix"), Some(&Json::array([0.4, 0.6])));
-    let (tilt, back, widen) = (line.get("tilt"), line.get("back"), line.get("widen"));
-    assert_eq!((tilt, back, widen), (Some(&Json::from(30u64)), Some(&Json::from(1u64)), Some(&Json::Null)));
-    assert!(line.get("survivors").is_none(), "--back replaced --survivors");
-    // The widening alone, and without the options, the line records the defaults.
-    let widened = dir.join("widen.jsonl");
-    let run = taxman(&["solve", "12", "--unsound", "--effort", "0", "--out", path(&widened), "--widen", "3"]);
-    assert_eq!(run.code, Some(0), "{}", run.stderr);
-    let line = Json::parse(fs::read_to_string(&widened).unwrap().lines().next().unwrap()).unwrap();
-    assert_eq!((line.get("widen"), line.get("fix")), (Some(&Json::from(3u64)), Some(&Json::array([0.7, 0.9]))));
-    let other = dir.join("default.jsonl");
-    let run = taxman(&["solve", "12", "--unsound", "--effort", "0", "--threads", "1", "--out", path(&other)]);
-    assert_eq!(run.code, Some(0), "{}", run.stderr);
-    let line = Json::parse(fs::read_to_string(&other).unwrap().lines().next().unwrap()).unwrap();
-    assert_eq!(line.get("fix"), Some(&Json::array([0.7, 0.9])));
-    assert_eq!(
-        (line.get("tilt"), line.get("back"), line.get("widen")),
-        (Some(&Json::from(0u64)), Some(&Json::from(0u64)), Some(&Json::Null))
-    );
+}
+
+/// The options that shape the rounds are `--back 8 --tilt 25 --widen 4` when none is given, `0` turns each off, `--fix`
+/// alone turns widening off, and the line records them.
+#[test]
+fn the_line_records_the_options_that_shape_the_rounds_and_zero_turns_each_off() {
+    let dir = TempDir::new("unsound-options");
+    // The first line of the file `out`, after a run of the game 12 at effort 0 with `extra`.
+    let line_of = |name: &str, extra: &[&str]| {
+        let out = dir.join(name);
+        let args = ["solve", "12", "--unsound", "--effort", "0", "--threads", "1", "--out", path(&out)];
+        let run = taxman(&[&args[..], extra].concat());
+        assert_eq!(run.code, Some(0), "{extra:?}: {}", run.stderr);
+        Json::parse(fs::read_to_string(&out).unwrap().lines().next().unwrap()).unwrap()
+    };
+    // What a line records of the options that shape the rounds: the share fixed, tilt, back and widen.
+    let shape = |line: &Json| ["fix", "tilt", "back", "widen"].map(|key| line.get(key).cloned().expect(key));
+    let int = |n: u64| Json::from(n);
+    let fix = |lo: f64, hi: f64| Json::array([lo, hi]);
+    // None given: the defaults, the share fixed the finder's, and the budget of effort 0 none.
+    let line = line_of("default.jsonl", &[]);
+    assert_eq!(shape(&line), [fix(0.7, 0.9), int(25), int(8), int(4)]);
     assert_eq!(line.get("budget"), Some(&Json::from(0u64)), "effort 0 budgets no steps");
+    // Each turned off with 0, and all three, which leaves the share fixed alone.
+    assert_eq!(shape(&line_of("tilt0.jsonl", &["--tilt", "0"])), [fix(0.7, 0.9), int(0), int(8), int(4)]);
+    assert_eq!(shape(&line_of("back0.jsonl", &["--back", "0"])), [fix(0.7, 0.9), int(25), int(0), int(4)]);
+    assert_eq!(shape(&line_of("widen0.jsonl", &["--widen", "0"])), [fix(0.7, 0.9), int(25), int(8), Json::Null]);
+    let off = line_of("off.jsonl", &["--back", "0", "--tilt", "0", "--widen", "0"]);
+    assert_eq!(shape(&off), [fix(0.7, 0.9), int(0), int(0), Json::Null]);
+    // The widening alone changes only the widening.
+    assert_eq!(shape(&line_of("widen3.jsonl", &["--widen", "3"])), [fix(0.7, 0.9), int(25), int(8), int(3)]);
+    // A share fixed turns widening off and leaves the other defaults, with or without `--widen 0`; the rest is given.
+    let share = shape(&line_of("fix.jsonl", &["--fix", "0.4,0.6"]));
+    assert_eq!(share, [fix(0.4, 0.6), int(25), int(8), Json::Null]);
+    assert_eq!(shape(&line_of("fix0.jsonl", &["--fix", "0.4,0.6", "--widen", "0"])), share);
+    let line = line_of("given.jsonl", &["--fix", "0.4,0.6", "--tilt", "30", "--back", "1"]);
+    assert_eq!(shape(&line), [fix(0.4, 0.6), int(30), int(1), Json::Null]);
+    assert!(line.get("survivors").is_none(), "--back replaced --survivors");
 
     // The three options together, with rounds: game 375 from the table's moves has two trajectories, the start's and
     // one from the moves for 367, and reaches the table's score in the first round, which ends the rounds of a budget
@@ -564,6 +596,84 @@ fn the_options_that_shape_the_rounds_are_checked_and_the_line_records_them() {
     );
     let known = line.get("stop_at_known").expect("what --stop-at-known recorded");
     assert_eq!(known.get("round"), Some(&Json::from(1u64)));
+}
+
+/// Games whose rounds find a better set at effort 2, from the table's moves, in two rounds or more under the defaults (the
+/// rounds end at the table's score: the games are small).
+const RAISED_BY_THE_DEFAULTS: [u32; 2] = [539, 544];
+
+/// The same, in three rounds or more with `--back 0 --tilt 0 --widen 0`.
+const RAISED_WITH_THE_OPTIONS_OFF: [u32; 2] = [375, 680];
+
+/// An unsound line without what varies from run to run: the build, and the times (the game's and each improvement's).
+fn without_times(line: &Json) -> Json {
+    let pairs = |json: &Json| json.as_obj().expect("an object").to_vec();
+    let kept = |json: &Json, vary: &[&str]| -> Vec<(String, Json)> {
+        pairs(json).into_iter().filter(|(key, _)| !vary.contains(&key.as_str())).collect()
+    };
+    let mut line = kept(line, &["build", "seconds", "start_seconds"]);
+    for (key, value) in &mut line {
+        if key == "improvements" {
+            let raised = value.as_arr().expect("an array").iter();
+            *value = Json::array(raised.map(|raised| Json::object(kept(raised, &["seconds"]))));
+        }
+    }
+    Json::object(line)
+}
+
+/// The lines (without their times) of the games `games` played from the table's moves for n - 1 at effort `effort` on
+/// one thread, their rounds ending at the table's score, with the flags `extra`, one run of the binary for each game,
+/// into the file `TAG-N.jsonl` of `dir`.
+fn unsound_lines(dir: &TempDir, tag: &str, games: &[u32], effort: u32, extra: &[&str]) -> Vec<Json> {
+    let effort = effort.to_string();
+    games
+        .iter()
+        .map(|n| {
+            let (n, file) = (n.to_string(), dir.join(format!("{tag}-{n}.jsonl")));
+            let args = ["solve", &n, "--unsound", "--effort", &effort, "--from-known", "--stop-at-known"];
+            let run = taxman(&[&args[..], &["--threads", "1", "--out", path(&file)], extra].concat());
+            assert_eq!(run.code, Some(0), "game {n} with {extra:?}: {}", run.stderr);
+            without_times(&Json::parse(fs::read_to_string(&file).unwrap().lines().next().unwrap()).unwrap())
+        })
+        .collect()
+}
+
+/// With no option, `--unsound` plays the rounds of `--back 8 --tilt 25 --widen 4`: the lines are the same, but for the
+/// build and the times.
+#[test]
+fn the_defaults_are_the_three_options_given_by_name() {
+    let dir = TempDir::new("unsound-defaults");
+    let games = &RAISED_BY_THE_DEFAULTS;
+    let by_default = unsound_lines(&dir, "default", games, 2, &[]);
+    let by_name = unsound_lines(&dir, "named", games, 2, &["--back", "8", "--tilt", "25", "--widen", "4"]);
+    assert_eq!(by_default, by_name);
+    for line in &by_default {
+        let count = |key: &str| line.get(key).and_then(Json::as_arr).map(<[Json]>::len);
+        assert!(line.get("rounds").and_then(Json::as_u64) >= Some(2), "the rounds are played: {line}");
+        assert!(count("improvements") >= Some(1), "the rounds find something: {line}");
+        assert!(count("trajectories") > Some(1), "the game follows trajectories from the games before: {line}");
+    }
+}
+
+/// `--back 0 --tilt 0 --widen 0` plays the rounds as the mode did before these options had defaults: the library's
+/// plan with the three off, whose rounds `tests/unsound.rs` pins.
+#[test]
+fn zero_turns_the_three_options_off() {
+    let dir = TempDir::new("unsound-off");
+    let games = &RAISED_WITH_THE_OPTIONS_OFF;
+    let off = unsound_lines(&dir, "off", games, 2, &["--back", "0", "--tilt", "0", "--widen", "0"]);
+    let plain =
+        Plan { effort: 2, from_known: true, stop_at_known: true, tilt: 0, back: 0, widen: None, ..Plan::default() };
+    let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
+    for (&n, line) in games.iter().zip(&off) {
+        let mut played = None;
+        unsound::solve_range(n, n, &opts, &plain, None, |line| played = Some(without_times(&line.to_json())))
+            .expect("a run of the unsound mode");
+        assert_eq!(played.as_ref(), Some(line), "game {n}");
+        assert_eq!(line.get("trajectories"), Some(&Json::array(["start"])), "game {n}: the start's alone");
+    }
+    // They are not the lines of the defaults, which follow trajectories from the games before.
+    assert_ne!(off, unsound_lines(&dir, "default", games, 2, &[]));
 }
 
 /// A searched game stops at the run's ceiling unless `--past-ceiling` is given, and the line says what the ceiling was

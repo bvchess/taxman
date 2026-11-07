@@ -19,7 +19,8 @@
 //!   the register links to it, and the front page holds no entry and no table row; `solver/docs/STATUS.md` is short and
 //!   dated;
 //! * the reference's (`solver/docs/REFERENCE.md`) table of the fields of a result line has the keys the code writes,
-//!   and its example line shows them, and so do its table and its example of an unsound line;
+//!   and its example line shows them, and so do the table and the example of an unsound line in the unsound mode's
+//!   document (`solver/docs/unsound.md`);
 //! * the design's reading order (`solver/docs/design/architecture.md`) is the module map of `src/lib.rs`, and
 //!   `rust-version` is what the README and the cloud setup say;
 //! * the docs call `unzip`'s moves *mandatory*, never *forced* (which is the search's word);
@@ -162,6 +163,11 @@ fn design_dir() -> PathBuf {
 /// REFERENCE.md, the frame solver's reference, in the docs of the solver.
 fn reference_md() -> PathBuf {
     repo_dir().join("solver/docs/REFERENCE.md")
+}
+
+/// unsound.md, the unsound mode's document, in the docs of the solver.
+fn unsound_md() -> PathBuf {
+    repo_dir().join("solver/docs/unsound.md")
 }
 
 fn read(path: impl AsRef<Path>) -> String {
@@ -1062,19 +1068,15 @@ fn unsound_keys(n: u32) -> BTreeSet<String> {
 }
 
 #[test]
-fn the_reference_documents_exactly_the_keys_of_an_unsound_line() {
-    let reference = read(reference_md());
-    let part = section(&reference, "### An unsound line");
+fn the_unsound_mode_documents_exactly_the_keys_of_an_unsound_line() {
+    let unsound = read(unsound_md());
+    let part = section(&unsound, "## An unsound line");
     // A game with a search (85), and one with none (12).
     let written = unsound_keys(85);
     assert_eq!(unsound_keys(12), written, "a game with no search has the keys of one with a search");
-    assert_eq!(
-        first_column_words(part),
-        written,
-        "REFERENCE.md's table of the keys of an unsound line, and the code's"
-    );
+    assert_eq!(first_column_words(part), written, "unsound.md's table of the keys of an unsound line, and the code's");
     let example = part.split("```").nth(1).expect("the example line is the first code block");
-    assert_eq!(top_level_keys(example), written, "REFERENCE.md's example of an unsound line, and the code's keys");
+    assert_eq!(top_level_keys(example), written, "unsound.md's example of an unsound line, and the code's keys");
     assert!(example.contains("\"method\":\"search\""), "the example is a searched game");
 }
 
@@ -1258,6 +1260,7 @@ const REWRITTEN: &[&str] = &[
     "solver/frame/README.md",
     "solver/frame/testdata/golden/README.md",
     "solver/docs/REFERENCE.md",
+    "solver/docs/unsound.md",
     "solver/docs/verifiers.md",
     "solver/docs/DESIGN.md",
     DESIGN_DIR,
