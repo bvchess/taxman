@@ -54,7 +54,7 @@ export function mountSettled(host, { games }) {
     const top = 6;
     const height = top + rows * pitch + 8;
     const svg = freshSVG(box, width, height, `Every game of the chain from game 1 to game ${fmt(last)}, a cell each, `
-      + `${cols} to a row from game 1 at the top left, colored by how it was settled. `
+      + `${cols} to a row from game 1 at the top left, each color showing how we settled the game. `
       + 'The counts are in the legend and in the table below.');
     const at = (i) => {
       const r = Math.floor(i / cols);

@@ -144,7 +144,7 @@ function graphBoard({ you, take, maxN, playing }) {
 
   function label(x) {
     if (state.pot.has(x)) {
-      if (!legal.has(x)) return `${x}, cannot be taken`;
+      if (!legal.has(x)) return `${x}, not a legal move`;
       return `${x}: the taxman would take ${listWords(M.properDivisors(x).filter((d) => state.pot.has(d)))}`;
     }
     if (state.player.includes(x)) return `${x}, ${you === 'You' ? 'yours' : 'the player’s'}`;

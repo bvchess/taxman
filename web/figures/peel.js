@@ -79,7 +79,7 @@ function words(f, k) {
     return `Game ${N}'s optimal set, its ${f.set.length} numbers at the left, and at the right the maximal factors outside it. A thin line joins a number to each factor it can pay with.`;
   }
   if (k > steps.length) {
-    return `Every number is paired, so the set is playable. The pairs are the payments of the game itself: in each order above, every number takes its own factor as tax.`;
+    return `Peel pairs every number, so the set is playable. The pairs are the payments of the game itself: in each order above, every number takes its own factor as tax.`;
   }
   // Who is still in play just before the step.
   const done = steps.slice(0, k - 1);
@@ -103,7 +103,7 @@ export function mountPeel(host, { small }) {
   const { steps } = f;
   const s = scene(host.querySelector('svg'), {
     width: W, height: H, className: 'is-dense',
-    label: `Peel, step by step, on game ${N}'s optimal set. The current step is described under the figure.`,
+    label: `Peel, step by step, on game ${N}'s optimal set. The text under the figure describes the current step.`,
   });
   const row = new Map(MEMBER_ORDER.map((m, i) => [m, rowY(i)]));
   for (const m of MEMBER_ORDER) row.set(f.factorOf.get(m), row.get(m));

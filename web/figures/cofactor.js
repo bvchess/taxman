@@ -73,7 +73,7 @@ export function mountCofactor(host, { games }) {
     const top = 22;
     const height = top + KINDS.length * rowH + 4;
     const svg = freshSVG(box, width, height, `The games from game ${fmt(FROM)} to game ${fmt(games.lastN)} by the cofactor of n, each bar `
-      + 'split by how its games were settled. Only the games of other cofactors include searches. The numbers are in '
+      + 'splitting its games by how we settled them. Only the games of other cofactors include searches. The numbers are in '
       + 'the table below.');
     const x0 = labelW;
     const scale = (width - labelW - endW) / most;

@@ -59,7 +59,7 @@ export function fitsFacts(small, n) {
 function standing(above, x) {
   const payer = above.turns.find((t) => t.tax.includes(x));
   if (payer) return `${x} pays for ${payer.move}`;
-  return above.moves.includes(x) ? `${x} is a move` : `${x} is left out`;
+  return above.moves.includes(x) ? `${x} is a move` : `the game leaves ${x} out`;
 }
 
 /** The panel's words as HTML: the lead in bold, then why. */

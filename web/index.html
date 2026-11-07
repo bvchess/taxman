@@ -22,7 +22,7 @@
     <p class="subhead">Playing optimal games</p>
   </hgroup>
   <p class="byline">Brian Chess</p>
-  <p class="lede">Taxman is a number game originally created to teach kids about factors.  We play an optimal game, one with the best
+  <p class="lede">Taxman began as a number game to teach kids about factors.  We play an optimal game, one with the best
   possible score, in each of games 1 to <span data-last-n>5,060</span>.  This site explains how we did it.</p>
   <p class="hurry">In a hurry? Go straight to <a href="summary.html">the summary</a>.</p>
 </header>
@@ -38,7 +38,8 @@
       <a class="gloss" href="glossary.html#taxman-sequence">Taxman sequence</a>, <a href="https://oeis.org/A019312">A019312</a> in
       the OEIS.</p>
     </aside>
-    <p>Taxman is played with the numbers 1 to n, which start in the <a class="gloss" href="glossary.html#pot"><em>pot</em></a>.</p>
+    <p>You play Taxman with the numbers 1 to n, which start in the
+    <a class="gloss" href="glossary.html#pot"><em>pot</em></a>.</p>
   </div>
   <ul class="rules">
     <li>You take a number from the pot and score it.  That number is your <a class="gloss" href="glossary.html#move"><em>move</em></a>.</li>
@@ -47,7 +48,7 @@
     <li>When no number you could take is left, the taxman takes the rest.</li>
     <li>You beat the taxman when your total is higher than the total he collects.</li>
   </ul>
-  <p>The best total you can reach in game n is written <a class="gloss" href="glossary.html#opt">opt(n)</a>, and a game
+  <p>We write the best total you can reach in game n as <a class="gloss" href="glossary.html#opt">opt(n)</a>, and a game
   that reaches it is an <a class="gloss" href="glossary.html#optimal-game"><em>optimal game</em></a>.  Try game 10: its
   best score is 40, and you can find it by hand.</p>
 
@@ -56,12 +57,11 @@
   <div class="para">
     <aside class="note tech" aria-label="Heuristic strategies">
       <div class="note-head"><span class="note-name">Heuristic strategies</span></div>
-      <p>A heuristic strategy plays a good game quickly, by rules such as taking the largest number that can still be
-      taken, or the one that costs the least tax.  To judge one, you need the best score to
-      measure it against: one reason to know opt(n).  The repository
-      holds
-      <a href="https://github.com/bvchess/taxman/blob/master/heuristics/README.md">our strategies and how they were
-      measured</a>, and <a href="https://github.com/bvchess/taxman/tree/master/moniot">Robert Moniot's seven</a>.</p>
+      <p>A heuristic strategy plays a good game quickly, by rules such as taking the largest number you can still take,
+      or the one that costs the least tax.  To judge one, you need the best score to measure it against: one reason to
+      know opt(n).  The repository holds
+      <a href="https://github.com/bvchess/taxman/blob/master/heuristics/README.md">our strategies and how we measured
+      them</a>, and <a href="https://github.com/bvchess/taxman/tree/master/moniot">Robert Moniot's seven</a>.</p>
     </aside>
     <p>The blue button plays an optimal game, the best you can do.  Playing well is easy: up to game 1,000, a simple
     strategy with no search comes within a fraction of a percent of the best score.  But only a perfect game is optimal,
@@ -74,13 +74,16 @@
   <div class="para">
     <aside class="note tech" aria-label="The counts">
       <div class="note-head"><span class="note-name">The counts</span></div>
-      <p>Rough sizes, not counts of legal games: n! move orders, 2<sup>n</sup> subsets of the <a class="gloss" href="glossary.html#board">board</a>, 2<sup>⌊n/2⌋</sup>
-      subsets of the numbers up to n/2, and 2<sup>c</sup> subsets of the c <a class="gloss" href="glossary.html#candidate">candidates</a>.  The last row is the <a class="gloss" href="glossary.html#node">nodes</a>
-      that the game's recorded search explored.  The row before it is no count: it says how far below the best score the
-      search starts when it starts from the game before, measured (<a href="search.html#head-start">chapter 5</a>).</p>
+      <p>Rough sizes, not counts of legal games: n! move orders, 2<sup>n</sup> subsets of the
+      <a class="gloss" href="glossary.html#board">board</a>, 2<sup>⌊n/2⌋</sup> subsets of the numbers up to n/2, and
+      2<sup>c</sup> subsets of the c <a class="gloss" href="glossary.html#candidate">candidates</a>.  The last row is
+      the <a class="gloss" href="glossary.html#node">nodes</a> that the game's recorded search explored.  The row before
+      it is no count: it says how far below the best score the search starts when it starts from the game before, as we
+      measured it (<a href="search.html#head-start">chapter 5</a>).</p>
     </aside>
-    <p>Game <span data-last-n>n</span>'s numbers can be put in about 10<sup data-orders-exp>…</sup> orders.  No computer could try them all.  Each
-    chapter of the story takes away part of the problem, until what is left is small enough for a <a class="gloss" href="glossary.html#search">search</a> to finish.</p>
+    <p>You can put game <span data-last-n>n</span>'s numbers in about 10<sup data-orders-exp>…</sup> orders.  No
+    computer could try them all.  Each chapter of the story takes away part of the problem, until what is left is small
+    enough for a <a class="gloss" href="glossary.html#search">search</a> to finish.</p>
   </div>
 
   <figure class="fig wide shrink" id="shrink" aria-label="The problem of playing the last game of the chain, shrinking from chapter to chapter."></figure>
@@ -89,8 +92,8 @@
 <section class="chapter front-chain" id="chain" data-toc="chain" aria-labelledby="h-chain">
   <h2 id="h-chain">The chain</h2>
   <div class="para">
-    <aside class="note tech" aria-label="How each game was proven">
-      <div class="note-head"><span class="note-name">How each game was proven</span></div>
+    <aside class="note tech" aria-label="How we proved each game">
+      <div class="note-head"><span class="note-name">How we proved each game</span></div>
       <p>Each game counts in the first group that fits it.</p>
       <ul>
         <li><b>Derived from game n&nbsp;−&nbsp;1.</b>  n is prime, and the
@@ -112,16 +115,16 @@
     </aside>
     <aside class="note tech" aria-label="The player's share">
       <div class="note-head"><span class="note-name">The player's share</span></div>
-      <p>The share is the player’s score, opt(n), divided by the total of the board,
+      <p>The share is the player’s score, opt(n), over the total of the board,
       1&nbsp;+&nbsp;2&nbsp;+&nbsp;⋯&nbsp;+&nbsp;n.</p>
       <p>In 1988 Hensley proved that as n grows, the share settles toward one value, somewhere between 50% and about
       73%.  The chain’s best scores put it near 63%.  That is a measurement, not a proof.</p>
     </aside>
     <p>We solved the games in order, from game 1 up, each from an
-    <a class="gloss" href="glossary.html#optimal-game">optimal game</a> of the one before,
-    so they form a <a class="gloss" href="glossary.html#chain">chain</a>.  The chart shows every game of it: the share of the
-    <a class="gloss" href="glossary.html#board">board</a> that the player wins, how each game was proven, and how
-    long a search took.</p>
+    <a class="gloss" href="glossary.html#optimal-game">optimal game</a> of the one before, so they form a
+    <a class="gloss" href="glossary.html#chain">chain</a>.  The chart shows every game of it: the share of the
+    <a class="gloss" href="glossary.html#board">board</a> that the player wins, how we proved each game, and how long a
+    search took.</p>
   </div>
   <figure class="chart" id="chain-chart">
     <p class="chart-sub"></p>
@@ -131,7 +134,7 @@
 
 <section class="chapter front-along" id="along" data-toc="along" aria-labelledby="h-along">
   <h2 id="h-along">Along the way</h2>
-  <p>Solving the games turned up some surprises.  Each one is told in the chapter that explains it.</p>
+  <p>Solving the games turned up some surprises.  The chapter that explains each one tells it.</p>
   <ul class="finding-cards"></ul>
 </section>
 

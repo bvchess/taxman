@@ -72,7 +72,7 @@ function trays({ you, take }) {
       p.classList.toggle('is-stuck', state.pot.has(x) && !legal.has(x));
       p.disabled = !state.pot.has(x);
       p.setAttribute('aria-label', state.pot.has(x)
-        ? `${x}${legal.has(x) ? '' : ', cannot be taken'}`
+        ? `${x}${legal.has(x) ? '' : ', not a legal move'}`
         : `${x}, ${lookName === 'player' ? (you === 'You' ? 'yours' : 'the player’s') : 'the taxman’s'}`);
       p._next = { where, lookName };
     }

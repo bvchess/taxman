@@ -142,10 +142,10 @@ export function mountLoop(host) {
       status.innerHTML = `${took} ${state.player.length === 1 ? 'The first move takes both of its primes.' : ''}`;
       return;
     }
-    const words = ['None', 'One', 'Two', 'Three', 'Four'];
+    const words = ['none', 'one', 'two', 'three', 'four'];
     status.innerHTML = `${took} <strong>${listWords(stuck)} ${stuck.length > 1 ? 'are' : 'is'} stuck</strong>: ${
       stuck.length > 1 ? 'their primes are gone' : `both of ${stuck[0]}’s primes are gone`
-    }. ${words[state.player.length]} of the four were played. Four numbers need four primes to pay with, and the first move took two of them.`;
+    }. You played ${words[state.player.length]} of the four. Four numbers need four primes to pay with, and the first move took two of them.`;
   }
 
   // Show the state in the form's pose.  staged is a take, whose move and tax go one after another; crossing is a switch

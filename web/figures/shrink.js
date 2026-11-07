@@ -75,7 +75,7 @@ export function shrinkCounts(games) {
     4: candidates == null
       ? { html: 'nothing to promote' }
       : power(candidates * LOG2, `sets of ${fmt(candidates)} candidates`),
-    5: nodes == null ? { html: 'settled with no search' } : { log: Math.log10(nodes), html: `${inWords(nodes)} nodes` },
+    5: nodes == null ? { html: 'no search at all' } : { log: Math.log10(nodes), html: `${inWords(nodes)} nodes` },
     2: { html: `the search starts only ${fmt(start.seededGap)} points below opt(n)` },
   };
 }

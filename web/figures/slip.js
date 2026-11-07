@@ -72,12 +72,12 @@ function words(f) {
   const gone = ['is', 'are both', 'are all'][Math.min(factors.length, 3) - 1];
   const plural = factors.length > 1 ? 's' : '';
   return [
-    `Game ${n - 1}'s optimal game, played in game ${n}: each move takes the same tax, and ${listWords(before.rest)} `
-    + `are left out.  It scores ${fmt(before.score)}.`,
+    `Game ${n - 1}'s optimal game, played in game ${n}: each move takes the same tax, and it leaves ${listWords(before.rest)} `
+    + `out.  It scores ${fmt(before.score)}.`,
     `${n} cannot come last: by then its maximal factor${plural}, ${listWords(factors)}, ${gone} gone.  The last to go `
-    + `is ${last}, ${last === cut ? 'played as a move' : `taken by ${cut}`}.`,
+    + `is ${last}, ${last === cut ? 'which the player plays as a move' : `which ${cut} takes`}.`,
     `So ${n} goes just before ${cut} and takes ${listWords(tax)}.  Now ${cut} has no maximal factor left in the pot.`,
-    `${dropped} is left out, and ${after.moves.join(', ')} scores ${scoreWords(f)}.`,
+    `We leave ${dropped} out, and ${after.moves.join(', ')} scores ${scoreWords(f)}.`,
   ];
 }
 
@@ -128,7 +128,7 @@ export function mountSlip(host, { small }) {
   const s = scene(host.querySelector('svg'), {
     width, height, className: 'is-dense',
     label: `Game ${N}'s game built from game ${N - 1}'s optimal game: ${N} goes just before ${cut}, takes the tax `
-      + `of ${cut} and leaves ${cut} out, in four states.  The current state is described under the figure.`,
+      + `of ${cut} and leaves ${cut} out, in four states.  The text under the figure describes the current state.`,
   });
   s.svg.style.maxWidth = `${REFERENCE.rem}rem`;
   addRow(s, before, '', HEADER);
@@ -144,7 +144,7 @@ export function mountSlip(host, { small }) {
       { at: 0, name: `game ${N - 1}'s game` },
       { at: 1, name: `${N} can't come last` },
       { at: 2, name: `${N} before ${cut}` },
-      { at: 3, name: `${dropped} left out` },
+      { at: 3, name: `leave ${dropped} out` },
     ],
     param: 'slip',
     fromParam: (value) => Number(value) - 1,

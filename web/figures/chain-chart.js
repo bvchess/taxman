@@ -66,7 +66,7 @@ export function mountChainChart(host, { games }) {
   const endShare = share[count - 1];
   host.querySelector('.chart-sub').textContent =
     `For games 1 to ${fmt(last)}, in stretches of ${STRETCH} games. The player’s share of the board ` +
-    `settles near ${pct(endShare)}. Under it, how the games of each stretch were proven, and the median time ` +
+    `settles near ${pct(endShare)}. Under it, how we proved the games of each stretch, and the median time ` +
     'of its searches.';
 
   responsive(box, (width) => {
@@ -90,7 +90,7 @@ export function mountChainChart(host, { games }) {
     const svg = freshSVG(box, width, height,
       `Chart of the chain from game 1 to game ${fmt(last)}: the player's share of the board; for each stretch of ` +
       `${STRETCH} games, ` +
-      'how its games were proven in three groups and the median time of its searches. ' +
+      'how we proved its games, in three groups, and the median time of its searches. ' +
       'The numbers are in the table below.');
     const x = (n) => m.l + ((n - 1) / (last - 1)) * plotW;
     const nAt = (px) => Math.min(last, Math.max(1, Math.round(1 + ((px - m.l) / plotW) * (last - 1))));
@@ -158,7 +158,7 @@ export function mountChainChart(host, { games }) {
     endLabel.textContent = `${pct(endShare)} at game ${fmt(last)}`;
 
     // How each game was proven: a stacked column a stretch, from the bottom derived from n − 1, repeats, search.
-    rowName('how each game was proven', `each ${STRETCH} games, whole = 100%`, provTop + nameH, 24);
+    rowName('how we proved each game', `each ${STRETCH} games, whole = 100%`, provTop + nameH, 24);
     gridRow([[0, '0'], [0.5, '50%'], [1, '100%']], yProv);
     const stack = [...GROUPS].reverse();
     for (const st of stretches) {
@@ -250,7 +250,7 @@ export function mountChainChart(host, { games }) {
       timeDot.setAttribute('opacity', tp === null ? 0 : 1);
       const rows = [
         `Game ${fmt(n)}`, ['opt(n)', fmt(c.score[j])], ['player’s share', pct(share[j], 2)],
-        ['proven by', ruleWords(c, j)],
+        ['proof', ruleWords(c, j)],
         `Games ${fmt(st.a)} to ${fmt(st.b)}`,
         ...GROUPS.map((grp) => [grp.name, fmt(st.by[grp.key])]),
         ['median search time', duration(st.median)],
