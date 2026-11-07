@@ -18,7 +18,7 @@ const STRETCH = 100;
 const TIME_TICKS = [[1e-3, '1 ms'], [1, '1 s'], [60, '1 min'], [3600, '1 h'], [DAY, '1 day']];
 const TIME_LO = 1e-3;
 const TIME_HI = 1.6 * DAY;
-// A group's tone: the gray ramp of chapter 2's grid (css/site.css), the search darkest.
+// A group's color: those of chapter 2's grid (css/site.css), the search darkest.
 const TONE = { search: 'var(--rule-search)', repeat: 'var(--rule-repeat)', before: 'var(--rule-ceiling)' };
 
 const median = (xs) => {
@@ -185,7 +185,7 @@ export function mountChainChart(host, { games }) {
       if (st.median === null) continue;
       const top = yTime(Math.min(TIME_HI, Math.max(TIME_LO, st.median)));
       el('rect', {
-        x: colX(st), y: top, width: colW(st), height: yTime(TIME_LO) - top, style: 'fill: var(--time)',
+        x: colX(st), y: top, width: colW(st), height: yTime(TIME_LO) - top, style: 'fill: var(--search)',
       }, svg);
     }
     const timeBase = timePlot + timeH + 0.5;

@@ -9,7 +9,8 @@
 //   candidate to each of its maximal factors in the frame in front, and a dotted arrow is the path of a promotion;
 //   a light solid line is a branch of a search tree;
 // * a box is a frame, dashed when it is closed;
-// * blue is the player's and orange the taxman's, and nothing else; what the prose names wears a halo of ink.
+// * blue is the player's and orange the taxman's: a number wears one of them once a figure says who takes it, and no
+//   other color (style.html, Color); what the prose names wears a halo of ink.
 //
 // The rule that joins the two renderings: depth means you can touch it.  A number the reader plays is a raised token
 // (a coin for a circle, a tile for a square) standing on the page with an edge and a shadow, and one that cannot be

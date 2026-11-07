@@ -79,11 +79,13 @@ export function mountShareChart(host, { games }) {
       const bottom = Math.max(top + 1.6, y(c.lo));
       band += `M${c.px} ${top.toFixed(1)}V${bottom.toFixed(1)}`;
     }
-    el('path', { d: band, 'stroke-width': 1.3, fill: 'none', style: 'stroke: var(--ink-2)' }, svg);
+    el('path', { d: band, 'stroke-width': 1.3, fill: 'none', style: 'stroke: var(--player)' }, svg);
 
     // The last game's share, at its end.
     const endY = y(facts.last.share);
-    el('circle', { cx: x(facts.last.n), cy: endY, r: 4, 'stroke-width': 2, style: 'fill: var(--ink-2); stroke: var(--paper)' }, svg);
+    el('circle', {
+      cx: x(facts.last.n), cy: endY, r: 4, 'stroke-width': 2, style: 'fill: var(--player); stroke: var(--paper)',
+    }, svg);
     const endLabel = el('text', { x: x(facts.last.n) - 8, y: endY + 20, 'text-anchor': 'end', class: 'row-label' }, svg);
     endLabel.textContent = `${pct(facts.last.share)} in game ${fmt(facts.last.n)}`;
 
@@ -99,7 +101,9 @@ export function mountShareChart(host, { games }) {
 
     // The hover layer: a crosshair that finds the searched game nearest the pointer.
     const cross = el('line', { y1: m.t, y2: axisY, class: 'cross', opacity: 0 }, svg);
-    const dot = el('circle', { r: 4, 'stroke-width': 2, opacity: 0, style: 'fill: var(--ink); stroke: var(--paper)' }, svg);
+    const dot = el('circle', {
+      r: 4, 'stroke-width': 2, opacity: 0, style: 'fill: var(--player); stroke: var(--paper)',
+    }, svg);
     const hit = el('rect', { x: m.l, y: m.t, width: plotW, height: plotH, fill: 'transparent', class: 'hit', 'aria-label': 'Explore the searched games with the arrow keys' }, svg);
     const nearest = (n) => {
       let lo = 0;

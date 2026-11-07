@@ -1,7 +1,7 @@
 /* Chapter 5, the search: the search tree of game 45 and the chart of the searches' cost.  The tree is flat ink, as an
    explanatory figure is, and grows from the root at the bottom: a node is a small chip with its promotions, a dropped
    branch a dashed chip, the best game's leaf a filled one.  Above it a strip of the candidates, in HTML.  The chart
-   is one series of dots in ink. */
+   is one series of dots in the search's green. */
 
 .search-tree-fig { max-width: 30rem; position: relative; }
 .search-tree-fig .fig-caption { min-height: 6.2em; }
@@ -47,5 +47,5 @@
   .v-figure.search-tree .v-text-label { font-size: 17px; }
 }
 
-#cost-chart .cost-dots { stroke: var(--ink-2); stroke-opacity: 0.6; }
-#cost-chart .cost-end { fill: var(--ink); stroke: var(--paper); }
+#cost-chart .cost-dots { stroke: var(--search); stroke-opacity: 0.8; }
+#cost-chart .cost-end { fill: var(--search); stroke: var(--paper); }

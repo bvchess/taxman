@@ -1,7 +1,8 @@
 /* The site's style: a white page in three columns, each with one job.  The left column finds your place, the center
    tells the story, and the right holds the technical layer: every claim's precise statement, notation and links.
    Numbers the reader plays are raised tokens; numbers in an explanatory figure are drawn flat, in ink.  Depth means
-   you can touch it.  Color is for the player (blue) and the taxman (orange) only.  style.html shows every piece. */
+   you can touch it.  Color names the story's three actors: the player (blue), the taxman (orange) and the search
+   (green).  style.html gives the rule and shows every piece. */
 
 /* The face, Radio Canada, served from this folder under the SIL Open Font License (fonts/OFL.txt): two variable files,
    upright and italic, weights 300 to 700, in the Latin subset.  A symbol outside it, such as Σ, ∪, ≤ or Ω, comes
@@ -42,17 +43,19 @@
   --hair: #e3e6ea;
   --wash: #f5f6f8;
 
-  /* How a game was settled: the chapter's four rules on a gray ramp, light to dark in the order the chapter meets them,
-     the three that need no search close together and a search far darker, so that the searches stand out (checked with
-     the dataviz validator, --ordinal: lightness monotone, steps of at least 0.06, the light end at 2.2:1 on white).
-     Never blue or orange, which are the player's and the taxman's. */
+  /* The search, the third actor: its color for its work in a chart (the games it settled, its nodes, its time), never a
+     number; darker than blue and orange, so a reader without red-green vision tells them apart by lightness
+     (style.html, "The search's green"). */
+  --search: #17654d;
+  /* How a game was settled, chapter 2's four rules.  The two that need a search wear the search's green, a search its
+     own green and a repeat, which rests on an earlier search, a lighter shade; the two that need none, the ceiling and
+     the prime formula, are gray.  Light to dark they alternate, gray and green (ceiling, repeat, prime, search), so
+     neighbors differ in both, and a search is the darkest; every pair is 8 or more apart under both color-blind
+     simulations (js/cvd.js), the lightest at 2.2:1 on white. */
   --rule-ceiling: #a9b0b9;
-  --rule-prime: #949ca6;
-  --rule-repeat: #7f8792;
-  --rule-search: var(--ink);
-  /* Time, in the charts that show how long a search took: a green of its own, 4.25:1 on the paper and 8 or more from
-     the player blue and every gray of the ramp under both color-blind simulations (js/cvd.js). */
-  --time: #2e8b57;
+  --rule-repeat: #659989;
+  --rule-prime: #6c737d;
+  --rule-search: var(--search);
 
   /* The two renderings: the flat fill of a kept number; the parts of a raised token and its tray */
   --kept: #d4d9e0;
@@ -80,7 +83,7 @@
   font-size: 18px;
 }
 
-/* The player and the taxman, the only colors, in three tones.  The lightest tone is the site's; ?tone=deep or
+/* The player and the taxman, in three tones.  The lightest tone is the site's; ?tone=deep or
    ?tone=light shows a page in another (js/tone.js), and data-tone on any element sets the tone inside it.  Each
    color has the same parts in every tone:
      --player        a mark drawn in the color: an outline, a line of a chart, a dot; at least 3:1 on the page

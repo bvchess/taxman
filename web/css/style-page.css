@@ -55,7 +55,9 @@
 .tone .tray-box header .score { font-size: 1.1rem; }
 .tone .slots { min-height: 0; gap: 2px; }
 .tone-flat svg { display: block; }
-.tone-values p { font-size: 0.72rem; color: var(--ink-2); margin: 4px 0 0; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.tone-values p, .search-colors p {
+  font-size: 0.72rem; color: var(--ink-2); margin: 4px 0 0; line-height: 1.4; font-variant-numeric: tabular-nums;
+}
 .chip-swatch { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 3px; vertical-align: -1px; box-shadow: inset 0 0 0 1px rgba(30, 34, 39, 0.15); }
 .chip-swatch + .chip-swatch { margin-right: 6px; }
 

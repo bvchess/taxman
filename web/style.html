@@ -119,13 +119,17 @@
       <p class="precise"><span class="run">Precisely.</span>The marks of each tone pass the lightness band, the chroma
       floor, CVD separation (deutan and protan ΔE 25 or more), the normal-vision floor and 3:1 contrast.  The faces
       are fills under ink, not marks, and keep a deutan and protan ΔE of 9.9 or more.  The page recomputes the
-      separations from the tokens, beside each tone.  A third hue would sit too close to blue for a deutan reader, so
-      a chapter not yet written is marked by a dashed line and a gray wash.</p>
+      separations from the tokens, beside each tone.  A chapter not yet written is marked by a dashed line and a gray
+      wash.</p>
     </aside>
-    <p>The page is ink on white.  Two colors mean something, and only two: blue is the player and the player's moves,
-    and orange is the taxman and his tax.  Every color distinction is doubled by a shape, a line style, a place or a
-    label, since about one man in twelve does not see red from green.  Blue against orange lies on the blue–yellow
-    axis that such readers still see.  What the prose names gets a halo of ink, never a third color.</p>
+    <p>The page is ink on white.  Three colors mean something, one for each actor in the story: blue is the player, the
+    player's moves and the player's score; orange is the taxman and his tax; and green is the search, the computer's
+    work: the games a search settled, its nodes and its time.  A number wears blue or orange once a figure says who
+    takes it, and is ink until then; green never marks a number, only the search's work in a chart.  Every other mark
+    is ink and gray.  Every color distinction is doubled by a shape, a line style, a place or a label, since about one
+    man in twelve does not see red from green.  Blue against orange lies on the blue–yellow axis that such readers
+    still see, and the search's green is far darker than either, so they tell it apart by lightness.  What the prose
+    names gets a halo of ink, never a color.</p>
   </div>
   <h3 class="section-head" id="tones">Three tones</h3>
   <div class="para">
@@ -141,6 +145,14 @@
     The site uses the lightest tone.</p>
   </div>
   <div class="tones spread" id="tone-panels"></div>
+  <h3 class="section-head" id="search-green">The search's green</h3>
+  <div class="para">
+    <p>The search's green has one tone.  It marks the searches in the charts of how each game was proven, and a lighter
+    shade of it the repeats, which rest on an earlier search; the two rules that need no search, the ceiling and the
+    prime formula, are gray.  The four alternate in lightness, gray and green, so neighbors differ in both, and a
+    search, the darkest, stands out.  The time and the nodes of a search are drawn in the same green.</p>
+  </div>
+  <div class="search-colors" id="search-colors"></div>
   <h3 class="section-head">The tokens</h3>
   <div class="tokens spread" id="tokens"></div>
 </section>
@@ -351,6 +363,7 @@ document.querySelector('.topbar-specimen .home').innerHTML = `${homeMark()}Taxma
 S.mountScale(document.getElementById('scale'));
 S.mountFigureNumbers(document.getElementById('figure-numbers'));
 S.mountTones(document.getElementById('tone-panels'));
+S.mountSearchColors(document.getElementById('search-colors'));
 S.mountTokens(document.getElementById('tokens'));
 S.mountMarks(document.getElementById('marks-table'));
 S.mountPromotion(document.getElementById('promo'));

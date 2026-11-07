@@ -1,7 +1,7 @@
 // The cost of the search: the nodes of every game of the chain that needed one, against n, on a log scale, all from
-// data/games.json (the games whose method is "search").  One series, so no legend: a dot a game, in ink, with the
-// last game labeled; a crosshair and a tooltip find the game under the pointer or the arrow keys, and a table gives
-// the numbers by stretches of 500 games.
+// data/games.json (the games whose method is "search").  One series, so no legend: a dot a game, in the search's green,
+// with the last game labeled; a crosshair and a tooltip find the game under the pointer or the arrow keys, and a table
+// gives the numbers by stretches of 500 games.
 
 import { el, fmt } from '../js/vocab.js';
 import { freshSVG, keyboard, responsive, tableView, tooltip } from '../js/chart.js';

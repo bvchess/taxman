@@ -5,6 +5,7 @@
 import { MOTION, SHAPE, el, fmt, numberSVG } from '../js/vocab.js';
 import { contrast, separation } from '../js/cvd.js';
 import { loadSmall } from '../js/data.js';
+import { RULE } from '../js/proof.js';
 import * as M from '../js/model.js';
 import { scene, timeline } from '../js/scene.js';
 import { ENTRIES } from './legend.js';
@@ -78,7 +79,7 @@ export const TOKENS = [
     ['--tray', 'Raised: a tray, the ground of the pot and of a frame.'],
     ['--tray-edge', 'Raised: a tray’s edge, a button’s edge.'],
   ]],
-  ['The player and the taxman, the only colors', [
+  ['The player and the taxman', [
     ['--player', 'A mark in the player’s color: an outline, the player’s share in a chart, a dot.  Nothing else is blue.'],
     ['--player-face', 'The face of a raised token the player took, under an ink number.'],
     ['--player-rim', 'The rim of that token, in a mid shade; --player-side, its edge.'],
@@ -89,6 +90,14 @@ export const TOKENS = [
     ['--taxman-rim', 'The rim of that token; --taxman-side, its edge.'],
     ['--taxman-tint', 'The taxman’s tray, and the fill of a flat number he took; --taxman-edge, the tray’s edge.'],
     ['--taxman-ink', 'Words in the taxman’s color; ink in the light tones.'],
+  ]],
+  ['The search', [
+    ['--search',
+      'The search’s work in a chart: the searches among the games, their nodes, their time.  Never a number.'],
+    ['--rule-search', 'A game settled by a search: the search’s green.'],
+    ['--rule-repeat', 'A game that repeats an earlier search: a lighter shade of it.'],
+    ['--rule-prime', 'A game settled by the prime formula: a mid gray.'],
+    ['--rule-ceiling', 'A game at its ceiling: a light gray, the lightest.'],
   ]],
 ];
 
@@ -146,6 +155,34 @@ export async function mountTones(host) {
       <p><span class="chip-swatch" style="background:${marks[0]}"></span><span class="chip-swatch" style="background:${marks[1]}"></span>marks ${marks.join(' ')}: ${sep(marks)}; on the page ${contrast(marks[0], '#ffffff').toFixed(1)}:1 and ${contrast(marks[1], '#ffffff').toFixed(1)}:1</p>
       <p><span class="chip-swatch" style="background:${faces[0]}"></span><span class="chip-swatch" style="background:${faces[1]}"></span>faces ${faces.join(' ')}: ${sep(faces)}</p>`;
   }
+}
+
+/** The four rules' colors, light to dark, and the search's green against the player and the taxman, worked out from
+ *  the tokens themselves. */
+export function mountSearchColors(host) {
+  const cs = getComputedStyle(document.documentElement);
+  const hex = (name) => cs.getPropertyValue(name).trim();
+  const swatch = (c) => `<span class="chip-swatch" style="background:${c}"></span>`;
+  const worst = (a, b) => Math.min(separation(a, b, 'deutan'), separation(a, b, 'protan'));
+  const sep = (a, b) =>
+    `deutan ${separation(a, b, 'deutan').toFixed(1)}, protan ${separation(a, b, 'protan').toFixed(1)}`;
+  const rules = ['ceiling', 'repeat', 'prime', 'search']
+    .map((key) => ({ name: RULE[key].name, color: hex(`--rule-${key}`) }));
+  let closest = null;
+  for (let i = 0; i < rules.length; i++) {
+    for (let j = i + 1; j < rules.length; j++) {
+      const d = worst(rules[i].color, rules[j].color);
+      if (!closest || d < closest.d) closest = { d, a: rules[i].name, b: rules[j].name };
+    }
+  }
+  const green = hex('--search');
+  host.innerHTML = `
+    <p>${rules.map((r) => swatch(r.color)).join('')}the four rules, light to dark:
+    ${rules.map((r) => `${r.name} ${r.color}`).join(', ')}; the closest pair, ${closest.a} and ${closest.b},
+    ${closest.d.toFixed(1)} apart under the worse of deutan and protan</p>
+    <p>${swatch(green)}the search’s ${green} against blue ${hex('--player')}: ${sep(green, hex('--player'))};
+    against orange ${hex('--taxman')}: ${sep(green, hex('--taxman'))};
+    on the page ${contrast(green, '#ffffff').toFixed(1)}:1</p>`;
 }
 
 export function mountTokens(host) {

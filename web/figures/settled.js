@@ -8,9 +8,8 @@
 //   a search           every other game: a search of its own, or nothing to promote
 //
 // A game that the ceiling or the prime formula settles is counted there whatever its record says, since both prove it
-// from the game before; the record is in its tooltip.  The four rules take a gray ramp, light to dark in the order the
-// chapter meets them, checked with the dataviz validator (--ordinal: monotone lightness, the light end at 2.2:1 on
-// white).
+// from the game before; the record is in its tooltip.  The two rules that need a search wear the search's green, a
+// search dark and a repeat light, and the two that need none are gray (css/site.css).
 
 import { el, fmt } from '../js/vocab.js';
 import { freshSVG, keyboard, pct, responsive, tableView, tooltip } from '../js/chart.js';
@@ -54,8 +53,9 @@ export function mountSettled(host, { games }) {
     const rows = Math.ceil(total / cols);
     const top = 6;
     const height = top + rows * pitch + 8;
-    const svg = freshSVG(box, width, height, `Every game of the chain from game 1 to game ${fmt(last)}, a cell each, ${cols} to a row `
-      + 'from game 1 at the top left, shaded by how it was settled. The counts are in the legend and in the table below.');
+    const svg = freshSVG(box, width, height, `Every game of the chain from game 1 to game ${fmt(last)}, a cell each, `
+      + `${cols} to a row from game 1 at the top left, colored by how it was settled. `
+      + 'The counts are in the legend and in the table below.');
     const at = (i) => {
       const r = Math.floor(i / cols);
       return { x: labelW + (i % cols) * pitch, y: top + r * pitch };
