@@ -38,7 +38,10 @@
 .st-sample.is-cut { border-style: dashed; border-color: var(--ink-3); color: var(--ink-3); }
 .st-sample.is-best { background: var(--kept); }
 
-.search-tree-fig .chart-tip { width: max-content; max-width: 100%; }
+.search-tree-fig .chart-tip { width: max-content; max-width: 100%; box-sizing: border-box; }
+.search-tree-fig .chart-tip .row { white-space: normal; align-items: flex-start; }
+.search-tree-fig .chart-tip .row span:first-child { white-space: nowrap; }
+.search-tree-fig .chart-tip .row span:last-child { text-align: right; }
 
 .search-tree .st-halo { stroke: var(--ink); stroke-width: 7px; }
 .search-tree .st-body { stroke-linejoin: round; }

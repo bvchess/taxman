@@ -56,8 +56,8 @@
     takes one candidate and splits the search tree: one branch promotes it, the other goes on without it.  Each point where it
     splits is a <a class="gloss" href="glossary.html#node">node</a>.  All the while the search keeps the best game it
     has found, and each node has a <a class="gloss" href="glossary.html#bound">bound</a>: a limit on what the promotions
-    of that branch could still add.  A branch whose bound cannot beat the best game found is dropped, unexplored.  This
-    way of searching is called branch and bound.</p>
+    of that branch could still add.  A branch whose bound cannot beat the best game found is a dead end, so the search
+      stops exploring down that path.  This way of searching is called branch and bound.</p>
   </div>
 
   <figure class="fig fig-panel search-tree-fig" id="tree">
@@ -85,10 +85,10 @@
 <section class="chapter" id="the-bound" data-toc="the-bound" aria-labelledby="h-bound">
   <h2 id="h-bound">The bound</h2>
   <p>The figure's <a class="gloss" href="glossary.html#bound">bound</a> adds up every
-  <a class="gloss" href="glossary.html#candidate">candidate</a> that could still be promoted alone with the branch's
-  promotions.  Every set that can be promoted passes that test, but so do many sets that cannot, so the bound is
-  loose: at game 45's root it is <span data-tree="rootBound">107</span>, while the best game adds
-  <span data-tree="best">39</span>.</p>
+  <a class="gloss" href="glossary.html#candidate">candidate</a> that could still be promoted alone along with the
+    promotions the branch has already selected. Every set that can be promoted passes this test, but so do many sets that cannot, so the bound is
+  loose: at game 45's root the bound is <span data-tree="rootBound">107</span>, but eventually we learn the best
+    set of promotions can only contribute <span data-tree="best">39</span>.</p>
 
   <div class="para">
     <aside class="note card" aria-label="The signed frame theorem, proved">
@@ -100,7 +100,7 @@
       independent in every frame, over every field.</p>
     </aside>
     <p>The <a class="gloss" href="glossary.html#frame-solver">frame solver</a>'s bound is a sharper test of the same
-    kind: one that every set of promotions that can be made passes, though some that cannot be made pass it too.
+    kind: one that every set of legal promotions will pass, though some that cannot be made pass it too.
     It grows from the <a class="gloss" href="glossary.html#loop">loop</a> of chapter 1.  List, for each number of a set,
     the maximal factors outside the set that could pay for it.  If some of the numbers, taken together, list every
     factor an even number of times, the set cannot be played.  The loop 10, 14, 15 and 21 lists each of 2, 3, 5 and 7

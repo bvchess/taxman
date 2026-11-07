@@ -21,7 +21,7 @@ import { el, fmt, listWords } from '../js/vocab.js';
 import { scene, timeline } from '../js/scene.js';
 
 export const N = 45;
-const COL = 76; // from one leaf to the next
+const COL = 76; // from one leaf to the next, at least
 const ROW = 60; // from one depth to the next
 const PAD_X = 48; // from the first leaf's center to the figure's edge
 const TOP = 58; // from the top of the figure to the highest leaf's center, with its label above
@@ -30,7 +30,12 @@ const CHIP = { w: 62, h: 26 }; // wide enough for "21, 18" at the phone's font s
 const LABEL_RISE = 25; // from a leaf's center to the lower line of its label
 const LINE = 17; // from one line of a label to the next
 const EDGE_GAP = 7; // from the middle of an edge to its label
-const CHAR = 8.4; // the width of a character of figure text at its largest size, for the check that all fits
+const CHAR = 8.4; // the width of a character of an edge label at its largest size, for the check that all fits
+const LABEL_GAP = 24; // between the labels of two leaves
+// The widths of the leaf labels' lines, in the figure's units at the phone's font size (17px, bold for the best
+// leaf), as measured in the page, and a digit's; each with a little margin.
+const LINE_WIDTH = { bound: 53, 'best so far': 88, 'best game': 88 };
+const DIGIT = 10.5;
 const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 
 /** The candidates of game n, largest first: the factors of the frames with freedoms that U* can take on alone. */
@@ -74,9 +79,9 @@ export function searchTree(n) {
   return { n, uStar, cands, nodes, best, bestSet };
 }
 
-// The sum written out, when it is short: "21 + 18 + 8 = 47".
+// The sum written out: "21 + 18 + 8 = 47"; a single term is just its number.
 function written(xs, total) {
-  return xs.length > 1 && xs.length <= 4 ? `${xs.join(' + ')} = ${total}` : String(total);
+  return xs.length > 1 ? `${xs.join(' + ')} = ${total}` : String(total);
 }
 
 function leftWords(live) {
@@ -166,7 +171,7 @@ function drawChip(parts, look) {
 }
 
 // A leaf's label: two short lines centered above the leaf, so that neighbors' labels never meet.  A look may give
-// words, "best|so far", to change what a label says.
+// words, "best so far|39", to change what a label says.
 function leafLabelMark(lines) {
   const text = el('text', { class: 'v-text v-text-label', 'text-anchor': 'middle' });
   const spans = lines.map(() => el('tspan', {}, text));
@@ -204,23 +209,27 @@ function passedOver(node) {
 }
 
 // What the search knows at a node, as the rows of a tooltip.
-function tipRows(t, node) {
+function tipRows(t, node, done) {
   const { cands } = t;
   const passed = passedOver(node);
   const ruledOut = cands.filter((x) => !node.P.includes(x) && !passed.includes(x) && !node.live.includes(x));
   const list = (xs) => (xs.length ? xs.join(', ') : 'none');
-  const rows = [!node.parent ? 'The root' : node.edge.promote ? `Promote ${node.edge.x}` : `Without ${node.edge.x}`];
-  rows.push(['promoted', list(node.P)]);
+  if (node.live.length === 0 && node.P.length === 0) throw new Error('search tree: a game without promotions');
+  const rows = [node.P.length ? `Promoted: ${list(node.P)}` : 'Nothing promoted'];
   if (passed.length) rows.push(['passed over', list(cands.filter((x) => passed.includes(x)))]);
   if (ruledOut.length) rows.push(['ruled out', list(ruledOut)]);
-  const terms = [...node.P, ...node.live];
-  rows.push(['remaining candidates', list(node.live)], ['bound', written(terms, node.bound)]);
-  const lead = 'Its bound is the most this branch can add.';
-  if (node.kind === 'branch') rows.push(`${lead} It splits on ${node.live[0]}: promote it, or go on without it.`);
-  else if (node.kind === 'cut') {
-    const than = node.bound < node.bestBefore ? 'less than' : 'no more than';
-    rows.push(`${lead} Dropped: its bound, ${node.bound}, is ${than} the best so far, ${node.bestBefore}.`);
-  } else rows.push(`${lead} A game: promoting ${listWords(node.P)} adds ${node.bound}, the best so far.`);
+  rows.push(['remaining candidates', list(node.live)], ['bound', written([...node.P, ...node.live], node.bound)]);
+  const than = node.bound < node.bestBefore ? 'less than' : 'no more than';
+  const so = `the best so far, ${node.bestBefore}`;
+  const game = `No candidate remains, so this is a game: promoting ${listWords(node.P)} adds ${node.bound}`;
+  if (node.kind === 'branch') {
+    rows.push(`This branch can add at most ${node.bound}, more than ${so}, so the search goes on. ` +
+      `Next it decides ${node.live[0]}: promote it, or go on without it.`);
+  } else if (node.kind === 'cut' && node.live.length) {
+    rows.push(`This branch can add at most ${node.bound}, ${than} ${so}, so the search drops it without looking ` +
+      'further.');
+  } else if (node.kind === 'cut') rows.push(`${game}, ${than} ${so}, so the search moves on.`);
+  else rows.push(`${game}, ${done ? 'and no other game adds more' : 'the best so far'}.`);
   return rows;
 }
 
@@ -239,29 +248,35 @@ export function mountSearchTree(host, { small }) {
 
   // Places: the leaves in the order the search reaches them, left to right; a node above the middle of its children;
   // the root at the bottom, each depth a row higher.
-  let col = 0;
+  const leafLabel = (node) => [node.kind === 'cut' ? 'bound' : 'best so far', String(node.bound)];
+  // Half the widest line a leaf's label ever has: the best leaf says "best so far", then "best game".
+  const reach = (node) => Math.max(...leafLabel(node).map((line) => LINE_WIDTH[line] ?? DIGIT * line.length),
+    node.kind === 'best' ? LINE_WIDTH['best game'] : 0) / 2;
+  let leftEdge = PAD_X; // the last leaf's x, then the next
+  let before = null;
   const place = (node) => {
-    if (node.children.length === 0) node.x = PAD_X + COL * col++;
-    else {
+    if (node.children.length === 0) {
+      if (before) leftEdge += Math.max(COL, reach(before) + reach(node) + LABEL_GAP);
+      node.x = leftEdge;
+      before = node;
+    } else {
       node.children.forEach(place);
       node.x = sum(node.children.map((c) => c.x)) / node.children.length;
     }
   };
   place(nodes[0]);
   const depth = Math.max(...nodes.map((node) => node.depth));
-  const W = 2 * PAD_X + COL * (col - 1);
+  const W = before.x + PAD_X;
   const H = TOP + ROW * depth + BOTTOM;
   for (const node of nodes) node.y = TOP + ROW * (depth - node.depth);
 
   // Everything must fit: the chips with their halos, a leaf's label above it, an edge's label beside its middle.
-  const leafLabel = (node) => (node.kind === 'cut' ? ['bound', String(node.bound)] : ['best', 'so far']);
   const edgeLabel = (node) => (node.edge.promote ? String(node.edge.x) : `no ${node.edge.x}`);
   const fits = (left, right, top, bottom) => left >= 0 && right <= W && top >= 0 && bottom <= H;
   for (const node of nodes) {
     let ok = fits(node.x - CHIP.w / 2 - 3, node.x + CHIP.w / 2 + 3, node.y - CHIP.h / 2 - 3, node.y + CHIP.h / 2 + 3);
     if (node.children.length === 0) {
-      const half = (CHAR * Math.max(...leafLabel(node).map((line) => line.length))) / 2;
-      ok = ok && fits(node.x - half, node.x + half, node.y - LABEL_RISE - LINE - 9, node.y);
+      ok = ok && fits(node.x - reach(node), node.x + reach(node), node.y - LABEL_RISE - LINE - 9, node.y);
     }
     if (node.parent) {
       const mid = (node.x + node.parent.x) / 2;
@@ -270,6 +285,15 @@ export function mountSearchTree(host, { small }) {
       ok = ok && (node.edge.promote ? fits(mid - reach, mid, 0, 0) : fits(mid, mid + reach, 0, 0));
     }
     if (!ok) throw new Error(`search tree: node ${node.id} does not fit the figure`);
+  }
+  // Labels of leaves in one row must keep apart.
+  const leaves = nodes.filter((node) => node.children.length === 0);
+  for (const a of leaves) {
+    for (const b of leaves) {
+      if (a.id < b.id && a.y === b.y && Math.abs(a.x - b.x) < reach(a) + reach(b) + LABEL_GAP - 1e-6) {
+        throw new Error(`search tree: the labels of leaves ${a.id} and ${b.id} meet`);
+      }
+    }
   }
 
   const s = scene(host.querySelector(':scope > svg'), {
@@ -322,7 +346,7 @@ export function mountSearchTree(host, { small }) {
       if (node.kind === 'cut' || node.kind === 'best') {
         v[`r${i}`] = {
           x: node.x, y: node.y - LABEL_RISE, halo: node.kind === 'best' ? 1 : 0, ...(isNew ? { at: [0.6, 1] } : {}),
-          ...(node.kind === 'best' ? { words: `best|${k === last ? 'game' : 'so far'}` } : {}),
+          ...(node.kind === 'best' ? { words: `${k === last ? 'best game' : 'best so far'}|${node.bound}` } : {}),
         };
       }
     }
@@ -383,7 +407,7 @@ export function mountSearchTree(host, { small }) {
     if (node.id > state) return;
     const at = chips.get(node.id).body.getBoundingClientRect();
     const over = host.getBoundingClientRect();
-    tip.show(tipRows(t, node), at.left + at.width / 2 - over.left, at.top - over.top);
+    tip.show(tipRows(t, node, state === last), at.left + at.width / 2 - over.left, at.top - over.top);
   };
   for (const node of nodes) {
     const g = chips.get(node.id).g;
