@@ -356,6 +356,7 @@ By band, the open members and the margins of each game (the share is of all memb
   from 15
   (2610) to 317 (2346) past it.  In all, 7.5% of the members are open to 2175 (18,596 of 247,482), 14.9% on 2176-3314
   (77,195 of 518,992), and 19.9% on 3315-3440 (14,704 of 73,968, 172 to 271 a game, the root's gap 1,103 to 1,555).
+  Past the prover's proofs, on 2531-3440, 15.2% are open (68,144 of 449,033).
 * **The open share follows the root's gap, not n.**  It grows 3.1 points per 100 of gap to 2175 and 2.0 past it (R²
   0.73, 0.73 and 0.91 in the three files), and it falls back with the gap (2600-2699).  The root's gap is the one the
   frame solver's search costs by: with layers 1 and 2 fixed, it equals the solver's GF(2) gap at the root on all 400
