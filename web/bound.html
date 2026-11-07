@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The bound · Taxman</title>
-<meta name="description" content="A quick test of even and odd rules out most sets of moves that cannot be played: it bounds what a search can still gain, and on the whole board it bounds the best score itself.">
+<meta name="description" content="A bound limits how high a score can go, and the sharper it is, the less a search has to explore.  Taxman's comes from a quick test of even and odd, applied to the frames of a search or to the whole board.">
 <meta name="author" content="Brian Chess">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <script src="js/tone.js"></script>
@@ -20,8 +20,7 @@
 <header class="essay-head para">
   <p class="kicker">Chapter 6</p>
   <h1>The bound</h1>
-  <p class="lede">A quick test of even and odd rules out most sets that cannot be played.  It bounds what a search can
-  still gain, and on the whole board it bounds opt(n) itself.</p>
+  <p class="lede">A bound limits how high a score can go.  The sharper it is, the less a search has to explore.</p>
 </header>
 
 <section class="chapter" id="the-test" data-toc="the-test" aria-labelledby="h-test">

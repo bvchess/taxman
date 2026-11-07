@@ -216,8 +216,8 @@ the design (`solver/docs/DESIGN.md`, `search.md`, `gf2-bound.md`, `tactics.md`).
 
 ### 6. The bound
 
-**Point.**  A quick test of even and odd rules out most sets that cannot be played; it bounds what a search can gain,
-and on the whole board it bounds opt(n).
+**Point.**  A bound limits how high a score can go, and the sharper it is, the less a search has to explore.  Ours is
+a quick test of even and odd, on the frames of a search or on the whole board.
 
 * The test: list, for each number of a set, the maximal factors outside the set that could pay for it; if some of the
   numbers list every factor an even number of times, the set cannot be played (the loop of chapter 1).  It is linear
