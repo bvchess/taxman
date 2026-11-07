@@ -101,14 +101,14 @@
     count prime factors: the primes stand in the column at the right, 1 beyond them, and each number sits one column to
     the left of its maximal factors, so every line runs to the right.  Taking a number sends the taxman everything it
     reaches by following its lines to the right, and every number the player takes leaves the graph with its lines.  A
-    number is still playable as a move so long as it still has a line to its right.</p>
+    number is a legal move, and stands up, as long as it still has a line to its right.</p>
   </div>
 
   <div class="game-host graph-game-host" id="graph-game"></div>
 
-  <p>The maximal factor graph makes it easy to see what a move will cost before you make it, as well as what it will
-    leave for the moves after it.  That makes the game far easier than playing on the plain board shown in the
-    introduction.</p>
+  <p>The maximal-factor graph makes it easy to see what a move will cost before you make it, as well as what it will
+  leave for the moves after it.  That makes the game far easier than playing on the plain board shown in the
+  introduction.</p>
 
   <div class="para">
     <aside class="note card" aria-label="The playability theorem, proved">
@@ -134,9 +134,9 @@
     <span class="n" data-n="8">8</span> and <span class="n" data-n="10">10</span> would take 2, so 6 must come before
     them.  A move must also come before any move it divides: <span class="n" data-n="5">5</span> before 10, if a
     player wanted to take both, or 10 would take 5.</p>
-    <p>A set of moves is playable when every move has a unique maximal factor to offer up as payment, and if you can
-      pay for each move in a way where you never end up running in a circle, each move before the next and the last
-      before the first. Without that problem, any order of play is a legal game.</p>
+    <p>Rules like these say which moves must come before which.  A set of moves is playable exactly when you can give
+    each move a maximal factor of its own to pay with, in a way whose rules never run in a circle: each move before the
+    next, and the last before the first.  Then any order that keeps the rules is a legal game.</p>
   </div>
 </section>
 
@@ -146,7 +146,7 @@
   one at a time, using only two kinds of safe step:</p>
   <ul class="rules">
     <li>A number with only one <a class="gloss" href="glossary.html#maximal-factor">maximal factor</a> left pays with it.</li>
-    <li>A factor that only one number remaining is used to pay for that number.</li>
+    <li>A factor that only one remaining number can use pays for that number.</li>
   </ul>
   <p>Each step takes a pair out, and the next step looks at what remains. We call this a
     <a class="gloss" href="glossary.html#peel"><em>peel</em></a> test. If it pairs every number, the set is
@@ -174,10 +174,10 @@
       <a href="https://github.com/bvchess/taxman/blob/master/solver/frame/src/playable.rs">solver/frame/src/playable.rs</a>.</p>
     </aside>
     <p>In game 21, peel pairs <span class="n" data-n="19">19</span> with 1, the only factor it has, and
-    <span class="n" data-n="9">9</span> with 3 for the same reason.  Once 3 is gone, 15 has only 5 left and 21 only
-    7, and the rest follow.  The pairs it finds can be used as the payments of the game itself.</p>
-    <p>A run of peel that pairs every number also reveals a legal order of play: play each number before any move that would
-    take it, or its payment, as tax.  So a playable set can be quickly organized into an ordered list of moves.</p>
+    <span class="n" data-n="9">9</span> with 3 for the same reason.  Once 3 is gone, 15 has only 5 left and 21 only 7,
+    and the rest follow.  The game can use the pairs it finds as its payments.</p>
+    <p>A run of peel that pairs every number also reveals a legal order of play: play each number before any move that
+    would take it, or its payment, as tax.  So peel quickly turns a playable set into an ordered list of moves.</p>
   </div>
 </section>
 
@@ -201,30 +201,28 @@
   <div class="para">
     <aside class="note card" aria-label="The two-factor proposition, proved">
       <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Numbers that each have one or two maximal factors outside their set make a playable set only
-      when they and those factors make no loop.</p>
-      <p class="precise"><span class="run">Precisely.</span>An instance whose members each list one or two factors is
+      <p class="plain">Numbers that each have two maximal factors outside their set make a playable set exactly when
+      they and those factors make no loop.</p>
+      <p class="precise"><span class="run">Precisely.</span>An instance whose members each list two factors is
       <a class="gloss" href="glossary.html#playable">playable</a> iff its lists are linearly independent over GF(2), iff
-      its graph is a forest.  The graph joins each member to the factors it lists, and a member that lists only one also
-      to one more vertex, the ground.  A member that lists none can never be played.</p>
+      its graph, which joins each member to the two factors it lists, is a forest.  With members that list one factor,
+      the same holds when the graph also joins each of them to one more vertex, the ground.  A member that lists none
+      can never be played.</p>
     </aside>
-    <p>Whatever order you choose, the first number takes both of its primes as <a class="gloss" href="glossary.html#tax">tax</a>.  That leaves two primes for the
-    other three numbers, and one of them is always stuck.</p>
-    <p>The same holds for any numbers that each have one or two maximal factors left to pay with, outside the set: they
-    make a playable set exactly when they and those factors make no loop.  A number with only one such factor also joins
-    the <em>ground</em>, one more point that all such numbers share.  The ground matters:
-    <span class="n" data-n="4">4</span> can pay only with 2, <span class="n" data-n="9">9</span> only with 3, and
-    <span class="n" data-n="6">6</span> needs one of the two, so one of the three is always stuck.  They make the loop
-    ground – 4 – 2 – 6 – 3 – 9 – ground.</p>
-    <p>Three maximal factors are too many for the rule.  With 4, 6, 10 and 15 left to pay with, the lines of
-    <span class="n" data-n="12">12</span>, <span class="n" data-n="20">20</span> and
-    <span class="n" data-n="30">30</span> close a loop, 30 – 6 – 12 – 4 – 20 – 10 – 30, yet you can play all three: 20,
-    then 12, then 30.  The rule holds only for numbers with one or two maximal factors to pay with, and for the others
-    the question goes back to peel.</p>
-    <p>So the rule covers only part of the game, but an important part.  Every number with two prime factors, such as 95
-    = 5 · 19 or 49 = 7 · 7, has at most two maximal factors, all of them primes.  These numbers make up
-    <a class="gloss" href="glossary.html#layer">layer</a> 2, and chapter 3 uses the rule to find exactly which of them
-    above n/2 every optimal game plays.</p>
+    <p>Whatever order you choose, the first number takes both of its primes as
+    <a class="gloss" href="glossary.html#tax">tax</a>.  That leaves two primes for the other three numbers, and one of
+    them is always stuck.</p>
+    <p>Every loop is stuck the same way.  A loop of k numbers has k factors among them.  The first of the numbers you
+    play takes two, and that leaves at most k&nbsp;−&nbsp;2 factors for the other k&nbsp;−&nbsp;1 numbers.</p>
+    <p>A loop is also the only way that peel gets stuck on numbers with two maximal factors to pay with.  Peel is stuck
+    when every number left still has two factors and every factor still has two numbers.  Then start anywhere and follow
+    the lines, never going back along the line you came by.  There is always another line out, so sooner or later you
+    come back to a point you passed, and that is a loop.</p>
+    <p>So the rule covers only part of the game, but an important part.  Every number with two different prime factors,
+    such as 95 = 5 · 19, has two maximal factors, both primes.  With the squares of primes, such as 49 = 7 · 7, these
+    numbers make up <a class="gloss" href="glossary.html#layer">layer</a> 2, and chapter 3 uses the rule to find exactly
+    which of them above n/2 every optimal game plays.  Numbers with three maximal factors or more can sit on a loop and
+    still be played, as chapter 3 shows, and for them only peel decides.</p>
   </div>
 </section>
 
