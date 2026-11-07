@@ -42,8 +42,8 @@
       (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">the evidence</a>).</p>
     </aside>
     <p>The search of <a href="search.html">chapter 5</a> finds the best score of the
-    <a class="gloss" href="glossary.html#frame-model">frame model</a>, in which every number of
-    <a class="gloss" href="glossary.html#u-star">U*</a> the player plays, and chooses only the promotions.  That score
+    <a class="gloss" href="glossary.html#frame-model">frame model</a>, in which the player plays every number of
+    <a class="gloss" href="glossary.html#u-star">U*</a> and chooses only the promotions.  That score
     is the score of a real game, so it is never above <a class="gloss" href="glossary.html#opt">opt(n)</a>.  It equals
     opt(n) exactly when some optimal game plays all of U*.</p>
     <p>Every optimal game plays the numbers of U* with one or two prime factors
@@ -66,7 +66,7 @@
     statement U in that game.</p>
     <p>Up to game 2,530 that costs nothing: the prover proves statement U in each of those games.  Past it, the
     <span data-rests="onU">2,529</span> scores from game <span data-rests="firstU">2,532</span> to the end of the chain
-    rest on statement U.  Game 2,531 follows from game 2,530 by the prime formula, so its score has a proof too.</p>
+    rest on statement U.  Game 2,531 follows from game 2,530 by the prime formula, so the prime formula proves its score too.</p>
   </div>
 </section>
 
@@ -75,7 +75,7 @@
   <div class="para">
     <aside class="note tech" aria-label="The prover">
       <div class="note-head"><span class="note-name">The prover</span></div>
-      <p>A branch and bound over sets of moves, with the parity bound as its bound, that takes the recorded score as its
+      <p>A branch and bound over sets of moves that uses the parity bound and takes the recorded score as its
       target.  It rests only on the theory's theorems and on elementary bounds, and we test its exact methods
       against brute force (<a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/README.md">its
       README</a>).  Its run of games 2 to 2,530 took 19 hours on a machine with 88 threads
@@ -132,10 +132,11 @@
   factors, and let d be the largest of them.  Adding d would raise the score, so, since the game is optimal, its moves
   with d added are not playable.  A proof would find a trade: give up a smaller number the game plays, so that the game
   can play d in its place, and the score rises, which an optimal game cannot allow.  In layer 2 such a trade always
-  exists, and that is how we prove the numbers with two prime factors.  Above layer 2, an
+  exists, and that is how chapter 3 settles the numbers with two prime factors.  Above layer 2, an
   <a class="gloss" href="glossary.html#odd-core">odd core</a> (<a href="bound.html#odd-cores">chapter 6</a>) can catch
-  d, and there the argument that works in layer 2 stops (<a
-  href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#where-a-proof-stops">a sketch</a>).</p>
+  d, and there the argument that works in layer 2 stops
+  (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#where-a-proof-stops">a
+  sketch</a>).</p>
 </section>
 
 <nav class="chapter-nav" aria-label="Pages"></nav>

@@ -31,7 +31,7 @@
   <div class="para">
     <p>Choose any game of the <a class="gloss" href="glossary.html#chain">chain</a>.  The explorer below shows what
     the chain records for it: what the player and the taxman each collect in an
-    <a class="gloss" href="glossary.html#optimal-game">optimal game</a>, how the chain proves the score, how many
+    <a class="gloss" href="glossary.html#optimal-game">optimal game</a>, what proves the score, how many
     <a class="gloss" href="glossary.html#promote">promotions</a> the optimal game makes, and what its
     <a class="gloss" href="glossary.html#search">search</a> cost.  For games up to 100 it also draws the moves on the
     <a class="gloss" href="glossary.html#board">board</a>.</p>
@@ -197,11 +197,10 @@
       <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/statements.md#open-questions">the theory’s
       other open questions</a>.</p>
     </aside>
-    <p>Last, how hard is Taxman?  Franklín and Moniot proved a more general game NP-hard:  Taxman not on numbers
-    but on any set of things that sit in levels, as the numbers sit under division, where a move scores one thing and
-    the taxman takes everything below it.  So a fast method for that game would give fast methods for a large family of
-    hard problems, none of which has a known fast method.  Whether Taxman itself, on the numbers 1 to n, is that hard is
-    open.</p>
+    <p>Last, how hard is Taxman?  Franklín and Moniot proved a more general game NP-hard:  Taxman on any set of things
+    that sit in levels, as division puts the numbers in levels, where a move scores one thing and the taxman takes
+    everything below it.  So a fast method for that game would give fast methods for a large family of hard problems,
+    none of which has a known fast method.  Whether Taxman itself, on the numbers 1 to n, is that hard is open.</p>
   </div>
 </section>
 
@@ -210,8 +209,8 @@
   <div class="para">
     <aside class="note tech" aria-label="A line of the file">
       <div class="note-head"><span class="note-name">A line of the file</span></div>
-      <p>One JSON line for each game, in order of n: n, score, moves in the order of play, promotions, proof (how the
-      chain proves the score), method, <code>in_the_bag</code>, <code>setup</code>, <code>nodes</code>,
+      <p>One JSON line for each game, in order of n: n, score, moves in the order of play, promotions, proof (what
+      proves the score), method, <code>in_the_bag</code>, <code>setup</code>, <code>nodes</code>,
       <code>seconds</code>, and <code>assumes</code>, what that rests on beyond the frame model (<a
       href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#a-results-line---out-schema-5">a
       results line</a>; <a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#proof-kinds">the
@@ -226,7 +225,7 @@
     <p>One file, <a
     href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a>, has a
     line for each game of the <a class="gloss" href="glossary.html#chain">chain</a>: its best score, the moves that
-    reach it in the order of play, its promotions, how the chain proves the score, and what that rests on.  Two programs
+    reach it in the order of play, its promotions, what proves the score, and what that rests on.  Two programs
     that share no code check every line.  Run these commands from the top folder of the
     <a href="https://github.com/bvchess/taxman">repository</a>:</p>
   </div>
@@ -242,10 +241,10 @@
   </dl>
   <p>Both verifiers replay each game: every <a class="gloss" href="glossary.html#move">move</a> legal, the largest
   prime first, no move left at the end, and the score as recorded.  They check that each score is at most n more than
-  the score of the game before it, and they work out again how the chain proves each score and what that rests on, so
+  the score of the game before it, and they work out again what proves each score and what that rests on, so
   that an edit to the file cannot change either.</p>
   <p>A replay shows that the moves are legal and score what the line says, but not that no other moves score more.
-  That rests on how the chain proves the score, which each line names: a rule, such as the ceiling, or a search.  The
+  That rests on what proves the score, which each line names: a rule, such as the ceiling, or a search.  The
   <a class="gloss" href="glossary.html#prover">prover</a> proves the scores of games 2 to 2,530 again, on the whole
   board, and <a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/reproducing.md">its guide</a>
   gives the commands.</p>
