@@ -73,8 +73,8 @@
     still in the pot, so is one of its maximal factors.  So a move is legal exactly when a maximal factor of it is
     still in the pot.</p>
     <p>Think of that factor as what <a class="gloss" href="glossary.html#pays-for"><em>pays for</em></a> the move.  Two moves cannot share a payment, because whichever is
-    taken first sends the factor to the taxman.  So a set can be played only if each of its numbers can be given a
-    maximal factor of its own, from outside the set.</p>
+    taken first sends the factor to the taxman.  So the player can play a set only if each of its numbers has a
+    maximal factor of its own, from outside the set: a number taken as a move cannot also pay for another.</p>
   </div>
 
   <div class="para">
@@ -89,10 +89,8 @@
       numbers still in the pot.  By the lifting lemma, x still reaches each of its divisors left in the pot through
       numbers left in the pot.  So the tax of a move is everything it reaches on the board, and a move is legal exactly
       when it still has an outgoing edge.</p>
-      <p>The graph is the <em>Hasse diagram</em> of divisibility on {1, …, n}.  The Hasse diagram of an order has an
-      edge from each element to each element directly below it, and is drawn so that every edge points the same way,
-      which is why it needs no arrowheads.  A divisor d of x is directly below x when no third number is a multiple of
-      d and a divisor of x, and that happens exactly when x/d is prime.</p>
+      <p>The graph is the <em>Hasse diagram</em> of divisibility on {1, …, n}: d is directly below x exactly when x/d
+      is prime.</p>
     </aside>
     <p>Draw every number joined to its maximal factors, and the game becomes much easier to play.  The board below
     is that <a class="gloss" href="glossary.html#maximal-factor-graph"><em>maximal-factor graph</em></a>.  Its columns
@@ -159,10 +157,10 @@
     <aside class="note card" aria-label="The peel theorem, proved">
       <div class="note-head"><span class="note-name">The peel theorem<span class="note-label">Theorem P4</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-peel-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Peel decides whether a set can be played, whichever safe steps it takes in whichever order.</p>
-      <p class="precise"><span class="run">Precisely.</span>A front move pairs a member that lists one live factor
-      with it; a back move pairs a live factor that one member alone lists with that member.  Each keeps an instance
-      playable, and keeps it unplayable.  An instance is playable iff a run of peel pairs every member, and such a run
-      yields an acyclic <a class="gloss" href="glossary.html#payment-scheme">payment scheme</a>.</p>
+      <p class="precise"><span class="run">Precisely.</span>A front move pairs a number that has one factor left to
+      pay with; a back move pairs a factor that one number alone can still use.  Each leaves a playable set playable and
+      an unplayable set unplayable.  A set is playable iff a run of peel pairs every number, and the pairs then form an
+      acyclic <a class="gloss" href="glossary.html#payment-scheme">payment scheme</a>.</p>
     </aside>
     <aside class="note tech" aria-label="Peel in the code">
       <div class="note-head"><span class="note-name">Peel in the code</span></div>
@@ -197,8 +195,8 @@
   <div class="para">
     <aside class="note card" aria-label="The two-factor proposition, proved">
       <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Numbers that each have at most two maximal factors can all be played exactly when they and their
-      maximal factors make no loop.</p>
+      <p class="plain">Numbers that each have at most two maximal factors outside their set can all be played exactly
+      when they and those factors make no loop.</p>
       <p class="precise"><span class="run">Precisely.</span>An instance whose members each list at most two factors
       is <a class="gloss" href="glossary.html#playable">playable</a> iff its lists are linearly independent over GF(2), iff its graph is a forest.  The graph
       joins each member to the factors it lists, and a member that lists only one also to one more vertex, the
@@ -206,20 +204,21 @@
     </aside>
     <p>Whatever order you choose, the first number takes both of its primes as <a class="gloss" href="glossary.html#tax">tax</a>.  That leaves two primes for the
     other three numbers, and one of them is always stuck.</p>
-    <p>The same holds for any numbers that each have at most two maximal factors: they can all be played exactly when
-    they and their maximal factors make no loop.  A number with only one maximal factor is joined to the
-    <em>ground</em> as well, one more point that all such numbers share.  The ground matters:
+    <p>The same holds for any numbers that each have at most two maximal factors left to pay with, outside the set:
+    they can all be played exactly when they and those factors make no loop.  A number with only one such factor also
+    joins the <em>ground</em>, one more point that all such numbers share.  The ground matters:
     <span class="n" data-n="4">4</span> can pay only with 2, <span class="n" data-n="9">9</span> only with 3, and
     <span class="n" data-n="6">6</span> needs one of the two, so one of the three is always stuck.  They make the loop
     ground – 4 – 2 – 6 – 3 – 9 – ground.</p>
     <p>Three maximal factors are too many for the rule.  With 4, 6, 10 and 15 left to pay with, the lines of
     <span class="n" data-n="12">12</span>, <span class="n" data-n="20">20</span> and
     <span class="n" data-n="30">30</span> close a loop, 30 – 6 – 12 – 4 – 20 – 10 – 30, yet all three can be played:
-    20, then 12, then 30.  The rule holds only for numbers with at most two maximal factors, and for the others the
-    question goes back to peel.</p>
-    <p>So the rule covers only part of the game, but an important part.  Every number with two prime factors, such as
-    95 = 5 · 19 or 49 = 7 · 7, has at most two maximal factors, all of them primes.  These numbers make up layer 2 of
-    the graph, and chapter 3 uses the rule to find exactly which of them above n/2 every optimal game plays.</p>
+    20, then 12, then 30.  The rule holds only for numbers with at most two maximal factors to pay with, and for the
+    others the question goes back to peel.</p>
+    <p>So the rule covers only part of the game, but an important part.  Every number with two prime factors, such as 95
+    = 5 · 19 or 49 = 7 · 7, has at most two maximal factors, all of them primes.  These numbers make up
+    <a class="gloss" href="glossary.html#layer">layer</a> 2, and chapter 3 uses the rule to find exactly which of them
+    above n/2 every optimal game plays.</p>
   </div>
 </section>
 
@@ -265,12 +264,14 @@
       </summary>
       <div class="aside-body">
         <p>Taking more numbers does not always score more.  In game 833, every <a class="gloss" href="glossary.html#optimal-game">optimal game</a> makes
-        <span data-833="moves">362</span> moves, yet some games make one more.  The longest of those still scores
-        less: they play five smaller numbers where the optimal game plays four larger ones.</p>
+        <span data-833="moves">362</span> moves, yet some games make one more.  The best of those still scores
+        less, and one of them shows why: it plays five smaller numbers where the optimal game plays four larger
+        ones.</p>
         <div id="exchange-833"></div>
-        <p>The trade happens below n/2.  Each of the nine numbers is a <a class="gloss" href="glossary.html#maximal-factor">maximal factor</a> of a number the optimal game
-        plays, and a number taken as a move cannot also pay for another.  The optimal game takes the four large ones
-        and pays for those numbers some other way.  The longest game leaves the four to pay, and takes five smaller ones
+        <p>The trade happens below n/2.  Each of the nine numbers is a
+        <a class="gloss" href="glossary.html#maximal-factor">maximal factor</a> of a number the optimal game plays, and
+        a number taken as a move cannot also pay for another.  The optimal game takes the four large ones and pays for
+        those numbers some other way.  That longest game leaves the four to pay, and takes five smaller ones
         instead.</p>
       </div>
     </details>

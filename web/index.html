@@ -33,7 +33,7 @@
     <aside class="note tech" aria-label="The rules, precisely">
       <div class="note-head"><span class="note-name">The rules, precisely</span></div>
       <p>Each move the player makes takes a number that still has a <a class="gloss" href="glossary.html#proper-divisor">proper divisor</a> in the pot,
-      then the taxman takes all of its divisors still in the pot.  Each move must pay one or more divisors as tax. When no move is left, the taxman takes the
+      then the taxman takes all of its divisors still in the pot.  When no move is left, the taxman takes the
       rest.  The best player score possible for game n is opt(n), and opt(1), opt(2), opt(3), … is the
       <a class="gloss" href="glossary.html#taxman-sequence">Taxman sequence</a>, <a href="https://oeis.org/A019312">A019312</a> in
       the OEIS.</p>
@@ -47,8 +47,9 @@
     <li>When no number you could take is left, the taxman takes the rest.</li>
     <li>You beat the taxman when your total is higher than the total he collects.</li>
   </ul>
-  <p>The best total you can reach in game n is written <a class="gloss" href="glossary.html#opt">opt(n)</a>, and a game that reaches it is an
-  <a class="gloss" href="glossary.html#optimal-game"><em>optimal game</em></a>.  Try game 10.</p>
+  <p>The best total you can reach in game n is written <a class="gloss" href="glossary.html#opt">opt(n)</a>, and a game
+  that reaches it is an <a class="gloss" href="glossary.html#optimal-game"><em>optimal game</em></a>.  Try game 10: its
+  best score is 40, and you can find it by hand.</p>
 
   <div class="game-host" id="game"></div>
 
@@ -56,15 +57,15 @@
     <aside class="note tech" aria-label="Heuristic strategies">
       <div class="note-head"><span class="note-name">Heuristic strategies</span></div>
       <p>A heuristic strategy plays a good game quickly, by rules such as taking the largest number that can still be
-      taken, or the one that costs the least tax.  Many heuristic strategies have been proposed,
-      and judging different heuristics benefits from having the best score possible to measure against.  That is one reason to know opt(n).  The repository
+      taken, or the one that costs the least tax.  To judge one, you need the best score to
+      measure it against: one reason to know opt(n).  The repository
       holds
       <a href="https://github.com/bvchess/taxman/blob/master/heuristics/README.md">our strategies and how they were
       measured</a>, and <a href="https://github.com/bvchess/taxman/tree/master/moniot">Robert Moniot's seven</a>.</p>
     </aside>
-    <p>The blue button plays an optimal game, the best you can do.  For game 10 you can find one by hand.  Playing well is
-    easy even in large games: a simple strategy with no search comes within a fraction of a percent of the best
-    score.  But only a perfect game is optimal, and only a proof shows that a game is perfect.</p>
+    <p>The blue button plays an optimal game, the best you can do.  Playing well is easy: up to game 1,000, a simple
+    strategy with no search comes within a fraction of a percent of the best score.  But only a perfect game is optimal,
+    and only a proof shows that a game is perfect.</p>
   </div>
 </section>
 
@@ -75,9 +76,8 @@
       <div class="note-head"><span class="note-name">The counts</span></div>
       <p>Rough sizes, not counts of legal games: n! move orders, 2<sup>n</sup> subsets of the <a class="gloss" href="glossary.html#board">board</a>, 2<sup>⌊n/2⌋</sup>
       subsets of the numbers up to n/2, and 2<sup>c</sup> subsets of the c <a class="gloss" href="glossary.html#candidate">candidates</a>.  The last row is the <a class="gloss" href="glossary.html#node">nodes</a>
-      that the game's recorded search explored.  The row before it is no count: it is where the search starts, as a
-      score below the best, from the game before and from a start of its own, measured
-      (<a href="search.html#head-start">chapter 5</a>).</p>
+      that the game's recorded search explored.  The row before it is no count: it says how far below the best score the
+      search starts when it starts from the game before, measured (<a href="search.html#head-start">chapter 5</a>).</p>
     </aside>
     <p>Game <span data-last-n>n</span>'s numbers can be put in about 10<sup data-orders-exp>…</sup> orders.  No computer could try them all.  Each
     chapter of the story takes away part of the problem, until what is left is small enough for a <a class="gloss" href="glossary.html#search">search</a> to finish.</p>
@@ -139,7 +139,9 @@
   <h2 id="h-check">Check it yourself</h2>
   <div class="para">
     <p>One file has a line for every game: its best score, moves that reach it, and how we know no moves score more.
-    Two programs check every line.  The code, the theory and the record of what we tried are on GitHub.</p>
+    Two programs check every line.  Up to game 2,530 the prover proves each score outright; past it, each score rests on
+    one open statement, statement U (<a href="statement-u.html">chapter 7</a>).  The code, the theory and the record of
+    what we tried are on GitHub.</p>
   </div>
   <ul class="source-list">
     <li><a href="https://github.com/bvchess/taxman">The repository</a><span>the frame solver, the prover, the theory
@@ -152,7 +154,7 @@
     <li><a href="https://github.com/bvchess/taxman/blob/master/solver/frame/README.md">The frame solver</a><span>how
     to build it and run it</span></li>
     <li><a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/README.md">The prover</a><span>the second
-    program, which proves the scores on the whole board</span></li>
+    program, which proves the scores up to game 2,530 on the whole board</span></li>
     <li><a href="https://oeis.org/A019312">The Taxman sequence</a><span>A019312 in the OEIS</span></li>
     <li><a href="https://arxiv.org/abs/2211.00461">The difficulty of beating the Taxman</a><span>Franklín and Moniot,
     Discrete Applied Mathematics 339 (2023)</span></li>

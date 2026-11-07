@@ -425,7 +425,7 @@ function captions(f) {
       `with a dotted line from each to its maximal factor in the frame in front.`,
     promote:
       `${f.promoted[0]} hops rightward: it leaves the factors of frame ${fp.number} and becomes a move of ` +
-      `frame ${M.promotedInto(f.frames, f.promoted[0])}, paid for by ${payer}. Only one candidate fits, and ` +
+      `frame ${M.promotedInto(f.frames, f.promoted[0])}, paid for by ${payer}. The freedoms allow only one promotion, and ` +
       `${f.promoted[0]} is the larger. The score: ${f.inTheBag} + ${f.promoted.join(' + ')} = ${f.score}.`,
   };
 }

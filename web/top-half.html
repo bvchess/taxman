@@ -74,10 +74,10 @@
       <p class="plain">In the games of the chain that needed a search, the numbers above n/2 carry about
       <span data-share="median">93%</span> of the score.</p>
       <p class="precise"><span class="run">Precisely.</span>Over the <span data-share="count">1,618</span> games whose
-      recorded search explored nodes, in_the_bag / score runs from <span data-share="low">91.9%</span> to
+      recorded search explored nodes, ΣU* / score runs from <span data-share="low">91.9%</span> to
       <span data-share="high">97.1%</span>, and from <span data-share="lowLater">92.1%</span> to
       <span data-share="highLater">93.2%</span> past game 500.  The recorded game plays exactly <a class="gloss" href="glossary.html#u-star">U*</a> above n/2, so
-      in_the_bag, the sum of U*, is what its sources score.</p>
+      ΣU* is what its sources score.</p>
     </aside>
     <p>The sources are the larger half of the numbers, so they are where most of the points are.  In the games of the
     <a class="gloss" href="glossary.html#chain">chain</a> that needed a <a class="gloss" href="glossary.html#search">search</a>,
@@ -171,13 +171,14 @@
     <figcaption class="fig-caption"></figcaption>
   </figure>
 
-  <p>Greedy keeps 14 of the 17.  It refuses <a class="go" href="?forest=15#forest" data-fig="forest"
-  data-forest-at="58" data-state="15">58</a>, <a class="go" href="?forest=17#forest" data-fig="forest"
-  data-forest-at="55" data-state="17">55</a> and <a class="go" href="?forest=18#forest" data-fig="forest"
-  data-forest-at="51" data-state="18">51</a>, and each would close a loop of four, chapter 1's loop again.  What it
-  keeps joins all 15 primes with no loop: a tree.  Taking the sources from the heaviest down and refusing any that
-  closes a loop builds the heaviest tree, a classic fact, and here it settles the game: every optimal game plays exactly the
-  sources of layer 2 that greedy keeps.</p>
+  <p>Greedy keeps 14 of the 17.  It refuses
+  <a class="go" href="?forest=15#forest" data-fig="forest" data-forest-at="58" data-state="15">58</a>,
+  <a class="go" href="?forest=17#forest" data-fig="forest" data-forest-at="55" data-state="17">55</a> and
+  <a class="go" href="?forest=18#forest" data-fig="forest" data-forest-at="51" data-state="18">51</a>, and each would
+  close a loop of four, chapter 1's loop again.  What it keeps joins all 15 primes with no loop: a tree.  Taking the
+  sources from the heaviest down and refusing any that closes a loop builds the heaviest tree: it is Kruskal's
+  algorithm, and here it settles the game: every optimal game plays exactly the sources of layer 2 that greedy
+  keeps.</p>
   <p>Game 100's tree holds 14 sources, so it needs 14 of the 15 primes to pay for them, and one is to spare.  From game
   187 on, no prime is ever left to spare: the sources greedy keeps in layer 2 need every prime up to n/2, so no other
   number of layer 2 can be played, and layer 2 is settled completely.</p>
@@ -200,7 +201,7 @@
       member of Y′ fits into Y: the playable subsets of the six lack the exchange property.  That exactly 48 orders
       trap <a class="gloss" href="glossary.html#descending-greedy">descending greedy</a> is proved by computation, which the figure repeats.</p>
     </aside>
-    <p>Here is why greedy is safe in layer 2: with only 2 layers, a set of <a class="gloss"
+    <p>Here is why greedy is safe in layer 2: there, a set of <a class="gloss"
     href="glossary.html#source">sources</a> that can be played and has no room for another is a <a class="gloss"
     href="glossary.html#forest">forest</a> on the primes, and every such forest holds the same number of sources.  So
     once nothing more fits, greedy has as many sources as any playable set can have: it is never stuck with too few.</p>
@@ -243,7 +244,8 @@
   <div class="para">
     <aside class="note card" aria-label="The uniqueness theorem, proved">
       <div class="note-head"><span class="note-name">The uniqueness theorem<span class="note-label">Theorem Q1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-uniqueness-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Wherever the cardinality conjecture (★) holds, U* is the only heaviest set of
+      <p class="plain">Wherever no playable set of sources has more members than U* above any threshold, U* is the
+      only heaviest set of
       <a class="gloss" href="glossary.html#source">sources</a> that can be played.</p>
       <p class="precise"><span class="run">Precisely.</span>Given (★), every <a class="gloss" href="glossary.html#playable">playable</a> set S of sources has
       |S ∩ [t, n]| ≤ |U* ∩ [t, n]| for every t.  The check of (♦) proves (★) wherever it passes.</p>
@@ -273,8 +275,8 @@
     href="glossary.html#layer">layers</a> 1 and 2 that is proved, so statement U is about the sources with three or
     more prime factors.  While we have evidence in support of statement U, we do not have proof it always holds.</p>
     <p>A second program, the <a class="gloss" href="glossary.html#prover">prover</a>, has found the best score on the
-      whole board without assuming statement U for every
-      game up to 2,530.  The best score has always been a game that plays all of U*.  Past game 2,530 our scores rest
+      whole board for every game up to 2,530, without assuming statement U, and in each of those games some optimal
+      game plays all of U*.  Past game 2,530 our scores rest
       on statement U: each is the best score of a game that plays U*, and that is the best possible score assuming
       it holds.</p>
   </div>

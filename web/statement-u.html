@@ -101,7 +101,7 @@
       <p>The lower layers: every optimal set holds U*<sub>1</sub> and U*<sub>2</sub>, by
       <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-bottom-layers-theorem">the
       bottom-layers theorem (F4)</a>.  The sources: <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#the-sources-conjecture">the
-      sources conjecture (S1)</a>, proved in every game up to 100,000.  The barred bounds:
+      sources conjecture (S1)</a>, proved in every game up to 100,000.  The bounds that leave out one number of U*:
       <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#the-barred-bound">W2</a>, and
       their counts by band in <a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md#the-upper-part-game-by-game">the
       upper part, game by game</a>.</p>
@@ -112,13 +112,14 @@
       <li>For the numbers of U* with one or two prime factors, the same statement is proved: every optimal game plays
       them.</li>
       <li>Among the <a class="gloss" href="glossary.html#source">sources</a> alone, U* is the heaviest set that can be
-      played, in every game up to 100,000.  Within the top half, giving up a number of U* never pays.</li>
+      played, in every game up to 100,000.  In those games, giving up a number of U* never pays within the top
+      half.</li>
       <li>The prover can leave out one number of U* at a time and bound what any game without it could score.  For
       about 85% of the numbers statement U is about, in games 2,531 to 3,440, that bound is below the recorded score,
       so a game that beats the score, if there is one, plays them.  In no game does it cover all of them; if it did,
       that game's score would be proven.</li>
-      <li>In every game measured, up to game 3,440, the heaviest set that the parity bound allows on the whole board
-      plays all of them.</li>
+      <li>In every game up to 3,440 that needs a search, a heaviest set that the parity bound allows, with layers 1
+      and 2 as every optimal game plays them, holds all of them.</li>
     </ul>
   </div>
 </section>

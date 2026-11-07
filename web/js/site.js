@@ -44,7 +44,7 @@ export const ALONG = [
       other in the chain.`,
   },
   {
-    title: 'Not always one best game', where: 'game 425', id: 'game-425', at: 4, href: 'frames.html#game-425',
+    title: 'Not always one best set', where: 'game 425', id: 'game-425', at: 4, href: 'frames.html#game-425',
     line: `The optimal set of moves is not always unique.  Up to game 424 each game has one unique set of optimal moves,
      but game 425 has two, which differ in three numbers and score the same.`,
   },

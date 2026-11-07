@@ -62,8 +62,8 @@
       That set's sum bounds what a branch can still add, so we call it
       the <a class="gloss" href="glossary.html#parity-bound">parity bound</a>.  The solver applies the bound to
     the promotions frame by frame, at every <a class="gloss" href="glossary.html#node">node</a>.</p>
-    <p>Some sets pass the test and still cannot be played, and they are all that the bound misses: the
-    <a href="#odd-cores">odd cores</a>.</p>
+    <p>Some sets pass the test and still cannot be played.  Each holds an <a href="#odd-cores">odd core</a>, and odd
+    cores are all that the bound misses.</p>
   </div>
 </section>
 
@@ -81,9 +81,9 @@
     <p>The parity bound needs no frames.  Applied to the numbers of the whole <a class="gloss"
     href="glossary.html#board">board</a>, rather than to the promotions of a frame, it bounds <a class="gloss"
     href="glossary.html#opt">opt(n)</a> itself: no set heavier than the heaviest that passes it can be played.</p>
-    <p>On every board from 2 to 8,191, splitting the board into frames costs the bound nothing.  At the root of a
-    search, the parity bound of the frames limits what the promotions can add, and that limit plus the weight of
-    <a class="gloss" href="glossary.html#u-star">U*</a> is exactly the parity bound of the whole board.</p>
+    <p>A computation on every board from 2 to 8,191 shows that splitting the board into frames costs the bound nothing.
+    At the root of a search, the parity bound of the frames limits what the promotions can add, and that limit plus the
+    weight of <a class="gloss" href="glossary.html#u-star">U*</a> is exactly the parity bound of the whole board.</p>
   </div>
 </section>
 
@@ -101,12 +101,12 @@
     <p>Franklín and Moniot's paper gives a looser bound: the heaviest set whose numbers can each be given a maximal
     factor of their own, from outside the set, to pay with.  Every set that passes the parity test passes theirs, but
     the parity bound comes far closer to opt(n): its gap is about a tenth of theirs.</p>
-    <p>Each way of handing out factors is a
-    <a class="gloss" href="glossary.html#payment-scheme">payment scheme</a>, and counting a set's schemes shows what
-    each bound allows.  Group the schemes by the factors they pay with, and count the groups.  Franklín and Moniot's
-    bound allows the set when some group has at least one scheme, and the parity bound allows it when some group has an odd
-    number of schemes.  The set can be played exactly when some group has a single scheme.  In the figure, each
-    set's schemes all pay with the same factors, so each set has one group.</p>
+    <p>Each way of handing out factors is a <a class="gloss" href="glossary.html#payment-scheme">payment scheme</a>, and
+    counting a set's schemes shows what each bound allows.  Group the schemes by the factors they pay with, and count
+    the schemes in each group.  Franklín and Moniot's bound allows the set when some group has at least one scheme, and
+    the parity bound allows it when some group has an odd number of schemes.  The set can be played exactly when some
+    group has a single scheme.  In the figure, each set's schemes all pay with the same factors, so each set has one
+    group.</p>
   </div>
 
   <figure class="fig wide ladder-fig" id="ladder">
@@ -142,11 +142,11 @@
     or minus.  Since +1 and −1 are both odd, the signs cannot change whether the total is even or odd, so the count is
     odd exactly when the determinant is.</p>
     <p>A determinant is even exactly when some of the table's rows add up to an even number in every column, that is,
-    when some of the set's numbers, taken together, list every factor an even number of times.  In the table of 6, 10
-    and 15, all three rows add up to even in every column, and there are two picks.  In the table of 9, 10 and 15, no
-    group of rows does, and there is one.  As linear algebra shows, a set passes the parity test exactly when some
-    choice of columns makes its determinant odd.  So the parity bound allows a set exactly when some group of its
-    schemes has an odd count: the counting theorem.</p>
+    when some of the set's numbers, taken together, list each of the group's factors an even number of times.  In the
+    table of 6, 10 and 15, all three rows add up to even in every column, and there are two picks.  In the table of 9,
+    10 and 15, no group of rows does, and there is one.  As linear algebra shows, a set passes the parity test exactly
+    when some choice of columns makes its determinant odd.  So the parity bound allows a set exactly when some group of
+    its schemes has an odd count: the counting theorem.</p>
   </div>
 
   <figure class="fig parity-table-fig" id="parity-table" aria-label="The tables of 6, 10 and 15 and of 9, 10 and 15: a row for each number, a column for each of the factors 2, 3 and 5, and a 1 where the number can pay with the factor.">
@@ -168,9 +168,9 @@
     </aside>
     <p>The five numbers 12, 18, 20, 30 and 45 pass the parity test, yet they cannot all be played, because
     <a class="gloss" href="glossary.html#peel">peel</a>, which decides whether a set can be played, cannot even begin.
-    Every number has at least two factors to pay with, and every factor at least two numbers that could use it, so
-    peel has no safe first step.  A set like this, which passes the test but cannot be played, is an
-    <a class="gloss" href="glossary.html#odd-core">odd core</a>.  Game 45 is the first board with one.</p>
+    Every number has at least two factors to pay with, and every factor at least two numbers that could use it, so peel
+    has no safe first step.  A set like this, which passes the test, cannot be played, and holds no smaller such set, is
+    an <a class="gloss" href="glossary.html#odd-core">odd core</a>.  Game 45 is the first board with one.</p>
   </div>
 
   <div class="para">

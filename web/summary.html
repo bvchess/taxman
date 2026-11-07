@@ -34,7 +34,7 @@
     href="https://oeis.org/A019312">A019312</a> in the OEIS, and <a
     href="https://github.com/bvchess/taxman/blob/master/results/b019312.txt">results/b019312.txt</a> holds them in the
     OEIS's own format.</p>
-    <p>One file of 1.1 MB, <a
+    <p>One file, <a
     href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a>, has a
     line for each game: its best score, a sequence of moves that reaches it, in the order played, and how we know no
     sequence scores more.  The explorer of <a href="results.html#explorer">chapter 8</a> shows any game, and <a
@@ -55,7 +55,8 @@
     <p>Game 20's best score is 124, so game 21's is above 124 and at most its
     <a class="gloss" href="glossary.html#ceiling">ceiling</a>, 124 + 21 = 145
     (<a href="chain.html#ceiling">chapter 2</a>).  21 does not fit and is not a prime, so game 20 does not settle
-    game 21 at once.  Rules settle most of the board, and the figure follows them one step at a time.</p>
+    game 21 at once.  Rules settle most of the board, and the figure follows them one step at a time.  You can check
+    every step by hand.</p>
   </div>
 
   <figure class="fig fig21" id="fig21">
@@ -97,8 +98,8 @@
     this problem, so game 21 is not a <a class="gloss" href="glossary.html#repeat">repeat</a>, and it needs a <a
     class="gloss" href="glossary.html#search">search</a> (<a href="search.html#repeat-check">chapter 5</a>).</li>
     <li><a class="go" href="?fig21=7#fig21" data-fig="fig21" data-state="7"><span class="sr-only">The
-    promotion</span></a> Only one candidate fits, and 9 is the larger, so 9 is promoted from frame 1: it becomes a move,
-    paid for by 3.  The search over promotions ends at its first node: 135 + 9 = 144 (<a
+    promotion</span></a> The freedoms allow only one promotion, and 9 is the larger, so 9 leaves frame 1 and becomes a
+    move, paid for by 3.  The search over promotions ends at its first node: 135 + 9 = 144 (<a
     href="frames.html#promotions">chapter 4</a> and <a href="search.html#branch-and-bound">chapter 5</a>).</li>
     <li><a class="go" href="?fig21=8#fig21" data-fig="fig21" data-state="8"><span class="sr-only">The game</span></a>
     Played in this order, the moves are 19, 9, 15, 21, 14, 18, 12, 20, 16, each paid for by its tax.  The player scores

@@ -20,7 +20,7 @@
 <header class="essay-head para">
   <p class="kicker">Chapter 2</p>
   <h1>Walking up the chain</h1>
-  <p class="lede">Game n is often easy if you know an optimal set of moves for n − 1.  So we play the games in order, from
+  <p class="lede">Game n is often easy if you know an optimal set of game n − 1.  So we play the games in order, from
   game 1 up, and this way most games need no search at all.</p>
 </header>
 
@@ -32,8 +32,9 @@
       the best score always rises.</p>
       <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  The moves of a legal game of n − 1, in their
       order, are a legal game of n, with the same taxes, and the moves of a game of n that does not play n are a legal
-      game of n − 1.  Playing n in a game of n − 1, just before the move after which no maximal factor of n is left in
-      the pot, and leaving that move out if it can no longer be played, gives a game of n that scores more.  So
+      game of n − 1.  Playing n in a game of n − 1, at its end if a maximal factor of n is still in the pot then, and
+      otherwise just before the move after which none is left, and leaving that move out if it can no longer be
+      played, gives a game of n that scores more.  So
       opt(n − 1) < opt(n), every optimal game of n plays n, and a set without n is
       <a class="gloss" href="glossary.html#playable">playable</a> in game n exactly when it is playable in game n − 1.</p>
     </aside>
@@ -165,7 +166,7 @@
       game 14 scores <span data-opt="13">52</span> + 14 = <span data-opt="14">66</span>, its ceiling.</p>
       <p>That a prime always lies between m and 2m, for every m from 2 up, is Bertrand's postulate.  Joseph Bertrand
       guessed it in 1845 and checked it for every m below three million, and Pafnuty Chebyshev proved it a few years
-      later.  In 1931 Paul Erdős, then eighteen, found a much simpler proof, which became his first paper.</p>
+      later.  In 1932 Paul Erdős, still a student, published a much simpler proof, his first paper.</p>
     </div>
   </details>
 
@@ -246,7 +247,7 @@
       of m makes an optimal game of n.  The first part does not need statement U.  Every game up to 2,530 is also
       proven by the prover, without statement U.</p>
     </aside>
-    <p>Most games in which n neither fits nor is prime still need no search.  Before the
+    <p>About a third of the games in which n neither fits nor is prime still need no search.  Before the
     <a class="gloss" href="glossary.html#frame-solver">frame solver</a> searches a game, rules settle most of it
     (<a href="top-half.html">chapter 3</a> and <a href="frames.html">chapter 4</a>), and what is left is the game's
     search problem: which few numbers up to n/2 to play as moves as well.  Often n does not change that problem at all.
@@ -266,11 +267,12 @@
       opt(n) = opt(n − 1) + n − x, and exchanging x for n maps the optimal sets of n − 1 onto those of n.  In game 39,
       x = 22.</p>
     </aside>
-    <p>Game 39 is one.  It poses the search problem of game 38, and an optimal game of 39 is an optimal game of 38
-    with one exchange: 39 takes the place of 22.  Game 39's best score is <span data-opt="38">486</span> + 39 − 22 =
-    <span data-opt="39">503</span>, <span data-gap="39">22</span> below its ceiling.  Here a theorem proves the same
-    exchange with no search at all.  It needs an odd n with two prime factors, as 39 = 3 · 13 is, and from game 189 on
-    it covers every one.</p>
+    <p>Game 39 is one.  It poses the search problem of game 38, and an optimal game of 39 is an optimal game of 38 with
+    one exchange:  39 takes the place of 22.  Game 39's best score is <span data-opt="38">486</span> + 39 − 22 =
+    <span data-opt="39">503</span>, <span data-gap="39">22</span> below its ceiling.  A repeat's answer rests on
+    statement U (<a href="statement-u.html">chapter 7</a>), but here a theorem, the semiprime formula, proves the same
+    exchange outright.  It needs an odd n with two prime factors, as 39 = 3 · 13 is, and from game 189 on it covers
+    every such n.</p>
   </div>
 
   <details class="aside" id="one-search" data-toc="one-search">
@@ -346,7 +348,8 @@
     <p>Whether a game needs a <a class="gloss" href="glossary.html#search">search</a> can usually be told from n alone,
     before any work.  Write n as its largest prime factor times what is left, the <em>cofactor</em> of n: in
     game 3,002, n = 38 · 79 has the cofactor 38, and a prime has the cofactor 1.  From game 188 on, no game whose
-    cofactor is 1, a prime, twice a prime or 9 needed a search.</p>
+    cofactor is 1, a prime, twice a prime or 9 needed a search.  Why it works for twice a prime and for 9 is still a
+    mystery.</p>
   </div>
 
   <figure class="chart" id="cofactor-fig">

@@ -15,7 +15,7 @@
 
 import * as M from '../js/model.js';
 import { NUMBER, duration, fmt, listWords, numberMark, setNumber } from '../js/vocab.js';
-import { PROOFS, PROVER_TO } from '../js/proof.js';
+import { PROOFS, PROVER_TO, foundationOf } from '../js/proof.js';
 
 // The games the story names, which the explorer offers to jump to, and the last game of the chain.
 const NAMED = [21, 40, 425, 833, 2873];
@@ -49,7 +49,7 @@ export function record(games, n) {
   r.taxman = r.board - r.score;
   r.prev = n > 1 ? c.score[i - 1] : null;
   r.settled = settled(r);
-  r.rests = restsOn(r);
+  r.rests = restsOn(r, foundationOf(c, i));
   return r;
 }
 
@@ -90,9 +90,15 @@ function settled(r) {
 }
 
 // What the score rests on.
-function restsOn({ n }) {
+function restsOn({ n }, f) {
   if (n === 1) return 'Nothing: game 1 has no move to choose.';
   if (n <= PROVER_TO) return `The prover proves it too, on the whole board, so it is opt(${fmt(n)}) without the frame model.`;
+  if (f <= PROVER_TO) {
+    return `It follows from game ${fmt(f)}’s score, which the prover proves on the whole board, so it is opt(${fmt(n)}) without the frame model.`;
+  }
+  if (f < n) {
+    return `It follows from game ${fmt(f)}’s score, the frame model’s best, which is opt(${fmt(f)}) wherever statement U holds, and U is open past game ${fmt(PROVER_TO)}.`;
+  }
   return `It is the frame model’s best score, which is opt(${fmt(n)}) wherever statement U holds, and U is open past game ${fmt(PROVER_TO)}.`;
 }
 
@@ -209,7 +215,7 @@ export function mountExplorer(host, { games, small }) {
   // ---- words ------------------------------------------------------------------------------------------------
 
   const settledHTML = ([lead, rest]) => `<b>${lead}</b> ${rest}`;
-  const shareText = (r) => `The player’s ${fmt(r.score)}, opt(${fmt(r.n)}), is ${percent(r.score / r.board)} of the board’s total, 1 + 2 + ⋯ + ${fmt(r.n)} = ${fmt(r.board)}.`;
+  const shareText = (r) => `The player’s ${fmt(r.score)}, opt(${fmt(r.n)}), is ${percent(r.score / r.board)} of the board’s total, ${r.n <= 3 ? Array.from({ length: r.n }, (_, k) => k + 1).join(' + ') : `1 + 2 + ⋯ + ${fmt(r.n)}`} = ${fmt(r.board)}.`;
 
   function defaultCaption(g, b) {
     const p = b.promotions;

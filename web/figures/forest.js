@@ -165,7 +165,7 @@ function states(f, places) {
 
 function captions(f) {
   const words = [
-    `Game ${f.n}'s ${f.scan.length} sources with two prime factors, each between its two primes. The ${f.primes.length} primes up to ${f.n / 2} are the squares.`,
+    `Game ${f.n}'s ${f.scan.length} sources with two prime factors, each between its two primes. The ${f.primes.length} primes up to ${f.n / 2} sit in squares.`,
   ];
   let keptSoFar = 0;
   for (const step of f.steps) {

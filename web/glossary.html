@@ -96,15 +96,15 @@
       factor that only one number can still use goes to that number (a <em>back move</em>).  The set is playable
       exactly when every number gets paired.</dd>
       <dt id="loop">loop</dt>
-      <dd>A ring of numbers and their maximal factors, each joined to the next by a line, that comes back to where it
-      started.  10, 15, 21 and 14 make one with their primes: 2 – 10 – 5 – 15 – 3 – 21 – 7 – 14 – 2.  Numbers with at
-      most two maximal factors that make a loop cannot all be played: here the first one played takes two of the four
-      primes as tax, which leaves two for the other three.  A number with only one maximal factor is joined to the
-      <em>ground</em> as well, one extra point that all such numbers share.  4 pays only with 2 and 9 only with 3, and
-      with 6 they make the loop ground – 4 – 2 – 6 – 3 – 9 – ground.</dd>
+      <dd>A ring of numbers and the maximal factors they could pay with, each joined to the next by a line, that comes
+      back to where it started.  10, 15, 21 and 14 make one with their primes: 2 – 10 – 5 – 15 – 3 – 21 – 7 – 14 – 2.
+      Numbers with at most two such factors each cannot all be played if they make a loop: here the first one played
+      takes two of the four primes as tax, which leaves two for the other three.  A number with only one such factor
+      also joins the <em>ground</em>, one extra point that all such numbers share.  4 pays only with 2 and 9 only with
+      3, and with 6 they make the loop ground – 4 – 2 – 6 – 3 – 9 – ground.</dd>
       <dt id="forest">forest</dt>
-      <dd>Numbers and their maximal factors, joined by lines, with no loop among them.  Numbers with at most two
-      maximal factors can all be played exactly when they form a forest with their maximal factors.  10, 15 and 21
+      <dd>Numbers and the maximal factors they could pay with, joined by lines, with no loop among them.  Numbers with
+      at most two such factors each can all be played exactly when they form a forest with those factors.  10, 15 and 21
       alone make 2 – 10 – 5 – 15 – 3 – 21 – 7, with no loop, and they can be played: 10, then 15, then 21.</dd>
     </dl>
   </div>
@@ -134,7 +134,8 @@
       <dd>n fits into an optimal set of game n − 1 when the set can still be played with n added.  Then game n is at
       its ceiling: 10 fits into game 9's optimal set, and 12 does not fit into game 11's.</dd>
       <dt id="search-problem">search problem</dt>
-      <dd>What is left to choose in a game once its frames are set: the frames, the candidates and how many of them may be promoted.  Two games with the same search problem have the same promotions.</dd>
+      <dd>What is left to choose in a game once its frames are set: the frames, the candidates and how many of them
+      may be promoted.  Two games that pose the same search problem have the same best promotions.</dd>
       <dt id="cofactor">cofactor</dt>
       <dd>n divided by its largest prime factor: 30 = 6 · 5 has the cofactor 6.  Whether a game needs a search can usually be told from it.</dd>
     </dl>
@@ -155,7 +156,8 @@
       <dd>A number above n/2.  It divides nothing else on the board, so it is never tax: it is a move or nothing.  On
       the board of game 21 the sources are 11 to 21.</dd>
       <dt id="factor">factor</dt>
-      <dd>A number up to n/2.  It is tax for some larger number, and sometimes a move itself.</dd>
+      <dd>A number up to n/2.  It divides some larger number on the board, so a move can take it as tax, and any factor
+      but 1 can also be a move.</dd>
       <dt id="layer">layer</dt>
       <dd>A number's count of prime factors, with repeats.  12 = 2 · 2 · 3 is in layer 3, every prime is in layer 1,
       and 1 alone is in layer 0.</dd>
@@ -250,13 +252,15 @@
       even number of times: 10, 14, 15 and 21 list each of 2, 3, 5 and 7 twice.</dd>
       <dt id="parity-bound">parity bound</dt>
       <dd>The weight of the heaviest set that passes the parity test.  Applied frame by frame, it limits what the
-      promotions of a node can add; applied to the whole board, it bounds opt(n), and it is the prover's bound.  On
-      the whole board its gap above opt(n) is about a tenth of the gap of Franklín and Moniot's bound.</dd>
+      promotions of a node can add; applied to the whole board, it bounds opt(n), and it is the prover's bound.  In
+      the games measured, its gap above opt(n) on the whole board is about a tenth of the gap of Franklín and Moniot's
+      bound.</dd>
       <dt id="fm-bound">Franklín and Moniot's bound</dt>
       <dd>An upper bound on opt(n): the heaviest set whose numbers can each be given a maximal factor of their own, from outside the set, to pay with.</dd>
       <dt id="odd-core">odd core</dt>
-      <dd>A set that passes the parity test yet cannot be played.  The first is on the board of game 45: 12, 18, 20,
-      30 and 45.  Odd cores are all that the search's bound misses.</dd>
+      <dd>A set that passes the parity test yet cannot be played, and holds no smaller such set.  Every set that passes
+      the test but cannot be played holds one.  The first is on the board of game 45: 12, 18, 20, 30 and 45.  Odd cores
+      are all that the search's bound misses.</dd>
   </dl>
 </section>
 
@@ -277,10 +281,11 @@
   <h2 id="h-g-results">The results</h2>
   <dl class="glossary">
       <dt id="share">player's share</dt>
-      <dd>opt(n) as a share of 1 + 2 + ⋯ + n, the whole board.  It tends to a constant, and the chain's best scores put
-      it near 0.63.</dd>
+      <dd>opt(n) as a share of 1 + 2 + ⋯ + n, the whole board.  It tends to a limit, and the chain's best scores put
+      it near 63%.</dd>
       <dt id="longest-game">longest game</dt>
-      <dd>A game with the most moves its board allows.  An optimal game is usually one, but not in game 833.</dd>
+      <dd>A game with the most moves its board allows.  An optimal game is usually one, but not in games 833 to
+      835.</dd>
   </dl>
 </section>
 

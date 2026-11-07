@@ -26,15 +26,15 @@
 
 <section class="chapter" id="repeat-check" data-toc="repeat-check" aria-label="A repeat">
   <p>Once the <a class="gloss" href="glossary.html#frame">frames</a> are set, all that is left to choose is which
-  <a class="gloss" href="glossary.html#candidate">candidates</a> to <a class="gloss" href="glossary.html#promote">promote</a>.
-  Before the <a class="gloss" href="glossary.html#frame-solver">frame solver</a> searches, it asks whether an earlier
-  game has seen this search scenario already.  When game n poses the <a class="gloss" href="glossary.html#search-problem">search
+  <a class="gloss" href="glossary.html#candidate">candidates</a> to
+  <a class="gloss" href="glossary.html#promote">promote</a>.  Before the
+  <a class="gloss" href="glossary.html#frame-solver">frame solver</a> searches, it asks whether an earlier game has
+  posed this search problem already.  When game n poses the <a class="gloss" href="glossary.html#search-problem">search
   problem</a> of one of the games just before it, game n is a <a class="gloss" href="glossary.html#repeat">repeat</a>
-  (<a href="chain.html#repeat">chapter 2</a>), and that game's promotions are the same as game n's.
-    That's what happens in game 39.  The new
-  number (39) lands in a <a class="gloss" href="glossary.html#closed">closed</a> frame, where descending greedy keeps 39
-  and drops 22, and the frames with freedoms and their candidates stay as they were in game 38. Because of that,
-  using the same promotions game 38 chose guarantees an optimal set of promotions in game 39.
+  (<a href="chain.html#repeat">chapter 2</a>), and that game's promotions are the same as game n's.  That's what happens
+  in game 39.  The new number (39) lands in a <a class="gloss" href="glossary.html#closed">closed</a> frame, where
+  descending greedy keeps 39 and drops 22, and the frames with freedoms and their candidates stay as they were in game
+  38.  Because of that, using the same promotions game 38 chose guarantees an optimal set of promotions in game 39.
   </p>
   <p>Game 45 isn't so lucky.  The maximal factors of 45 are 15, in frame 1, and 9, which with 27 made a closed frame of its
   own in game 44.  45 joins the two frames into one, so frame 1 changes, and game 45 poses a novel search problem.  It
@@ -52,12 +52,12 @@
       <p class="precise"><span class="run">Precisely.</span>P ∪ X is a promotion set exactly when each member of X is a
       factor of its home in state(P), and every frame of state(P) stays winnable with X applied.</p>
     </aside>
-    <p>A <a class="gloss" href="glossary.html#search">search</a> tries the sets one candidate at a time.  At each step it
-    takes one candidate and splits the search tree: one branch promotes it, the other goes on without it.  Each point where it
-    splits is a <a class="gloss" href="glossary.html#node">node</a>.  All the while the search keeps the best game it
-    has found, and each node has a <a class="gloss" href="glossary.html#bound">bound</a>: a limit on what the promotions
-    of that branch could still add.  A branch whose bound cannot beat the best game found is a dead end, so the search
-      stops exploring that path.  This way of searching is called branch and bound.</p>
+    <p>A <a class="gloss" href="glossary.html#search">search</a> tries the sets one candidate at a time.  At each step
+    it takes one candidate and splits the search tree: one branch promotes it, the other goes on without it.  Each point
+    the search reaches is a <a class="gloss" href="glossary.html#node">node</a>.  All the while the search keeps the
+    best game it has found, and each node has a <a class="gloss" href="glossary.html#bound">bound</a>: a limit on what
+    the promotions of that branch could still add.  A branch whose bound cannot beat the best game found is a dead end,
+    so the search stops exploring that path.  This way of searching is called branch and bound.</p>
   </div>
 
   <figure class="fig fig-panel search-tree-fig" id="tree">
@@ -151,7 +151,7 @@
       start below opt(n)</a>).</p>
     </aside>
     <p>A search does not start from nothing.  The search of game n starts from the optimal set of game n − 1, carried
-    over to game n (<a href="chain.html#ceiling">chapter 2</a>), and that start is usually optimal or close to it.  Game
+    over to game n (<a href="chain.html#ceiling">chapter 2</a>), and that start is often optimal or close to it.  Game
     5,060’s search starts <span data-start="seededGap">45</span> points below the best score this way; from a start of
     its own, it would begin <span data-start="ownGap">595</span> below.  A branch is dropped only when its bound cannot
     beat the best game found, so the nearer the search starts to the best, the more branches it can drop.  A start far
@@ -161,13 +161,14 @@
     <aside class="note card" aria-label="The near-repeat lemma, proved">
       <div class="note-head"><span class="note-name">The near-repeat lemma<span class="note-label">Lemma R7</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/search-rules.md#the-near-repeat-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">A branch that poses part of an earlier game's problem adds no more than that game's best, so
-      the search may drop it.</p>
+      once the best game found reaches that much, the search may drop it.</p>
       <p class="precise"><span class="run">Precisely.</span>Under three conditions against a game m, every completion
       of a node is a promotion set of m's root problem, worth at most a bound Z of its best.</p>
     </aside>
-    <p>Game n − 1 helps another way too.  Where a branch of game n poses only part of the problem that game n − 1 posed, the
-    search can drop it, by the near-repeat lemma.  It is a <a class="gloss" href="glossary.html#repeat">repeat</a> in
-    part: game n − 1’s search has already shown how much that part can add.</p>
+    <p>Game n − 1 helps another way too.  Where a branch of game n poses only part of the problem that game n − 1 posed,
+    it can add no more than game n − 1's best, so once the search's best game reaches that, it drops the branch, by the
+    near-repeat lemma.  It is a <a class="gloss" href="glossary.html#repeat">repeat</a> in part: game n − 1’s search has
+    already shown how much that part can add.</p>
   </div>
 </section>
 
@@ -182,10 +183,11 @@
       search</a>, every promotion set heavier than the best found, and true to every mirror, lies in an open branch.
       So a search with no branch left proves P*, the heaviest promotion set's sum, equal to its best.</p>
     </aside>
-    <p>When all branches have been explored, the <a class="gloss" href="glossary.html#search">search</a> has proved that no set of
-    promotions beats its best one: every set was either tried or dropped by a bound that showed it could not do
-    better.  So its best game is the best of the <a class="gloss" href="glossary.html#frame-model">frame model</a>,
-    which is an <a class="gloss" href="glossary.html#optimal-game">optimal game</a> wherever
+    <p>When all branches have been explored, the <a class="gloss" href="glossary.html#search">search</a> has proved that
+    no set of promotions beats its best one: every set was tried, or dropped for a reason that shows it cannot do
+    better: a bound, a dead end, or a heavier mirror image.  So its best game is the best of the
+    <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is an
+    <a class="gloss" href="glossary.html#optimal-game">optimal game</a> wherever
     <a class="gloss" href="glossary.html#statement-u">statement U</a> holds.  This is how
     <span data-proof="exhausted">1,612</span> games of the <a class="gloss" href="glossary.html#chain">chain</a> were
     proven.</p>
@@ -200,9 +202,10 @@
 <section class="chapter" id="cost" data-toc="cost" aria-labelledby="h-cost">
   <h2 id="h-cost">What it costs</h2>
   <p>The chart shows the number of <a class="gloss" href="glossary.html#node">nodes</a> of every game of the
-  <a class="gloss" href="glossary.html#chain">chain</a> that needed a <a class="gloss" href="glossary.html#search">search</a>,
-  <span data-cost="count">1,618</span> games in total.  They climb from a single node in the small games to billions by the
-  end: game <span data-cost="endN">5,060</span> took <span data-cost="endNodes">1.2 billion</span>.</p>
+  <a class="gloss" href="glossary.html#chain">chain</a> whose <a class="gloss" href="glossary.html#search">search</a>
+  explored a node, <span data-cost="count">1,749</span> games in total.  They climb from a single node in the small
+  games to billions by the end: game <span data-cost="endN">5,060</span> took <span data-cost="endNodes">1.2
+  billion</span>.</p>
 
   <figure class="chart fig" id="cost-chart">
     <p class="chart-sub"></p>

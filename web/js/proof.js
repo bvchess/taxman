@@ -40,6 +40,8 @@ export const RULES = [
 export const RULE = Object.fromEntries(RULES.map((r) => [r.key, r]));
 /** The rules that settle a game with no search. */
 export const NO_SEARCH = ['ceiling', 'prime', 'repeat'];
+/** The rules that rest on the score of game n − 1. */
+const NO_MODEL = ['ceiling', 'prime'];
 
 /** The front page's three groups of rules, in the order it shows them. */
 export const GROUPS = [
@@ -84,6 +86,24 @@ function rootsOf(c) {
 
 /** The game whose search the record of row i rests on: game 2512 for each of games 2512 to 2519. */
 export const searchOf = (c, i) => rootsOf(c)[i];
+
+// For each game, the game whose frame model its score rests on, its foundation: the game itself for a repeat and a
+// search, and the foundation of the game before for the ceiling and the prime formula.  Cached for the columns of one
+// games.json.
+const FOUNDATIONS = new WeakMap();
+function foundationsOf(c) {
+  if (!FOUNDATIONS.has(c)) {
+    const found = [];
+    c.n.forEach((n, i) => found.push(i > 0 && NO_MODEL.includes(ruleOf(c, i)) ? found[i - 1] : n));
+    FOUNDATIONS.set(c, found);
+  }
+  return FOUNDATIONS.get(c);
+}
+
+/** The game whose frame model the score of row i rests on, followed down through the games before: game 2530 for game
+ *  2531, which the prime formula gives from game 2530.  Up to PROVER_TO the prover proves the score outright; past it,
+ *  it rests on statement U. */
+export const foundationOf = (c, i) => foundationsOf(c)[i];
 
 /** How the chain's record proves the game in row i, in words: "a repeat of game 21's search". */
 export function recordWords(c, i) {

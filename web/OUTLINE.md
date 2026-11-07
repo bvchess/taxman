@@ -62,6 +62,8 @@ The rules the owner's reviews have set, on top of [docs/WRITING.md](../docs/WRIT
   happen.
 * **Keep the words true to the pictures.**  A number is a node; the lines are its relations to its factors.  The text
   takes a figure's examples in turn, the figure's heads say who decides, and its caption says what its marks are.
+* **Active voice.**  Say who does what: "descending greedy keeps the source", not "the source is kept".  The passive
+  voice is unwelcome.
 * **Titles say what a part is for.**  "Comparing bounds", not "Counting payment schemes".  A chapter's subhead is
   general enough to stand on its own, and a chapter goes from technique to results without turning back.
 

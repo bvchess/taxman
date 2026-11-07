@@ -134,7 +134,7 @@ export function mountLoop(host) {
 
   function say(stuck, over, last) {
     if (!last) {
-      status.innerHTML = 'Take one of the four coins. The taxman takes its primes still on the table.';
+      status.innerHTML = 'Take one of the four numbers. The taxman takes its primes still on the table.';
       return;
     }
     const took = `You took ${last.move}; the taxman took ${listWords(last.tax)}.`;
