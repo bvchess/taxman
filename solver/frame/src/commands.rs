@@ -155,12 +155,12 @@ const SOLVE_FLAGS: [&str; 10] = [
     "--gate-trial-plan",
 ];
 
-/// The flags of the unsound mode that take a value, besides `--out` and the solver's: the level of effort, the seed and
-/// the share fixed.
-const UNSOUND_FLAGS: [&str; 3] = ["--effort", "--seed", "--fix"];
+/// The flags of the unsound mode that take a value, besides `--out` and the solver's: the level of effort, the seed,
+/// and the options that shape the rounds (the share fixed, the games the trajectories begin from, the widening).
+const UNSOUND_FLAGS: [&str; 5] = ["--effort", "--seed", "--fix", "--back", "--widen"];
 
-/// The switches of the unsound mode: the mode itself, the second trajectory, and its measuring options.
-const UNSOUND_SWITCHES: [&str; 4] = ["--unsound", "--survivors", "--stop-at-known", "--from-known"];
+/// The switches of the unsound mode: the mode itself, the tilted share, and its measuring options.
+const UNSOUND_SWITCHES: [&str; 4] = ["--unsound", "--tilt", "--stop-at-known", "--from-known"];
 
 /// `solve N|A-B [options]`: solves game N or a range, each from the one before (`solver::solve_range_each`); with
 /// `--unsound`, plays them in the unsound mode ([`solve_unsound`]).
@@ -233,8 +233,8 @@ fn proof_search_flags() -> impl Iterator<Item = &'static str> {
     solve.chain(SEARCH_FLAGS).chain(SEARCH_SWITCHES).chain(["--force-search"])
 }
 
-/// `solve A-B --unsound --effort E --out FILE [--seed S] [--fix LO,HI] [--survivors] [--stop-at-known]
-/// [--from-known]`, with `--threads`, `--tactic` and `--show`: plays the games in the unsound mode
+/// `solve A-B --unsound --effort E --out FILE [--seed S] [--fix LO,HI] [--tilt] [--back J] [--widen S]
+/// [--stop-at-known] [--from-known]`, with `--threads`, `--tactic` and `--show`: plays the games in the unsound mode
 /// (`solver::unsound::solve_range`), with no proof, and appends their unsound lines to FILE.  It stops on SIGINT and
 /// SIGTERM between rounds, the game in play unrecorded.
 fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
@@ -251,13 +251,21 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     }
     let default = Plan::default();
     let fix = args.value("--fix").map(unsound::parse_fix).transpose().map_err(CliError::Usage)?;
+    let back = args.value("--back").map(unsound::parse_back).transpose().map_err(CliError::Usage)?;
+    let widen = args.value("--widen").map(unsound::parse_widen).transpose().map_err(CliError::Usage)?;
+    if args.has("--fix") && widen.is_some() {
+        return Err(CliError::Usage(unsound::WIDEN_WITH_FIX.into()));
+    }
     let plan = Plan {
         effort,
         seed: args.parsed("--seed")?.unwrap_or(default.seed),
         fix: fix.unwrap_or(default.fix),
-        survivors: args.has("--survivors"),
+        tilt: args.has("--tilt"),
+        back: back.unwrap_or(default.back),
+        widen,
         stop_at_known: args.has("--stop-at-known"),
         from_known: args.has("--from-known"),
+        ..default
     };
     let out = args.value("--out").map(Path::new);
     let out = out.ok_or_else(|| CliError::Usage("--unsound needs --out FILE, the file of its lines".into()))?;

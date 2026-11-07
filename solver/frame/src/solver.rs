@@ -107,7 +107,6 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
-use std::iter;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
@@ -931,12 +930,15 @@ trait Job: Send + Sync {
     fn search(&self, go: Go, opts: &SolveOptions) -> Result<Outcome, String>;
     /// The unsound mode's search ([`unsound`]) on `threads` threads, with no ceiling: the start that a search makes
     /// ([`search::start_incumbent`]), from the promotions of `seed`, the moves for `n − 1`, if the search takes a seed,
-    /// then the rounds of LNS on many threads that `plan` asks for ([`finder::Lns::rounds`]), which end once `enough`
-    /// says so of the game's promotion sum.  With `plan.survivors` and a seed, the rounds follow a second trajectory,
-    /// from what survives of the seed.  `clock` is the game's seconds so far.
+    /// then the rounds of LNS on many threads that `plan` asks for ([`finder::Lns::rounds`]), which end once their
+    /// work reaches the plan's budget ([`unsound::Plan::budget`]) or `enough` says so of the game's promotion sum.  If
+    /// the search takes a seed, the rounds follow a trajectory besides the start's from what survives of the moves in
+    /// `back`, the games n − 1, n − 2, ... and their moves, for each that is not a set an earlier trajectory began
+    /// from ([`unsound::trajectories`]).  `clock` is the game's seconds so far.
     fn improve(
         &self,
         seed: Option<&[u32]>,
+        back: &[(u32, &[u32])],
         plan: &unsound::Plan,
         threads: usize,
         clock: &dyn Fn() -> f64,
@@ -1071,6 +1073,7 @@ impl<const W: usize> Job for SearchJob<W> {
     fn improve(
         &self,
         seed: Option<&[u32]>,
+        back: &[(u32, &[u32])],
         plan: &unsound::Plan,
         threads: usize,
         clock: &dyn Fn() -> f64,
@@ -1082,22 +1085,28 @@ impl<const W: usize> Job for SearchJob<W> {
         // The job's control has no ceiling, and only takes the start's offers.
         let start = search::start_incumbent(prepared, &graph, &self.control, threads, seed.as_ref());
         let start_seconds = clock();
-        // The second trajectory, if there is one, begins from what survives of the seed, as the finder's seed rounds
-        // do.  The start is at least as heavy, since it began from those survivors, so the game's set begins as the
-        // start.
-        let survivors = seed.as_ref().filter(|_| plan.survivors).map(|seed| search::seed_survivors(prepared, seed));
-        let starts: Vec<Bits<W>> = iter::once(start).chain(survivors).collect();
+        // The other trajectories, if there are any, begin from what survives of the moves for the games before, as the
+        // finder's seed rounds begin from what survives of the seed.  The start is at least as heavy as the survivors
+        // of the moves for n − 1, since it began from them, but those of an earlier game may be heavier than the start:
+        // the game's set then begins as theirs (`finder::Lns::rounds` records it as an improvement of round 0).
+        let survivors = back
+            .iter()
+            .filter(|_| self.seeds)
+            .map(|&(game, moves)| (game, search::seed_survivors(prepared, &self.board.seed(moves))));
+        let (starts, trajectories) = unsound::trajectories(start, survivors);
         let space = SearchSpace::new(prepared);
         let lns = finder::Lns { p: prepared, space: &space, options: plan.lns() };
-        let ran = lns.rounds(&starts, plan.rounds(), threads, clock, enough);
+        let ran = lns.rounds(&starts, plan.budget(), threads, clock, enough);
         unsound::Improved {
             start: start.sum(),
             start_seconds,
-            trajectories: starts.len(),
+            trajectories,
             promotions: ran.set.to_vec(),
             moves: solution_for_promotions::<W>(&self.board.tables, ran.set),
             rounds: ran.rounds,
             nodes: ran.nodes,
+            work: ran.work,
+            stage_rounds: ran.stage_rounds,
             improvements: ran.improvements,
             interrupted: ran.interrupted,
         }

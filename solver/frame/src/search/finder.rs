@@ -39,17 +39,31 @@
 //! [`NEIGHBORHOODS`] neighborhoods, each a unit of at most `unit_nodes` steps.  Every neighborhood of a round starts
 //! from the incumbent as the round starts, and neighborhood k of round r draws its random choices from a generator of
 //! its own, keyed by the seed, n, r and k alone ([`Options::rng_of`]), with a control of its own, so that what it finds
-//! is a function of the incumbent and those four.  The threads take the round's neighborhoods in any order; once all
-//! are done, the best set they found becomes the incumbent, the lowest k's on a tie ([`Lns::round`]).  So the incumbent
-//! after r rounds depends on the start, n, the seed and r alone, and a run of more rounds does those of a run of fewer
-//! first.  These rounds are not those of the finder beside a search, which are timed.
+//! and the steps it takes are a function of the incumbent and those four.  The threads take the round's neighborhoods
+//! in any order; once all are done, the best set they found becomes the incumbent, the lowest k's on a tie
+//! ([`Lns::round`]).  The rounds go on until their work reaches a budget, checked after each round (the work of a
+//! round is its steps and [`NEIGHBORHOOD_WORK`] for each neighborhood), so the incumbent after r rounds depends on the
+//! start, n, the seed and r alone, and a run of a larger budget does the rounds of a smaller one first.  These rounds
+//! are not those of the finder beside a search, which are timed.
 //!
-//! The rounds may keep more than one incumbent, a *trajectory* each: the unsound mode keeps the start's, and with
-//! `--survivors` a second that begins from what survives of the seed ([`surviving`]), as the finder beside a search
+//! The rounds may keep more than one incumbent, a *trajectory* each: the unsound mode keeps the start's, and one for
+//! each distinct set that survives of the moves for the games before ([`surviving`]), as the finder beside a search
 //! starts its seed rounds.  With T trajectories, neighborhood k of a round works from the incumbent of trajectory
 //! k mod T as the round starts, each trajectory's next incumbent is the best set of its own neighborhoods, the lowest
 //! k's on a tie, if that is heavier, and the game's set is the heaviest incumbent, the first trajectory's on a tie
 //! ([`Lns::rounds`]).  The draws of neighborhood k do not depend on T, and the guarantees above hold for any T.
+//!
+//! Two options of [`Options`] change which promotions a neighborhood frees, and neither changes what the guarantees
+//! rest on: a neighborhood's draws still come from its own generator, and its freeing depends on nothing else but its
+//! trajectory's incumbent and stage.
+//!
+//! * **`tilt`** frees the small promotions more often than the large ones.  The number a neighborhood frees is the
+//!   same, drawn from `fix` (the share fixed); which ones is a weighted draw without replacement, the weight of a
+//!   promotion by its size x/n ([`tilt_weight`]), in whole numbers so that it is the same on every machine
+//!   ([`tilted_freed`]).  The small promotions are where the optimal game changes from n − 1 to n ([`TILT`]).
+//! * **`widen`** moves a trajectory whose incumbent has not grown heavier in its last S rounds down a ladder of shares
+//!   fixed ([`LADDER`]), one stage for each S rounds without growth, and back to the first stage when it grows
+//!   ([`Standing::after`]).  A trajectory's stage in a round depends only on the rounds before it.
 
 use super::incumbent::surviving;
 use super::{best_so_far, offer_found, payload_of, set_of_payload, Prepared, SearchSpace, TaxSearcher, TaxUnit};
@@ -87,6 +101,36 @@ pub fn run_unit<const W: usize>(
     Ran { set: set_of_payload(&out.payload), nodes: out.stats.nodes, completed: out.completed }
 }
 
+/// The step limit of one unit by default (the engine counts in blocks of 1,024).
+pub const UNIT_STEPS: u64 = 1024;
+
+/// The ladder of `widen`: the range of the share of the incumbent's promotions kept fixed at each stage, from the
+/// first, where a trajectory begins and returns when it grows, to the last, where it stays.  A smaller share leaves a
+/// neighborhood more to search, and the steps of a round grow with it (the notebook's larger neighborhoods measured the
+/// last two:
+/// https://github.com/bvchess/taxman-notebook/blob/main/search/larger-neighborhoods-and-a-second-base-2026-11/README.md
+/// ).
+pub const LADDER: [(f64, f64); 3] = [(0.7, 0.9), (0.5, 0.7), (0.4, 0.6)];
+
+/// The stages of the ladder.
+pub const STAGES: usize = LADDER.len();
+
+/// The weights of the tilted share by the size of a promotion, in [`TILT`]`.len()` bins of width n/40 from n/4: the
+/// share of the drops in a bin over the share of the seed's promotions in it, fitted on the searched games of 1001-3440
+/// and written times 100 (4.87, 4.70, 3.48, 2.41, 1.53, 1.12, 0.76, 0.45, 0.28, 0.33), as whole numbers, so that a
+/// draw is the same on every machine (the notebook's study of how the optimal game changes with n, section 6, tilt.py:
+/// https://github.com/bvchess/taxman-notebook/blob/main/search/how-the-optimal-game-changes-with-n-2026-11/README.md).
+/// A promotion below n/4 takes the first weight, and one above the last bin's start the last.
+pub const TILT: [u64; 10] = [487, 470, 348, 241, 153, 112, 76, 45, 28, 33];
+
+/// The weight of the promotion `x` of game `n` in the tilted share: [`TILT`] of the bin of x/n.  The bin is
+/// floor((x/n − 1/4) · 40) = floor((40x − 10n) / n), clamped to the table, worked in whole numbers so that a size
+/// on the edge of a bin has no rounding.
+pub fn tilt_weight(x: u32, n: u32) -> u64 {
+    let bin = (40 * u64::from(x)).saturating_sub(10 * u64::from(n)) / u64::from(n);
+    TILT[bin.min(TILT.len() as u64 - 1) as usize]
+}
+
 /// How LNS searches, with the defaults the finders' measurements chose.
 #[derive(Clone, Copy, Debug)]
 pub struct Options {
@@ -96,15 +140,30 @@ pub struct Options {
     pub unit_nodes: u64,
     /// The seed of the random choices (mixed with n, so that each game has its own: [`rng`](Self::rng)).
     pub seed: u64,
+    /// A unit frees the small promotions more often than the large ones ([`Lns::neighborhood`]).  The finder beside a
+    /// proof search never does.
+    pub tilt: bool,
+    /// The rounds on many threads move a trajectory that has not grown heavier in this many rounds one stage down the
+    /// [`LADDER`], which then replaces `fix`.  The finder beside a proof search never does.
+    pub widen: Option<u64>,
 }
 
 impl Default for Options {
     fn default() -> Options {
-        Options { fix: (0.7, 0.9), unit_nodes: 1024, seed: 1 }
+        Options { fix: LADDER[0], unit_nodes: UNIT_STEPS, seed: 1, tilt: false, widen: None }
     }
 }
 
 impl Options {
+    /// These options for a neighborhood at `stage` of the ladder: with `widen`, the share fixed of that stage; else the
+    /// options as they are.
+    pub fn at_stage(&self, stage: usize) -> Options {
+        match self.widen {
+            Some(_) => Options { fix: LADDER[stage], ..*self },
+            None => *self,
+        }
+    }
+
     /// The generator of the board `n`.
     pub fn rng(&self, n: u32) -> Rng {
         Rng(self.seed ^ u64::from(n).wrapping_mul(0xD1B5_4A32_D192_ED03))
@@ -137,9 +196,19 @@ pub struct Outcome<const W: usize> {
 /// The neighborhoods of a round of the rounds on many threads ([`Lns::round`]), K: a constant of the unsound mode, the
 /// same on every machine, since the answer depends on it.  A round keeps at most K threads busy, and the incumbent
 /// moves only between rounds, so a larger K feeds more threads and a smaller one adopts a better set sooner.  64 feeds
-/// every thread of a machine of up to 64 threads, and 64 of a larger one's; and since a level of effort is a power of 2
-/// of rounds, every level is a power of 2 of neighborhoods.
+/// every thread of a machine of up to 64 threads, and 64 of a larger one's.
 pub const NEIGHBORHOODS: u64 = 64;
+
+/// What a neighborhood costs besides its steps, in steps' worth: the work of a neighborhood is its steps plus this.
+/// A neighborhood has a fixed cost (building its unit and starting the engine on it), so that rounds of small
+/// neighborhoods take longer than their steps say, and a budget of steps would give an option that frees more of the
+/// game far fewer rounds for the same time.  Effort 1 at n = 3000 and 5000, from the table's moves, on 4 threads,
+/// with and without `tilt` and at the shares fixed 0.7,0.9 and 0.5,0.7, took on average 3.3 to 68.6 ms a neighborhood
+/// at 18.5 to 1,452 steps at n = 3000, and 8.6 to 274 ms at 36 to 1,935 steps at n = 5000.  A line through the cheapest
+/// and the dearest of each size gives a fixed cost of about 54 steps' worth at n = 3000 and 25 at n = 5000 (a least
+/// squares line through all four, 94 and 33), and 32 steps' worth a neighborhood makes the wall time a work comes to
+/// 0.046 to 0.066 ms at n = 3000 and 0.126 to 0.143 ms at n = 5000 whatever the options.
+pub const NEIGHBORHOOD_WORK: u64 = 32;
 
 /// What a round of the rounds on many threads came to ([`Lns::round`]).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -153,14 +222,49 @@ pub struct Round<const W: usize> {
     pub finished: u64,
 }
 
-/// A better set that a round of [`Lns::rounds`] found: the round (from 1), the trajectory that made it (0 is the first
-/// start's), the game's new promotion sum, and the time on the caller's clock when the round ended.
+impl<const W: usize> Round<W> {
+    /// The work of the round: its steps and [`NEIGHBORHOOD_WORK`] for each of its [`NEIGHBORHOODS`].
+    pub fn work(&self) -> u64 {
+        self.nodes + NEIGHBORHOODS * NEIGHBORHOOD_WORK
+    }
+}
+
+/// A better set that a round of [`Lns::rounds`] found: the round (from 1; 0 is a start heavier than the first, before
+/// any round), the trajectory that made it (0 is the first start's) and the stage of the ladder its neighborhoods
+/// worked at in that round, the engine's steps and the work of the rounds up to and including this one, the game's new
+/// promotion sum, and the time on the caller's clock when the round ended.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Improvement {
     pub round: u64,
     pub trajectory: usize,
+    pub stage: usize,
+    pub steps: u64,
+    pub work: u64,
     pub sum: u64,
     pub seconds: f64,
+}
+
+/// Where a trajectory stands on the ladder of `widen`: its stage, and the rounds since its incumbent grew heavier or
+/// its stage changed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Standing {
+    pub stage: usize,
+    pub stalled: u64,
+}
+
+impl Standing {
+    /// The standing after a round of the trajectory, in which its incumbent grew heavier or not (`grew`), when `widen`
+    /// rounds without growth move it one stage down the [`LADDER`] (it stays at the last, and counts the rounds again
+    /// after each move), and growth returns it to the first.
+    pub fn after(self, grew: bool, widen: u64) -> Standing {
+        if grew {
+            Standing::default()
+        } else if self.stalled + 1 >= widen {
+            Standing { stage: (self.stage + 1).min(STAGES - 1), stalled: 0 }
+        } else {
+            Standing { stalled: self.stalled + 1, ..self }
+        }
+    }
 }
 
 /// What [`Lns::rounds`] came to.
@@ -168,12 +272,17 @@ pub struct Improvement {
 pub struct Rounds<const W: usize> {
     /// The game's set after the last round: the heaviest incumbent of the trajectories, the first's on a tie.
     pub set: Bits<W>,
-    /// The rounds done, and their engine's steps.
+    /// The rounds done, their engine's steps, and their work (the steps and [`NEIGHBORHOOD_WORK`] for each of their
+    /// neighborhoods).
     pub rounds: u64,
     pub nodes: u64,
-    /// Each round that found a better set, in order.
+    pub work: u64,
+    /// For each trajectory, the rounds it worked at each stage of the ladder.  Without `widen` they are all at the
+    /// first.
+    pub stage_rounds: Vec<[u64; STAGES]>,
+    /// Each round that found a better set, in order, after round 0 if a start was heavier than the first.
     pub improvements: Vec<Improvement>,
-    /// A stop signal ended the rounds before `most` were done or `enough` said so.
+    /// A stop signal ended the rounds before their work reached the budget or `enough` said so.
     pub interrupted: bool,
 }
 
@@ -186,13 +295,23 @@ pub struct Lns<'a, const W: usize> {
 
 impl<const W: usize> Lns<'_, W> {
     /// The unit that searches a neighborhood of the incumbent `best`: a random share of its promotions (drawn from
-    /// `options.fix`) fixed, and every other candidate free.
+    /// `options.fix`) fixed, and every other candidate free.  The promotions fixed are the first of a shuffle of the
+    /// members; with `options.tilt` the promotions freed, as many as the share leaves, are a draw that favors the small
+    /// ones ([`tilted_freed`]).
     pub fn neighborhood(&self, best: &Bits<W>, rng: &mut Rng) -> TaxUnit<W> {
-        let Options { fix, .. } = self.options;
+        let Options { fix, tilt, .. } = self.options;
         let mut members = best.to_vec();
-        rng.shuffle(&mut members);
+        if !tilt {
+            rng.shuffle(&mut members);
+        }
         let share = fix.0 + rng.unit() * (fix.1 - fix.0);
-        let fixed: Bits<W> = members[..(members.len() as f64 * share).round() as usize].iter().copied().collect();
+        let kept = (members.len() as f64 * share).round() as usize;
+        let fixed: Bits<W> = if tilt {
+            let freed: Bits<W> = tilted_freed(&members, self.p.n, members.len() - kept, rng).into_iter().collect();
+            best.difference(&freed)
+        } else {
+            members[..kept].iter().copied().collect()
+        };
         TaxUnit { promoted: fixed, cands: self.p.candidates.difference(&fixed) }
     }
 
@@ -243,13 +362,17 @@ impl<const W: usize> Lns<'_, W> {
 
     /// Round `round` (counted from 1) of the rounds on many threads (see the module documentation, "On many threads,
     /// alone"), from the incumbents `bases`, at least one, on `threads` threads: the [`NEIGHBORHOODS`] neighborhoods,
-    /// the kth of the incumbent `bases[k % bases.len()]`, drawn from [`Options::rng_of`] and searched as a unit
-    /// ([`unit`](Self::unit)) with a control of its own, since a control passes the incumbent of one run on to the
-    /// next.  The answer is the same on any number of threads.
-    pub fn round(&self, bases: &[Bits<W>], round: u64, threads: usize) -> Round<W> {
+    /// the kth of the incumbent `bases[k % bases.len()]`, at the stage of the ladder `stages[k % bases.len()]`
+    /// ([`Options::at_stage`]), drawn from [`Options::rng_of`] and searched as a unit ([`unit`](Self::unit)) with a
+    /// control of its own, since a control passes the incumbent of one run on to the next.  The answer is the same on
+    /// any number of threads.
+    pub fn round(&self, bases: &[Bits<W>], stages: &[usize], round: u64, threads: usize) -> Round<W> {
+        debug_assert_eq!(bases.len(), stages.len(), "a stage for each trajectory");
         let n = self.p.n;
         let ran = in_parallel(NEIGHBORHOODS as usize, threads, |k| {
-            self.unit(&bases[k % bases.len()], &mut self.options.rng_of(n, round, k as u64), &Control::new())
+            let trajectory = k % bases.len();
+            let at = Lns { options: self.options.at_stage(stages[trajectory]), ..*self };
+            at.unit(&bases[trajectory], &mut self.options.rng_of(n, round, k as u64), &Control::new())
         });
         let mut out = Round { sets: bases.to_vec(), nodes: 0, finished: 0 };
         for (k, ran) in ran.into_iter().enumerate() {
@@ -265,46 +388,98 @@ impl<const W: usize> Lns<'_, W> {
     }
 
     /// Rounds 1, 2, ... of the rounds on many threads ([`round`](Self::round)), from the incumbents `starts`, at least
-    /// one, a trajectory each, on `threads` threads: at most `most` of them, and none once `enough` says that the
-    /// game's promotion sum is enough (asked of the starts, and after each round).  A trajectory's incumbent becomes
-    /// the best set of its own neighborhoods if that is heavier.  The game's set is the heaviest incumbent, the
-    /// first's on a tie, and a round that makes it heavier is an [`Improvement`], whose time is the caller's `clock`.
+    /// one, a trajectory each, on `threads` threads: until their work reaches `budget` (the engine's steps and
+    /// [`NEIGHBORHOOD_WORK`] for each neighborhood, checked after each round, so the round that reaches it is the
+    /// last, and a budget of 0 allows none), and none once `enough` says that the game's promotion sum is enough (asked
+    /// of the starts, and after each round).  A round's work is at least [`NEIGHBORHOODS`] times
+    /// [`NEIGHBORHOOD_WORK`], so the rounds end.  A trajectory's incumbent becomes the best set of its own
+    /// neighborhoods if that is heavier.  With `options.widen`, a trajectory's stage moves down the ladder and back as
+    /// its [`Standing`] says, from the rounds before.  The game's set is the heaviest incumbent, the first's on a
+    /// tie, and a round that makes it heavier than it was is an [`Improvement`], whose time is the caller's `clock`.
+    /// A start that is heavier than the first one makes the game's set before any round: an improvement of round 0.
     /// A stop signal ([`engine::stop_signal`]) ends the rounds before the next, or in the middle of one, whose units
     /// it stops: then the rounds are `interrupted`, and the round it stopped is not counted.
     pub fn rounds(
         &self,
         starts: &[Bits<W>],
-        most: u64,
+        budget: u64,
         threads: usize,
         clock: &dyn Fn() -> f64,
         enough: &dyn Fn(u64) -> bool,
     ) -> Rounds<W> {
         let mut incumbents = starts.to_vec();
-        let set = heaviest(&incumbents).1;
-        let mut out = Rounds { set, rounds: 0, nodes: 0, improvements: Vec::new(), interrupted: false };
+        let (trajectory, set) = heaviest(&incumbents);
+        let mut out = Rounds {
+            set,
+            rounds: 0,
+            nodes: 0,
+            work: 0,
+            stage_rounds: vec![[0; STAGES]; starts.len()],
+            improvements: Vec::new(),
+            interrupted: false,
+        };
+        if set.sum() > starts[0].sum() {
+            let sum = set.sum();
+            let none = Improvement { round: 0, trajectory, stage: 0, steps: 0, work: 0, sum, seconds: clock() };
+            out.improvements.push(none);
+        }
+        let mut standing = vec![Standing::default(); starts.len()];
         let signaled = || engine::stop_signal().is_some();
-        while out.rounds < most && !enough(out.set.sum()) {
+        while out.work < budget && !enough(out.set.sum()) {
             if signaled() {
                 out.interrupted = true;
                 break;
             }
             let round = out.rounds + 1;
-            let ran = self.round(&incumbents, round, threads);
+            let stages: Vec<usize> = standing.iter().map(|standing| standing.stage).collect();
+            let ran = self.round(&incumbents, &stages, round, threads);
             // A signal in the middle of the round stopped some of its units.
             if signaled() {
                 out.interrupted = true;
                 break;
             }
-            (out.rounds, out.nodes) = (round, out.nodes + ran.nodes);
+            (out.rounds, out.nodes, out.work) = (round, out.nodes + ran.nodes, out.work + ran.work());
+            for (t, &stage) in stages.iter().enumerate() {
+                out.stage_rounds[t][stage] += 1;
+                if let Some(widen) = self.options.widen {
+                    standing[t] = standing[t].after(ran.sets[t].sum() > incumbents[t].sum(), widen);
+                }
+            }
             incumbents = ran.sets;
             let (trajectory, set) = heaviest(&incumbents);
             if set.sum() > out.set.sum() {
-                out.improvements.push(Improvement { round, trajectory, sum: set.sum(), seconds: clock() });
+                let (stage, steps, work, sum) = (stages[trajectory], out.nodes, out.work, set.sum());
+                out.improvements.push(Improvement { round, trajectory, stage, steps, work, sum, seconds: clock() });
             }
             out.set = set;
         }
         out
     }
+}
+
+/// The `count` promotions that the tilted share frees among `members`, the promotions of game `n` in ascending order:
+/// a weighted draw without replacement, one member at a time.  Each draw is a number from `rng` below the total weight
+/// ([`tilt_weight`]) of the members left, and takes the member whose cumulative weight, over the members in order,
+/// first passes it.  It is the distribution of Efraimidis and Spirakis' keys u^(1/w), worked in whole numbers, so that
+/// the draw is the same on every machine.
+fn tilted_freed(members: &[u32], n: u32, count: usize, rng: &mut Rng) -> Vec<u32> {
+    let mut left: Vec<(u32, u64)> = members.iter().map(|&x| (x, tilt_weight(x, n))).collect();
+    let mut total: u64 = left.iter().map(|&(_, weight)| weight).sum();
+    let mut freed = Vec::with_capacity(count);
+    for _ in 0..count {
+        let mut draw = rng.below(total as usize) as u64;
+        let at = left.iter().position(|&(_, weight)| match draw.checked_sub(weight) {
+            Some(rest) => {
+                draw = rest;
+                false
+            }
+            None => true,
+        });
+        let (x, weight) = left.remove(at.expect("a draw below the total weight of the members left"));
+        total -= weight;
+        freed.push(x);
+    }
+    freed
 }
 
 /// The heaviest of `sets`, at least one, and its index: the first of equals.
@@ -582,39 +757,85 @@ mod tests {
         assert_ne!(lns.options.rng(800).next(), lns.options.rng(801).next());
     }
 
-    /// The rounds on many threads on the prepared game `p` from the sets `starts`, a trajectory each: at most `most`,
-    /// on `threads` threads, ending once the game's set reaches `target` if there is one.
-    fn rounds_from(p: &Prepared<W>, starts: &[Bits<W>], most: u64, threads: usize, target: Option<u64>) -> Rounds<W> {
+    /// The rounds on many threads on the prepared game `p` from the sets `starts`, a trajectory each, with `options`:
+    /// until their steps reach `budget`, on `threads` threads, ending once the game's set reaches `target` if there is
+    /// one.
+    fn rounds_with(
+        p: &Prepared<W>,
+        options: Options,
+        starts: &[Bits<W>],
+        budget: u64,
+        threads: usize,
+        target: Option<u64>,
+    ) -> Rounds<W> {
         let space = SearchSpace::new(p);
-        let lns = Lns { p, space: &space, options: Options::default() };
-        lns.rounds(starts, most, threads, &|| 0.0, &|sum| target.is_some_and(|target| sum >= target))
+        let lns = Lns { p, space: &space, options };
+        lns.rounds(starts, budget, threads, &|| 0.0, &|sum| target.is_some_and(|target| sum >= target))
+    }
+
+    /// [`rounds_with`] the default options.
+    fn rounds_from(p: &Prepared<W>, starts: &[Bits<W>], budget: u64, threads: usize, target: Option<u64>) -> Rounds<W> {
+        rounds_with(p, Options::default(), starts, budget, threads, target)
     }
 
     /// [`rounds_from`] the greedy set of `p`, one trajectory.
-    fn rounds_of(p: &Prepared<W>, most: u64, threads: usize, target: Option<u64>) -> Rounds<W> {
-        rounds_from(p, &[p.greedy], most, threads, target)
+    fn rounds_of(p: &Prepared<W>, budget: u64, threads: usize, target: Option<u64>) -> Rounds<W> {
+        rounds_from(p, &[p.greedy], budget, threads, target)
     }
 
     /// The game of the tests of the rounds on many threads, whose greedy set its rounds 1 and 2 improve.
     const ROUNDS_GAME: u32 = 400;
 
+    /// A budget of work that every round reaches, so that the rounds it allows are one.
+    const ONE_ROUND: u64 = 1;
+
     #[test]
     fn the_rounds_on_many_threads_are_the_same_on_any_number_of_threads() {
         let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
-        let one = rounds_of(&p, 2, 1, None);
+        // The work of the first round and one more: the budget of the first two rounds.
+        let two = rounds_of(&p, ONE_ROUND, 1, None).work + 1;
+        let one = rounds_of(&p, two, 1, None);
         let rounds: Vec<u64> = one.improvements.iter().map(|improvement| improvement.round).collect();
         assert_eq!(rounds, [1, 2], "each round improves the greedy set: {:?}", one.improvements);
         assert!(p.can_promote(&one.set) && one.set.sum() == one.improvements[1].sum);
         assert_eq!((one.rounds, one.interrupted), (2, false));
+        assert_eq!(one.stage_rounds, [[2, 0, 0]], "without widen a trajectory stays at the first stage");
         for threads in [2, 4] {
-            assert_eq!(rounds_of(&p, 2, threads, None), one, "{threads} threads");
+            assert_eq!(rounds_of(&p, two, threads, None), one, "{threads} threads");
         }
     }
 
     #[test]
-    fn more_rounds_do_the_rounds_of_fewer_first_and_stop_once_they_are_enough() {
+    fn the_rounds_run_until_their_work_reaches_the_budget_and_the_round_that_reaches_it_is_the_last() {
         let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
-        let (short, long) = (rounds_of(&p, 1, 4, None), rounds_of(&p, 2, 4, None));
+        let first = rounds_of(&p, ONE_ROUND, 4, None);
+        assert_eq!(first.rounds, 1);
+        // A round's work is its steps and the work of each neighborhood, and every neighborhood takes a step at least.
+        let overhead = NEIGHBORHOODS * NEIGHBORHOOD_WORK;
+        assert_eq!(first.work, first.nodes + overhead);
+        assert!(first.nodes >= NEIGHBORHOODS, "every neighborhood takes a step at least: {}", first.nodes);
+        // A budget the first round reaches exactly ends there, and one more takes a second round.
+        assert_eq!(rounds_of(&p, first.work, 4, None), first);
+        let more = rounds_of(&p, first.work + 1, 4, None);
+        assert!(more.rounds >= 2 && more.work > first.work, "{} rounds, {} work", more.rounds, more.work);
+        assert_eq!(more.work, more.nodes + more.rounds * overhead);
+        // The rounds stop at the first round whose total reaches the budget: one less of budget than the total is
+        // reached by the same rounds, since the round before fell short of it.
+        assert_eq!(rounds_of(&p, more.work - 1, 4, None), more);
+        // Each improvement records the steps and the work of the rounds up to its own, which grow with the rounds.
+        let steps: Vec<u64> = more.improvements.iter().map(|improvement| improvement.steps).collect();
+        assert!(steps.windows(2).all(|pair| pair[0] < pair[1]) && steps.iter().all(|&s| (1..=more.nodes).contains(&s)));
+        for improvement in &more.improvements {
+            assert_eq!(improvement.work, improvement.steps + improvement.round * overhead, "{improvement:?}");
+        }
+        assert_eq!(more.improvements[0].steps, first.nodes, "the first round improves the greedy set");
+    }
+
+    #[test]
+    fn more_work_does_the_rounds_of_less_first_and_stops_once_it_is_enough() {
+        let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
+        let short = rounds_of(&p, ONE_ROUND, 4, None);
+        let long = rounds_of(&p, short.work + 1, 4, None);
         assert!(
             long.improvements.starts_with(&short.improvements),
             "{:?}, {:?}",
@@ -624,11 +845,12 @@ mod tests {
         assert!(long.set.sum() > short.set.sum() && !short.improvements.is_empty());
         // Enough at the first improvement: the rounds end with it.
         let first = long.improvements[0];
-        let stopped = rounds_of(&p, 2, 4, Some(first.sum));
+        let stopped = rounds_of(&p, long.work, 4, Some(first.sum));
         assert_eq!((stopped.rounds, stopped.set.sum(), stopped.improvements), (first.round, first.sum, vec![first]));
-        // A start that is enough runs no round, and neither do no rounds.
-        for none in [rounds_of(&p, 2, 4, Some(0)), rounds_of(&p, 0, 4, None)] {
-            assert_eq!((none.set, none.rounds, none.nodes, none.improvements.len()), (p.greedy, 0, 0, 0));
+        // A start that is enough runs no round, and neither does no budget.
+        for none in [rounds_of(&p, long.work, 4, Some(0)), rounds_of(&p, 0, 4, None)] {
+            assert_eq!((none.set, none.rounds, none.nodes, none.work), (p.greedy, 0, 0, 0));
+            assert!(none.improvements.is_empty());
         }
     }
 
@@ -648,18 +870,24 @@ mod tests {
         let space = SearchSpace::new(&p);
         let lns = Lns { p: &p, space: &space, options: Options::default() };
         let poorer = p.greedy.without(p.greedy.max().unwrap());
-        for bases in [vec![p.greedy], vec![p.greedy, poorer], vec![poorer, p.greedy, poorer]] {
-            let ran = lns.round(&bases, 3, 4);
-            // Each trajectory's best set, the lowest k's among equals, from the neighborhoods that k mod T names.
-            let mut expected = bases.clone();
-            for k in 0..NEIGHBORHOODS {
-                let t = k as usize % bases.len();
-                let unit = lns.unit(&bases[t], &mut lns.options.rng_of(p.n, 3, k), &Control::new());
-                if unit.set.sum() > expected[t].sum() {
-                    expected[t] = unit.set;
+        // With widening, each trajectory's neighborhoods work at the stage of their trajectory.
+        let widened = Lns { options: Options { widen: Some(1), ..lns.options }, ..lns };
+        for (lns, stages) in [(&lns, [0, 0, 0]), (&widened, [0, 2, 1])] {
+            for bases in [vec![p.greedy], vec![p.greedy, poorer], vec![poorer, p.greedy, poorer]] {
+                let stages = &stages[..bases.len()];
+                let ran = lns.round(&bases, stages, 3, 4);
+                // Each trajectory's best set, the lowest k's among equals, from the neighborhoods that k mod T names.
+                let mut expected = bases.clone();
+                for k in 0..NEIGHBORHOODS {
+                    let t = k as usize % bases.len();
+                    let at = Lns { options: lns.options.at_stage(stages[t]), ..*lns };
+                    let unit = at.unit(&bases[t], &mut lns.options.rng_of(p.n, 3, k), &Control::new());
+                    if unit.set.sum() > expected[t].sum() {
+                        expected[t] = unit.set;
+                    }
                 }
+                assert_eq!(ran.sets, expected, "{} trajectories, stages {stages:?}", bases.len());
             }
-            assert_eq!(ran.sets, expected, "{} trajectories", bases.len());
         }
     }
 
@@ -673,15 +901,40 @@ mod tests {
         let poor: Bits<W> = half[..half.len() / 2].iter().copied().collect();
         assert!(p.can_promote(&poor) && poor.sum() < p.greedy.sum());
         for starts in [[p.greedy, poor], [poor, p.greedy]] {
-            let one = rounds_from(&p, &starts, 2, 1, None);
+            let short = rounds_from(&p, &starts, ONE_ROUND, 4, None);
+            let two = short.work + 1;
+            let one = rounds_from(&p, &starts, two, 1, None);
             assert!(p.can_promote(&one.set) && one.set.sum() == one.improvements.last().unwrap().sum);
-            assert_eq!(rounds_from(&p, &starts, 2, 4, None), one, "4 threads");
-            let short = rounds_from(&p, &starts, 1, 4, None);
+            assert_eq!(rounds_from(&p, &starts, two, 4, None), one, "4 threads");
             assert!(one.improvements.starts_with(&short.improvements), "{:?}", one.improvements);
-            // The improvement names the trajectory of the heaviest incumbent after the round.
-            let (trajectory, set) = heaviest(&lns.round(&starts, 1, 1).sets);
-            let expected = Improvement { round: 1, trajectory, sum: set.sum(), seconds: 0.0 };
-            assert_eq!(short.improvements, [expected], "starts {starts:?}");
+            // A start heavier than the first raises the game's set before any round, as an improvement of round 0.
+            // The improvement of a round names the trajectory of the heaviest incumbent after it, and the round's
+            // steps and work.
+            let (first, best) = (starts[0].sum(), heaviest(&starts));
+            let mut expected = Vec::new();
+            if best.1.sum() > first {
+                let sum = best.1.sum();
+                expected.push(Improvement {
+                    round: 0,
+                    trajectory: best.0,
+                    stage: 0,
+                    steps: 0,
+                    work: 0,
+                    sum,
+                    seconds: 0.0,
+                });
+            }
+            let ran = lns.round(&starts, &[0, 0], 1, 1);
+            let (trajectory, set) = heaviest(&ran.sets);
+            assert!(set.sum() > best.1.sum(), "the first round raises the heaviest start");
+            let (steps, work, sum) = (ran.nodes, ran.work(), set.sum());
+            expected.push(Improvement { round: 1, trajectory, stage: 0, steps, work, sum, seconds: 0.0 });
+            assert_eq!(short.improvements, expected, "starts {starts:?}");
+            assert_eq!(
+                expected.len() == 2,
+                starts[1].sum() > first,
+                "only the second order begins with a heavier start"
+            );
         }
         // Two equal starts tie, and the first trajectory's set is the game's.
         let tied = rounds_from(&p, &[p.greedy, p.greedy], 0, 1, None);
@@ -701,6 +954,251 @@ mod tests {
             first(options, 800, 1, 1),
         ];
         assert!(others.iter().all(|&other| other != one), "{one} {others:?}");
+    }
+
+    /// A neighborhood with no option fixes the promotions that the first form of the mode (commit fa05cac) fixed: the
+    /// first of a shuffle of the incumbent's, as many as a share drawn from `fix` says.  The draws are of the greedy
+    /// set of game 400, 21 promotions, of which 16 are fixed each time.
+    #[test]
+    fn a_neighborhood_with_no_option_fixes_what_it_fixed_before_the_options() {
+        let options = Options::default();
+        assert!(!options.tilt && options.widen.is_none(), "the finder beside a search draws as it did");
+        let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
+        let space = SearchSpace::new(&p);
+        let lns = Lns { p: &p, space: &space, options };
+        assert_eq!((p.greedy.len(), p.greedy.sum()), (21, 3575));
+        let pinned: [(u64, u64, u64, [u32; 6]); 4] = [
+            (1, 0, 2641, [75, 98, 150, 153, 156, 165]),
+            (1, 1, 2730, [75, 98, 153, 165, 171, 176]),
+            (2, 5, 2660, [75, 98, 150, 153, 156, 168]),
+            (7, 63, 2763, [98, 150, 153, 156, 165, 171]),
+        ];
+        for (round, k, sum, first) in pinned {
+            let unit = lns.neighborhood(&p.greedy, &mut options.rng_of(p.n, round, k));
+            let fixed = unit.promoted.to_vec();
+            assert_eq!(
+                (fixed.len(), unit.promoted.sum(), fixed[..6].to_vec()),
+                (16, sum, first.to_vec()),
+                "{round} {k}"
+            );
+            assert_eq!(unit.cands, p.candidates.difference(&unit.promoted));
+        }
+    }
+
+    #[test]
+    fn the_tilt_weight_is_the_table_of_the_bin_of_the_size() {
+        // x/n from 0.25 in bins of 0.025: the first bin takes everything below, the last everything above.
+        for (x, bin) in
+            [(0, 0), (99, 0), (100, 0), (109, 0), (110, 1), (119, 1), (120, 2), (189, 8), (190, 9), (399, 9), (400, 9)]
+        {
+            assert_eq!(tilt_weight(x, 400), TILT[bin], "x={x}");
+        }
+        // A size on the edge of a bin takes the bin that starts there, with no rounding: 11/40 = 0.275.
+        assert_eq!((tilt_weight(10, 40), tilt_weight(11, 40), tilt_weight(20, 40)), (TILT[0], TILT[1], TILT[9]));
+    }
+
+    /// The tilted draw is in whole numbers, so it is the same on every machine: these are the promotions that four
+    /// tilted neighborhoods of the greedy set of game 400 (21 promotions) free, the draws of the untilted test above.
+    #[test]
+    fn a_tilted_neighborhood_frees_the_same_promotions_on_every_machine() {
+        let options = Options { tilt: true, ..Options::default() };
+        let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
+        let space = SearchSpace::new(&p);
+        let lns = Lns { p: &p, space: &space, options };
+        let freed: Vec<Vec<u32>> = [(1, 0), (1, 1), (2, 5), (7, 63)]
+            .into_iter()
+            .map(|(round, k)| {
+                let unit = lns.neighborhood(&p.greedy, &mut options.rng_of(p.n, round, k));
+                assert_eq!(unit.cands, p.candidates.difference(&unit.promoted));
+                p.greedy.difference(&unit.promoted).to_vec()
+            })
+            .collect();
+        let pinned = [vec![75, 98, 153, 165], vec![75, 150, 156, 168], vec![75, 98, 182], vec![75, 98, 150, 165, 184]];
+        assert_eq!(freed, pinned);
+    }
+
+    /// `tilted_freed` is the successive draw it says, whatever the number freed: the same draws taken with the
+    /// cumulative weights of the members left.
+    #[test]
+    fn the_tilted_draw_takes_the_member_whose_cumulative_weight_covers_each_number() {
+        let p = board(1000).prepare(SearchTactics::default()).unwrap();
+        let members = p.candidates.to_vec();
+        for (seed, count) in
+            [(1, 0), (2, 1), (3, 7), (4, members.len() / 2), (5, members.len() - 1), (6, members.len())]
+        {
+            let (mut rng, mut other) = (Rng(seed), Rng(seed));
+            let freed = tilted_freed(&members, p.n, count, &mut rng);
+            let mut left = members.clone();
+            let mut expected = Vec::new();
+            for _ in 0..count {
+                let ends: Vec<u64> = left
+                    .iter()
+                    .scan(0, |sum, &x| {
+                        *sum += tilt_weight(x, p.n);
+                        Some(*sum)
+                    })
+                    .collect();
+                let draw = other.next() % ends[ends.len() - 1];
+                expected.push(left.remove(ends.partition_point(|&end| end <= draw)));
+            }
+            assert_eq!(freed, expected, "{count} freed");
+            assert_eq!(rng.next(), other.next(), "the same numbers drawn");
+        }
+    }
+
+    /// The members freed by `lns` in `draws` neighborhoods of `best`: how many, and the sum of their sizes x/n.
+    fn freed_by(lns: &Lns<'_, W>, best: &Bits<W>, draws: u64) -> (u64, f64) {
+        let (mut count, mut sizes) = (0, 0.0);
+        for k in 0..draws {
+            let fixed = lns.neighborhood(best, &mut lns.options.rng_of(lns.p.n, 1, k)).promoted;
+            for x in best.difference(&fixed).iter() {
+                count += 1;
+                sizes += f64::from(x) / f64::from(lns.p.n);
+            }
+        }
+        (count, sizes)
+    }
+
+    #[test]
+    fn a_tilted_neighborhood_frees_as_many_promotions_as_a_uniform_one_and_favors_the_small_ones() {
+        let p = board(1000).prepare(SearchTactics::default()).unwrap();
+        let space = SearchSpace::new(&p);
+        // The candidates stand in for an incumbent: the draw only splits a set in two.
+        let best = p.candidates;
+        assert!(best.len() > 100);
+        let uniform = Lns { p: &p, space: &space, options: Options::default() };
+        let tilted = Lns { options: Options { tilt: true, ..uniform.options }, ..uniform };
+        // With a share fixed that is one number, the number freed is the same.
+        for share in [0.0, 0.3, 0.8, 1.0] {
+            let options = Options { fix: (share, share), ..uniform.options };
+            let freed = |tilt| Lns { options: Options { tilt, ..options }, ..uniform };
+            let expected = u64::from(best.len()) - (f64::from(best.len()) * share).round() as u64;
+            for k in 0..20 {
+                let counts: Vec<u32> = [false, true]
+                    .into_iter()
+                    .map(|tilt| {
+                        let fixed = freed(tilt).neighborhood(&best, &mut options.rng_of(1000, 1, k)).promoted;
+                        best.len() - fixed.len()
+                    })
+                    .collect();
+                assert_eq!(counts, [expected as u32; 2], "share {share}, draw {k}");
+            }
+        }
+        // With the default share, the numbers freed average alike, and the tilted ones are smaller.
+        let (uniform_count, uniform_sizes) = freed_by(&uniform, &best, 300);
+        let (tilted_count, tilted_sizes) = freed_by(&tilted, &best, 300);
+        let mean = |count: u64, sizes: f64| sizes / count as f64;
+        let per_draw = |count: u64| count as f64 / 300.0;
+        assert!((per_draw(uniform_count) - per_draw(tilted_count)).abs() < 0.1 * per_draw(uniform_count));
+        let (small, large) = (mean(tilted_count, tilted_sizes), mean(uniform_count, uniform_sizes));
+        assert!(
+            small < large - 0.02,
+            "the tilted draw frees promotions of mean size {small:.3} n, the uniform {large:.3} n"
+        );
+    }
+
+    #[test]
+    fn the_stage_moves_down_after_s_rounds_without_growth_and_back_on_growth() {
+        let run = |widen: u64, grew: &[bool]| {
+            let mut standing = Standing::default();
+            grew.iter()
+                .map(|&grew| {
+                    standing = standing.after(grew, widen);
+                    standing.stage
+                })
+                .collect::<Vec<_>>()
+        };
+        let (no, yes) = (false, true);
+        // Three rounds without growth for each stage down, the last stage staying.
+        assert_eq!(run(3, &[no; 10]), [0, 0, 1, 1, 1, 2, 2, 2, 2, 2]);
+        // Growth returns it to the first stage, and the rounds are counted again from it.
+        assert_eq!(run(3, &[no, no, no, no, no, yes, no, no, no]), [0, 0, 1, 1, 1, 0, 0, 0, 1]);
+        assert_eq!(run(3, &[no, no, yes, no, no, no, yes, yes]), [0, 0, 0, 0, 0, 1, 0, 0]);
+        assert_eq!(run(1, &[no, no, no, yes, no, yes, yes]), [1, 2, 2, 0, 1, 0, 0]);
+        assert_eq!(Standing::default(), Standing { stage: 0, stalled: 0 });
+    }
+
+    /// Cases of the options that shape the rounds, each with the starts of its trajectories: the tilted share, the
+    /// widening (after a round without growth), two trajectories, and all three.
+    fn shaped_cases(p: &Prepared<W>) -> Vec<(&'static str, Options, Vec<Bits<W>>)> {
+        let half = p.greedy.to_vec();
+        let poor: Bits<W> = half[..half.len() / 2].iter().copied().collect();
+        let options = Options::default();
+        let (tilt, widen) = (Options { tilt: true, ..options }, Options { widen: Some(1), ..options });
+        let all = Options { tilt: true, widen: Some(1), ..options };
+        vec![
+            ("tilt", tilt, vec![p.greedy]),
+            ("widen", widen, vec![p.greedy]),
+            ("two trajectories", options, vec![p.greedy, poor]),
+            ("all three", all, vec![p.greedy, poor]),
+        ]
+    }
+
+    /// The module `$module` of four tests, one for each case of [`shaped_cases`], each calling `$check` with the index
+    /// of its case: the cases together use more CPU than a test may.
+    macro_rules! for_each_case {
+        ($module:ident, $check:ident) => {
+            mod $module {
+                #[test]
+                fn tilt() {
+                    super::$check(0);
+                }
+                #[test]
+                fn widen() {
+                    super::$check(1);
+                }
+                #[test]
+                fn two_trajectories() {
+                    super::$check(2);
+                }
+                #[test]
+                fn all_three() {
+                    super::$check(3);
+                }
+            }
+        };
+    }
+
+    /// The rounds of case `case` of [`shaped_cases`] are the same on one thread and on four.
+    fn check_same_on_any_number_of_threads(case: usize) {
+        let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
+        let (what, options, starts) = shaped_cases(&p).swap_remove(case);
+        let budget = 2 * rounds_with(&p, options, &starts, ONE_ROUND, 4, None).work;
+        let one = rounds_with(&p, options, &starts, budget, 1, None);
+        assert!(one.rounds >= 2 && p.can_promote(&one.set), "{what}: {} rounds", one.rounds);
+        assert_eq!(rounds_with(&p, options, &starts, budget, 4, None), one, "{what}: 4 threads");
+        // Every round of every trajectory is at one stage, and without widen at the first.
+        let at: Vec<u64> = one.stage_rounds.iter().map(|stages| stages.iter().sum()).collect();
+        assert_eq!(at, vec![one.rounds; starts.len()], "{what}");
+        if options.widen.is_none() {
+            assert!(one.stage_rounds.iter().all(|stages| stages[1..] == [0, 0]), "{what}: {:?}", one.stage_rounds);
+        }
+    }
+    for_each_case!(same_on_any_number_of_threads, check_same_on_any_number_of_threads);
+
+    /// The improvements of case `case` of [`shaped_cases`] at a budget are a prefix of those at a larger one.
+    fn check_prefix_property(case: usize) {
+        let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
+        let (what, options, starts) = shaped_cases(&p).swap_remove(case);
+        let less = rounds_with(&p, options, &starts, ONE_ROUND, 4, None);
+        let more = rounds_with(&p, options, &starts, 3 * less.work, 4, None);
+        assert!(more.rounds > less.rounds, "{what}: {} rounds, then {}", less.rounds, more.rounds);
+        assert!(more.improvements.starts_with(&less.improvements), "{what}: {less:?}, {more:?}");
+    }
+    for_each_case!(prefix_property, check_prefix_property);
+
+    #[test]
+    fn a_trajectory_that_stalls_widens_its_neighborhoods_and_one_that_grows_does_not() {
+        let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
+        let options = Options { widen: Some(1), ..Options::default() };
+        let budget = 12 * rounds_with(&p, options, &[p.greedy], ONE_ROUND, 4, None).work;
+        let ran = rounds_with(&p, options, &[p.greedy], budget, 4, None);
+        let [stages] = ran.stage_rounds[..] else { panic!("one trajectory") };
+        assert_eq!(stages.iter().sum::<u64>(), ran.rounds);
+        assert!(stages[0] >= 1 && stages[1] >= 1 && stages[2] >= 1, "{stages:?} in {} rounds", ran.rounds);
+        // The stage an improvement records is the stage its round worked at, so the first round's is the first.
+        assert_eq!(ran.improvements[0].stage, 0);
+        assert!(ran.improvements.iter().all(|improvement| improvement.stage < STAGES));
     }
 
     #[test]

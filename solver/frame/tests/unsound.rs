@@ -1,7 +1,12 @@
 //! The unsound mode (`taxman::solver::unsound`): its lines replay to their scores and never beat the built-in table,
-//! are the same on one thread and on four, do the rounds of a lower level first, resume, and end their rounds at the
+//! are the same on one thread and on four, run the rounds of a lower level first, resume, and end their rounds at the
 //! table's score with `--stop-at-known`; and the wall between its lines and proven ones holds both ways.  The options
-//! that shape the rounds (`fix`, `survivors`) change no line unless they are given, and keep all of the above.
+//! that shape the rounds (`fix`, `tilt`, `back`, `widen`) change no line unless they are given, and each of them, and
+//! the last three together, keep all of the above.
+//!
+//! A level of effort budgets 2^(E−1) × `round_work` work of rounds.  The tests lower `round_work` from the 65,536 of a
+//! round of full neighborhoods to the work of a round or two of the small games they play, so that a level is a few
+//! rounds and a test stays inside its CPU limit.
 
 mod common;
 
@@ -11,13 +16,19 @@ use std::path::Path;
 use std::slice;
 use taxman::game::{replay, Optimal};
 use taxman::json::Json;
-use taxman::results::{moves_digest, verify_files, ResultsFile};
-use taxman::solver::unsound::{self, Line, Plan, Previous, Raised, Source};
+use taxman::results::{verify_files, ResultsFile};
+use taxman::search::finder::{NEIGHBORHOODS, NEIGHBORHOOD_WORK};
+use taxman::solver::unsound::{self, Line, Origin, Plan, Previous, Raised, Source};
 use taxman::solver::{solve_range, Method, SolveOptions};
+
+/// The work that effort 1 budgets in these tests: a little more than the work of a round of the small games (their
+/// steps are about 80 a round, and the neighborhoods' work is 64 × 32 = 2,048), so that effort E runs a few rounds more
+/// than effort E − 1.
+const WORK: u64 = 2_200;
 
 /// The plan of a run at `effort`, with the default seed and no measuring option.
 fn plan(effort: u32) -> Plan {
-    Plan { effort, ..Plan::default() }
+    Plan { effort, round_work: WORK, ..Plan::default() }
 }
 
 /// The options of a run on `threads` threads, with or without the tactic `seed_incumbent`.  Without it, a game's start
@@ -58,9 +69,21 @@ fn timeless(line: &Line) -> Line {
     Line { seconds: 0.0, start_seconds: 0.0, threads: 0, improvements, ..line.clone() }
 }
 
+/// The lines without what varies from run to run.
+fn timeless_all(lines: &[Line]) -> Vec<Line> {
+    lines.iter().map(timeless).collect()
+}
+
 /// The rounds that raised a line's score, and the scores they raised it to.
 fn raised(line: &Line) -> Vec<(u64, u64)> {
     line.improvements.iter().map(|raised| (raised.round, raised.score)).collect()
+}
+
+/// What each improvement of a line recorded, but its time: the round, the trajectory that made it, its stage, the steps
+/// and the work of the rounds so far, and the score.
+fn raised_by(line: &Line) -> Vec<(u64, usize, usize, u64, u64, u64)> {
+    let each = |r: &Raised| (r.round, r.trajectory, r.stage, r.steps, r.work, r.score);
+    line.improvements.iter().map(each).collect()
 }
 
 #[test]
@@ -72,6 +95,7 @@ fn lines_replay_to_their_scores_and_never_beat_the_table() {
         let json = line.to_json();
         assert_eq!(json.get("unsound"), Some(&Json::Bool(true)), "n={n}");
         assert!(json.get("completed").is_none() && json.get("proof").is_none(), "n={n}: it claims nothing");
+        assert_eq!(json.get("budget"), Some(&Json::from(0u64)), "n={n}: effort 0 budgets no steps");
         if n > 1 {
             let prev = line.prev.as_ref().expect("the moves for n - 1");
             assert_eq!((prev.n, prev.source, prev.short_by), (n - 1, Source::Run, 0), "n={n}");
@@ -88,7 +112,7 @@ fn lines_replay_to_their_scores_and_never_beat_the_table() {
 fn the_lines_are_the_same_on_one_thread_and_on_four() {
     let one = lines(SECOND, &options(1, false), &plan(1), None);
     let four = lines(SECOND, &options(4, false), &plan(1), None);
-    assert_eq!(one.iter().map(timeless).collect::<Vec<_>>(), four.iter().map(timeless).collect::<Vec<_>>());
+    assert_eq!(timeless_all(&one), timeless_all(&four));
     let raised = one.iter().filter(|line| !line.improvements.is_empty()).count();
     assert_eq!(raised, 3, "the first round raises the start of each search");
     assert!(one.iter().all(|line| line.threads == 1) && four.iter().all(|line| line.threads == 4));
@@ -100,28 +124,59 @@ fn a_higher_level_of_effort_does_the_rounds_of_a_lower_one_first() {
         (lines(FIRST, &options(4, false), &plan(1), None), lines(FIRST, &options(4, false), &plan(2), None));
     for (less, more) in less.iter().zip(&more) {
         assert!(raised(more).starts_with(&raised(less)), "n={}: {:?}, then {:?}", less.n, raised(less), raised(more));
-        assert_eq!((less.rounds, more.rounds), (1, 2), "n={}", less.n);
+        assert!(more.rounds > less.rounds && more.work > less.work, "n={}", less.n);
     }
-    // 375 is raised in its second round only, 376 in both.
-    assert_eq!((raised(&less[0]).len(), raised(&more[0]).len()), (0, 1));
-    assert_eq!((raised(&less[1]).len(), raised(&more[1]).len()), (1, 2));
+    // 375 is raised in its second round only at effort 1, and again in its third at effort 2, which 376 does not.
+    assert_eq!((raised(&less[0]).len(), raised(&more[0]).len()), (1, 2));
+    assert_eq!((raised(&less[1]).len(), raised(&more[1]).len()), (2, 2));
+}
+
+#[test]
+fn the_rounds_of_a_level_run_until_their_work_reaches_its_budget_and_the_round_that_reaches_it_is_the_last() {
+    let opts = options(4, false);
+    let rounds = |plan: &Plan| lines(FIRST, &opts, plan, None);
+    for effort in 1..=3 {
+        let plan = plan(effort);
+        assert_eq!(plan.budget(), WORK << (effort - 1));
+        for line in rounds(&plan) {
+            let n = line.n;
+            assert!(line.work >= plan.budget(), "n={n}: {} work, a budget of {}", line.work, plan.budget());
+            assert_eq!(line.to_json().get("budget"), Some(&Json::from(plan.budget())), "n={n}");
+            // The work is the steps and the work of each neighborhood, and each improvement says how much of both.
+            let overhead = NEIGHBORHOODS * NEIGHBORHOOD_WORK;
+            assert_eq!(line.work, line.steps + line.rounds * overhead, "n={n}");
+            assert_eq!(line.to_json().get("work"), Some(&Json::from(line.work)), "n={n}");
+            for raised in &line.improvements {
+                assert_eq!(raised.work, raised.steps + raised.round * overhead, "n={n}: {raised:?}");
+                assert!(raised.work <= line.work, "n={n}");
+            }
+        }
+    }
+    // A budget of exactly the work that the rounds did is reached by the same rounds, the last of which reaches it;
+    // one more is not, and takes another round.
+    let n = FIRST.0;
+    let line = &lines((n, n), &opts, &plan(3), None)[0];
+    let again = |round_work| lines((n, n), &opts, &Plan { round_work, ..plan(1) }, None).remove(0);
+    let (exact, more) = (again(line.work), again(line.work + 1));
+    assert_eq!((exact.rounds, exact.work), (line.rounds, line.work), "n={n}");
+    assert!(more.rounds > line.rounds && more.work > line.work, "n={n}: {} rounds", more.rounds);
 }
 
 /// Games whose rounds, from a start made with the table's moves for n − 1, find different sets under the options that
-/// shape the rounds: every option reaches the table's score of 375, 539 and 544 (the default does too), and of 680, to
-/// which the default's four rounds fall 42 short.  Each starts from the table's moves, so it is the same game whatever
-/// the lines before it.
+/// shape the rounds, and each starts from the table's moves, so it is the same game whatever the lines before it.
 const SHAPED: [u32; 4] = [375, 539, 544, 680];
 
-/// The plans of the options at `effort`: a share fixed other than the default's, a second trajectory, and both (with
-/// another share fixed, under which the rounds of both trajectories raise the score of 375 and 544 twice), for the
-/// games [`SHAPED`].
-fn shaped(effort: u32) -> [(&'static str, Plan); 3] {
+/// The plans of the options at `effort`, for the games [`SHAPED`] from the table's moves: a share fixed other than the
+/// default's, the tilted share, trajectories from the 8 games before, the widening after a round without growth, and
+/// the last three together.
+fn shaped(effort: u32) -> [(&'static str, Plan); 5] {
     let known = Plan { from_known: true, ..plan(effort) };
     [
         ("fix", Plan { fix: (0.4, 0.6), ..known }),
-        ("survivors", Plan { survivors: true, ..known }),
-        ("fix and survivors", Plan { fix: (0.6, 0.8), survivors: true, ..known }),
+        ("tilt", Plan { tilt: true, ..known }),
+        ("back", Plan { back: 8, ..known }),
+        ("widen", Plan { widen: Some(1), ..known }),
+        ("tilt, back and widen", Plan { tilt: true, back: 8, widen: Some(1), ..known }),
     ]
 }
 
@@ -131,81 +186,30 @@ fn shaped_lines(opts: &SolveOptions, plan: &Plan) -> Vec<Line> {
     SHAPED.iter().flat_map(|&n| lines((n, n), opts, plan, None)).collect()
 }
 
-/// The rounds that raised a line's score, the trajectories that made them, and the scores.
-fn raised_by(line: &Line) -> Vec<(u64, usize, u64)> {
-    line.improvements.iter().map(|raised| (raised.round, raised.trajectory, raised.score)).collect()
-}
-
-/// What a line of the first form of the mode (commit e37d6a1, before `fix` and `survivors`) held of a game.
-struct Was {
-    n: u32,
-    start: Option<u64>,
-    score: u64,
-    steps: u64,
-    /// The rounds that raised the score, and the scores.
-    raised: &'static [(u64, u64)],
-    /// [`moves_digest`] of the moves.
-    moves: &'static str,
-}
-
-/// The games [`SHAPED`] from the table's moves for n − 1 at effort 3, as the first form played them.
-const WAS_SHAPED: [Was; 4] = [
-    Was {
-        n: 375,
-        start: Some(44303),
-        score: 44328,
-        steps: 324,
-        raised: &[(2, 44327), (3, 44328)],
-        moves: "c60134b0257ae6c6",
-    },
-    Was { n: 539, start: Some(91632), score: 91703, steps: 328, raised: &[(2, 91703)], moves: "2951cc1d96d9b139" },
-    Was { n: 544, start: Some(93214), score: 93256, steps: 339, raised: &[(1, 93256)], moves: "b0d3b082dc846aac" },
-    Was {
-        n: 680,
-        start: Some(146758),
-        score: 146784,
-        steps: 260,
-        raised: &[(1, 146773), (4, 146784)],
-        moves: "702a5d8476976273",
-    },
-];
-
-/// The games [`SECOND`], with no seed, at effort 2, as the first form played them (386 repeats 385).
-const WAS_SECOND: [Was; 4] = [
-    Was { n: 384, start: Some(45975), score: 45999, steps: 153, raised: &[(1, 45999)], moves: "1ef59033cec8af1d" },
-    Was {
-        n: 385,
-        start: Some(46360),
-        score: 46384,
-        steps: 157,
-        raised: &[(1, 46368), (2, 46384)],
-        moves: "ad6f91f2a7f43303",
-    },
-    Was { n: 386, start: None, score: 46770, steps: 0, raised: &[], moves: "093617dce8a0500c" },
-    Was { n: 387, start: Some(47133), score: 47157, steps: 151, raised: &[(1, 47157)], moves: "d121c33eea93cf8c" },
-];
-
-/// `lines` are what the first form held of these games, and say they followed one trajectory with the default share.
-fn assert_were(lines: &[Line], was: &[Was]) {
-    assert_eq!(lines.len(), was.len());
-    for (line, was) in lines.iter().zip(was) {
-        let n = was.n;
-        let now = (line.n, line.start, line.score, line.steps, raised(line), moves_digest(&line.moves));
-        assert_eq!(now, (n, was.start, was.score, was.steps, was.raised.to_vec(), was.moves.to_owned()), "n={n}");
-        assert_eq!((line.plan.fix, line.plan.survivors), ((0.7, 0.9), false), "n={n}");
-        assert_eq!(line.trajectories, line.start.map(|_| 1), "n={n}: one trajectory for a searched game");
-        assert!(line.improvements.iter().all(|raised| raised.trajectory == 0), "n={n}");
+#[test]
+fn without_the_options_the_rounds_are_these() {
+    // The lines of this form of the mode at effort 3, to see that no change to a neighborhood's draws or to the budget
+    // goes unseen: the neighborhoods of the default are pinned beside, in `search::finder`.
+    let plan = Plan { from_known: true, ..plan(3) };
+    let lines = shaped_lines(&options(4, true), &plan);
+    let now: Vec<_> = lines.iter().map(|line| (line.n, line.score, line.rounds, line.steps, raised(line))).collect();
+    let was = [
+        (375, 44328, 5, 394, vec![(2, 44327), (3, 44328)]),
+        (539, 91703, 5, 394, vec![(2, 91703)]),
+        (544, 93256, 5, 429, vec![(1, 93256)]),
+        (680, 146798, 5, 326, vec![(1, 146773), (4, 146784), (5, 146798)]),
+    ];
+    assert_eq!(now, was);
+    for line in &lines {
+        assert_eq!((line.plan.fix, line.plan.tilt, line.plan.back, line.plan.widen), ((0.7, 0.9), false, 0, None));
+        assert_eq!(line.trajectories, Some(vec![Origin::Start]), "n={}: the start's trajectory alone", line.n);
+        assert_eq!(line.stage_rounds, Some(vec![[line.rounds, 0, 0]]), "n={}: every round at stage 0", line.n);
+        assert!(line.improvements.iter().all(|raised| (raised.trajectory, raised.stage) == (0, 0)), "n={}", line.n);
     }
 }
 
-#[test]
-fn without_the_options_the_lines_are_those_of_the_first_form() {
-    assert_were(&shaped_lines(&options(4, true), &Plan { from_known: true, ..plan(3) }), &WAS_SHAPED);
-    assert_were(&lines(SECOND, &options(4, false), &plan(2), None), &WAS_SECOND);
-}
-
-/// The module `$module` of three tests, `fix`, `survivors` and `fix_and_survivors`, each calling `$check` with the
-/// index of that option in [`shaped`]: one test of all three would use more CPU than a test may.
+/// The module `$module` of five tests, `fix`, `tilt`, `back`, `widen` and `all_three`, each calling `$check` with the
+/// index of that option in [`shaped`]: one test of all five would use more CPU than a test may.
 macro_rules! for_each_option {
     ($module:ident, $check:ident) => {
         mod $module {
@@ -214,12 +218,20 @@ macro_rules! for_each_option {
                 super::$check(0);
             }
             #[test]
-            fn survivors() {
+            fn tilt() {
                 super::$check(1);
             }
             #[test]
-            fn fix_and_survivors() {
+            fn back() {
                 super::$check(2);
+            }
+            #[test]
+            fn widen() {
+                super::$check(3);
+            }
+            #[test]
+            fn all_three() {
+                super::$check(4);
             }
         }
     };
@@ -230,13 +242,14 @@ fn check_same_on_one_thread_and_on_four(shape: usize) {
     let shape = shaped(3)[shape].1;
     let one = shaped_lines(&options(1, true), &shape);
     let four = shaped_lines(&options(4, true), &shape);
-    assert_eq!(one.iter().map(timeless).collect::<Vec<_>>(), four.iter().map(timeless).collect::<Vec<_>>());
+    assert_eq!(timeless_all(&one), timeless_all(&four));
     assert!(one.iter().all(|line| line.threads == 1) && four.iter().all(|line| line.threads == 4));
 }
 for_each_option!(same_on_one_thread_and_on_four, check_same_on_one_thread_and_on_four);
 
 /// Under option `shape` of [`shaped`], the improvements of the games [`SHAPED`] at effort 1 are a prefix of those at
-/// effort 2, and those at effort 2 of those at effort 3: the rounds, the trajectories and the scores.
+/// effort 2, and those at effort 2 of those at effort 3: the rounds, the trajectories, the stages, the steps and the
+/// scores.
 fn check_lower_level_first(shape: usize) {
     let by_level: Vec<Vec<Line>> =
         (1..=3).map(|effort| shaped_lines(&options(4, true), &shaped(effort)[shape].1)).collect();
@@ -244,67 +257,167 @@ fn check_lower_level_first(shape: usize) {
         for (less, more) in less.iter().zip(more) {
             let (n, raised) = (less.n, (raised_by(less), raised_by(more)));
             assert!(raised.1.starts_with(&raised.0), "n={n}: {:?}, then {:?}", raised.0, raised.1);
-            assert_eq!(more.rounds, 2 * less.rounds, "n={n}");
+            assert!(more.rounds >= less.rounds && more.work >= less.work, "n={n}");
         }
     }
-    // The longer run finds more, so the comparison shows something.
-    let found: Vec<usize> = by_level.iter().map(|lines| lines.iter().map(|l| l.improvements.len()).sum()).collect();
-    assert!(found[0] < found[2], "improvements at efforts 1 to 3: {found:?}");
+    // The longer run does more, so the comparison shows something.
+    let rounds: Vec<u64> = by_level.iter().map(|lines| lines.iter().map(|line| line.rounds).sum()).collect();
+    assert!(rounds[0] < rounds[2], "rounds at efforts 1 to 3: {rounds:?}");
 }
 for_each_option!(lower_level_first, check_lower_level_first);
 
-/// Option `shape` of [`shaped`] reaches the table's score of every game [`SHAPED`] in four rounds, 680 included, and
-/// the line records the option and the trajectories the game followed.
-fn check_what_the_option_finds(shape: usize) {
+/// Option `shape` of [`shaped`] is in the line: the plan, the trajectories the game followed, the rounds of each at
+/// each stage, and what each improvement says of both.
+fn check_what_the_line_records(shape: usize) {
     let (what, shape) = shaped(3)[shape];
     let lines = shaped_lines(&options(4, true), &shape);
-    let scores: Vec<u64> = lines.iter().map(|line| line.score).collect();
-    assert_eq!(scores, [44328, 91703, 93256, 146826], "the default's rounds leave game 680 at 146,784");
-    let trajectories: Vec<Option<usize>> = lines.iter().map(|line| line.trajectories).collect();
-    assert_eq!(trajectories, [Some(if shape.survivors { 2 } else { 1 }); 4]);
-    assert!(lines.iter().all(|line| (line.plan.fix, line.plan.survivors) == (shape.fix, shape.survivors)));
-    let json = lines[0].to_json();
-    assert_eq!(json.get("fix"), Some(&Json::array([shape.fix.0, shape.fix.1])));
-    assert_eq!(json.get("survivors"), Some(&Json::Bool(shape.survivors)));
-    if what == "survivors" {
-        // The second trajectory raises the score first in all four games, the start's trajectory passes it in 375 and
-        // 539 (680 is raised twice by the second), and the line says which made each improvement.
-        let by = |line: &Line| line.improvements.iter().map(|raised| raised.trajectory).collect::<Vec<_>>();
-        assert_eq!(lines.iter().map(by).collect::<Vec<_>>(), [vec![1, 0], vec![1, 0], vec![1], vec![1, 1]]);
-        let in_round = |line: &Line| line.improvements.iter().map(|raised| raised.round).collect::<Vec<_>>();
-        assert_eq!(lines.iter().map(in_round).collect::<Vec<_>>(), [vec![2, 3], vec![1, 2], vec![2], vec![1, 2]]);
-        let record = json.get("improvements").and_then(Json::as_arr).expect("the improvements");
-        assert_eq!(record[0].get("trajectory"), Some(&Json::from(1u64)));
-        assert_eq!(record[1].get("trajectory"), Some(&Json::from(0u64)));
+    for line in &lines {
+        let (n, json) = (line.n, line.to_json());
+        assert_eq!(line.plan, shape, "{what}");
+        assert_eq!(json.get("fix"), Some(&Json::array([shape.fix.0, shape.fix.1])), "n={n}");
+        assert_eq!(json.get("tilt"), Some(&Json::Bool(shape.tilt)), "n={n}");
+        assert_eq!(json.get("back"), Some(&Json::from(shape.back)), "n={n}");
+        assert_eq!(json.get("widen"), Some(&shape.widen.map_or(Json::Null, Json::from)), "n={n}");
+        assert_eq!(json.get("budget"), Some(&Json::from(shape.budget())), "n={n}");
+        let (origins, stages) = (line.trajectories.as_ref().unwrap(), line.stage_rounds.as_ref().unwrap());
+        assert_eq!(origins[0], Origin::Start, "n={n}");
+        assert_eq!(stages.len(), origins.len(), "n={n}: the rounds of each trajectory");
+        assert!(stages.iter().all(|rounds| rounds.iter().sum::<u64>() == line.rounds), "n={n}: {stages:?}");
+        assert!(shape.widen.is_some() || stages.iter().all(|rounds| rounds[1..] == [0, 0]), "n={n}: {stages:?}");
+        assert!(origins.len() <= 1 + shape.back as usize, "n={n}: {origins:?}");
+        let steps: Vec<u64> = line.improvements.iter().map(|raised| raised.steps).collect();
+        assert!(steps.windows(2).all(|pair| pair[0] < pair[1]) && steps.iter().all(|&s| s <= line.steps), "n={n}");
+        for raised in &line.improvements {
+            assert!(raised.trajectory < origins.len() && raised.stage < 3, "n={n}: {raised:?}");
+            assert!(shape.widen.is_some() || raised.stage == 0, "n={n}: {raised:?}");
+        }
+    }
+    let trajectories: Vec<usize> = lines.iter().map(|line| line.trajectories.as_ref().unwrap().len()).collect();
+    assert_eq!(trajectories, if shape.back > 0 { vec![2, 3, 4, 4] } else { vec![1; 4] }, "{what}");
+    if shape.widen.is_some() {
+        // A trajectory that stalls widens its neighborhoods: some game spends rounds at the second stage.
+        let widened: u64 = lines.iter().flat_map(|line| line.stage_rounds.as_ref().unwrap()).map(|r| r[1] + r[2]).sum();
+        assert!(widened > 0, "{what}: no round at a stage below the first");
     }
 }
-for_each_option!(what_the_option_finds, check_what_the_option_finds);
+for_each_option!(what_the_line_records, check_what_the_line_records);
 
 #[test]
-fn a_game_with_no_seed_follows_one_trajectory_whatever_the_switch() {
-    let (with, without) = (Plan { survivors: true, ..plan(2) }, plan(2));
-    let (with, without) =
-        (lines(SECOND, &options(4, false), &with, None), lines(SECOND, &options(4, false), &without, None));
-    // But for the switch the plan records, the lines are the same, and say that the searched games followed one.
-    let unswitched = |line: &Line| Line { plan: Plan { survivors: false, ..line.plan }, ..timeless(line) };
-    assert_eq!(with.iter().map(unswitched).collect::<Vec<_>>(), without.iter().map(unswitched).collect::<Vec<_>>());
-    assert!(with.iter().all(|line| line.plan.survivors && line.trajectories == line.start.map(|_| 1)));
-    assert!(with.iter().any(|line| line.start.is_some()), "a searched game");
+fn back_adds_a_trajectory_for_each_distinct_set_that_survives_of_the_games_before() {
+    let known = Plan { from_known: true, ..plan(1) };
+    let origins = |back| -> Vec<Vec<Origin>> {
+        let shape = Plan { back, ..known };
+        shaped_lines(&options(4, true), &shape).into_iter().map(|line| line.trajectories.unwrap()).collect()
+    };
+    let (none, one, eight) = (origins(0), origins(1), origins(8));
+    assert!(none.iter().all(|origins| origins == &[Origin::Start]));
+    let game = Origin::Game;
+    // What survives of the moves for 374 is the start of 375, so 375 begins no trajectory from it, and the moves for
+    // 367 are the first to give another; the other games begin one from the moves for the game before.
+    assert_eq!(
+        one,
+        [
+            vec![Origin::Start],
+            vec![Origin::Start, game(538)],
+            vec![Origin::Start, game(543)],
+            vec![Origin::Start, game(679)]
+        ]
+    );
+    assert_eq!(eight[0], [Origin::Start, game(367)]);
+    assert_eq!(eight[1], [Origin::Start, game(538), game(531)]);
+    assert_eq!(eight[2], [Origin::Start, game(543), game(539), game(538)]);
+    assert_eq!(eight[3], [Origin::Start, game(679), game(675), game(674)]);
+    // The games are in the order n − 1, n − 2, ..., none twice, and a smaller J keeps the first trajectories.
+    for (shaped, (one, eight)) in SHAPED.iter().zip(one.iter().zip(&eight)) {
+        let games: Vec<u32> =
+            eight[1..].iter().map(|origin| if let Origin::Game(m) = origin { *m } else { 0 }).collect();
+        assert!(
+            games.windows(2).all(|pair| pair[0] > pair[1]) && games.iter().all(|m| (shaped - 8..*shaped).contains(m))
+        );
+        assert!(eight.starts_with(one), "n={shaped}");
+    }
+}
+
+/// Games whose start, from the table's moves for n − 1, is lighter than what survives of the moves for an earlier game:
+/// their start, and the score of the heaviest start.
+const SURVIVORS_AHEAD: [(u32, u64, u64); 2] = [(715, 161442, 161449), (805, 204901, 204916)];
+
+#[test]
+fn a_trajectory_that_begins_heavier_than_the_start_raises_the_score_before_any_round() {
+    let back = Plan { back: 8, from_known: true, stop_at_known: true, ..plan(0) };
+    let opts = options(4, true);
+    for (n, start, score) in SURVIVORS_AHEAD {
+        let line = &lines((n, n), &opts, &back, None)[0];
+        assert_eq!(
+            (line.start, line.score, line.rounds, line.steps, line.work),
+            (Some(start), score, 0, 0, 0),
+            "n={n}"
+        );
+        // The game's score is that of the trajectory, from the first: an improvement of round 0.
+        let [raised] = &line.improvements[..] else { panic!("n={n}: {:?}", line.improvements) };
+        let origins = line.trajectories.as_ref().unwrap();
+        assert!((1..origins.len()).contains(&raised.trajectory), "n={n}: {:?} of {origins:?}", raised.trajectory);
+        assert_eq!((raised.round, raised.stage, raised.steps, raised.work, raised.score), (0, 0, 0, 0, score), "n={n}");
+        // What --stop-at-known recorded is that round, if the score is the table's.
+        let known = line.known.unwrap();
+        assert_eq!(known.round, (score >= known.score).then_some(0), "n={n}");
+        // A level above does the same first, and its rounds go on from there.
+        let more = &lines((n, n), &opts, &Plan { effort: 1, stop_at_known: false, ..back }, None)[0];
+        assert_eq!(raised_by(more).first(), Some(&(0, raised.trajectory, 0, 0, 0, score)), "n={n}");
+        assert!(more.rounds >= 1 && more.score >= score, "n={n}");
+    }
 }
 
 #[test]
-fn a_share_fixed_that_is_not_a_range_inside_0_to_1_is_refused() {
+fn a_game_has_no_trajectory_from_the_moves_nothing_has() {
+    // Game n − j below 1 has no moves, and a game that takes no seed begins no trajectory from any game.
+    let back = Plan { back: 8, ..plan(1) };
+    let seeded = lines((1, 40), &options(2, true), &back, None);
+    let searched: Vec<&Line> = seeded.iter().filter(|line| line.trajectories.is_some()).collect();
+    assert!(!searched.is_empty());
+    for line in searched {
+        let origins = line.trajectories.as_ref().unwrap();
+        let games: Vec<u32> =
+            origins.iter().filter_map(|o| if let Origin::Game(m) = o { Some(*m) } else { None }).collect();
+        assert!(games.iter().all(|&m| m >= 1 && m < line.n && line.n - m <= 8), "n={}: {games:?}", line.n);
+    }
+    let unseeded = lines(SECOND, &options(4, false), &back, None);
+    let plain = lines(SECOND, &options(4, false), &plan(1), None);
+    let unbacked = |line: &Line| Line { plan: Plan { back: 0, ..line.plan }, ..timeless(line) };
+    assert_eq!(unseeded.iter().map(unbacked).collect::<Vec<_>>(), plain.iter().map(unbacked).collect::<Vec<_>>());
+    assert!(unseeded
+        .iter()
+        .filter(|line| line.start.is_some())
+        .all(|line| line.trajectories == Some(vec![Origin::Start])));
+}
+
+#[test]
+fn a_plan_with_an_option_out_of_range_is_refused() {
+    let refused = |plan: Plan| unsound::solve_range(12, 12, &options(1, true), &plan, None, |_| ()).unwrap_err();
     for fix in [(0.9, 0.7), (-0.1, 0.5), (0.5, 1.1), (f64::NAN, 0.5), (0.5, f64::INFINITY)] {
-        let plan = Plan { fix, ..plan(1) };
-        let err = unsound::solve_range(12, 12, &options(1, true), &plan, None, |_| ()).unwrap_err();
+        let err = refused(Plan { fix, ..plan(1) });
         assert!(err.starts_with("--fix takes LO,HI") && err.contains("0 <= LO <= HI <= 1"), "{fix:?}: {err}");
     }
+    for back in [9, 100] {
+        assert!(refused(Plan { back, ..plan(1) }).starts_with("--back takes J, a whole number from 0 to 8"), "{back}");
+    }
+    assert!(refused(Plan { widen: Some(0), ..plan(1) }).starts_with("--widen takes S"));
+    // The ladder of the widening replaces the share fixed.
+    for fix in [(0.5, 0.7), (0.4, 0.6)] {
+        assert_eq!(refused(Plan { widen: Some(2), fix, ..plan(1) }), unsound::WIDEN_WITH_FIX, "{fix:?}");
+    }
+    assert!(refused(Plan { effort: unsound::MAX_EFFORT + 1, ..plan(1) }).contains("more than the most"));
+    // The most effort budgets 2^47 work, which no run reaches and no count overflows: the plan is accepted.
+    let most = Plan { effort: unsound::MAX_EFFORT, round_work: unsound::ROUND_WORK, ..plan(1) };
+    assert_eq!((unsound::check_plan(&most), most.budget()), (Ok(()), 1 << 47));
 }
 
 #[test]
 fn a_run_resumes_from_its_file() {
     let dir = TempDir::new("unsound-resume");
-    let (opts, plan, (lo, hi)) = (options(4, false), plan(1), SECOND);
+    // The games after the break begin trajectories from the moves for the 3 games before: this run's, the file's, the
+    // table's.
+    let (opts, plan, (lo, hi)) = (options(4, true), Plan { back: 3, ..plan(1) }, SECOND);
     let whole = lines(SECOND, &opts, &plan, Some(&dir.join("whole.jsonl")));
     let file = dir.join("parts.jsonl");
     let first = lines((lo, lo + 1), &opts, &plan, Some(&file));
@@ -333,6 +446,7 @@ fn stop_at_known_ends_the_rounds_at_the_tables_score() {
         let known = line.known.expect("what --stop-at-known recorded");
         assert_eq!((known.score, line.score), (optimal.score(line.n).unwrap(), known.score), "n={}", line.n);
         assert_eq!(Some(line.rounds), known.round, "n={}: the rounds end with the one that reached it", line.n);
+        assert!(line.work < measured.budget(), "n={}: the rounds ended before their budget", line.n);
     }
     // With the seed, 376 starts from the moves for 375, at the table's score, and runs no round.
     let seeded = self::lines(FIRST, &options(4, true), &measured, None);

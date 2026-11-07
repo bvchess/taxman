@@ -36,13 +36,16 @@ fn help_lists_the_commands_and_every_tactic() {
             "--effort E",
             "--seed S",
             "--fix LO,HI",
-            "--survivors",
+            "--tilt",
+            "--back J",
+            "--widen S",
             "--stop-at-known",
             "--from-known",
             "tables N K...",
         ] {
             assert!(run.stdout.contains(text), "{args:?}: no {text:?}");
         }
+        assert!(!run.stdout.contains("--survivors"), "{args:?}: --back replaced --survivors");
         for name in taxman::tactics::Tactics::names() {
             assert!(run.stdout.contains(name), "{args:?}: the help does not name the tactic {name}");
         }
@@ -400,7 +403,7 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
     let dir = TempDir::new("unsound");
     let file = dir.join("unsound.jsonl");
     let unsound =
-        |range: &str| taxman(&["solve", range, "--unsound", "--effort", "1", "--threads", "1", "--out", path(&file)]);
+        |range: &str| taxman(&["solve", range, "--unsound", "--effort", "0", "--threads", "1", "--out", path(&file)]);
     let run = unsound("1-30");
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert_eq!(run.stdout.lines().filter(|line| line.contains("  unsound")).count(), 30, "{}", run.stdout);
@@ -459,11 +462,13 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         let message = format!("{} is a flag of the proof search, which --unsound does not run", flag[0]);
         assert_usage_error(&[&base[..], flag].concat(), &message);
     }
-    let unsound_only: [&[&str]; 6] = [
+    let unsound_only: [&[&str]; 8] = [
         &["--effort", "1"],
         &["--seed", "2"],
         &["--fix", "0.5,0.7"],
-        &["--survivors"],
+        &["--tilt"],
+        &["--back", "2"],
+        &["--widen", "3"],
         &["--stop-at-known"],
         &["--from-known"],
     ];
@@ -471,30 +476,83 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         let message = format!("{} is a flag of the unsound mode: give --unsound with it", flag[0]);
         assert_usage_error(&[&["solve", "12"][..], flag].concat(), &message);
     }
+    // `--back 1` is what `--survivors` was, and the switch is gone.
+    assert_usage_error(&[&base[..], &["--survivors"]].concat(), "unknown option --survivors");
 }
 
-/// `--fix LO,HI` takes two numbers with 0 <= LO <= HI <= 1, and the line records the range and the switch
-/// `--survivors`.
+/// `--fix LO,HI` takes two numbers with 0 <= LO <= HI <= 1, `--back J` a whole number from 0 to 8 and `--widen S` a
+/// whole number from 1, `--widen` is refused with `--fix`, and the line records the options.
 #[test]
-fn the_share_fixed_is_a_range_and_the_line_records_it_with_the_survivors_switch() {
+fn the_options_that_shape_the_rounds_are_checked_and_the_line_records_them() {
     let dir = TempDir::new("unsound-fix");
     let file = dir.join("fix.jsonl");
-    let base = ["solve", "12", "--unsound", "--effort", "1", "--threads", "1", "--out", path(&file)];
+    let base = ["solve", "12", "--unsound", "--effort", "0", "--threads", "1", "--out", path(&file)];
     for fix in ["0.9,0.7", "-0.1,0.5", "0.5,1.1", "0.5", "0.5,", "a,b", "0.5,0.7,0.9", "nan,0.5", "0.5,inf", ""] {
         let message = format!("--fix takes LO,HI, two numbers with 0 <= LO <= HI <= 1, such as 0.7,0.9: got {fix:?}");
         assert_usage_error(&[&base[..], &["--fix", fix]].concat(), &message);
     }
+    for back in ["9", "-1", "", "a", "1.5", "99999999999"] {
+        let message = format!("--back takes J, a whole number from 0 to 8: got {back:?}");
+        assert_usage_error(&[&base[..], &["--back", back]].concat(), &message);
+    }
+    for widen in ["0", "-1", "", "a", "2.5"] {
+        let message = format!("--widen takes S, a whole number of rounds, at least 1: got {widen:?}");
+        assert_usage_error(&[&base[..], &["--widen", widen]].concat(), &message);
+    }
+    // The widening has a ladder of its own for the share fixed, whatever the value of the share.
+    for fix in ["0.7,0.9", "0.4,0.6"] {
+        let message = "--widen takes the share fixed from its own ladder, so --fix is refused with it";
+        assert_usage_error(&[&base[..], &["--widen", "2", "--fix", fix]].concat(), message);
+    }
     assert!(!file.exists(), "a refused run plays no game");
-    let run = taxman(&[&base[..], &["--fix", "0.4,0.6", "--survivors"]].concat());
+    let options = ["--fix", "0.4,0.6", "--tilt", "--back", "1"];
+    let run = taxman(&[&base[..], &options].concat());
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     let line = Json::parse(fs::read_to_string(&file).unwrap().lines().next().unwrap()).unwrap();
     assert_eq!(line.get("fix"), Some(&Json::array([0.4, 0.6])));
-    assert_eq!(line.get("survivors"), Some(&Json::Bool(true)));
-    // Without the options, the line records the defaults.
+    let (tilt, back, widen) = (line.get("tilt"), line.get("back"), line.get("widen"));
+    assert_eq!((tilt, back, widen), (Some(&Json::Bool(true)), Some(&Json::from(1u64)), Some(&Json::Null)));
+    assert!(line.get("survivors").is_none(), "--back replaced --survivors");
+    // The widening alone, and without the options, the line records the defaults.
+    let widened = dir.join("widen.jsonl");
+    let run = taxman(&["solve", "12", "--unsound", "--effort", "0", "--out", path(&widened), "--widen", "3"]);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let line = Json::parse(fs::read_to_string(&widened).unwrap().lines().next().unwrap()).unwrap();
+    assert_eq!((line.get("widen"), line.get("fix")), (Some(&Json::from(3u64)), Some(&Json::array([0.7, 0.9]))));
     let other = dir.join("default.jsonl");
-    let run = taxman(&["solve", "12", "--unsound", "--effort", "1", "--threads", "1", "--out", path(&other)]);
+    let run = taxman(&["solve", "12", "--unsound", "--effort", "0", "--threads", "1", "--out", path(&other)]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     let line = Json::parse(fs::read_to_string(&other).unwrap().lines().next().unwrap()).unwrap();
     assert_eq!(line.get("fix"), Some(&Json::array([0.7, 0.9])));
-    assert_eq!(line.get("survivors"), Some(&Json::Bool(false)));
+    assert_eq!(
+        (line.get("tilt"), line.get("back"), line.get("widen")),
+        (Some(&Json::Bool(false)), Some(&Json::from(0u64)), Some(&Json::Null))
+    );
+    assert_eq!(line.get("budget"), Some(&Json::from(0u64)), "effort 0 budgets no steps");
+
+    // The three options together, with rounds: game 375 from the table's moves has two trajectories, the start's and
+    // one from the moves for 367, and reaches the table's score in the first round, which ends the rounds of a budget
+    // of 65,536 steps.
+    let rounds = dir.join("rounds.jsonl");
+    let args = ["solve", "375", "--unsound", "--effort", "1", "--from-known", "--stop-at-known", "--threads", "1"];
+    let options = ["--tilt", "--back", "8", "--widen", "2", "--out", path(&rounds)];
+    let run = taxman(&[&args[..], &options].concat());
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let line = Json::parse(fs::read_to_string(&rounds).unwrap().lines().next().unwrap()).unwrap();
+    assert_eq!(line.get("budget"), Some(&Json::from(65_536u64)));
+    assert_eq!(line.get("trajectories"), Some(&Json::array([Json::from("start"), Json::from(367u64)])));
+    assert_eq!(line.get("stage_rounds"), Some(&Json::array([Json::array([1u64, 0, 0]), Json::array([1u64, 0, 0])])));
+    assert_eq!(line.get("rounds"), Some(&Json::from(1u64)));
+    // The work of a round is its steps and 32 for each of its 64 neighborhoods.
+    let (steps, work) = (line.get("steps").and_then(Json::as_u64), line.get("work").and_then(Json::as_u64));
+    assert_eq!(work, steps.map(|steps| steps + 64 * 32));
+    let improvements = line.get("improvements").and_then(Json::as_arr).expect("the improvements");
+    assert_eq!(improvements.len(), 1);
+    assert_eq!(improvements[0].get("round"), Some(&Json::from(1u64)));
+    assert_eq!(
+        (improvements[0].get("trajectory"), improvements[0].get("stage")),
+        (Some(&Json::from(0u64)), Some(&Json::from(0u64)))
+    );
+    let known = line.get("stop_at_known").expect("what --stop-at-known recorded");
+    assert_eq!(known.get("round"), Some(&Json::from(1u64)));
 }

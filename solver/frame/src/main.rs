@@ -12,7 +12,7 @@ use cli::{errln, outln, CliError, CliResult};
 use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, gate_trial, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
-use taxman::solver::unsound::MAX_EFFORT;
+use taxman::solver::unsound::{Plan, MAX_BACK, MAX_EFFORT, ROUND_WORK};
 use taxman::tactics::Tactics;
 
 /// The usage text with its `{...}` parts to fill in by [`usage`].
@@ -73,15 +73,21 @@ commands:
       --unsound                play each game as well as --effort finds, with no proof, on all the threads: each
                                line, appended to --out (needed), holds legal moves and their score, a lower bound,
                                and is marked unsound, which every reader of proven lines refuses.  It takes
-                               --threads, --tactic, --show and the six flags below, and refuses the others
-      --effort E               with --unsound: the level of effort, from 0 (the search's start alone) to {max_effort}
-                               (2^(E-1) rounds of {neighborhoods} neighborhoods of the finder's search); a higher level
-                               does the rounds of a lower one first
+                               --threads, --tactic, --show and the flags below, and refuses the others
+      --effort E               with --unsound: the level of effort, from 0 (the search's start alone) to {max_effort}.
+                               Level E runs rounds of {neighborhoods} neighborhoods of the finder's search until
+                               their work (their steps and {neighborhood_work} for each neighborhood) reaches
+                               2^(E-1) x {round_work}; a higher level does the rounds of a lower one first
       --seed S                 with --unsound: the seed of the rounds' random choices (default {seed})
       --fix LO,HI              with --unsound: the share of the incumbent's promotions that each neighborhood keeps
                                fixed, drawn from LO to HI, 0 <= LO <= HI <= 1 (default {fix})
-      --survivors              with --unsound: follow a second incumbent, from what survives of the moves for n-1,
-                               beside the start's, each with half of a round's neighborhoods
+      --tilt                   with --unsound: a neighborhood frees the small promotions more often than the large ones
+                               (the share freed is the same)
+      --back J                 with --unsound: besides the start's, follow an incumbent from what survives of the moves
+                               for each of the games n-1 .. n-J (J from 0 to {max_back}, default {back}) that differs
+                               from the ones before, each with its share of a round's neighborhoods
+      --widen S                with --unsound: an incumbent that has not grown heavier for S rounds (S >= 1) moves its
+                               neighborhoods down a ladder of the shares fixed, {ladder}; refused with --fix
       --stop-at-known          with --unsound: end a game's rounds once its score is the built-in table's
       --from-known             with --unsound: start every game from the built-in table's moves for n-1
   regress [--from A] [--to N] [--threads K] [--window K] [--tactic ...]
@@ -101,6 +107,7 @@ fn usage() -> String {
     let rows: Vec<String> = Tactics::names().chunks(4).map(|row| row.join(", ")).collect();
     let gates = gate_trial::GATES.map(|gate| gate.to_string()).join(",");
     let (lo, hi) = finder::Options::default().fix;
+    let ladder: Vec<String> = finder::LADDER.iter().map(|(lo, hi)| format!("{lo},{hi}")).collect();
     USAGE
         .replace("{tactics}", &rows.join(&format!(",\n{:31}", "")))
         .replace("{finder_after}", &finder::AFTER.to_string())
@@ -116,8 +123,13 @@ fn usage() -> String {
         .replace("{trial_least_gap}", &gate_trial::LEAST_GAP.to_string())
         .replace("{max_effort}", &MAX_EFFORT.to_string())
         .replace("{neighborhoods}", &finder::NEIGHBORHOODS.to_string())
+        .replace("{round_work}", &ROUND_WORK.to_string())
+        .replace("{neighborhood_work}", &finder::NEIGHBORHOOD_WORK.to_string())
         .replace("{seed}", &finder::Options::default().seed.to_string())
         .replace("{fix}", &format!("{lo},{hi}"))
+        .replace("{max_back}", &MAX_BACK.to_string())
+        .replace("{back}", &Plan::default().back.to_string())
+        .replace("{ladder}", &ladder.join(" -> "))
 }
 
 fn main() -> ExitCode {
