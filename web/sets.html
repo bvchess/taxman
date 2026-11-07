@@ -67,8 +67,9 @@
       d | f.</p>
     </aside>
     <p>A <a class="gloss" href="glossary.html#move">move</a> is legal when one of its divisors is still in the <a class="gloss" href="glossary.html#pot">pot</a>, and only some
-    divisors matter: a number's <a class="gloss" href="glossary.html#maximal-factor"><em>maximal factors</em></a>, the number divided by one of its primes.  <span class="n" data-n="12">12</span> =
-    2 · 2 · 3 has the maximal factors 6 and 4, 9 has only 3, and a prime has only 1.  If any divisor of a move is
+    divisors matter: a number's <a class="gloss" href="glossary.html#maximal-factor"><em>maximal factors</em></a>, the number divided by one of its primes.  <span class="n" data-n="10">10</span> =
+    2 · 5 has the maximal factors 5 and 2, <span class="n" data-n="8">8</span> = 2 · 2 · 2 has only 4, though 2
+    divides it too, and a prime has only 1.  If any divisor of a move is
     still in the pot, so is one of its maximal factors.  So a move is legal exactly when a maximal factor of it is
     still in the pot.</p>
     <p>Think of that factor as what <a class="gloss" href="glossary.html#pays-for"><em>pays for</em></a> the move.  Two moves cannot share a payment, because whichever is
@@ -125,9 +126,11 @@
     </aside>
     <p>A payment for each number is not quite enough, because the order can still tie itself in a knot.  A move takes
     all of its divisors in the pot, not only the one that pays for it, so it can take a factor that another move was
-    counting on.  In game 21, <span class="n" data-n="9">9</span> is paid for by 3, and
-    <span class="n" data-n="15">15</span> would take 3 as <a class="gloss" href="glossary.html#tax">tax</a>, so 9 must come before 15.  And 9 divides
-    <span class="n" data-n="18">18</span>, so 9 must come before 18 as well, or 18 would take it.</p>
+    counting on.  In game 10, <span class="n" data-n="9">9</span> is paid for by 3, and
+    <span class="n" data-n="6">6</span> would take 3 as <a class="gloss" href="glossary.html#tax">tax</a>, so 9 must
+    come before 6.  Then 6 is paid for by 2, and <span class="n" data-n="8">8</span> and
+    <span class="n" data-n="10">10</span> would take 2, so 6 must come before them.  A move must also come before any
+    move it divides: <span class="n" data-n="5">5</span> before 10, if both are taken, or 10 would take 5.</p>
     <p>Rules like these say which moves must come before which.  A set can be played exactly when its numbers can be
     paid for in a way whose rules never run in a circle, each move before the next and the last before the first.
     Then any order that keeps the rules is a legal game.</p>
