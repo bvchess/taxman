@@ -104,11 +104,12 @@
       Each is kept as a <em>nogood</em>, a set that cannot be promoted from the root
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/design/search.md#forced-members-and-nogoods">nogoods</a>).</p>
     </aside>
-    <p>When the heaviest set that passes the bound's test can be promoted, it is the best the branch can do, and the
-    branch is done.  When it cannot, the solver finds a few of its
-    <a class="gloss" href="glossary.html#candidate">candidates</a> that cannot be promoted together, often only one or
-    two.  Every better set leaves one of them out, so the
-    <a class="gloss" href="glossary.html#node">node</a> branches on them: promote one, or go on without it.</p>
+    <p>At each <a class="gloss" href="glossary.html#node">node</a>, the solver checks whether the heaviest set that
+    passes the bound's test can really be promoted.  If it can, nothing in the branch does better, and the branch is
+    done.  If it cannot, the solver finds the few <a class="gloss" href="glossary.html#candidate">candidates</a> in it
+    that cause the trouble, often only one or two: they cannot all be promoted together.  Any set that can be promoted
+    leaves at least one of them out, so the search splits on one of them: one branch promotes it, and the other goes on
+    without it.</p>
     <p>The solver remembers each dead end it finds.  A set of candidates that cannot be promoted together from the root cannot
     be promoted anywhere in the tree, so once such a set is found, no other branch tries it again.</p>
   </div>
