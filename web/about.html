@@ -39,11 +39,11 @@
   <ul class="adds">
     <li><p class="adds-head"><b>The chain</b></p>
     <p>For every game from game 1 to game <span data-last-n>n</span>, a sequence of moves that reaches the best score,
-    found from the game before, and how we know that no sequence scores more, with what that rests on.  The <a
-    class="gloss" href="glossary.html#prover">prover</a>, which shares no proof code with the <a class="gloss"
-    href="glossary.html#frame-solver">frame solver</a>, proves the scores to game 2,530 a second time, on the whole
-    board (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what
-    supports the scores</a>).</p></li>
+    found from the game before, and how we know that no sequence scores more, with what that rests on.  Up to game
+    2,530 the <a class="gloss" href="glossary.html#prover">prover</a> proves the scores on the whole board too, without
+    the frame model, so they rest on no open statement
+    (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports
+    the scores</a>).</p></li>
     <li><p class="adds-head"><b>The frame model and its exactness</b><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#the-exactness-theorem">proved<span class="sr-only">, proof on GitHub</span></a></p>
     <p>The <a class="gloss" href="glossary.html#frame-model">frame model</a> leaves only the promotions to choose,
     and the exactness theorem makes its best score the best score of a game that plays

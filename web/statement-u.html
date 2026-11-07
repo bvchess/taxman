@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Statement U · Taxman</title>
+<meta name="description" content="The scores of the chain of optimal Taxman games rest on one open statement, statement U: proven in every game up to 2,530 by a second program that searches the whole board, and the evidence for it past that game.">
+<meta name="author" content="Brian Chess">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<script src="js/tone.js"></script>
+<link rel="stylesheet" href="css/site.css">
+<link rel="stylesheet" href="css/statement-u.css">
+</head>
+<body data-page="story" data-chapter="6">
+<header class="topbar"></header>
+<div class="site">
+<aside class="rail" aria-label="Contents"></aside>
+<main class="essay"><div class="column">
+
+<header class="essay-head para">
+  <p class="kicker">Chapter 6</p>
+  <h1>Statement U</h1>
+  <p class="lede">One open statement stands between the frame model and the best score.  It is proven in every game up
+  to 2,530.</p>
+</header>
+
+<section class="chapter" id="what-supports-the-scores" data-toc="what-supports-the-scores" aria-labelledby="h-supports">
+  <h2 id="h-supports">What the scores rest on</h2>
+  <div class="para">
+    <aside class="note card" aria-label="The corollary of statement U, proved">
+      <div class="note-head"><span class="note-name">The corollary of statement U<span class="note-label">Corollary X8</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">The frame model's best score is never above opt(n), and equals it exactly when statement U
+      holds.</p>
+      <p class="precise"><span class="run">Precisely.</span>ΣU* + P*(Π<sub>n</sub>) ≤ opt(n), with equality iff
+      statement U holds at n.</p>
+    </aside>
+    <aside class="note card" aria-label="Statement U, open, proved to game 2,530">
+      <div class="note-head"><span class="note-name">Statement U</span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">open, proved to game 2,530<span class="sr-only">, evidence on GitHub</span></a></div>
+      <p class="plain">Some optimal game plays every number of U* with three or more prime factors.</p>
+      <p class="precise"><span class="run">Precisely.</span>Some optimal set of n contains U*<sub>≥3</sub>.  It holds
+      at every game the prover proves
+      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">the evidence</a>).</p>
+    </aside>
+    <p>The search of <a href="search.html">chapter 5</a> proves the best score of the
+    <a class="gloss" href="glossary.html#frame-model">frame model</a>: the best score of a game that plays every number
+    of <a class="gloss" href="glossary.html#u-star">U*</a>.  That is
+    <a class="gloss" href="glossary.html#opt">opt(n)</a> exactly when
+    <a class="gloss" href="glossary.html#statement-u">statement U</a> holds: when some optimal game plays every number
+    of U* with three or more prime factors.  For the numbers with one or two it is proved
+    (<a href="top-half.html#bottom-layers">chapter 3</a>).  For the rest it is open.  An optimal game might give one of
+    them up, free the factor that paid for it, and win the points back below n/2.</p>
+  </div>
+
+  <figure class="fig rests-fig" id="rests-on" aria-label="What each kind of proof in the chain's records rests on, with the number of games of each kind, and what makes the frame model's best score opt(n).">
+    <div class="rests"></div>
+  </figure>
+
+  <div class="para">
+    <p>A score at the <a class="gloss" href="glossary.html#ceiling">ceiling</a> or by the
+    <a class="gloss" href="glossary.html#prime-formula">prime formula</a> rests on the game before it.  A
+    <a class="gloss" href="glossary.html#search">search</a> rests on the frame model of its own game, and so does a
+    <a class="gloss" href="glossary.html#repeat">repeat</a>, which takes the answer of the earlier game that posed the
+    same search problem.  Followed down, every score rests on the frame model of some game.  Up to game 2,530 that
+    gives opt(n), proven.  Past it, the scores rest on statement U from game
+    <span data-rests="firstU">2,532</span> on, <span data-rests="onU">2,529</span> of them.  Game 2,531 follows from
+    game 2,530 by the prime formula, so its score is proven too.</p>
+  </div>
+</section>
+
+<section class="chapter" id="prover" data-toc="prover" aria-labelledby="h-prover">
+  <h2 id="h-prover">Proving it game by game</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="The prover">
+      <div class="note-head"><span class="note-name">The prover</span></div>
+      <p>A branch and bound over sets of moves, bounded by the parity bound, that takes the recorded score as its
+      target.  It rests only on the theory's theorems and on elementary bounds, and its exact methods are tested
+      against brute force (<a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/README.md">its
+      README</a>).  Its run of games 2 to 2,530 took 19 hours on a machine with 88 threads
+      (<a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md">the proofs</a>).</p>
+    </aside>
+    <p>Statement U can be settled one game at a time: find opt(n) without the frame model, and compare.  A second
+    program, the <a class="gloss" href="glossary.html#prover">prover</a>, does that.  It searches the whole
+    <a class="gloss" href="glossary.html#board">board</a>, sets of moves rather than promotions, with no frames.  Its
+    bound is the <a class="gloss" href="glossary.html#parity-bound">parity bound</a>, the test of
+    <a href="search.html#parity-bound">chapter 5</a> applied to the whole board.  Wherever its opt(n) is the frame
+    model's best score, statement U holds.</p>
+    <p>It has proven every game up to 2,530.  In each one opt(n) is the score the
+    <a class="gloss" href="glossary.html#frame-solver">frame solver</a> found, so statement U holds there, and the score
+    is opt(n) with no assumption.</p>
+  </div>
+</section>
+
+<section class="chapter" id="evidence" data-toc="evidence" aria-labelledby="h-evidence">
+  <h2 id="h-evidence">The evidence past 2,530</h2>
+  <div class="para">
+    <aside class="note tech" aria-label="The evidence for statement U">
+      <div class="note-head"><span class="note-name">The evidence for statement U</span></div>
+      <p>The lower layers: every optimal set holds U*<sub>1</sub> and U*<sub>2</sub>, by
+      <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-bottom-layers-theorem">the
+      bottom-layers theorem (F4)</a>.  The sources: <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#the-sources-conjecture">the
+      sources conjecture (S1)</a>, proved in every game up to 100,000.  The barred bounds:
+      <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#the-barred-bound">W2</a>, and
+      their counts by band in <a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md#the-upper-part-game-by-game">the
+      upper part, game by game</a>.</p>
+    </aside>
+    <p>What supports statement U past game 2,530:</p>
+    <ul class="rules">
+      <li>It holds in every game the prover reaches, up to game 2,530.</li>
+      <li>It is proved for the numbers with one or two prime factors: every optimal set holds those of U*.
+      Statement U asks the same of the numbers with three or more.</li>
+      <li>Among the <a class="gloss" href="glossary.html#source">sources</a> alone, U* is the heaviest set that can be
+      played, in every game up to 100,000.</li>
+      <li>The prover can leave out one number of U* at a time and bound what any game without it could score.  For
+      about 85% of the numbers statement U asks about, in games 2,531 to 3,440, that bound is below the recorded
+      score, so a game that beats the score, if there is one, plays them.  In no game does it reach all of them.</li>
+      <li>At the start of the search of every game measured, up to game 3,440, the heaviest set that the parity bound
+      allows holds all of them.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="chapter" id="why-open" data-toc="why-open" aria-labelledby="h-why-open">
+  <h2 id="h-why-open">Where a proof stops</h2>
+  <p>Suppose an optimal game leaves out some numbers of U* with three or more prime factors, and let d be the largest.
+  Adding d back would make the game heavier, so it must make it unplayable: d is caught in a set of numbers that
+  cannot all be played.  If giving up a smaller number frees d, the exchange beats the game, so no optimal game leaves
+  d out.  In layer 2 such an exchange always exists, which is how the numbers with two prime factors are proved.
+  Above layer 2, d can be caught in an <a class="gloss" href="glossary.html#odd-core">odd core</a>
+  (<a href="search.html#ladder">chapter 5</a>), and there the argument stops
+  (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#where-a-proof-stops">a
+  sketch</a>).</p>
+</section>
+
+<nav class="chapter-nav" aria-label="Pages"></nav>
+
+</div></main>
+</div>
+
+<script type="module">
+import { initEssay } from './js/essay.js';
+import { loadGames } from './js/data.js';
+import { fmt } from './js/vocab.js';
+import { mountRestsOn } from './figures/rests-on.js';
+
+initEssay();
+const games = await loadGames();
+const fill = (attr, facts) => {
+  for (const span of document.querySelectorAll(`[data-${attr}]`)) span.textContent = facts[span.dataset[attr]];
+};
+
+const rests = mountRestsOn(document.getElementById('rests-on'), { games });
+fill('rests', { onU: fmt(rests.onU), firstU: fmt(rests.firstU) });
+</script>
+</body>
+</html>

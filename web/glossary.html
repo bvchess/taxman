@@ -231,26 +231,21 @@
       <dd>A set of candidates that cannot be promoted together from the start of a search, which the search remembers, so that no branch tries it again.</dd>
       <dt id="odd-core">odd core</dt>
       <dd>A set that passes the parity test, which every playable set passes, yet cannot be played.  The first is on the board of game 45: 12, 18, 20, 30 and 45.  Odd cores are all that the search's bound misses.</dd>
+      <dt id="parity-bound">parity bound</dt>
+      <dd>The prover's upper bound on opt(n): the heaviest set in which no group of numbers lists every factor an even number of times.  Its gap is about a tenth of Franklín and Moniot's bound's.</dd>
+      <dt id="fm-bound">Franklín and Moniot's bound</dt>
+      <dd>An upper bound on opt(n): the heaviest set whose numbers can each be given a maximal factor of their own, from outside the set, to pay with.</dd>
   </dl>
 </section>
 
-<section class="chapter" id="trust" data-toc="trust" aria-labelledby="h-g-trust">
-  <h2 id="h-g-trust">Trust</h2>
+<section class="chapter" id="the-statement" data-toc="the-statement" aria-labelledby="h-g-statement">
+  <h2 id="h-g-statement">Statement U</h2>
   <dl class="glossary">
     <dt id="frame-solver">frame solver</dt>
     <dd>The program that finds the optimal games, by searching the frame model.</dd>
     <dt id="prover">prover</dt>
     <dd>A second program, which shares no proof code with the frame solver and proves the scores on the whole board,
     without frames.</dd>
-    <dt id="referee">referee</dt>
-    <dd>The check that replays every recorded game: each move legal, the score as recorded, and no move left at the
-    end.</dd>
-      <dt id="verifier">verifier</dt>
-      <dd>A program that checks the whole file of games without changing it.  There are two: the frame solver's, and one in Python that shares no code with it.</dd>
-      <dt id="parity-bound">parity bound</dt>
-      <dd>The prover's upper bound on opt(n): the heaviest set in which no group of numbers lists every factor an even number of times.  Its gap is about a tenth of Franklín and Moniot's bound's.</dd>
-      <dt id="fm-bound">Franklín and Moniot's bound</dt>
-      <dd>An upper bound on opt(n): the heaviest set whose numbers can each be given a maximal factor of their own, from outside the set, to pay with.</dd>
       <dt id="proof-kind">proof kind</dt>
       <dd>How a game of the chain was proven: by a search of the whole tree, at the ceiling, by the prime formula, as a repeat, or with nothing to choose.  Each game's record names its own.</dd>
   </dl>

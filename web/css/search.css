@@ -49,3 +49,44 @@
 
 #cost-chart .cost-dots { stroke: var(--search); stroke-opacity: 0.8; }
 #cost-chart .cost-end { fill: var(--search); stroke: var(--paper); }
+
+/* The figures of chapter 5's section on the parity bound: the ladder of the counting theorem, its "yes" on a gray step
+   and its "no" on the page, and game 78's odd core.  Both are flat ink. */
+
+/* ---- the ladder ------------------------------------------------------------------------------------------- */
+
+.ladder { border-top: 1.5px solid var(--ink); }
+.ladder-head, .ladder-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, 6.6rem); column-gap: 10px; align-items: center;
+}
+.ladder-head { padding: 10px 0 8px; border-bottom: 1px solid var(--hair); font-size: 0.78rem; line-height: 1.35; color: var(--ink-2); }
+.ladder-corner { color: var(--ink-3); align-self: end; text-align: right; }
+.rung-head { align-self: end; }
+.rung-head b { display: block; color: var(--ink); font-size: 0.9rem; }
+.rung-head span { display: block; }
+.ladder-row { padding: 14px 0 12px; border-bottom: 1px solid var(--hair); }
+.ladder-name { margin: 0; font-weight: 700; }
+.ladder-count { margin: 0 0 8px; font-size: 0.86rem; color: var(--ink-2); }
+.ladder-schemes { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 18px; }
+.ladder-cell { width: calc(var(--w) * 0.75px); max-width: 100%; }
+.ladder-scheme .v-label { font-size: 16px !important; }
+.rung { align-self: stretch; display: grid; align-content: center; padding: 6px 10px; border-radius: 10px; }
+.rung-name { display: none; }
+.rung-answer { font-size: 1rem; }
+.rung.is-yes { background: var(--wash); }
+.rung.is-yes .rung-answer { font-weight: 700; color: var(--ink); }
+.rung.is-no .rung-answer { color: var(--ink-3); }
+
+/* ---- game 78's odd core ----------------------------------------------------------------------------------- */
+
+.exact-78-fig { margin: 12px 0 16px; }
+.exact-78-fig svg { max-width: 24rem; margin: 0 auto; }
+
+/* ---- narrower ---------------------------------------------------------------------------------------------- */
+
+@container essay (max-width: 700px) {
+  .ladder-head, .ladder-row { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 8px; }
+  .ladder-corner { display: none; }
+  .ladder-set { grid-column: 1 / -1; }
+  .ladder-cell { width: calc(var(--w) * 0.66px); }
+}

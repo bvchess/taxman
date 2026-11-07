@@ -19,7 +19,8 @@ import { listWords, numberWord } from '../js/vocab.js';
 import { fitsFacts, fitsWords, primeFacts, primeWords } from '../figures/fits.js';
 import { slipFacts, slipOfRecord } from '../figures/slip.js';
 import { linkWords, linksFacts } from '../figures/links.js';
-import { GROUPS, RULES, oneSearchFacts, settled } from '../js/proof.js';
+import { GROUPS, PROVER_TO, RULES, oneSearchFacts, settled } from '../js/proof.js';
+import { restsFacts } from '../figures/rests-on.js';
 import { readResults, repoRoot } from './results.mjs';
 
 // Descending greedy is checked against the results file's in_the_bag for every game up to GREEDY_ALL_UP_TO, then for
@@ -318,7 +319,7 @@ for (let n = 1; n <= FRAME_MODEL_UP_TO; n++) {
 // --- How each game was proven (js/proof.js) ---------------------------------------------------------------------
 
 // The committed data/games.json is what the site's figures sort, so it must be this results file's export, its seconds
-// the time each game had a worker (tools/export.mjs).  trust.html says that every line assumes nothing.
+// the time each game had a worker (tools/export.mjs).
 const games = JSON.parse(readFileSync(join(repoRoot, 'web', 'data', 'games.json'), 'utf8'));
 const cols = games.columns;
 same('games.json holds every game of the results file', cols.n.length, records.length);
@@ -337,6 +338,16 @@ const sorted = settled(games);
 same('every game has a rule', sorted.rules.every((rule) => RULES.some((r) => r.key === rule)), true);
 same('the rules add up to every game', sum(Object.values(sorted.counts)), records.length);
 same('the groups add up to every game', sum(Object.values(sorted.groupCounts)), records.length);
+{
+  const rests = restsFacts(games);
+  const stale = 'statement-u.html: its sentence about game 2,531 is stale';
+  same(`${stale}: game ${PROVER_TO + 1} is no longer by the prime formula`, cols.proof[PROVER_TO], 'prime_formula');
+  same(`${stale}: the first game resting on statement U is no longer ${PROVER_TO + 2}`, rests.firstU, PROVER_TO + 2);
+  same('every game from the first resting on statement U on rests on it', rests.onU, games.lastN - rests.firstU + 1);
+  const page = readFileSync(join(repoRoot, 'web', 'statement-u.html'), 'utf8').replace(/\s+/g, ' ');
+  const words = 'Game 2,531 follows from game 2,530 by the prime formula';
+  same(`${stale}: it no longer says "${words}"`, page.includes(words), true);
+}
 const badGroup = [];
 const badSearch = [];
 sorted.rules.forEach((rule, i) => {

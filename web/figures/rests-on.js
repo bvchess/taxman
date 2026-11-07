@@ -15,11 +15,25 @@ const GROUPS = [
 ];
 const NAMES = { ...Object.fromEntries(PROOFS.map((p) => [p.key, p.name])), trivial: 'nothing to choose' };
 
-/** The counts the figure and its prose show: games by proof. */
+/**
+ * The counts the figure and its prose show: games by proof.  A score rests on statement U when the search it rests on,
+ * followed down through the ceiling and the prime formula, is of a game past PROVER_TO: onU counts those games, firstU
+ * is the first.
+ */
 export function restsFacts(games) {
   const c = games.columns;
   const count = Object.fromEntries(PROOFS.map((p) => [p.key, c.proof.filter((x) => x === p.key).length]));
-  return { count, total: c.n.length, last: games.lastN, past: games.lastN - PROVER_TO };
+  let foundation = 0;
+  let onU = 0;
+  let firstU = null;
+  c.n.forEach((n, i) => {
+    if (c.proof[i] !== 'cap' && c.proof[i] !== 'prime_formula') foundation = n;
+    if (foundation > PROVER_TO) {
+      onU += 1;
+      firstU ??= n;
+    }
+  });
+  return { count, total: c.n.length, last: games.lastN, onU, firstU };
 }
 
 export function mountRestsOn(host, { games }) {
@@ -34,7 +48,6 @@ export function mountRestsOn(host, { games }) {
       <p class="rests-on"><span class="rests-arrow" aria-hidden="true"></span>${g.rests}</p>
     </div>`;
   box.innerHTML = `
-    <p class="rests-top">All ${fmt(f.total)} games: each replayed by the referee and by both verifiers</p>
     <div class="rests-groups">${GROUPS.map(group).join('')}</div>
     <div class="rests-model">
       <p class="rests-title">The frame model of game k gives opt(k)</p>

@@ -122,7 +122,7 @@
     sum bounds what a branch can still add.  The solver applies the test to the promotions frame by frame, at every
     node.</p>
     <p>Some sets pass the test and still cannot be played.  The smallest board with one is
-    game 45's: <a href="trust.html#ladder">12, 18, 20, 30 and 45</a>.  Sets like it are all that the
+    game 45's: <a href="#ladder">12, 18, 20, 30 and 45</a>.  Sets like it are all that the
     bound misses.</p>
   </div>
 </section>
@@ -279,6 +279,111 @@
   </div>
 </section>
 
+<section class="chapter" id="parity-bound" data-toc="parity-bound" aria-labelledby="h-parity">
+  <h2 id="h-parity">The parity bound</h2>
+  <div class="para">
+    <aside class="note card" aria-label="The parity bound, proved">
+      <div class="note-head"><span class="note-name">The parity bound<span class="note-label">Theorem W1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#the-parity-bound">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">The heaviest set that passes the test bounds opt(n).</p>
+      <p class="precise"><span class="run">Precisely.</span>A <a class="gloss" href="glossary.html#playable">playable</a>
+      set is independent with its own coordinates over GF(2) (the independence lemma, P10), which is independence at
+      both parities of the layer.  So opt(n) is at most the heaviest set independent at both parities.  Weighted
+      matroid intersection finds it, and a weight split checks its value.</p>
+    </aside>
+    <p>The test needs no frames.  Applied to the whole board, it bounds <a class="gloss"
+    href="glossary.html#opt">opt(n)</a> itself.  List, for each number of a set, its
+    <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a> outside the set.  In a set that can be
+    played, no group of numbers lists every factor an even number of times.  So the heaviest set with no such group
+    bounds opt(n).  We call it the <a class="gloss" href="glossary.html#parity-bound">parity bound</a>.  At the root
+    of a search, the frame solver's bound with the weight of U* added comes to the same number on every board from 2
+    to 8,191.  The parity bound is the bound of the <a class="gloss" href="glossary.html#prover">prover</a>, the
+    second program of <a href="statement-u.html#prover">chapter 6</a>.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="The two gaps, measured">
+      <div class="note-head"><span class="note-name">The two gaps</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md">measured<span class="sr-only">, evidence on GitHub</span></a></div>
+      <p class="plain">The parity bound's gap above opt(n) is about a tenth of Franklín and Moniot's.</p>
+      <p class="precise"><span class="run">Precisely.</span>130 points against 1,200 in games 1,000 to 1,300.  Theirs is
+      the heaviest set with a payment scheme, a maximum-weight matching
+      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#what-the-paper-proves">what
+      the paper proves</a>).</p>
+    </aside>
+    <p>Franklín and Moniot's paper gives a looser bound: the heaviest set whose numbers can each be given a maximal
+    factor of their own, from outside the set, to pay with.  Every set that passes the parity test passes theirs, and
+    the parity bound comes far closer to opt(n): its gap is about a tenth of theirs.</p>
+    <p>Why one is stricter than the other shows in a count.  A
+    <a class="gloss" href="glossary.html#payment-scheme">payment scheme</a> gives each number of a set a maximal factor
+    of its own, from outside the set, to pay with.  Count the schemes that pay with the same factors.  A set is
+    allowed by Franklín and Moniot's bound when some choice of factors gets at least one scheme, and by the parity bound
+    when some choice gets an odd number.  It can be played exactly when some choice gets exactly one.</p>
+  </div>
+
+  <figure class="fig wide ladder-fig" id="ladder">
+    <div class="ladder"></div>
+    <figcaption class="fig-caption">Each drawing is one payment scheme: a thick line joins a number to the factor it
+    pays with, a thin line to a factor it could pay with.  Each set's schemes all pay with the same factors.</figcaption>
+  </figure>
+
+  <div class="para">
+    <aside class="note card" aria-label="The counting theorem, proved">
+      <div class="note-head"><span class="note-name">The counting theorem<span class="note-label">Theorem C2</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-counting-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">A set has a payment scheme, passes the parity test, or can be played exactly when some set of
+      factors gets at least one, an odd number, or exactly one of its schemes.</p>
+      <p class="precise"><span class="run">Precisely.</span>With per(S, T) the number of schemes of S onto the factors
+      T, the three conditions are per(S, T) ≥ 1, odd, or 1, for some T.  The odd count is independence over GF(2),
+      since a permanent is its determinant mod 2.</p>
+    </aside>
+    <p>Two schemes on the same factors differ around a <a class="gloss" href="glossary.html#loop">loop</a>: the
+    triangle's second scheme is its first turned once around.  Whichever of 6, 10 and 15 is played first takes both
+    of its primes as tax, and one of the other two is left with nothing to pay with.  Swap 6 for 9 and the loop opens:
+    one scheme, and the set plays, 9 first.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="The first odd core, proved">
+      <div class="note-head"><span class="note-name">The first odd core<span class="note-label">Proposition C3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-first-odd-core">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">Below game 45 every set that passes the parity test can be played.</p>
+      <p class="precise"><span class="run">Precisely.</span>Every S ⊆ {2, …, 44} independent with its own coordinates
+      over GF(2) is playable, so the parity bound is opt(n) for n ≤ 44, and {12, 18, 20, 30, 45} is an odd core.</p>
+    </aside>
+    <p>An odd count is what the parity test cannot tell from one.  The five numbers 12, 18, 20, 30 and 45 have three
+    schemes, all paying with 4, 6, 9, 10 and 15.  Three is odd, so they pass the test, yet they cannot all be played:
+    every number has two or more factors to pay with and every factor two or more takers, so
+    <a class="gloss" href="glossary.html#peel">peel</a> has no safe step.  A set like this, which passes the test and
+    cannot be played, is an odd core, and game 45 is the first with one.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="The exactness of the parity bound to game 77, measured">
+      <div class="note-head"><span class="note-name">Exact to game 77</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#what-the-parity-bound-misses">measured<span class="sr-only">, evidence on GitHub</span></a></div>
+      <p class="plain">The parity bound equals opt(n) for every game up to 77, and exceeds it at game 78.</p>
+      <p class="precise"><span class="run">Precisely.</span>The prover's run on games 2 to 2,530 records each bound,
+      checked by its weight split: at game 78 it is 1,992 against opt(78) = 1,991
+      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#observations">the evidence</a>).
+      U* with <span data-78="promotions">28, 30, 36 and 39</span> passes the test at that weight; the nine numbers drawn
+      are what peel leaves of it.</p>
+    </aside>
+    <p>Up to game 77 the parity bound is exactly opt(n): below game 45 no board has an odd core, and from game 45 to
+    game 77 none of them raises the bound.  At game 78 the bound first misses, by one point:
+    <span data-78="bound">1,992</span> against opt(78) = <span data-78="opt">1,991</span>.  A set worth
+    <span data-78="bound">1,992</span> that passes the test is the optimal set of game 78 with
+    <span data-78="inn">28</span>
+    promoted in place of <span data-78="out">27</span>, and these nine of its numbers cannot all be played.</p>
+  </div>
+
+  <figure class="fig exact-78-fig" id="exact-78">
+    <svg role="img" aria-label="The odd core of game 78."></svg>
+    <figcaption class="fig-caption">Each number sits between two factors it can pay with, and
+    <span data-78="threes">30 and 42</span> reach across the ring to a third.  Double outline: the promotions,
+    <span data-78="promoted">28 and 30</span>.</figcaption>
+  </figure>
+
+  <p>Each of the nine numbers lists two or three of the nine factors, and every factor is listed twice or more, so peel
+  has no safe step.  Yet no group of the nine lists every factor an even number of times.  It is an odd core, the first
+  that raises the bound.</p>
+</section>
+
 <nav class="chapter-nav" aria-label="Pages"></nav>
 
 </div></main>
@@ -287,9 +392,11 @@
 <script type="module">
 import { initEssay, registerFigure } from './js/essay.js';
 import { headStart, loadGames, loadSmall } from './js/data.js';
-import { fmt } from './js/vocab.js';
+import { fmt, listWords } from './js/vocab.js';
 import { mountSearchTree } from './figures/search-tree.js';
 import { mountSearchCost, nodesWords } from './figures/search-cost.js';
+import { mountLadder } from './figures/ladder.js';
+import { mountExact78 } from './figures/exact-78.js';
 
 initEssay();
 const [small, games] = await Promise.all([loadSmall(), loadGames()]);
@@ -321,6 +428,14 @@ function searchedFrom(n) {
   for (let i = 0; i < c.n.length; i++) if (c.method[i] === 'search' && c.n[i] >= n) out.push(c.nodes[i]);
   return out;
 }
+registerFigure('ladder', mountLadder(document.getElementById('ladder')));
+const e78 = mountExact78(document.getElementById('exact-78'), { small });
+registerFigure('exact-78', e78);
+const f = e78.facts;
+fill('78', {
+  bound: fmt(f.bound), opt: fmt(f.opt), inn: listWords(f.inn), out: listWords(f.out), promotions: listWords(f.promotions),
+  threes: listWords(f.threes), promoted: listWords(f.core.map(([x]) => x).filter((x) => f.promotions.includes(x))),
+});
 </script>
 </body>
 </html>

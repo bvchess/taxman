@@ -13,7 +13,7 @@ export const STORY = [
   { n: 3, title: 'The top half', line: 'One greedy pass chooses the numbers above n/2.', href: 'top-half.html' },
   { n: 4, title: 'Frames', line: 'What is left splits into frames, and only the promotions are left to choose.', href: 'frames.html' },
   { n: 5, title: 'The search', line: 'A search tries promotion sets, and a bound proves when nothing better is left.', href: 'search.html' },
-  { n: 6, title: 'Trust', line: 'Every score is checked, and every score says what it rests on.', href: 'trust.html' },
+  { n: 6, title: 'Statement U', line: 'The one open statement the scores rest on, and the evidence for it.', href: 'statement-u.html' },
   {
     n: 7, title: 'The results', line: 'The best scores, how each was proven, and what they show.', href: 'results.html',
   },

@@ -5,7 +5,7 @@ navigation on the left, the story in the center, and the technical layer on the 
 and ES modules, and need no build step.  [OUTLINE.md](OUTLINE.md) is the plan of the pages.
 
 * `index.html` is the introduction, which explains the game.  The chapters of the story follow: `sets.html` (1),
-  `chain.html` (2), `top-half.html` (3), `frames.html` (4), `search.html` (5), `trust.html` (6) and `results.html` (7).
+  `chain.html` (2), `top-half.html` (3), `frames.html` (4), `search.html` (5), `statement-u.html` (6) and `results.html` (7).
   `glossary.html`, `notation.html` and `about.html` are the reference pages.  `style.html` shows the site's look;
   no page links it.
 * `css/site.css` holds the look of every page; a page with styles of its own has `css/<page>.css` beside it.
