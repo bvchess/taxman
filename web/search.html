@@ -37,7 +37,7 @@
   using the same promotions game 38 chose guarantees an optimal set of promotions in game 39.
   </p>
   <p>Game 45 isn't so lucky.  The maximal factors of 45 are 15, in frame 1, and 9, which with 27 made a closed frame of its
-  own in game 44.  45 joins the two frames into one, so frame 1 changes, and game 45 poses novel search problem.  It
+  own in game 44.  45 joins the two frames into one, so frame 1 changes, and game 45 poses a novel search problem.  It
   has <span data-tree="candidates">8</span> candidates, so <span data-tree="sets">256</span> sets of them.
     Game <span data-last-n>5,060</span> has
   <span data-last="candidates">1,380</span> candidates, and far too many sets to try one by one.</p>
@@ -57,7 +57,7 @@
     splits is a <a class="gloss" href="glossary.html#node">node</a>.  All the while the search keeps the best game it
     has found, and each node has a <a class="gloss" href="glossary.html#bound">bound</a>: a limit on what the promotions
     of that branch could still add.  A branch whose bound cannot beat the best game found is a dead end, so the search
-      stops exploring down that path.  This way of searching is called branch and bound.</p>
+      stops exploring that path.  This way of searching is called branch and bound.</p>
   </div>
 
   <figure class="fig fig-panel search-tree-fig" id="tree">
@@ -117,7 +117,7 @@
       node's promotion limit.  The solver calls it the GF(2) bound.  The only sets it lets through that cannot be promoted hold an odd
       core in some frame.</p>
     </aside>
-    <p>The test asks that no group of a set's numbers list every factor an even number of times.  It is linear algebra
+    <p>The test requires that no group of a set's numbers list every factor an even number of times.  This is linear algebra
     over GF(2), the arithmetic of
     even and odd, so it is quick to check, and a classical algorithm finds the heaviest set that passes it.  That set's
     sum bounds what a branch can still add.  The solver applies the test to the promotions frame by frame, at every
@@ -143,8 +143,8 @@
     done.  When it cannot, the solver finds a few of its <a class="gloss" href="glossary.html#candidate">candidates</a>
     that cannot be promoted together, often only one or two.  Every better set leaves one of them out, so the
     <a class="gloss" href="glossary.html#node">node</a> branches on them: promote one, or go on without it.</p>
-    <p>The solver remembers each dead end it finds.  A set of candidates that cannot be promoted from the root cannot
-    be promoted anywhere in the tree, so once one is found, no other branch tries it again.</p>
+    <p>The solver remembers each dead end it finds.  A set of candidates that cannot be promoted together from the root cannot
+    be promoted anywhere in the tree, so once such a set is found, no other branch tries it again.</p>
   </div>
 
   <div class="para">
@@ -170,10 +170,10 @@
   <div class="para">
     <aside class="note tech" aria-label="The two starts of game 5,060">
       <div class="note-head"><span class="note-name">The two starts of game 5,060</span></div>
-      <p>As sums of promotions, the part of the score a search chooses: the best is <span data-start="best">…</span>,
-      and the search starts at <span data-start="seeded">…</span> from game 5,059’s optimal set and at
-      <span data-start="own">…</span> on its own.  The frame solver measured both, each search stopped after its first
-      thousand nodes
+      <p>As sums of promotions, the part of the score a search chooses: the best is
+      <span data-start="best">570,330</span>, and the search starts at <span data-start="seeded">570,285</span> from
+      game 5,059’s optimal set and at <span data-start="own">569,735</span> on its own.  The frame solver measured both,
+      each search stopped after its first thousand nodes
       (<a href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-start-of-game-5060-with-and-without-the-game-before-2026-11/README.md">the
       start of game 5,060</a>).  What a start below the best costs a search was measured at game 3,020
       (<a href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-dear-games-the-problem-or-the-chains-path-2026-10/README.md#4-what-a-start-below-optn-costs">a
@@ -181,8 +181,8 @@
     </aside>
     <p>A search does not start from nothing.  The search of game n starts from the optimal set of game n − 1, carried
     over to game n (<a href="chain.html#ceiling">chapter 2</a>), and that start is usually optimal or close to it.  Game
-    5,060’s search starts <span data-start="seededGap">…</span> points below the best score this way; from a start of
-    its own, it would begin <span data-start="ownGap">…</span> below.  A branch is dropped only when its bound cannot
+    5,060’s search starts <span data-start="seededGap">45</span> points below the best score this way; from a start of
+    its own, it would begin <span data-start="ownGap">595</span> below.  A branch is dropped only when its bound cannot
     beat the best game found, so the nearer the search starts to the best, the more branches it can drop.  A start far
     below the best can make a search many times longer.</p>
   </div>
@@ -221,8 +221,8 @@
     <p>A search can also stop early.  No game of n scores more than the best score of game n − 1 plus n, the
     <a class="gloss" href="glossary.html#ceiling">ceiling</a> (<a href="chain.html#ceiling">chapter 2</a>).  A search
     whose best game reaches the ceiling has nothing left to find, and it stops there.  That is how
-    <span data-start="cap">…</span> searches of the chain ended, <span data-start="capStart">…</span> of them at their
-    start, before a single step.</p>
+    <span data-start="cap">494</span> searches of the chain ended, <span data-start="capStart">490</span> of them at
+    their start, before a single step.</p>
   </div>
 </section>
 
