@@ -38,3 +38,29 @@
   .ladder-set { grid-column: 1 / -1; }
   .ladder-cell { width: calc(var(--w) * 0.66px); }
 }
+
+/* ---- the parity tables ------------------------------------------------------------------------------------- */
+
+.parity-table-fig .parity-tables { display: flex; flex-wrap: wrap; gap: 20px 28px; justify-content: center; }
+.parity-table-fig .pt-block { flex: 0 0 15rem; min-width: 0; }
+.parity-table-fig .pt-title { margin: 0 0 6px; font-weight: 700; }
+.parity-table-fig .pt-table { border-collapse: separate; border-spacing: 0; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.parity-table-fig .pt-table th { font-weight: 600; color: var(--ink-2); text-align: center; padding: 3px 4px; }
+.parity-table-fig .pt-table tfoot th { text-align: right; padding-right: 8px; }
+.parity-table-fig .pt-table tbody th { padding: 3px 8px 3px 0; }
+.parity-table-fig .pt-cell { width: 3.1rem; height: 2.1rem; text-align: center; color: var(--ink-3); border-radius: 6px; border: 2px solid transparent; }
+.parity-table-fig .pt-cell.is-one { color: var(--ink); }
+.parity-table-fig .pt-cell.is-pick { border-color: var(--ink); }
+.parity-table-fig tr.is-chosen .pt-cell { background: var(--wash); }
+.parity-table-fig tfoot td { width: 3.1rem; padding-top: 4px; text-align: center; border-top: 1px solid var(--hair); font-size: 0.82rem; color: var(--ink-2); white-space: nowrap; }
+.parity-table-fig .pt-toggle { min-width: 2.6rem; padding: 4px 8px; font-size: 0.9rem; box-shadow: none; }
+.parity-table-fig .pt-toggle:active, .parity-table-fig .pt-pick:active { transform: none; }
+.parity-table-fig .pt-toggle[aria-pressed="true"], .parity-table-fig .pt-pick[aria-pressed="true"] { transform: none; }
+.parity-table-fig .pt-verdict { margin: 8px 0 4px; font-size: 0.86rem; line-height: 1.4; color: var(--ink-2); }
+.parity-table-fig .pt-picks { margin: 0; font-size: 0.86rem; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.parity-table-fig .pt-pick { padding: 4px 10px; font-size: 0.8rem; box-shadow: none; }
+.parity-table-fig .pt-picks .pt-pick:first-of-type { margin-left: 6px; }
+
+@container essay (max-width: 560px) {
+  .parity-table-fig .parity-tables { flex-direction: column; align-items: center; }
+}

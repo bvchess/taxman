@@ -109,28 +109,6 @@
     with the same factors, so each set has one group.</p>
   </div>
 
-  <div class="para">
-    <aside class="note card" aria-label="The counting theorem, proved">
-      <div class="note-head"><span class="note-name">The counting theorem<span class="note-label">Theorem C2</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-counting-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Group a set's schemes by the factors they pay with.  The set has a scheme, passes the parity
-      test, or can be played exactly when some group has at least one, an odd number, or exactly one scheme.</p>
-      <p class="precise"><span class="run">Precisely.</span>With per(S, T) the number of schemes of S onto the factors
-      T, the three conditions are per(S, T) ≥ 1, odd, or 1, for some T.  The odd count is independence over GF(2),
-      since a permanent is its determinant mod 2.</p>
-    </aside>
-    <p>Why would the parity test care how many schemes a set has?  Make a table for one group of schemes, with a row
-    for each number of the set and a column for each factor the group pays with, and write 1 where the number lists
-    the factor and 0 elsewhere.  A scheme picks a 1 in every row, no two in the same column, so the group's count is
-    the number of such picks.  The table's determinant, from algebra, adds up the same picks, each with a sign, plus
-    or minus.  Since +1 and −1 are both odd, the signs cannot change whether the total is even or odd, so the count is
-    odd exactly when the determinant is.</p>
-    <p>A determinant is even exactly when some of the table's rows add up to an even number in every column, that is,
-    when some of the set's numbers, taken together, list every factor an even number of times.  6, 10 and 15 list 2
-    and 3, 2 and 5, and 3 and 5, each factor twice, and they have two schemes.  As linear algebra shows, a set passes
-    the parity test exactly when some choice of columns makes its determinant odd.  So the parity bound allows a set
-    exactly when some group of its schemes has an odd count: the counting theorem.</p>
-  </div>
-
   <figure class="fig wide ladder-fig" id="ladder">
     <div class="ladder"></div>
     <figcaption class="fig-caption">Circles are a set's numbers, and squares the factors outside it that could pay
@@ -147,6 +125,36 @@
     <p>12, 18, 20, 30 and 45 have three schemes, an odd number, so both bounds allow them.  Yet they cannot all be
     played: they are the first <a href="#odd-cores">odd core</a>.</p>
   </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="The counting theorem, proved">
+      <div class="note-head"><span class="note-name">The counting theorem<span class="note-label">Theorem C2</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-counting-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">Group a set's schemes by the factors they pay with.  The set has a scheme, passes the parity
+      test, or can be played exactly when some group has at least one, an odd number, or exactly one scheme.</p>
+      <p class="precise"><span class="run">Precisely.</span>With per(S, T) the number of schemes of S onto the factors
+      T, the three conditions are per(S, T) ≥ 1, odd, or 1, for some T.  The odd count is independence over GF(2),
+      since a permanent is its determinant mod 2.</p>
+    </aside>
+    <p>Why would the parity test care how many schemes a set has?  Make a table for one group of schemes, with a row
+    for each number of the set and a column for each factor the group pays with, and write 1 where the number lists
+    the factor and 0 elsewhere.  A scheme picks a 1 in every row, no two in the same column, so the group's count is
+    the number of such picks.  The table's determinant, from algebra, adds up the same picks, each with a sign, plus
+    or minus.  Since +1 and −1 are both odd, the signs cannot change whether the total is even or odd, so the count is
+    odd exactly when the determinant is.</p>
+    <p>A determinant is even exactly when some of the table's rows add up to an even number in every column, that is,
+    when some of the set's numbers, taken together, list every factor an even number of times.  In the table of 6, 10
+    and 15, all three rows add up to even in every column, and there are two picks.  In the table of 9, 10 and 15, no
+    group of rows does, and there is one.  As linear algebra shows, a set passes the parity test exactly when some
+    choice of columns makes its determinant odd.  So the parity bound allows a set exactly when some group of its
+    schemes has an odd count: the counting theorem.</p>
+  </div>
+
+  <figure class="fig parity-table-fig" id="parity-table" aria-label="The tables of 6, 10 and 15 and of 9, 10 and 15: a row for each number, a column for each of the factors 2, 3 and 5, and a 1 where the number can pay with the factor.">
+    <div class="parity-tables"></div>
+    <figcaption class="fig-caption">A 1 marks a factor the number can pay with.  A pick, outlined, takes a 1 in every
+    row, no two in the same column: it is one payment scheme.  Choose rows to add them up; the bottom row says whether
+    each column comes out even or odd.</figcaption>
+  </figure>
 </section>
 
 <section class="chapter" id="odd-cores" data-toc="odd-cores" aria-labelledby="h-odd-cores">
@@ -163,6 +171,17 @@
     Every number has at least two factors to pay with, and every factor at least two numbers that could use it, so
     peel has no safe first step.  A set like this, which passes the test but cannot be played, is an
     <a class="gloss" href="glossary.html#odd-core">odd core</a>.  Game 45 is the first board with one.</p>
+  </div>
+
+  <div class="para">
+    <p>What lets an odd core exist?  A number's maximal factors are the number divided by each of its primes, so a
+    number with two different primes has two, and a number with three has three: 30 = 2 · 3 · 5, with 15, 10 and 6,
+    is the smallest.  Numbers that each list at most two factors can be played exactly when they pass the parity test
+    (the <a href="sets.html#loop-section">loop rule</a> of chapter 1), so a set of them is never an odd core.  One
+    number with three is enough.  In game 45's core, 12, 18, 20 and 45 each list two factors and make a chain,
+    10 – 20 – 4 – 12 – 6 – 18 – 9 – 45 – 15, and 30 joins it at 6, 10 and 15.  Whichever of the three 30 pays with,
+    the rest of the chain has just one way to pay, so the set has three schemes: an odd number, but never exactly
+    one.</p>
   </div>
 
   <div class="para">
@@ -206,6 +225,7 @@ import { initEssay, registerFigure } from './js/essay.js';
 import { loadSmall } from './js/data.js';
 import { listWords, fmt } from './js/vocab.js';
 import { mountLadder } from './figures/ladder.js';
+import { mountParityTables } from './figures/parity-table.js';
 import { mountExact78 } from './figures/exact-78.js';
 
 initEssay();
@@ -215,6 +235,7 @@ const fill = (attr, facts) => {
 };
 
 registerFigure('ladder', mountLadder(document.getElementById('ladder')));
+mountParityTables(document.getElementById('parity-table'));
 const e78 = mountExact78(document.getElementById('exact-78'), { small });
 registerFigure('exact-78', e78);
 const f = e78.facts;
