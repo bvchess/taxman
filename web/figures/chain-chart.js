@@ -16,10 +16,11 @@ import { freshSVG, keyboard, pct, responsive, tableView, tooltip } from '../js/c
 
 const DAY = 86400;
 const STRETCH = 100;
-// The scale of the time of a search: gridlines and labels at these.
+// The scale of the time of a search: gridlines and labels at these, up to the first at or above the slowest
+// stretch's median.
 const TIME_TICKS = [[1e-3, '1 ms'], [1, '1 s'], [60, '1 min'], [3600, '1 h'], [DAY, '1 day']];
 const TIME_LO = 1e-3;
-const TIME_HI = 1.6 * DAY;
+const TIME_HEADROOM = 1.6; // the scale runs this far above its top tick, as a factor
 // A group's color: those of chapter 2's grid (css/site.css), the search darkest.
 const TONE = { search: 'var(--rule-search)', repeat: 'var(--rule-repeat)', before: 'var(--rule-ceiling)' };
 
@@ -54,6 +55,12 @@ export function mountChainChart(host, { games }) {
     });
   }
 
+  // The time row's top tick: the first at or above the slowest median (the last, if none is).
+  const slowest = Math.max(...stretches.filter((st) => st.median !== null).map((st) => st.median));
+  const topAt = TIME_TICKS.findIndex(([v]) => v >= slowest);
+  const timeTicks = TIME_TICKS.slice(0, (topAt < 0 ? TIME_TICKS.length - 1 : topAt) + 1);
+  const timeHi = timeTicks[timeTicks.length - 1][0] * TIME_HEADROOM;
+
   const box = host.querySelector('.chart-box');
   const tip = tooltip(box);
   const endShare = share[count - 1];
@@ -72,7 +79,7 @@ export function mountChainChart(host, { games }) {
     const shareH = narrow ? 140 : 170;
     const provH = narrow ? 90 : 100;
     const timeH = narrow ? 110 : 130;
-    const nameH = narrow ? 18 : 0; // a narrow row's name stands above its plot
+    const nameH = narrow ? 34 : 0; // a narrow row's name and its line under it stand above its plot
     const keyH = narrow ? 52 : 0; // a narrow screen's key stands above the proof row's plot
     const provTop = m.t + shareH + 40;
     const provPlot = provTop + nameH + keyH;
@@ -92,23 +99,23 @@ export function mountChainChart(host, { games }) {
     const hi = 0.75;
     const y = (s) => m.t + (1 - (s - lo) / (hi - lo)) * shareH;
     const yProv = (f) => provPlot + (1 - f) * provH;
-    const logSpan = Math.log10(TIME_HI / TIME_LO);
+    const logSpan = Math.log10(timeHi / TIME_LO);
     const yTime = (s) => timePlot + (1 - Math.log10(s / TIME_LO) / logSpan) * timeH;
     // A stretch's column spans its games on the n axis, with a hairline gap between neighbors.
     const colX = (st) => x(st.a) + 0.5;
     const colW = (st) => Math.max(1, x(st.b === last ? last : st.b + 1) - x(st.a) - 1);
 
-    // The name of a row at its left (a narrow screen: above), with a line under it.
+    // The name of a row at its left (a narrow screen: above), with a line under it (a narrow screen: stacked).
     const rowName = (text, sub, ry, rh) => {
       const name = el('text', {
-        x: narrow ? m.l : nameX, y: narrow ? ry - 6 : ry + rh / 2 - (sub ? 4 : -4),
+        x: narrow ? m.l : nameX, y: narrow ? ry - 22 : ry + rh / 2 - (sub ? 4 : -4),
         'text-anchor': narrow ? 'start' : 'end', class: 'row-label',
       }, svg);
       name.textContent = text;
       if (sub) {
         const s = el('text', {
-          x: narrow ? m.l + plotW : nameX, y: narrow ? ry - 6 : ry + rh / 2 + 13,
-          'text-anchor': 'end', class: 'row-count',
+          x: narrow ? m.l : nameX, y: narrow ? ry - 6 : ry + rh / 2 + 13,
+          'text-anchor': narrow ? 'start' : 'end', class: 'row-count',
         }, svg);
         s.textContent = sub;
       }
@@ -182,9 +189,9 @@ export function mountChainChart(host, { games }) {
 
     // The time of a search: a line through the median of each stretch's searches, on a log scale.
     rowName('time required to search', 'median per 100 games, log scale', timePlot, timeH);
-    gridRow(TIME_TICKS, yTime);
+    gridRow(timeTicks, yTime);
     const timePoint = (st) => (st.median === null ? null : {
-      x: (x(st.a) + x(st.b)) / 2, y: yTime(Math.min(TIME_HI, Math.max(TIME_LO, st.median))),
+      x: (x(st.a) + x(st.b)) / 2, y: yTime(Math.min(timeHi, Math.max(TIME_LO, st.median))),
     });
     let line = '';
     let pen = 'M';
