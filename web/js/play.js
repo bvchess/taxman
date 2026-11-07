@@ -2,8 +2,8 @@
 //
 // A number is taken only if a divisor of it is still in the pot, and the taxman takes every such divisor; a number
 // that cannot be taken refuses, and the caption says why.  The controls are − n +, Take back, Start over and the blue
-// "Play an optimal game", which plays the recorded game of n from data/small.json.  The caption says what each move
-// took, and at the end compares the score with opt(n).
+// "Play an optimal game", which plays the recorded game of n from data/small.json.  The caption opens with the
+// figure's opening line, says what each move took, and at the end compares the score with opt(n).
 //
 // A figure gives the game its board, which draws the state and calls take(x) when the reader takes x: figures/game.js
 // draws the pot of sockets and the two trays, figures/graph-game.js the maximal-factor graph as the pot, over the same
@@ -34,7 +34,10 @@ import { listWords, reducedMotion } from './vocab.js';
 const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 const range = (a, b) => Array.from({ length: Math.max(0, b - a + 1) }, (_, i) => a + i);
 
-export function mountPlay(host, { small, board, n: startN = 10, minN = 2, maxN = 30, param = 'game', you = 'You' }) {
+export function mountPlay(host, {
+  small, board, n: startN = 10, minN = 2, maxN = 30, param = 'game', you = 'You',
+  opening = 'Take a number. The taxman takes all of its divisors still in the pot.',
+}) {
   const best = new Map(small.map((g) => [g.n, g]));
   let n = startN;
   let state = null;
@@ -86,7 +89,7 @@ export function mountPlay(host, { small, board, n: startN = 10, minN = 2, maxN =
     const top = range(n - Math.ceil(n / 2) + 1, n);
     const rest = top.filter((t) => t !== x && !tax.includes(t));
     const messages = [
-      OPENING, refusal(1), refusal(n), tookWords(x, tax), takenBack(top),
+      opening, refusal(1), refusal(n), tookWords(x, tax), takenBack(top),
       ...[sum(top), best.get(n)?.score ?? 0].map((mine) => tookWords(x, tax) + endWords(rest, mine, sum(range(1, n)))),
     ];
     const keep = status.innerHTML;
@@ -121,7 +124,6 @@ export function mountPlay(host, { small, board, n: startN = 10, minN = 2, maxN =
   const refusal = (x) => (x === 1
     ? '1 can’t be taken: it has no divisor below it, so the taxman would get nothing.'
     : `${x} can’t be taken: none of its divisors is left in the pot, so the taxman would get nothing.`);
-  const OPENING = 'Take a number. The taxman takes all of its divisors still in the pot.';
   const takenBack = (mine) => `Taken back. ${mine.length ? `You have ${listWords(mine)}.` : 'Take a number.'}`;
 
   function take(x, { quiet = false } = {}) {
@@ -155,7 +157,7 @@ export function mountPlay(host, { small, board, n: startN = 10, minN = 2, maxN =
     build();
     reserve();
     place();
-    setStatus(OPENING);
+    setStatus(opening);
   }
 
   async function playBest() {

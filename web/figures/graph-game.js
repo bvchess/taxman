@@ -34,9 +34,12 @@ import { scene } from '../js/scene.js';
 import { boxAround, glide, makePiece, reserveRows, returnDelays, startOf, traysHTML } from '../js/trays.js';
 import { MOTION, NS, SHAPE, SIZE, listWords, look, reducedMotion, restyle } from '../js/vocab.js';
 
-export function mountGraphGame(host, { small, n = 21 }) {
+export function mountGraphGame(host, { small, n = 10 }) {
   let view;
-  const game = mountPlay(host, { small, n, param: 'graph', board: (context) => (view = graphBoard(context)) });
+  const game = mountPlay(host, {
+    small, n, param: 'graph', opening: 'The game is easier when you see it as a graph.',
+    board: (context) => (view = graphBoard(context)),
+  });
   return { ...game, highlight: (x, on) => view.highlight(x, on) };
 }
 
