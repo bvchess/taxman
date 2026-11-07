@@ -41,7 +41,7 @@
 # (and exits 0) when every listed game has a line in OUT.
 #
 # Output: $OUT (default $TAXMAN_WORK/results/exact_parity_A_B.jsonl, one line per game, the format of
-# solver/noframe/data/exact_parity_2_1300.jsonl), logs in $LOGS: prover.log (this script), prover.err (`exact`).
+# solver/noframe/data/exact_parity_2_2530.jsonl), logs in $LOGS: prover.log (this script), prover.err (`exact`).
 #
 # Environment (all optional, but OUT in list mode):
 #   THREADS         threads, default every CPU
@@ -50,7 +50,8 @@
 #   OUT             the output file (required in list mode)
 #   STRICT          the recorded optima, default results/optimal.jsonl.gz (committed)
 #   BASELINE        for A > 2: the proofs of the smaller games the check builds on (default: the prover's
-#                   data/exact_parity_2_1300.jsonl).  A = 2 needs none, and is refused with one
+#                   data/exact_parity_2_2530.jsonl, of which the check reads the games below A).  A = 2 needs none,
+#                   and is refused with one
 #   EXTRA_ARGS      more flags for `exact`
 #   MAX_FAILS       default 5
 #   DEADLINE_HOURS, POWEROFF, S3_DEST, SAVE_EVERY: as in run.sh (SAVE_EVERY defaults to PASS_SECONDS here)
@@ -100,7 +101,7 @@ else
     if [ "$from" -eq 2 ]; then
         [ -z "${BASELINE:-}" ] || die "a range from 2 needs no BASELINE (its check reads the output alone): unset it"
     else
-        BASELINE="${BASELINE:-$PROVER/data/exact_parity_2_1300.jsonl}"
+        BASELINE="${BASELINE:-$PROVER/data/exact_parity_2_2530.jsonl}"
     fi
     total=$((to - from + 1))
     OUT="${OUT:-$TAXMAN_WORK/results/exact_parity_${from}_${to}.jsonl}"

@@ -8,7 +8,8 @@
     summarize.py star FILE...     the threshold-by-threshold (★) campaign: thresholds and components by method
     summarize.py exact FILE...    the proofs of optimal scores (a later file overrides), and how many searches start
                                   from the roles of F4 (`fix_low` 1, which `exact` does unless told not to)
-    summarize.py check A B FILE...  FILEs prove every n in 2..B, with the recorded scores in A..B
+    summarize.py check A B FILE...  FILEs prove every n in 2..B, with the recorded scores in A..B (the last FILE holds
+                                  A..B, the earlier ones the games below A)
     summarize.py order A B        the games A..B, dearest first by the solver's nodes (the order prover.sh runs them)
     summarize.py cost [--band N] FILE...  its cost curve: the searches made with the parity bound from scratch, by band
     summarize.py sources B_FILE D_FILE  study E6: the search with the sources of layer 3 and up free (exact, from the
@@ -577,11 +578,15 @@ def exact_order(args):
 
 
 def exact_check(args):
-    """check A B FILE...: the files (a later file's line for a game replaces an earlier file's) prove opt(n) for every
-    n in 2..B (`exact_proofs`: so the files must reach back to 2, as data/exact_parity_2_1300.jsonl does), have a
-    line for every n in A..B, and each line's score is the recorded optimum.  Exits 1 if any of that fails."""
+    """check A B FILE...: the files prove opt(n) for every n in 2..B (`exact_proofs`: so together they must reach back
+    to 2, as data/exact_parity_2_2530.jsonl does alone), have a line for every n in A..B, and each line's score is the
+    recorded optimum.  The last FILE is the run's output and holds the games A..B; the files before it, the baseline,
+    count for the games below A only, so that a baseline that reaches past A cannot stand in for a line the output
+    lacks.  Exits 1 if any of that fails."""
     lo, hi = int(args[0]), int(args[1])
-    rows = {r["n"]: r for r in lines(args[2:])}
+    paths = args[2:]
+    rows = {r["n"]: r for r in lines(paths[:-1]) if r["n"] < lo}
+    rows.update({r["n"]: r for r in lines(paths[-1:])})
     scores = recorded_scores()
     missing = [n for n in range(lo, hi + 1) if n not in rows]
     wrong = [n for n in range(lo, hi + 1) if n in rows and rows[n]["score"] != scores.get(n)]

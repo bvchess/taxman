@@ -1,16 +1,13 @@
 // What rests on what: the kinds of proof in the chain's records, grouped by what each rests on, and under them what
-// makes the frame model's best score opt(n): the prover's proof up to 2175, statement U at n past it.  A flat
-// figure in HTML, each count read from data/games.json.  The two foundations wear the standing pills they have, and
-// the box of the one given statement U has the pill's double outline.
+// makes the frame model's best score opt(n): the prover's proof up to PROVER_TO (js/proof.js), statement U at n past
+// it.  A flat figure in HTML, each count read from data/games.json.  The two foundations wear the standing pills they
+// have, and the box of the one given statement U has the pill's double outline.
 //
 // The kinds and their meaning are those of solver/docs/REFERENCE.md, "Proof kinds"; the prover's reach is
 // results/README.md's, "What supports the scores", item 6.
 
 import { fmt, standingBadge } from '../js/vocab.js';
-import { PROOFS } from '../js/proof.js';
-
-/** The last game the prover proves on the whole board (results/README.md, "What supports the scores"). */
-export const PROVER_TO = 2175;
+import { PROOFS, PROVER_TO } from '../js/proof.js';
 
 const GROUPS = [
   { title: 'From the game before', kinds: ['cap', 'prime_formula'], rests: 'rests on game n − 1, which rests on its own proof' },

@@ -160,7 +160,7 @@ show that every independent set J that avoids x has w(J) ≤ w(I) − w(x) + max
 Either way w(J) ≤ w(I) − w(x) + max(0, w(y)).  ∎
 
 The prover bounds every node of its searches by W1, with the node's picks and bars ([solver/noframe/docs/proofs.md,
-"With the parity bound (to 1300)"](../../solver/noframe/docs/proofs.md#with-the-parity-bound-to-1300)).
+"The search"](../../solver/noframe/docs/proofs.md#the-search)).
 
 ## The barred bound
 

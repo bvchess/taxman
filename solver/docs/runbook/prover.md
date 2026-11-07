@@ -52,9 +52,10 @@ proofs](../../noframe/docs/proofs.md#a-game-on-several-threads)).  Many games ne
 and those that meet the prime formula or the semiprime formula.
 
 For the estimate that the account's owner approves, price the range from the cost by bands of 100 in n in [the
-prover's proofs](../../noframe/docs/proofs.md#to-2175-on-a-cloud-machine): the thread-hours, halved for the roles where
-the bands are from the plain root, over the vCPUs, with the idle tail, at the spot price of the hour
-([machine.md](machine.md)).  Past the last band, [taxman-notebook/agenda/AGENDA.md, "The diagnosis of the
+prover's proofs](../../noframe/docs/proofs.md#the-run-of-2-to-2530): the thread-hours, over the vCPUs, with the idle
+tail, at the spot price of the hour ([machine.md](machine.md)).  Past the last band, the root gaps of the games ahead
+price them through the fit by gap that the same section gives; `exact --budget 1` prints the gaps at about a second a
+game.  [taxman-notebook/agenda/AGENDA.md, "The diagnosis of the
 wall"](https://github.com/bvchess/taxman-notebook/blob/main/agenda/AGENDA.md#2-the-diagnosis-of-the-wall) carries the
 trend of the prover's nodes against the solver's, an extrapolation.  The cost of a game follows the root's parity gap,
 not n, so the bands are a guide, not a rule, and the first passes of the run check the estimate ([Run](#run), step 4,
@@ -63,7 +64,8 @@ reads the cost of a node from the log).
 *Details.*  The [Graviton
 calibration](https://github.com/bvchess/taxman-notebook/blob/main/graviton-calibration-2026-10/README.md) measured the
 prover's speed: a Graviton4 core runs it at 0.93 of an M1 Max core, and a Graviton3 core at 0.75.  The cost of a node
-grows with n: from the plain root on Graviton4 it was 2.0 to 2.6 ms through 1899, then 4.1 ms at 2170 to 2173.
+grows with n: from the plain root on Graviton4 it was 2.0 to 2.6 ms through 1899, then 4.1 ms at 2170 to 2173.  The run
+from the roles on a Broadwell machine has its own, by band, in the same section.
 
 ## Which instance
 
@@ -133,20 +135,23 @@ SSH](launch.md#steps-through-ssm-or-ssh)), the first as root and the others as `
    moved` give the nodes of a long game.  The seconds of a pass over the nodes of one pass give the milliseconds a node,
    to compare with the estimate ([What it costs](#what-it-costs)); the late games cost more.
 
-**`BASELINE`, from A = 1302 on.**  The check at the end needs every n in 2..A − 1 proven, from one file: `BASELINE`,
-whose default holds the scores proven for 2..1300.  For a later range, join the committed files that cover 2..A −
-1 and set `BASELINE` to the joined file before `prover.sh` in step 3 and before `prover.sh --verify`; for 2176..B:
+**`BASELINE`, for a range from A > 2.**  The check at the end needs every n in 2..A − 1 proven, from one file:
+`BASELINE`, whose default is the committed `solver/noframe/data/exact_parity_2_2530.jsonl`.  The check reads its games
+below A only, so the default serves any A up to 2531, the rehearsal above included.  For a range that continues a run
+of your own, join the files that cover 2..A − 1 and set `BASELINE` to the joined file before `prover.sh` in step 3 and
+before `prover.sh --verify`; for 3001..B after a run of 2531..3000:
 
 ```
-cat solver/noframe/data/exact_parity_2_1300.jsonl solver/noframe/data/exact_parity_1301_2175.jsonl \
-    > ~/baseline_2_2175.jsonl
+cat solver/noframe/data/exact_parity_2_2530.jsonl ~/prover-work/results/exact_parity_2531_3000.jsonl \
+    > ~/baseline_2_3000.jsonl
 ```
 
-`prover.sh` reads `BASELINE` only in that check, so a run without it ends in a failed check after the whole run; with
-`S3_DEST` the results are saved, and `--verify` with the file runs the check again.  The joined file is also the first
-file of `summarize.py exact` ([Bring the data home, verify, commit](#bring-the-data-home-verify-commit)).  A range from
-2 needs no `BASELINE`, and `prover.sh` refuses one: its check reads the output alone ([On a machine of your
-own](#on-a-machine-of-your-own)).  `prover.sh --list`, a measurement on chosen games, is in the script's header.
+`prover.sh` reads `BASELINE` only in that check, so a range from past 2531 without the joined file ends in a failed
+check after the whole run; with `S3_DEST` the results are saved, and `--verify` with the file runs the check again.  The
+joined file is also the first file of `summarize.py exact` ([Bring the data home, verify,
+commit](#bring-the-data-home-verify-commit)).  A range from 2 needs no `BASELINE`, and `prover.sh` refuses one: its
+check reads the output alone ([On a machine of your own](#on-a-machine-of-your-own)).  `prover.sh --list`, a
+measurement on chosen games, is in the script's header.
 
 The guardrails are those of [launch.md](launch.md#cost-guardrails), with these differences:
 
@@ -186,16 +191,17 @@ directory (the results, the checkpoints and the logs), on a disk that survives a
 
    ```
    R=~/prover-rehearsal
-   TAXMAN_WORK=$R THREADS=3 PASS_SECONDS=30 solver/tools/cloud/prover.sh 2 1300 &
-   sleep 75; kill -TERM $(cat $R/prover.pid); wait $!; echo $?     # "ended: stopped", status 143
+   TAXMAN_WORK=$R THREADS=3 PASS_SECONDS=30 solver/tools/cloud/prover.sh 2 1250 &
+   sleep 40; kill -TERM $(cat $R/prover.pid); wait $!; echo $?     # "ended: stopped", status 143
    ls $R/ckpt                                                      # exact_N_low.ckpt, a paused search each
-   TAXMAN_WORK=$R THREADS=3 PASS_SECONDS=30 solver/tools/cloud/prover.sh 2 1300      # resumes, finishes, checks
-   OUT=$R/results/exact_parity_2_1300.jsonl solver/tools/cloud/prover.sh --verify 2 1301   # must FAIL
+   TAXMAN_WORK=$R THREADS=3 PASS_SECONDS=30 solver/tools/cloud/prover.sh 2 1250      # resumes, finishes, checks
+   OUT=$R/results/exact_parity_2_1250.jsonl solver/tools/cloud/prover.sh --verify 2 1251   # must FAIL
    rm -rf $R
    ```
 
-   The second `prover.sh` ends with `OK: opt(n) is proven equal to the recorded score for every n in 2..1300` and status
-   0, and the last command prints `without a line: 1301` and `FAILED`.
+   The second `prover.sh` ends with `OK: opt(n) is proven equal to the recorded score for every n in 2..1250` and status
+   0, and the last command prints `without a line: 1251` and `FAILED`.  The whole run takes one minute on 3 threads of
+   a server and two to three on a laptop; the stop must come before it ends, so shorten the `sleep` on a faster machine.
 
 3. **Run,** in tmux.  The settings go inside tmux's command, since a tmux server already running keeps its own
    environment.  `chrt -i 0` gives the run the idle scheduling policy (Linux), which all its threads inherit, so that
@@ -289,7 +295,7 @@ aws s3 sync $D/logs/ ./prover-logs/
 # or, over SSH, without S3:
 rsync -av ec2-user@HOST:taxman-work/results/exact_parity_A_B.jsonl solver/noframe/data/
 rsync -av ec2-user@HOST:taxman-work/logs/ ./prover-logs/
-OUT=solver/noframe/data/exact_parity_A_B.jsonl solver/tools/cloud/prover.sh --verify A B   # with BASELINE from A = 1302
+OUT=solver/noframe/data/exact_parity_A_B.jsonl solver/tools/cloud/prover.sh --verify A B   # for A > 2, with BASELINE
 ```
 
 The check (`summarize.py check A B`, which `prover.sh` also ran at the end) passes only if two things hold:
@@ -303,7 +309,7 @@ It then exits with status 0 and prints `OK: opt(n) is proven equal to the record
 anything else prints which n failed.  Then, on your machine, count the games proven and their cost by bands of 100 in n:
 
 ```
-# BASELINE from A = 1302 on; for A = 2, the file alone
+# for A > 2, BASELINE first; for A = 2, the file alone
 python3 solver/noframe/tools/summarize.py exact BASELINE solver/noframe/data/exact_parity_A_B.jsonl
 python3 solver/noframe/tools/summarize.py cost --band 100 solver/noframe/data/exact_parity_A_B.jsonl
 ```
@@ -322,9 +328,12 @@ names another file.  Do not commit the work directory, the checkpoints or the lo
 Then do the end of the [rules for every launch](launch.md#rules-for-every-launch): `POWEROFF=always` has shut the
 instance down, which terminates it; confirm that nothing is left, the launch's security group included.
 
-## An example
+## Examples
 
 [The run of
 1301..2175](https://github.com/bvchess/taxman-notebook/blob/main/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)
 searched from the plain root on one `c8g.4xlarge` at spot; its entry has the estimate it was planned by, the launch's
-values, what it cost and what its model got wrong.
+values, what it cost and what its model got wrong.  [The run of
+2..2530](https://github.com/bvchess/taxman-notebook/blob/main/the-model-free-proofs-of-2-2530-on-one-machine-2026-11/README.md)
+is the one-machine variant, [On a machine of your own](#on-a-machine-of-your-own) at idle priority on 88 threads; its
+entry has the hours, the cost by band and what the cost model says of the games ahead.

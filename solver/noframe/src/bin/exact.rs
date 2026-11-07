@@ -16,11 +16,11 @@
 //! as the searches of `data/exact_2_1231.jsonl` ran).  Which games end up proven, given their predecessors, is worked
 //! out by `tools/summarize.py exact` from the file.
 //!
-//! The roles of F4 (`--fix-low 1`, the default; `--fix-low 0` starts from the plain root, as the committed files
-//! `data/exact_*.jsonl` were made): the search starts from the roles `upper::low_roles` writes down, "B" below, the
-//! largest prime forced and every other prime barred, the sources of layer 2 in U\* forced and the other numbers of
-//! layer 2 above n/2 barred, and, on a board whose frames of layer 2 are closed (the function decides it from the
-//! board's own U\*, not from n), every number of layer 2 up to n/2 barred.  The bottom-layers theorem (F4,
+//! The roles of F4 (`--fix-low 1`, the default, as `data/exact_parity_2_2530.jsonl` was made; `--fix-low 0` starts
+//! from the plain root, as `data/exact_2_1231.jsonl` was): the search starts from the roles `upper::low_roles` writes
+//! down, "B" below, the largest prime forced and every other prime barred, the sources of layer 2 in U\* forced and the
+//! other numbers of layer 2 above n/2 barred, and, on a board whose frames of layer 2 are closed (the function decides
+//! it from the board's own U\*, not from n), every number of layer 2 up to n/2 barred.  The bottom-layers theorem (F4,
 //! docs/theory/frame-model.md) says every optimal set obeys them, so a search from them that proves "no playable set
 //! obeying them beats V" still proves opt(n) <= V (an optimal set beating V would obey them), and its line is written
 //! `"proven"` like any other.  The recorded moves must obey them (checked).  The sources of layer 3 and up stay free.

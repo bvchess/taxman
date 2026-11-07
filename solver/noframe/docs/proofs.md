@@ -2,8 +2,8 @@
 
 Part of [the prover's README](../README.md).
 
-The prover proves opt(n) = V(n), the recorded score, for every n ≤ 2175.  `src/game.rs` proves upper bounds on opt(n)
-from proven facts only:
+The prover proves opt(n) = V(n), the recorded score, for every n ≤ 2530, in one run of one build ([the
+run](#the-run-of-2-to-2530)).  `src/game.rs` proves upper bounds on opt(n) from proven facts only:
 
 * [the playability theorem (P2)](../../../docs/theory/playability.md#the-playability-theorem) with [the core theorem
   (P7)](../../../docs/theory/playability.md#the-core-theorem): a set of picks is playable iff dismantling the instance
@@ -22,13 +22,95 @@ from proven facts only:
   to n/2, which `src/upper.rs` decides for each board from its own U\*.
 
 A search from the roles proves that no playable set that obeys them beats V(n).  That proves opt(n) ≤ V(n), because an
-optimal set beating V(n) would obey them.  Its lines say `"fix_low":1`, and the plain root's `"fix_low":0`; the
-committed `data/exact_*.jsonl` are all from the plain root, from before the field, and do not rest on F4.
-`tools/summarize.py exact` and `check` count the proofs that rest on it.  Its game (`src/game.rs`) knows nothing of
-frames, greedy, `unzip` or promotions; U\* and descending greedy (`src/peel.rs`) enter through the roles of F4
-and the checks of the conjectures.
+optimal set beating V(n) would obey them.  Its lines say `"fix_low":1`, and the plain root's `"fix_low":0`.  All 795
+searches of `data/exact_parity_2_2530.jsonl` start from the roles, so its proofs rest on F4 besides the other theorems;
+`data/exact_2_1231.jsonl` is from the plain root, from before the field, and does not.  `tools/summarize.py exact` and
+`check` count the proofs that rest on it.  Its game (`src/game.rs`) knows nothing of frames, greedy, `unzip` or
+promotions; U\* and descending greedy (`src/peel.rs`) enter through the roles of F4 and the checks of the conjectures.
 
-The search:
+## The run of 2 to 2530
+
+**One run of one build proved every game of 2..2530.**  `data/exact_parity_2_2530.jsonl` holds its 2,529 lines, one a
+game.  The command was `../tools/cloud/prover.sh 2 2530` ([the
+runbook](../../docs/runbook/prover.md#on-a-machine-of-your-own)), from commit 9015f79, on the 88 threads of one machine
+(two Xeon E5-2699 v4 processors, 756 GiB) at idle priority, in passes of 3600 s.  It started on 2026-11-06 at 05:02 PST
+and ended "complete" on 2026-11-07 at 00:21 PST: 19.3 hours and 20 passes, with no interruption and no error.  It cost
+no money, only its hours.  [The notebook's
+entry](https://github.com/bvchess/taxman-notebook/blob/main/the-model-free-proofs-of-2-2530-on-one-machine-2026-11/README.md)
+has the account.
+
+The check, `../tools/cloud/prover.sh --verify 2 2530`, prints `OK: opt(n) is proven equal to the recorded score for
+every n in 2..2530`: every game has a line with the recorded score, and no search found a set that beats it.  Every
+game's recorded moves obey the roles of F4, and the roles' parity bound is at least its score, which `exact` asserts
+before any search.  With `tools/summarize.py exact data/exact_parity_2_2530.jsonl`:
+
+| | games |
+|---|---|
+| Franklín–Moniot bound already equals V(n) | 45 |
+| parity bound at the root already equals V(n) | 199 |
+| proven by a search | 795 |
+| `chain`, at its ceiling V(n) = n + V(n−1), predecessor proven | 712 |
+| `prime`, by the prime formula, predecessor proven | 319 |
+| `semiprime`, by the semiprime formula, predecessor proven | 459 |
+| **every n in 2 .. 2530** | **2,529** |
+
+The 795 searches took 1,957.8 million nodes and **1,698.5 thread-hours** (search seconds), 3.12 ms a node on average.
+The other 1,734 games took 616 seconds in all.  The machine was not otherwise idle: from about 09:00 PST on the first
+day, experiments of the frame solver ran beside the run on up to 8 threads at nice 19, so the seconds and the
+milliseconds a node below run a little long.  The nodes of a search on one thread do not depend on that, and those of a
+search on several threads vary a little with the timing ([a game on several
+threads](#a-game-on-several-threads)).  `tools/summarize.py cost --band 100 data/exact_parity_2_2530.jsonl` gives the
+cost by band, with the dearest game of each in brackets:
+
+| n | searches | the root's parity gap (mean) | median nodes | most nodes | nodes | thread-hours | ms a node |
+|---|---|---|---|---|---|---|---|
+| 2–899 | 208 | 50 | 13 | 1,286 (800) | 19,900 | < 0.01 | 1.37 |
+| 900–999 | 32 | 166 | 390 | 9,780 (990) | 44,265 | 0.02 | 1.22 |
+| 1000–1099 | 37 | 123 | 438 | 12,829 (1023) | 65,312 | 0.02 | 1.26 |
+| 1100–1199 | 33 | 111 | 127 | 3,729 (1197) | 12,320 | 0.01 | 1.62 |
+| 1200–1299 | 35 | 173 | 3,162 | 14,066 (1287) | 116,983 | 0.04 | 1.32 |
+| 1300–1399 | 36 | 277 | 6,744 | 217,589 (1380) | 1,486,863 | 0.67 | 1.63 |
+| 1400–1499 | 43 | 450 | 66,885 | 847,263 (1475) | 4,866,369 | 2.53 | 1.87 |
+| 1500–1599 | 39 | 458 | 24,510 | 365,270 (1520) | 1,975,263 | 1.00 | 1.82 |
+| 1600–1699 | 34 | 345 | 9,958 | 74,165 (1696) | 513,421 | 0.17 | 1.19 |
+| 1700–1799 | 33 | 306 | 7,037 | 26,521 (1720) | 342,081 | 0.11 | 1.11 |
+| 1800–1899 | 33 | 423 | 41,534 | 177,450 (1859) | 1,757,520 | 0.54 | 1.11 |
+| 1900–1999 | 28 | 301 | 5,490 | 94,997 (1995) | 457,430 | 0.22 | 1.73 |
+| 2000–2099 | 41 | 380 | 10,141 | 99,062 (2000) | 640,090 | 0.31 | 1.77 |
+| 2100–2199 | 39 | 570 | 26,271 | 1,218,046 (2184) | 3,869,567 | 2.62 | 2.44 |
+| 2200–2299 | 37 | 727 | 184,120 | 13,021,992 (2288) | 35,043,723 | 43.1 | 4.43 |
+| 2300–2399 | 39 | 976 | 10,824,087 | 297,725,337 (2346) | 1,523,252,740 | 1,410.3 | 3.33 |
+| 2400–2499 | 37 | 742 | 482,280 | 117,479,896 (2499) | 241,256,583 | 147.8 | 2.21 |
+| 2500–2530 | 11 | 901 | 6,362,874 | 60,920,815 (2500) | 142,069,911 | 89.0 | 2.25 |
+
+**The cost is in the games past 2175.**  They took 99.6% of the thread-hours, and 2300–2399 alone 83%.
+The dearest five, 2346, 2376, 2379, 2340 and 2375, took 44% (295.2, 129.1, 126.5, 113.0 and 80.1 thread-hours), the
+ten dearest 65% and the fifty dearest 98%.  71 searches took a million nodes or more, 27 ten million or more and 5 a
+hundred million or more; 63 took a thread-hour or more, 23 ten or more and 4 a hundred or more.  The dearest, 2346
+(root gap 1,346), took 297,725,337 nodes and 1,062,725 thread-seconds on up to 88 threads, over the whole run: 19.3
+hours.
+
+**The cost follows the root's parity gap.**  The gap is the root's parity bound less V(n).  From n = 900 on, log10 nodes
+grows 0.498 ± 0.008 per 100 points of gap (tenfold per 201 points, R² 0.88), and 0.217 ± 0.009 per 100 in n (R² 0.52),
+where log10 seconds grows 0.225 ± 0.008 per 100 in n: a search costs 1.7 times as much per 100 in n.  The gap's mean
+swings between 277 and 458 from 1300 to 2099 with no steady rise, then rises: 570, 727 and 976 over 2100–2399.  The
+tenfold per 210 points of the cloud run of 2026-10 (490 searches, R² 0.61) is the slope that `POINTS_PER_DECADE` in
+`src/game.rs` weighs a conflict by.
+
+**The time of a node** was 1.1 to 1.9 ms from 900 through 2099, then 2.4, 4.4, 3.3 and 2.2 ms by the hundreds to 2499,
+and 2.3 at 2500–2530.  In 2200–2530 the games that ran on one thread took 2.49 ms a node, those on 2 to 8 threads 2.68,
+those on 9 to 87 threads 3.24, and 2346 on 88 threads 3.57.  These are different games, so the rise is not a clean
+effect of the threads.
+
+**The next 100 games.**  39 of the 100 games of 2531–2630 need a search, with root gaps of 341 to 942 (mean 643, against
+742 at 2400–2499).  The fit on the gap, made on the searches of gap below 1,000, prices them at about 90 million nodes:
+55 to 90 thread-hours at 2.2 to 3.6 ms a node, an hour on 88 threads.  On the run's own games of gap below 1,000 the
+same fit overprices by 1.4 times.  It is an extrapolation of one slope, and the entry gives the other fits.
+
+## The search
+
+A search is a branch and bound over the picks: a bound on what the picks still free can add, a playability check of the
+heaviest set, and a branch on a conflict found there.
 
 * **Bound.**  The maximum-weight matching between numbers and their maximal factors, with forced picks matched downward
   and barred numbers only paying.  It is solved once by successive shortest paths, then re-optimized in each child from
@@ -74,7 +156,7 @@ The search:
   repaired incrementally the same way, and cut the tree 3.3-fold at n = 793.  Beside the parity bound it cut nothing
   at 990, so `exact` uses it only without the parity bound.
 * **Pausing.**  A search still running at the end of a run saves its open subtrees and nogoods, and resumes in the
-  next run, depth first.  So a game can take any number of ten-minute runs.
+  next run, depth first.  So a game can take any number of runs.
 * **Threads.**  A game's search can run on several threads (`src/team.rs`), each searching open subtrees depth first
   with a bound and a nogood table of its own.  A thread with nothing to do asks the thread that holds the largest open
   subtree, by the expected tree of its gap, which gives it away and never searches it.  A pause saves the open subtrees
@@ -89,14 +171,13 @@ committed chain's score from one below it, with each rule on, on every seventh g
 every third game of 187-700 that needs a search.  The parity bound's intersection is checked against enumeration on
 random pairs of matroids.
 
-**From the roles of F4** (the default since 2026-10; the committed proofs below are from the plain root).  Over
-the games of 2..999, the 391 searches took 588,026 nodes and 357 s from the roles, against 614,900 nodes and 712 s from
-the plain root (`data/exact_parity_2_1300.jsonl`).  The nodes are within 5%, and the time of a node is halved, since the
-parity solves have the primes and the numbers of layer 2 settled.  Every game of 2..2175 has the recorded moves obey the
-roles, and the roles' parity bound is at least its score; `exact --budget 1` checks both for every game before any
-search.  The frames of layer 2 are closed on every board from 187 on, and on most below it.  The roles bar the numbers
-of layer 2 up to n/2 where the frames are closed, and leave them free on the 80 boards of 2..1300 where they are not,
-all of them at most 186 (`upper::tests`).
+**From the roles of F4.**  Over the games of 2..999, the 391 searches took 588,026 nodes and 357 s from the roles,
+against 614,900 nodes and 712 s from the plain root ([the notebook's
+entry](https://github.com/bvchess/taxman-notebook/blob/main/theorem-b-by-default-in-the-prover-and-the-hunts-probes-2026-10/README.md)).
+The nodes are within 5%, and the time of a node is halved, since the parity solves have the primes and the numbers of
+layer 2 settled.  The frames of layer 2 are closed on every board from 187 on, and on most below it.  The roles bar the
+numbers of layer 2 up to n/2 where the frames are closed, and leave them free on the 80 boards of 2..1300 where they
+are not, all of them at most 186 (`upper::tests`).
 
 ## The semiprime formula needs no search
 
@@ -133,25 +214,17 @@ relation is `semiprime` exactly where n closes a cycle, and then opt(n) − opt(
 largest number of the path for x instead of the smallest is caught on every such game, so that the test can see the
 failure it guards against.  On the committed chain to 1300, every such n that closes a cycle meets the formula.
 
-*Details.*  `exact --from 1301 --to 2175 --budget 1` stops every search at once, so it only classifies.  It gives, for
-the 875 games the cloud run proved:
+*Details.*  Of the 875 games of 1301–2175, the formula settles 176 with no search, and `chain` and `prime` 270 and 115,
+leaving 314 to search; of the 355 games of 2176–2530 it settles 72, and `chain` and `prime` 105 and 43, leaving 135.
+The cloud run of 2026-10, made before the formula, had searched the 176, and they took 84.0 of its 226.0 thread-hours.
 
-| relation | games |
-|---|---|
-| `chain` | 270 |
-| `prime` | 115 |
-| `semiprime` | 176 |
-| `none`, which needs a search | 314 |
+## Earlier runs
 
-The cloud run (`data/exact_parity_1301_2175.jsonl`) was made before the formula and searched 490 of these games, the 314
-and the 176.  Those 176 took 84.0 of its 226.0 thread-hours.  Its file is a record and stays as it was; the lines of the
-176 say `"relation":"none"`.  Put together with the 561 lines of the classification that rest on a relation, it passes
-`tools/summarize.py check 1301 2175`, which counts the 176 as proven by `semiprime`.
+The runs before the one above proved shorter ranges with the builds of their day, and the notebook holds their accounts.
+The files of the last two are retired, since one run of one build redid them.
 
-## With the Franklín–Moniot bound (to 989)
-
-`data/exact_2_1231.jsonl`, where `relation: chain` marks a game at its ceiling, V(n) = n + V(n − 1), and
-`relation: prime` one given by the prime formula:
+**With the Franklín–Moniot bound (to 989).**  `data/exact_2_1231.jsonl`, where `relation: chain` marks a game at its
+ceiling, V(n) = n + V(n − 1), and `relation: prime` one given by the prime formula:
 
 | | games |
 |---|---|
@@ -167,119 +240,21 @@ overrates most: 798–804 at 7–12 million nodes, and 987–989 at 19–53 mill
 50–70 million nodes each, and 1020 and 1023–1027 several million, without finishing; their searches are saved in
 `data/checkpoints/exact_open_searches.tar.gz`.
 
-## With the parity bound (to 1300)
+**With the parity bound (to 1300).**  The parity bound finished those open searches in 4,000 to 215,000 more nodes each
+([the notebook's
+entry](https://github.com/bvchess/taxman-notebook/blob/main/the-parity-bound-in-the-model-free-proofs-2026-10/README.md)),
+and proved every game to 1300 twice.  The run of 2..2530 proves them from scratch, from the roles: 990, 992 and 996 in
+9,780, 8,850 and 8,741 nodes, and 993 and 995 by the semiprime formula.  And no rule cuts an optimal game: for every
+game that needs a search, the same search with the target one below V(n) finds a set worth V(n), which replays by the
+rules (`examples/paritycheck.rs`; all 665 such games to 1300, `data/paritycheck_2_1300.jsonl`, 31 minutes).
 
-`data/exact_parity_990_1300.jsonl` continues that file: the open searches resumed with the parity bound, then every
-game from 1028 to 1300, then 999–1019 again.  The open searches finished in 4,000 to 215,000 more nodes each (17 to
-595 seconds; 990: 89,639 nodes after its 70.5 million; 992: 214,329 after 65.2 million), and with them 991, 994, 997
-and 998 by the ceiling and the prime formula.  With the two files (`tools/summarize.py exact data/exact_2_1231.jsonl
-data/exact_parity_990_1300.jsonl`):
-
-| | games |
-|---|---|
-| Franklín–Moniot bound already equals V(n) | 45 |
-| proven by a search (to 989 with the Franklín–Moniot bound alone, from 990 with the parity bound) | 649 |
-| `chain`, at its ceiling V(n) = n + V(n−1), predecessor proven | 407 |
-| `prime`, by the prime formula, predecessor proven | 198 |
-| **every n in 2 .. 1300**, the committed chain to 1300 | **1299** |
-
-The parity searches of this file took 2.7 hours of thread time on three threads; the warm starts came in for its last
-96 games.  The hardest was 1287, at 146,855 nodes and 279 seconds.  So the frame model's answer is opt(n) for every
-game n ≤ 1300 of the committed chain, including the solver's own results past the Java's 1000.
-
-`data/exact_parity_2_1300.jsonl` proves every game again from scratch with the parity bound, with no resumed search
-and no proof by the Franklín–Moniot bound alone (the final build, two threads).  It is a second, self-standing proof of
-every n ≤ 1300 by a different bound, and the cost curve below.  And no rule cuts an optimal game: for every game that
-needs a search, the same search with the target one below V(n) finds a set worth V(n), which replays by the rules
-(`examples/paritycheck.rs`; all 665 such games to 1300, `data/paritycheck_2_1300.jsonl`, 31 minutes).
-
-## What a proof costs, and how far it reaches
-
-A proof's cost follows the root's parity gap, the root's parity bound less V(n), not n.  `tools/summarize.py cost
-data/exact_parity_2_1300.jsonl` gives the 557 games that need a search, proven from scratch with the parity bound in
-1.17 thread-hours (two threads; about 1.6 ms a node from 990 on, the warm starts included):
-
-| n | searches | the root's parity gap (mean) | median nodes | most nodes | seconds, all searches |
-|---|---|---|---|---|---|
-| 2–499 | 127 | 3–24 | ≤ 21 | 83 | 2 |
-| 500–799 | 154 | 44–78 | 74–402 | 2,673 | 44 |
-| 800–899 | 57 | 86 | 382 | 5,474 | 55 |
-| 900–999 | 53 | 164 | 2,406 | 68,260 (996) | 611 |
-| 1000–1099 | 54 | 120 | 2,358 | 91,928 (1023) | 974 |
-| 1100–1199 | 56 | 111 | 789 | 41,153 (1199) | 264 |
-| 1200–1300 | 56 | 169 | 18,247 | 146,855 (1287) | 2,276 |
-
-The cost follows the root's parity gap as the frame solver's follows its root gap.  Over 900–1300 a search's nodes grow
-tenfold per 84 points of gap (1.19 ± 0.05 decades per 100 points, R² 0.76).  The gap grows about 14 points per 100 in n,
-with swings of ±50 between bands; that is the measurement of [matroid intersection
-bounds](https://github.com/bvchess/taxman-notebook/blob/main/search/matroid-intersection-bounds-2026-10/README.md),
-which these roots reproduce.  Against n, log10 nodes grows 0.16 ± 0.04 and log10 seconds 0.23 ± 0.04 per 100 in n over
-900–1300 (R² 0.06 and 0.11: the gap's swings dominate), and 0.33 and 0.34 from n = 78 on.  The search with the
-Franklín–Moniot bound alone had spent 50–70 million nodes on each of 990–996 without finishing; the parity bound proves
-them from scratch in 44,000–68,000.
-
-The prover's proofs reach 2175, where the committed chain (`../../results/optimal.jsonl.gz`) ended when they were
-made; the next subsection is the run that made them.
-
-*Details.*  An extrapolation from the bands above, 0.23 decades per 100 in n, made before that run, gave about 57 hours
-of thread time to 2000, and about 3 hours for the hardest proofs.  It was low: 1301–1999 took 164 hours, and the hardest
-proof, of 1475, 4.9.
-
-## To 2175, on a cloud machine
-
-`data/exact_parity_1301_2175.jsonl` is `exact` over the 875 games of 1301–2175, each proven from scratch with the
-parity bound.  It ran on one `c8g.4xlarge` (Graviton4, 16 vCPUs, one game a thread) on spot in us-east-1b, run by
-`../tools/cloud/prover.sh` ([solver/docs/runbook/prover.md](../../docs/runbook/prover.md)), with
-the build of commit 4db7a14.  It ran from 2026-10-14 23:29 to 2026-10-15 15:22 UTC: 190 passes of 300 s, every one
-ending with status 0, with no interruption; 15.9 hours of run and 16.0 instance-hours at $0.2402, **$3.84**.
-
-The check, `../tools/cloud/prover.sh --verify 1301 2175`, run on the instance and again at home on this file, prints
-`OK: opt(n) is proven equal to the recorded score for every n in 2..2175`: every game has a line with the recorded
-score, and no search found a set that beats it.  With `tools/summarize.py exact data/exact_parity_2_1300.jsonl
-data/exact_parity_1301_2175.jsonl`:
-
-| | games |
-|---|---|
-| Franklín–Moniot bound already equals V(n) | 45 |
-| parity bound at the root already equals V(n) | 199 |
-| proven by a search | 1,047 (557 to 1300, 490 from 1301) |
-| `chain`, at its ceiling V(n) = n + V(n−1), predecessor proven | 607 (337 and 270) |
-| `prime`, by the prime formula, predecessor proven | 276 (161 and 115) |
-| **every n in 2 .. 2175**, the committed chain to there | **2174** |
-
-Of the 875 games of 1301–2175, 490 needed a search, and every one ran to the end; the root's parity bound exceeds the
-recorded score in each, by 125 to 767, with a mean of 384.  The other 385 are at their ceiling or meet the prime
-formula, and took 83 seconds in all.  The searches took 309.2 million nodes and **226.0 thread-hours** (search
-seconds), 2.63 ms a node on average.  `tools/summarize.py cost --band 100 data/exact_parity_1301_2175.jsonl` gives the
-cost by band, with the dearest game of each in brackets:
-
-| n | searches | the root's parity gap (mean) | median nodes | most nodes | nodes (millions) | thread-hours | ms a node |
-|---|---|---|---|---|---|---|---|
-| 1301–1399 | 60 | 297 | 53,346 | 2,639,109 (1393) | 31.6 | 22.7 | 2.58 |
-| 1400–1499 | 58 | 447 | 730,285 | 6,328,930 (1475) | 67.2 | 47.3 | 2.54 |
-| 1500–1599 | 58 | 458 | 335,164 | 2,889,122 (1520) | 30.9 | 19.9 | 2.32 |
-| 1600–1699 | 53 | 340 | 132,489 | 1,879,179 (1696) | 13.1 | 7.2 | 1.99 |
-| 1700–1799 | 55 | 313 | 110,480 | 633,344 (1700) | 9.8 | 5.6 | 2.03 |
-| 1800–1899 | 54 | 433 | 727,936 | 5,333,481 (1849) | 82.7 | 52.7 | 2.29 |
-| 1900–1999 | 52 | 294 | 92,155 | 1,898,240 (1995) | 11.7 | 9.1 | 2.79 |
-| 2000–2099 | 56 | 374 | 176,716 | 4,136,842 (2064) | 23.5 | 20.1 | 3.08 |
-| 2100–2175 | 44 | 527 | 262,534 | 6,868,466 (2172) | 38.7 | 41.5 | 3.86 |
-
-What the cost follows is the root's parity gap, not n.  Over the 490 searches, log10 nodes grows 0.477 ± 0.017 per 100
-points of gap: tenfold per 210 (R² 0.61, residual sd 0.45 decades), where 900–1300 had tenfold per 84.  Against n it
-grows −0.009 ± 0.013 per 100 in n (R² 0.00; log10 seconds 0.007 ± 0.013): the bands' means swing between 294 and 527
-of gap with no steady rise.
-
-*Details.*  The cost of a node does not grow steadily with n.  It is 2.0–2.6 ms through 1899: 2.58 at 1301–1399 and
-1.99 at 1600–1699, against 2.12 ms for 1300 alone on one Graviton4 core (the calibration's) and 1.7 on two quiet laptop
-threads at 1200–1300.  Then it is 2.8, 3.1 and 3.9 ms by the hundreds to 2175, and 4.10 to 4.15 for 2170–2173.  The
-dear games are many: 77 searches took a million nodes or more and 57 an hour or more, the ten dearest 24% of the
-thread-hours and the fifty dearest 59%.
-
-The run took 1.5 times the nodes projected before it, just above the projected range, and 1.6 times the thread-hours,
-inside it.  [The notebook's
+**On a cloud machine (1301 to 2175).**  The first run past 1300 proved the 875 games from the plain root, one game a
+thread, on one `c8g.4xlarge` (Graviton4, 16 vCPUs) at spot, with the build of commit 4db7a14, in 15.9 hours for $3.84.
+It searched 490 games in 309.2 million nodes and 226.0 thread-hours.  [The notebook's
 entry](https://github.com/bvchess/taxman-notebook/blob/main/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)
-has the run's account, the projection game by game, and what the run says about the projection's model.
+has the account, and the projection by which it was planned.  Its build lacked the later cuts: the roles, the bars
+outside the heaviest set, and the choice of the conflict by expected tree.  On the 314 games that the run of 2..2530
+also searched, it took 194.1 million nodes, against 13.2 million (6.3 thread-hours) for the run of 2..2530.
 
 ## A game on several threads
 
@@ -296,8 +271,11 @@ one thread's, since each thread keeps nogoods of its own: 1540 took 118,246 node
 | 1475 | 1 | 105,472 | 301 | 301 | 351 |
 | 1475 | 4 | 473,528 | 301 | 1,200 | 1,574 |
 
-*Details.*  The runs were release builds at nice 19, on a machine whose other threads ran other work at idle priority,
-where two runs of one binary on one game differed by up to 20% (1548 on one thread: 20.3 and 24.4 s).
+The run of 2..2530 put up to 88 threads on a game: 58 of its 795 searches ran on more than one thread, the dearest, 2346,
+on 88.  No such game was searched on one thread to compare.
+
+*Details.*  The runs above were release builds at nice 19, on a machine whose other threads ran other work at idle
+priority, where two runs of one binary on one game differed by up to 20% (1548 on one thread: 20.3 and 24.4 s).
 
 * **Subtrees moved.**  Four threads moved 84 subtrees of 1540 from one thread to another, and 12 of 1475 in five
   minutes.  A pause left 234 open subtrees of 1475 on four threads, against 90 on one.  A run that resumes them

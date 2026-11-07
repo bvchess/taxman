@@ -11,15 +11,17 @@ cargo build --release
 ./target/release/span --from 2 --to 100000 --threads 6 --seconds 540 --out OUT.jsonl     # resumable; ~10 min
 ./target/release/span --from 101000 --to 1000000 --step 1000 --threads 6 --seconds 540 --out OUT.jsonl
 ./target/release/star --from 2 --to 20000 --threads 6 --seconds 540 --out OUT.jsonl
-./target/release/exact --from 2 --to 1300 --threads 3 --seconds 540 --fix-low 0 --checkpoints work/fresh --out OUT.jsonl
-                                    # with the parity bound, rerun until done (data/exact_parity_2_1300.jsonl; without
-                                    # --fix-low 0 the searches start from the roles of the bottom-layers theorem, the
-                                    # default)
+../tools/cloud/prover.sh 2 2530     # the proofs of 2..2530 (data/exact_parity_2_2530.jsonl): `exact` over the range in
+                                    # resumable passes on every CPU, then the check.  It takes 1,700 thread-hours; the
+                                    # steps are in solver/docs/runbook/prover.md, "On a machine of your own"
+./target/release/exact --from 2 --to 1300 --threads 3 --seconds 540 --checkpoints work/fresh --out OUT.jsonl
+                                    # a part of it, rerun until done: the searches start from the roles of the
+                                    # bottom-layers theorem (--fix-low 0 starts from the plain root); 6 thread-minutes
 ./target/release/exact --from 2 --to 1231 --parity 0 --fix-low 0 --threads 6 --seconds 540 --out OUT.jsonl
                                     # the Franklín–Moniot bound alone (data/exact_2_1231.jsonl, which left open
                                     # searches:)
 tar -xzf data/checkpoints/exact_open_searches.tar.gz -C work   # to resume them with the parity bound:
-./target/release/exact --from 990 --to 1300 --fix-low 0 --threads 3 --seconds 540 --out data/exact_parity_990_1300.jsonl
+./target/release/exact --from 990 --to 1300 --fix-low 0 --threads 3 --seconds 540 --out OUT.jsonl
 cargo run --release --example parityroot 2 1300     # the root's parity bound, checked, for every game
 cargo run --release --example paritycheck 2 1300    # one below each recorded score, the search finds it (~30 minutes)
 bash tools/adversary_campaign.sh                                                          # data/adversary/
@@ -29,14 +31,11 @@ bash tools/adversary_campaign.sh                                                
                                     # semiprime games (J3), derived
 ./target/release/optsets --list 798,799,800 --upper fixed --threads 1 --seconds 540 --out FIXED.jsonl
 ./target/release/moves --from 2 --to 1300 --seconds 540 --out OUT.jsonl         # one thread; ~7 minutes
-EXTRA_ARGS='--fix-low 0' ../tools/cloud/prover.sh 1301 2175   # `exact` over a range in resumable passes, all CPUs,
-                                    # then the check (data/exact_parity_1301_2175.jsonl; without EXTRA_ARGS the
-                                    # searches start from the roles of the bottom-layers theorem)
-tools/summarize.py check 1301 2175 data/exact_parity_2_1300.jsonl data/exact_parity_1301_2175.jsonl
-                                    # every n in 2..2175 proven, scores recorded, and how many proofs rest on it
-./target/release/exact --from 2 --to 2175 --budget 1 --out PRE.jsonl    # no search, only the roles' checks (4 min);
-                                    # each line's "relation" says whether the game needs a search (none) or rests on
-                                    # the game before it (chain, prime, semiprime)
+tools/summarize.py check 2 2530 data/exact_parity_2_2530.jsonl
+                                    # every n in 2..2530 proven, scores recorded, and how many proofs rest on F4
+./target/release/exact --from 2 --to 2530 --budget 1 --out PRE.jsonl    # no search, only the roles' checks (about a
+                                    # second a game); each line's "relation" says whether the game needs a search
+                                    # (none) or rests on the game before it (chain, prime, semiprime)
 ./target/release/upper --from 1301 --to 2175 --out data/upper_1301_2175.jsonl          # one thread, 5 minutes
 ./target/release/upper --from 2176 --to 3314 --out data/upper_2176_3314.jsonl          # 21 minutes
 ./target/release/upper --from 3315 --to 3440 --out data/upper_3315_3440.jsonl          # 5 minutes

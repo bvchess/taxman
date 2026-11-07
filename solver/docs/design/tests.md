@@ -220,7 +220,8 @@ every second line of the Java fixtures), and the comment on each says what the w
   * The same game at every width that holds it (128 included) has the same frames, candidates, greedy set,
     `max_total`, answer and tree.
   * Game 1133 (W = 20, 41 nodes by default and a few thousand at most) under every tactic against the committed chain, and a
-    slice of that chain; the prover's proof of game 1133 (`solver/noframe/data/exact_*.jsonl`) gives the committed score.
+    slice of that chain; the prover's proof of game 1032, whose W = 20 search the tests also resume
+    (`solver/noframe/data/exact_parity_2_2530.jsonl`), gives the committed score.
   * A game of 2050 built at W = 64 (it dispatches to 36) and one of 4100 at 128 go through the frames, the matching
     bound, conflicts, the greedy set and a node-limited search; games of 2050, 2400, 2800 and 3100 at the widths they
     dispatch to (36, 40, 48 and 56) and at 64 (2050 also at 128) have the same start and the same node-limited search,
@@ -257,7 +258,7 @@ the computations behind the statements that are not proved are in [evidence.md](
 | R5 | No check: no code starts a search from a floor. |
 | Q1 | A search over the states of the pot that uses no theory (`heuristics/evaluation/certify.py`) finds the heaviest set of sources unique in every game to 62. |
 | Q3 | The prover's `src/moves.rs`: ℓ(n) and the heaviest longest game against brute force to 22, and ν(n) against the matching solver on every board to 400. |
-| W1 | The heuristics' check above, to 22.  The prover's parity bound is at least opt(n) on every game to 1300 (`solver/noframe/data/exact_parity_2_1300.jsonl`), and the recorded moves are independent at both parities on every game to 1300 that is not prime; the intersection agrees with brute force on 3,000 random pairs of matroids ([matroid intersection bounds](https://github.com/bvchess/taxman-notebook/blob/main/search/matroid-intersection-bounds-2026-10/README.md)). |
+| W1 | The heuristics' check above, to 22.  The prover's parity bound is at least opt(n) on every game to 2530 (`solver/noframe/data/exact_parity_2_2530.jsonl`), and the recorded moves are independent at both parities on every game to 2530 (`exact` asserts both before any search); the intersection agrees with brute force on 3,000 random pairs of matroids ([matroid intersection bounds](https://github.com/bvchess/taxman-notebook/blob/main/search/matroid-intersection-bounds-2026-10/README.md)). |
 | F1, F3, F6 | The census of every board 2..8191 (above): its check A, that each frame lies in one layer and the frames in front of it one layer down, and its check C, clean numbering; the unit tests of `frames` (above). |
 | F4 | `tests/bottom_layers.rs` (above). |
 | X1 to X7 | `tests/model_exact.rs` (above), and the census's checks D to G: no candidate has a back claim's factor among its maximal factors (X5), none is a factor of a frame numbered 0 and every one has a home (X3, X6), and the sources played are the U\* of `src/root_problem.rs` (X1); check I and `tests/canonical_root.rs` (above), that setup builds Π_n. |

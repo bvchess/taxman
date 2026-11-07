@@ -16,6 +16,11 @@
 import { primeFactors } from './model.js';
 import { fmt } from './vocab.js';
 
+/** The last game the prover proves on the whole board, without the frame model (results/README.md, "What supports the
+ *  scores"); past it, a score is the frame model's best, which is opt(n) wherever statement U holds.  The pages' text
+ *  says the number too, in trust.html, results.html, top-half.html and the others that name it. */
+export const PROVER_TO = 2530;
+
 /** The proof kinds of a results line, in plain words (docs/GLOSSARY.md, "proof"). */
 export const PROOFS = [
   { key: 'exhausted', name: 'searched the whole tree', short: 'a search of the whole tree' },

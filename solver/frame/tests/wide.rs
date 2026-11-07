@@ -16,6 +16,7 @@ use common::{
     config, options, prev_of, profile_at_width, random_subset, stored_games, testdata, variants, Config, Game, Profile,
     Rng, TempDir,
 };
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::time::Duration;
 use taxman::bits::Bits;
@@ -316,20 +317,24 @@ fn a_board_past_4095_builds_bounds_and_searches_at_w128() {
     builds_bounds_and_searches::<128>(4100, 4095);
 }
 
-/// At W = 20 the prover's proof (`solver/noframe/data/exact_parity_2_1300.jsonl`) is the only upper bound that does not
+/// At W = 20 the prover's proof (`solver/noframe/data/exact_parity_2_2530.jsonl`) is the only upper bound that does not
 /// come from the search being tested (the Java stops at 1023, and the prover shares no code with the frame solver): for
-/// game 1133 its own search finished, and proved the recorded score optimal.
+/// game 1032, whose W = 20 search [`a_w20_search_interrupted_and_resumed_gives_the_same_answer`] resumes, its own
+/// search finished, and proved the recorded score optimal.  The file is long and its lines are in the order the games
+/// finished, so the test reads it line by line up to the one that opens with the game's `{"n":N,`, and parses that one.
 #[test]
 fn the_provers_proof_matches_a_w20_result() {
-    let n = 1133;
+    let n = 1032;
     let score = stored_games()[&n].0;
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../noframe/data/exact_parity_2_1300.jsonl");
-    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-    let lines = text.lines().filter(|line| !line.trim().is_empty());
-    let proof = lines
-        .map(|line| Json::parse(line).expect("a line of JSON"))
-        .find(|line| line.get("n").and_then(Json::as_u32) == Some(n))
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../noframe/data/exact_parity_2_2530.jsonl");
+    let file = std::fs::File::open(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let start = format!("{{\"n\":{n},");
+    let line = BufReader::new(file)
+        .lines()
+        .map(|line| line.expect("a line of the prover's file"))
+        .find(|line| line.starts_with(&start))
         .unwrap_or_else(|| panic!("n={n}: the prover's file has no line for it"));
+    let proof = Json::parse(&line).expect("a line of JSON");
     assert_eq!(proof.get("search").and_then(Json::as_str), Some("proven"), "n={n}: the prover's search did not finish");
     assert_eq!(
         proof.get("score").and_then(Json::as_u64),

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Trust · Taxman</title>
-<meta name="description" content="Every score of the chain of optimal Taxman games is checked, and every score says what it rests on: a referee, two verifiers, a second program that proves the scores to game 2,175, and the parity bound.">
+<meta name="description" content="Every score of the chain of optimal Taxman games is checked, and every score says what it rests on: a referee, two verifiers, a second program that proves the scores to game 2,530, and the parity bound.">
 <meta name="author" content="Brian Chess">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <script src="js/tone.js"></script>
@@ -53,9 +53,8 @@
       target.  It rests only on the theory's theorems and on elementary bounds, and its exact methods are tested
       against brute force (<a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/README.md">its
       README</a>).  Both programs read the chain through one gzip decoder, whose check of every byte makes a misread
-      fail loudly rather than hand both the same wrong game.  The proofs reach game 2,175, where the chain ended when
-      they were made (<a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md">the
-      proofs</a>).</p>
+      fail loudly rather than hand both the same wrong game.  The proofs reach game 2,530
+      (<a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md">the proofs</a>).</p>
     </aside>
     <p>Every proof of the frame solver rests, in the end, on the
     <a class="gloss" href="glossary.html#frame-model">frame model</a>,
@@ -64,7 +63,7 @@
     it.  It shares no proof code with the frame solver.  It searches the whole
     <a class="gloss" href="glossary.html#board">board</a>, sets of moves rather than promotions, with no frames, and
     proves that no set that can be played beats the recorded score.</p>
-    <p>It proves every score of the chain up to game 2,175.  There each score is
+    <p>It proves every score of the chain up to game 2,530.  There each score is
     <a class="gloss" href="glossary.html#opt">opt(n)</a> with no assumption, and statement U holds as well, since the
     frame model's best is that score.</p>
   </div>
@@ -145,7 +144,7 @@
     <aside class="note card" aria-label="The exactness of the parity bound to game 77, measured">
       <div class="note-head"><span class="note-name">Exact to game 77</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#what-the-parity-bound-misses">measured<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">The parity bound equals opt(n) for every game up to 77, and exceeds it at game 78.</p>
-      <p class="precise"><span class="run">Precisely.</span>The prover's run on games 2 to 1,300 records each bound,
+      <p class="precise"><span class="run">Precisely.</span>The prover's run on games 2 to 2,530 records each bound,
       checked by its weight split: at game 78 it is 1,992 against opt(78) = 1,991
       (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#observations">the evidence</a>).
       U* with <span data-78="promotions">28, 30, 36 and 39</span> passes the test at that weight; the nine numbers drawn
@@ -181,17 +180,17 @@
       <p class="precise"><span class="run">Precisely.</span>ΣU* + P*(Π<sub>n</sub>) ≤ opt(n), with equality iff
       statement U holds at n.</p>
     </aside>
-    <aside class="note card" aria-label="Statement U, open, proved to game 2,175">
-      <div class="note-head"><span class="note-name">Statement U</span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">open, proved to game 2,175<span class="sr-only">, evidence on GitHub</span></a></div>
+    <aside class="note card" aria-label="Statement U, open, proved to game 2,530">
+      <div class="note-head"><span class="note-name">Statement U</span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">open, proved to game 2,530<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">Some optimal game plays every number of U* with three or more prime factors.</p>
       <p class="precise"><span class="run">Precisely.</span>Some optimal set of n contains U*<sub>≥3</sub>.  It holds at
       every game the prover proves
       (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">the evidence</a>).</p>
     </aside>
-    <p>Every score up to game 2,175 is <a class="gloss" href="glossary.html#opt">opt(n)</a>, proved on the whole board
+    <p>Every score up to game 2,530 is <a class="gloss" href="glossary.html#opt">opt(n)</a>, proved on the whole board
     by the <a class="gloss" href="glossary.html#prover">prover</a>.</p>
-    <p>Past game 2,175 the scores rest on the <a class="gloss" href="glossary.html#frame-solver">frame solver</a> alone,
-    <span data-rests="past">2,885</span> of them.  Each is the best score of the
+    <p>Past game 2,530 the scores rest on the <a class="gloss" href="glossary.html#frame-solver">frame solver</a> alone,
+    <span data-rests="past">2,530</span> of them.  Each is the best score of the
     <a class="gloss" href="glossary.html#frame-model">frame model</a>, and that is opt(n) exactly when
     <a class="gloss" href="glossary.html#statement-u">statement U</a> holds at n: when some optimal game plays every
     number of <a class="gloss" href="glossary.html#u-star">U*</a> with three or more prime factors.  Statement U is
@@ -234,9 +233,9 @@
       <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#where-a-proof-stops">where a
       proof stops</a>.</p>
     </aside>
-    <p>What supports statement U past game 2,175:</p>
+    <p>What supports statement U past game 2,530:</p>
     <ul class="rules">
-      <li>It holds at every game the prover reaches, up to game 2,175.</li>
+      <li>It holds at every game the prover reaches, up to game 2,530.</li>
       <li>It is proved for the numbers with one or two prime factors: every optimal set holds those of U*.
       Statement U asks the same of the numbers with three or more.</li>
       <li>Among the <a class="gloss" href="glossary.html#source">sources</a> alone, U* is the heaviest set that can be

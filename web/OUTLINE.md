@@ -89,7 +89,7 @@ chain's end, and this site explains how.
 * **Check it yourself:** the data, the programs and the theory on GitHub.
 * **Right column:** the rules precisely, opt(n) and the Taxman sequence (OEIS A019312); the heuristics' claims and how
   they were measured (`heuristics/README.md`); how to check the chain; what supports the scores (proven outright to
-  2175, given statement U past it), beside "Check it yourself" and not at the top, until chapter 6 gives it its home;
+  2530, given statement U past it), beside "Check it yourself" and not at the top, until chapter 6 gives it its home;
   how to cite the site.
 
 ## The story
@@ -158,7 +158,7 @@ greedy pass chooses them.
   48 of the 720 orders of six of them trap greedy at four, though five fit.  Taken from the largest down, they do not.
   Yet U\* is certified best among the sources in every game to 100,000.
 * Whether an optimal game of the whole board plays all of U\* is statement U, the one open statement the frame solver's
-  scores rest on past 2175.
+  scores rest on past 2530.
 
 **Figures.**  Game 21 in layers (the game-21 figure, from the pot to the sources).  The layer-2 graph of a mid-size
 game, greedy adding edges from the largest down and refusing the ones that close a loop.  A chart of the top half's
@@ -218,12 +218,12 @@ register); the design (`solver/docs/DESIGN.md`, `search.md`, `gf2-bound.md`, `ta
 **Point.**  Every score is checked, and every score says what it rests on.
 
 * A referee replays every game: legal, finished, scoring what is recorded.
-* A second program, the prover, shares no proof code with the frame solver and proves every score to 2175 on the whole
+* A second program, the prover, shares no proof code with the frame solver and proves every score to 2530 on the whole
   board, with no frames.
 * Its bound: a set that can be played is independent over GF(2), and that bound's gap is about a tenth of the best
   published bound's.
 * The parity bound equals opt(n) for every n up to 77 and misses first at 78, where an odd core weighs in (measured).
-* Past 2175 the scores are exact given statement U, and here is what supports it.
+* Past 2530 the scores are exact given statement U, and here is what supports it.
 * What each game's record says: how it was proven and what it assumes.
 
 **Figures.**  What rests on what: the proof kinds and their assumptions.  The ladder of three conditions, at least one,

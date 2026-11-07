@@ -1,6 +1,6 @@
 # Status
 
-Updated 2026-11-06.
+Updated 2026-11-07.
 
 The state of the work as of the date above: the priority, and the projects in flight.  This page is rewritten, not
 appended to, when the state changes.  What was done and why is in the [lab
@@ -13,16 +13,14 @@ notebook](https://github.com/bvchess/taxman-notebook/blob/main/README.md), how f
 The Nov 1 run finished on 2026-11-06 at 05:00 PST, and its file is `results/optimal.jsonl.gz`: the games 1 to 5060, each
 proven, by one build ([results/runs.md](../../results/runs.md)).  The cleanup of the frame solver is finished; its last
 step retired the bounds store, the ledger, `--use-prev`, the readers of older line formats, `certify`, the certificates
-and the extended mode.  The priority is the prover's proof of the games 2 to 2530 by one build, and after it the unsound
-mode.
+and the extended mode.  The prover's run of 2 to 2530 is done and committed.  The priority is the unsound mode.
 
 ## In flight
 
-* **The prover's run of 2 to 2530.**  It runs on batmobile, from a clone at commit 9015f79, on every thread at idle
-  priority ([the runbook](runbook/prover.md#on-a-machine-of-your-own) says how).  It started by itself on 2026-11-06 at
-  05:02 PST, when the chain ended.  When it ends, its output is checked against the results file (`prover.sh --verify 2
-  2530`) and committed under `solver/noframe/data/`, where it supersedes the older `exact_parity` files ([the
-  runbook](runbook/prover.md#bring-the-data-home-verify-commit) says how).
+* **The prover's run of 2 to 2530.**  Done: one run of commit 9015f79 on batmobile, which ended on 2026-11-07 at 00:21
+  PST, proved every game of 2 to 2530.  `prover.sh --verify 2 2530` passes on its file, which is committed as
+  `solver/noframe/data/exact_parity_2_2530.jsonl` and replaced the older `exact_parity` files ([the prover's
+  proofs](../noframe/docs/proofs.md#the-run-of-2-to-2530) record the run).
 
 ## Open
 

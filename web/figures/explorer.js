@@ -15,11 +15,7 @@
 
 import * as M from '../js/model.js';
 import { NUMBER, duration, fmt, listWords, numberMark, setNumber } from '../js/vocab.js';
-import { PROOFS } from '../js/proof.js';
-
-// The prover proves every score from 2 to here on the whole board, without the frame model (results/README.md, "The
-// files"); past it, a score is the frame model's best, which is opt(n) wherever statement U holds.
-export const PROVER_LAST = 2175;
+import { PROOFS, PROVER_TO } from '../js/proof.js';
 
 // The games the story names, which the explorer offers to jump to, and the last game of the chain.
 const NAMED = [21, 40, 425, 833, 2873];
@@ -96,8 +92,8 @@ function settled(r) {
 // What the score rests on.
 function restsOn({ n }) {
   if (n === 1) return 'Nothing: game 1 has no move to choose.';
-  if (n <= PROVER_LAST) return `The prover proves it too, on the whole board, so it is opt(${fmt(n)}) without the frame model.`;
-  return `It is the frame model’s best score, which is opt(${fmt(n)}) wherever statement U holds, and U is open past game ${fmt(PROVER_LAST)}.`;
+  if (n <= PROVER_TO) return `The prover proves it too, on the whole board, so it is opt(${fmt(n)}) without the frame model.`;
+  return `It is the frame model’s best score, which is opt(${fmt(n)}) wherever statement U holds, and U is open past game ${fmt(PROVER_TO)}.`;
 }
 
 // The six numbers under the words: each a label, a value and a line under it.

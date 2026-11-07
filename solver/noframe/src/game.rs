@@ -267,7 +267,8 @@ const INF: i64 = i64::MAX / 4;
 /// The most conflicts that a node learns from its set (see [`Prover::learn_conflicts`]).
 const LEARNED: usize = 4;
 /// The growth of a search with its node's gap, the bound less the target: tenfold per this many points (measured over
-/// the proofs of 1301-2175, solver/noframe/docs/proofs.md, "To 2175, on a cloud machine").
+/// the 490 searches of 1301-2175 of the cloud run of 2026-10; the run of 2 to 2530 finds 201 over 900-2530,
+/// solver/noframe/docs/proofs.md, "The run of 2 to 2530").
 const POINTS_PER_DECADE: f64 = 210.0;
 
 impl MatchingBound {
