@@ -55,9 +55,9 @@
       node's promotion limit.  The solver calls it the GF(2) bound.  The only sets it lets through that cannot be
       promoted hold an odd core in some frame.</p>
     </aside>
-    <p>The test requires that no group of a set's numbers list every factor an even number of times.  This is linear
-    algebra over GF(2), the arithmetic of even and odd, so it is quick to check, and a classical algorithm finds the
-    heaviest set that passes it.  That set's sum bounds what a branch can still add.  The solver applies the test to
+    <p>We call it the <a class="gloss" href="glossary.html#parity-test">parity test</a>: no group of a set's numbers
+    may list every factor an even number of times.  This is linear algebra over GF(2), the arithmetic of even and odd,
+    so it is quick to check, and a classical algorithm finds the heaviest set that passes it.  That set's sum bounds what a branch can still add.  The solver applies the test to
     the promotions frame by frame, at every <a class="gloss" href="glossary.html#node">node</a>.</p>
     <p>Some sets pass the test and still cannot be played, and they are all that the bound misses: the
     <a href="#odd-cores">odd cores</a>.</p>

@@ -96,12 +96,16 @@
       factor that only one number can still use goes to that number (a <em>back move</em>).  The set is playable
       exactly when every number gets paired.</dd>
       <dt id="loop">loop</dt>
-      <dd>A number with two maximal factors can be drawn as an edge between them, and a number with one as an edge from
-      it to the ground, one more point that all such numbers share.  Numbers with at most two maximal factors can all
-      be played exactly when their edges contain no loop.  10, 14, 15 and 21 make a loop on 2, 5, 3 and 7.</dd>
+      <dd>Numbers that close a ring when each is drawn as an <em>edge</em>, a line between its two maximal factors.
+      10 = 2 · 5 is the edge from 2 to 5, and 10, 15, 21 and 14 run from 2 to 5, to 3, to 7 and back to 2.  Numbers in
+      a loop cannot all be played: here the first one played takes two of the four primes as tax, which leaves two for
+      the other three.  A number with only one maximal factor is drawn as an edge from that factor to the
+      <em>ground</em>, one extra point that all such edges share.  4 pays only with 2 and 9 only with 3, and with 6
+      they close the loop ground – 2 – 3 – ground.</dd>
       <dt id="forest">forest</dt>
-      <dd>A set of edges with no loop.  Numbers with at most two maximal factors, drawn as edges, can all be played
-      exactly when they form a forest.</dd>
+      <dd>A set of edges with no loop.  Numbers with at most two maximal factors can all be played exactly when their
+      edges form a forest.  10, 15 and 21 alone run from 2 to 5, to 3, to 7 and stop, and they can be played: 10, then
+      15, then 21.</dd>
     </dl>
   </div>
 </section>
@@ -121,8 +125,8 @@
       <dd>n more than the best score of game n − 1.  No score in game n can beat it, so a game that reaches it is
       optimal.</dd>
       <dt id="prime-formula">prime formula</dt>
-      <dd>At a prime n, an optimal game swaps the largest prime below n for n itself, and its score rises by the
-      difference.</dd>
+      <dd>When n is an odd prime, take an optimal game of n − 1 and play n in place of the largest prime below n.  The
+      result is an optimal game of n, and the score rises by the difference of the two primes.</dd>
       <dt id="repeat">repeat</dt>
       <dd>A game that poses exactly the search problem of an earlier game, so the earlier game's answer carries
       over.</dd>
@@ -167,7 +171,9 @@
       <dt id="top-half">top half</dt>
       <dd>The numbers above n/2, the sources, and the part of the score they make.  In the games that need a search, it is about 93% of the score.</dd>
       <dt id="exchange-property">exchange property</dt>
-      <dd>What makes a greedy choice safe in general: a smaller playable set can always take a member from a larger one and stay playable.  The playable sets of sources lack it in game 2,873.</dd>
+      <dd>What makes a greedy choice safe in general: whenever one playable set is smaller than another, some member
+      of the larger one can be added to the smaller one, and the result can still be played.  The playable sets of
+      sources lack it in game 2,873.</dd>
     </dl>
   </div>
 </section>
@@ -184,21 +190,23 @@
     <dl class="glossary">
       <dt id="frame">frame</dt>
       <dd>A group of sources with every factor that can pay for them: a small game inside the big one.  Game 21 has
-      four.</dd>
+      four.  The frames with freedoms are numbered from the front, frame 0 first: in game 21, frame 0 holds 14, 15 and
+      21, and frame 1 holds 12, 18 and 20.  In a larger game, frames with freedoms at the same distance from the front
+      are collapsed into a single frame, with one number.</dd>
       <dt id="in-front">in front of</dt>
-      <dd>One frame is in front of another when a number of the other has a maximal factor in it.  Frames in front
-      are played first, and in the figures they sit to the right.</dd>
+      <dd>Frame A is in front of frame B when some number of B has a maximal factor in A, as 9 has 3 in game 21.
+      Frames in front are played first, and in the figures they sit to the right.</dd>
       <dt id="freedom">freedom</dt>
-      <dd>A factor that a frame can spare: its factors less its moves.  A frame with none is <em>closed</em>.  The
-      frames with freedoms are numbered from the front, frame 0 first: in game 21, frame 0 holds 14, 15 and 21, and
-      frame 1 holds 12, 18 and 20.  In a larger game, frames with freedoms at the same distance from the front are
-      collapsed into a single frame, with one number.</dd>
+      <dd>A factor that a frame can spare.  Each move of a frame needs a factor of its own to pay for it, so a frame
+      has as many freedoms as it has factors beyond its moves: frame 0 of game 21 has four factors and three moves,
+      and one freedom.  A frame with none is <em>closed</em>.</dd>
       <dt id="candidate">candidate</dt>
       <dd>A factor that its frame can spare and the frame in front of it can take on.  Game 21 has the candidates 4 and
       9.</dd>
       <dt id="promote">promote</dt>
-      <dd>To play a factor as a move.  A promoted factor becomes a move of the frame in front, one number lower.  An
-      optimal game of 21 promotes 9, from frame 1 into frame 0.</dd>
+      <dd>To play a factor as a move.  A promoted factor leaves its frame and becomes a move of the frame in front,
+      where one of its maximal factors pays for it.  An optimal game of 21 promotes 9 from frame 1 into frame 0, where
+      3 pays for it.</dd>
       <dt id="frame-model">frame model</dt>
       <dd>The game seen as frames, with the sources fixed to U*, so that only the promotions are left to choose.  Its
       best score is the best score of the game wherever statement U holds.</dd>
@@ -226,7 +234,8 @@
       <dt id="branch-and-bound">branch and bound</dt>
       <dd>A way of searching: split on one choice at a time, keep the best answer found, and drop every branch whose bound cannot beat it.</dd>
       <dt id="conflict">conflict</dt>
-      <dd>A few candidates that cannot be promoted together at a node.  Every better set leaves one of them out, so the search branches on them.</dd>
+      <dd>A few candidates that cannot all be promoted together at a node.  Any set that can be promoted leaves at
+      least one of them out, so the search splits on one of them.</dd>
       <dt id="nogood">nogood</dt>
       <dd>A set of candidates that cannot be promoted together from the start of a search, which the search remembers, so that no branch tries it again.</dd>
   </dl>
@@ -235,12 +244,18 @@
 <section class="chapter" id="the-bound" data-toc="the-bound" aria-labelledby="h-g-bound">
   <h2 id="h-g-bound">The bound</h2>
   <dl class="glossary">
-      <dt id="odd-core">odd core</dt>
-      <dd>A set that passes the parity test, which every playable set passes, yet cannot be played.  The first is on the board of game 45: 12, 18, 20, 30 and 45.  Odd cores are all that the search's bound misses.</dd>
+      <dt id="parity-test">parity test</dt>
+      <dd>A quick test that every playable set passes.  List, for each number of a set, the maximal factors outside
+      the set that could pay for it.  The set fails when some of its numbers, taken together, list every factor an
+      even number of times: 10, 14, 15 and 21 list each of 2, 3, 5 and 7 twice.</dd>
       <dt id="parity-bound">parity bound</dt>
-      <dd>The prover's upper bound on opt(n): the heaviest set in which no group of numbers lists every factor an even number of times.  Its gap is about a tenth of Franklín and Moniot's bound's.</dd>
+      <dd>The prover's upper bound on opt(n): the weight of the heaviest set on the board that passes the parity
+      test.  Its gap above opt(n) is about a tenth of the gap of Franklín and Moniot's bound.</dd>
       <dt id="fm-bound">Franklín and Moniot's bound</dt>
       <dd>An upper bound on opt(n): the heaviest set whose numbers can each be given a maximal factor of their own, from outside the set, to pay with.</dd>
+      <dt id="odd-core">odd core</dt>
+      <dd>A set that passes the parity test yet cannot be played.  The first is on the board of game 45: 12, 18, 20,
+      30 and 45.  Odd cores are all that the search's bound misses.</dd>
   </dl>
 </section>
 
