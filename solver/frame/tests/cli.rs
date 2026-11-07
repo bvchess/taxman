@@ -35,7 +35,7 @@ fn help_lists_the_commands_and_every_tactic() {
             "--gate-trial GATES",
             "--gate-trial-plan SPEC",
             "--unsound",
-            "--effort E",
+            "--effort L",
             "--seed S",
             "--fix LO,HI",
             "--tilt P",
@@ -421,8 +421,11 @@ fn a_game_with_no_previous_game_says_it_is_solved_standalone() {
 fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_search() {
     let dir = TempDir::new("unsound");
     let file = dir.join("unsound.jsonl");
-    let unsound =
-        |range: &str| taxman(&["solve", range, "--unsound", "--effort", "0", "--threads", "1", "--out", path(&file)]);
+    // The rounds end at the table's score (`--stop-at-known`), which most of these small games have at their start.
+    let unsound = |range: &str| {
+        let args = ["solve", range, "--unsound", "--effort", "1", "--stop-at-known", "--threads", "1"];
+        taxman(&[&args[..], &["--out", path(&file)]].concat())
+    };
     let run = unsound("1-30");
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert_eq!(run.stdout.lines().filter(|line| line.contains("  unsound")).count(), 30, "{}", run.stdout);
@@ -441,23 +444,24 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         assert!(run.stderr.contains("line 1: an unsound line"), "{args:?}: {}", run.stderr);
     }
     let proven = solve_into(&dir, "proven.jsonl", "1-5");
-    let run = taxman(&["solve", "6", "--unsound", "--effort", "0", "--threads", "1", "--out", &proven]);
+    let run = taxman(&["solve", "6", "--unsound", "--effort", "1", "--threads", "1", "--out", &proven]);
     assert_eq!(run.code, Some(1), "{}", run.stdout);
     assert!(run.stderr.contains("line 1: not an unsound line"), "{}", run.stderr);
     // The measuring options take the games of the built-in table only.
     let past = (Optimal::built_in().max_n() + 1).to_string();
     let elsewhere = dir.join("past.jsonl");
-    let run = taxman(&["solve", &past, "--unsound", "--effort", "0", "--stop-at-known", "--out", path(&elsewhere)]);
+    let run = taxman(&["solve", &past, "--unsound", "--effort", "1", "--stop-at-known", "--out", path(&elsewhere)]);
     assert_eq!(run.code, Some(1), "{}", run.stdout);
     assert!(run.stderr.contains(&format!("lacks game {past}")), "{}", run.stderr);
 
     let base = ["solve", "12", "--unsound", "--effort", "1", "--out", path(&elsewhere)];
-    assert_usage_error(&base[..3], "--unsound needs --effort E");
+    assert_usage_error(&base[..3], "--unsound needs --effort L, the level of effort, from 1 to 6");
     assert_usage_error(&base[..5], "--unsound needs --out FILE");
-    assert_usage_error(
-        &["solve", "12", "--unsound", "--effort", "33"],
-        "--effort 33: the level of effort, from 0 to 32",
-    );
+    // The levels are 1 to 6: the start alone is no level, and nothing above the most is.
+    for effort in ["0", "7", "33", "-1", "", "a", "1.5"] {
+        let message = format!("--effort takes L, the level of effort, a whole number from 1 to 6: got {effort:?}");
+        assert_usage_error(&["solve", "12", "--unsound", "--effort", effort, "--out", path(&elsewhere)], &message);
+    }
     let proof_search: [&[&str]; 17] = [
         &["--window", "2"],
         &["--finder-after", "1"],
@@ -509,7 +513,7 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
 fn the_options_that_shape_the_rounds_are_checked() {
     let dir = TempDir::new("unsound-fix");
     let file = dir.join("fix.jsonl");
-    let base = ["solve", "12", "--unsound", "--effort", "0", "--threads", "1", "--out", path(&file)];
+    let base = ["solve", "12", "--unsound", "--effort", "1", "--threads", "1", "--out", path(&file)];
     for fix in ["0.9,0.7", "-0.1,0.5", "0.5,1.1", "0.5", "0.5,", "a,b", "0.5,0.7,0.9", "nan,0.5", "0.5,inf", ""] {
         let message = format!("--fix takes LO,HI, two numbers with 0 <= LO <= HI <= 1, such as 0.7,0.9: got {fix:?}");
         assert_usage_error(&[&base[..], &["--fix", fix]].concat(), &message);
@@ -545,10 +549,10 @@ fn the_options_that_shape_the_rounds_are_checked() {
 #[test]
 fn the_line_records_the_options_that_shape_the_rounds_and_zero_turns_each_off() {
     let dir = TempDir::new("unsound-options");
-    // The first line of the file `out`, after a run of the game 12 at effort 0 with `extra`.
+    // The first line of the file `out`, after a run of the game 12 at level 1 with `extra`.
     let line_of = |name: &str, extra: &[&str]| {
         let out = dir.join(name);
-        let args = ["solve", "12", "--unsound", "--effort", "0", "--threads", "1", "--out", path(&out)];
+        let args = ["solve", "12", "--unsound", "--effort", "1", "--threads", "1", "--out", path(&out)];
         let run = taxman(&[&args[..], extra].concat());
         assert_eq!(run.code, Some(0), "{extra:?}: {}", run.stderr);
         Json::parse(fs::read_to_string(&out).unwrap().lines().next().unwrap()).unwrap()
@@ -557,10 +561,10 @@ fn the_line_records_the_options_that_shape_the_rounds_and_zero_turns_each_off() 
     let shape = |line: &Json| ["fix", "tilt", "back", "widen"].map(|key| line.get(key).cloned().expect(key));
     let int = |n: u64| Json::from(n);
     let fix = |lo: f64, hi: f64| Json::array([lo, hi]);
-    // None given: the defaults, the share fixed the finder's, and the budget of effort 0 none.
+    // None given: the defaults, the share fixed the finder's, and the budget of level 1, two rounds of work.
     let line = line_of("default.jsonl", &[]);
     assert_eq!(shape(&line), [fix(0.7, 0.9), int(25), int(8), int(4)]);
-    assert_eq!(line.get("budget"), Some(&Json::from(0u64)), "effort 0 budgets no steps");
+    assert_eq!(line.get("budget"), Some(&Json::from(131_072u64)), "level 1 budgets 2 x 65,536 work");
     // Each turned off with 0, and all three, which leaves the share fixed alone.
     assert_eq!(shape(&line_of("tilt0.jsonl", &["--tilt", "0"])), [fix(0.7, 0.9), int(0), int(8), int(4)]);
     assert_eq!(shape(&line_of("back0.jsonl", &["--back", "0"])), [fix(0.7, 0.9), int(25), int(0), int(4)]);
@@ -579,14 +583,14 @@ fn the_line_records_the_options_that_shape_the_rounds_and_zero_turns_each_off() 
 
     // The three options together, with rounds: game 375 from the table's moves has two trajectories, the start's and
     // one from the moves for 367, and reaches the table's score in the first round, which ends the rounds of a budget
-    // of 65,536 steps.
+    // of 131,072 work.
     let rounds = dir.join("rounds.jsonl");
     let args = ["solve", "375", "--unsound", "--effort", "1", "--from-known", "--stop-at-known", "--threads", "1"];
     let options = ["--tilt", "100", "--back", "8", "--widen", "2", "--out", path(&rounds)];
     let run = taxman(&[&args[..], &options].concat());
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     let line = Json::parse(fs::read_to_string(&rounds).unwrap().lines().next().unwrap()).unwrap();
-    assert_eq!(line.get("budget"), Some(&Json::from(65_536u64)));
+    assert_eq!(line.get("budget"), Some(&Json::from(131_072u64)));
     assert_eq!(line.get("trajectories"), Some(&Json::array([Json::from("start"), Json::from(367u64)])));
     assert_eq!(line.get("stage_rounds"), Some(&Json::array([Json::array([1u64, 0, 0]), Json::array([1u64, 0, 0])])));
     assert_eq!(line.get("rounds"), Some(&Json::from(1u64)));
@@ -604,8 +608,8 @@ fn the_line_records_the_options_that_shape_the_rounds_and_zero_turns_each_off() 
     assert_eq!(known.get("round"), Some(&Json::from(1u64)));
 }
 
-/// Games whose rounds find a better set at effort 2, from the table's moves, in two rounds or more under the defaults (the
-/// rounds end at the table's score: the games are small).
+/// Games whose rounds find a better set at level 1, from the table's moves, in two rounds or more under the defaults
+/// (the rounds end at the table's score: the games are small).
 const RAISED_BY_THE_DEFAULTS: [u32; 2] = [539, 544];
 
 /// The same, in three rounds or more with `--back 0 --tilt 0 --widen 0`.
@@ -627,7 +631,7 @@ fn without_times(line: &Json) -> Json {
     Json::object(line)
 }
 
-/// The lines (without their times) of the games `games` played from the table's moves for n - 1 at effort `effort` on
+/// The lines (without their times) of the games `games` played from the table's moves for n - 1 at level `effort` on
 /// one thread, their rounds ending at the table's score, with the flags `extra`, one run of the binary for each game,
 /// into the file `TAG-N.jsonl` of `dir`.
 fn unsound_lines(dir: &TempDir, tag: &str, games: &[u32], effort: u32, extra: &[&str]) -> Vec<Json> {
@@ -650,8 +654,8 @@ fn unsound_lines(dir: &TempDir, tag: &str, games: &[u32], effort: u32, extra: &[
 fn the_defaults_are_the_three_options_given_by_name() {
     let dir = TempDir::new("unsound-defaults");
     let games = &RAISED_BY_THE_DEFAULTS;
-    let by_default = unsound_lines(&dir, "default", games, 2, &[]);
-    let by_name = unsound_lines(&dir, "named", games, 2, &["--back", "8", "--tilt", "25", "--widen", "4"]);
+    let by_default = unsound_lines(&dir, "default", games, 1, &[]);
+    let by_name = unsound_lines(&dir, "named", games, 1, &["--back", "8", "--tilt", "25", "--widen", "4"]);
     assert_eq!(by_default, by_name);
     for line in &by_default {
         let count = |key: &str| line.get(key).and_then(Json::as_arr).map(<[Json]>::len);
@@ -667,9 +671,9 @@ fn the_defaults_are_the_three_options_given_by_name() {
 fn zero_turns_the_three_options_off() {
     let dir = TempDir::new("unsound-off");
     let games = &RAISED_WITH_THE_OPTIONS_OFF;
-    let off = unsound_lines(&dir, "off", games, 2, &["--back", "0", "--tilt", "0", "--widen", "0"]);
+    let off = unsound_lines(&dir, "off", games, 1, &["--back", "0", "--tilt", "0", "--widen", "0"]);
     let plain =
-        Plan { effort: 2, from_known: true, stop_at_known: true, tilt: 0, back: 0, widen: None, ..Plan::default() };
+        Plan { effort: 1, from_known: true, stop_at_known: true, tilt: 0, back: 0, widen: None, ..Plan::default() };
     let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
     for (&n, line) in games.iter().zip(&off) {
         let mut played = None;
@@ -679,7 +683,7 @@ fn zero_turns_the_three_options_off() {
         assert_eq!(line.get("trajectories"), Some(&Json::array(["start"])), "game {n}: the start's alone");
     }
     // They are not the lines of the defaults, which follow trajectories from the games before.
-    assert_ne!(off, unsound_lines(&dir, "default", games, 2, &[]));
+    assert_ne!(off, unsound_lines(&dir, "default", games, 1, &[]));
 }
 
 /// A searched game stops at the run's ceiling unless `--past-ceiling` is given, and the line says what the ceiling was

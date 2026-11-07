@@ -13,7 +13,8 @@ use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, gate_trial, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
 use taxman::solver::unsound::{
-    DEFAULT_BACK, DEFAULT_TILT, DEFAULT_WIDEN, MAX_ABOVE, MAX_BACK, MAX_EFFORT, MAX_TILT, REPAIR_REACH, ROUND_WORK,
+    DEFAULT_BACK, DEFAULT_TILT, DEFAULT_WIDEN, MAX_ABOVE, MAX_BACK, MAX_EFFORT, MAX_TILT, MIN_EFFORT, REPAIR_REACH,
+    ROUND_WORK,
 };
 use taxman::tactics::Tactics;
 
@@ -77,10 +78,10 @@ commands:
                                and is marked unsound, which every reader of proven lines refuses.  It takes
                                --threads, --tactic, --show and the flags below, and refuses the others.  The rounds
                                are shaped by --tilt, --back and --widen, which are on unless given 0
-      --effort E               with --unsound: the level of effort, from 0 (the search's start alone) to {max_effort}.
-                               Level E runs rounds of {neighborhoods} neighborhoods of the finder's search until
+      --effort L               with --unsound: the level of effort, from {min_effort} to {max_effort}.
+                               Level L runs rounds of {neighborhoods} neighborhoods of the finder's search until
                                their work (their steps and {neighborhood_work} for each neighborhood) reaches
-                               2^(E-1) x {round_work}; a higher level does the rounds of a lower one first
+                               2^L x {round_work}; a higher level does the rounds of a lower one first
       --seed S                 with --unsound: the seed of the rounds' random choices (default {seed})
       --fix LO,HI              with --unsound: the share of the incumbent's promotions that each neighborhood keeps
                                fixed, drawn from LO to HI, 0 <= LO <= HI <= 1 (default {fix}); turns widening off,
@@ -136,6 +137,7 @@ fn usage() -> String {
         .replace("{trial_steps}", &gate_trial::STEPS.to_string())
         .replace("{trial_threads}", &gate_trial::THREADS.to_string())
         .replace("{trial_least_gap}", &gate_trial::LEAST_GAP.to_string())
+        .replace("{min_effort}", &MIN_EFFORT.to_string())
         .replace("{max_effort}", &MAX_EFFORT.to_string())
         .replace("{neighborhoods}", &finder::NEIGHBORHOODS.to_string())
         .replace("{round_work}", &ROUND_WORK.to_string())

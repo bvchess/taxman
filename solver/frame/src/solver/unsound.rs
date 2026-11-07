@@ -1,4 +1,4 @@
-//! The unsound mode, `taxman solve LO-HI --unsound --effort E --out FILE`: each game played as well as a level of
+//! The unsound mode, `taxman solve LO-HI --unsound --effort L --out FILE`: each game played as well as a level of
 //! effort finds, with no proof that its score is opt(n).  The user's guide to it is solver/docs/unsound.md.
 //!
 //! The proof of a hard game past 5060 takes hours, and nearly all of it goes to proving a set that the search found
@@ -19,25 +19,26 @@
 //!   level ([`Plan::budget`]) of LNS on every thread, whose answer is the same on any number of threads
 //!   ([`Lns::rounds`](crate::search::finder::Lns::rounds)).
 //! * The run's ceiling is n + score(n − 1) of the moves the game starts from.  A searched game stops there: its rounds
-//!   end once its score reaches it, before the first round if the start does, else after the round that does (effort 0
-//!   is the start alone, and a game with no moves for n − 1 has no ceiling).  When those moves are optimal, it is the
-//!   proven mode's ceiling, n + opt(n − 1), which no play of game n exceeds, and the stop loses nothing.  Nothing here
-//!   says they are optimal.  When they fall short, a game could score above the ceiling, which would prove the line of
-//!   n − 1 short (`prev.short_by`, as before); the stop gives that chance up, for the rounds it saves in every other
-//!   game.  So the stop is a heuristic and no proof: the line stays unsound, and records the ceiling and whether the game
-//!   is at it (`ceiling`, `at_ceiling`).  A game is not held below the ceiling, and a round that reaches it may pass it.
+//!   end once its score reaches it, before the first round if the start does, else after the round that does (a game
+//!   with no moves for n − 1 has no ceiling).  When those moves are optimal, it is the proven mode's ceiling,
+//!   n + opt(n − 1), which no play of game n exceeds, and the stop loses nothing.  Nothing here says they are optimal.
+//!   When they fall short, a game could score above the ceiling, which would prove the line of n − 1 short
+//!   (`prev.short_by`, as before); the stop gives that chance up, for the rounds it saves in every other game.  So the
+//!   stop is a heuristic and no proof: the line stays unsound, and records the ceiling and whether the game is at it
+//!   (`ceiling`, `at_ceiling`).  A game is not held below the ceiling, and a round that reaches it may pass it.
 //!   `--past-ceiling` takes the stop away, to measure what it costs.
 //! * The moves are replayed before they count ([`replay`]), and a score above the built-in table's, which is proven, is
 //!   a hard error.
 //!
 //! # The level of effort
 //!
-//! Effort 0 is the start alone.  Effort E ≥ 1 runs rounds of [`NEIGHBORHOODS`] neighborhoods until the work of its
-//! rounds reaches 2^(E−1) × [`ROUND_WORK`] ([`Plan::budget`]); the budget is checked after each round, and the round
-//! that reaches it is the last.  The work of a round is its engine's steps and [`finder::NEIGHBORHOOD_WORK`] for each
+//! The levels are [`MIN_EFFORT`] to [`MAX_EFFORT`], 1 to 6, each twice the work of the one below.  Level L runs rounds
+//! of [`NEIGHBORHOODS`] neighborhoods until the work of its rounds reaches 2^L × [`ROUND_WORK`] ([`Plan::budget`]); the
+//! budget is checked after each round, and the round that reaches it is the last.  The start alone is no level, since
+//! it never repairs a shortfall.  The work of a round is its engine's steps and [`finder::NEIGHBORHOOD_WORK`] for each
 //! of its neighborhoods, which have a cost beside their steps, so that the time a budget takes is much the same
 //! whatever the options.  The steps of a neighborhood are a function of its unit, never of the threads, so the rounds
-//! do not depend on the level: a run at E + 1 does the rounds of E first, and then more.  So the `improvements` of a
+//! do not depend on the level: a run at L + 1 does the rounds of L first, and then more.  So the `improvements` of a
 //! line at one level show what every lower level would have scored, and each records the `steps` and the `work` of the
 //! rounds up to its own.
 //!
@@ -45,7 +46,7 @@
 //!
 //! Five options of the plan change what the rounds search, and so the line.  Every value of them, alone or together,
 //! keeps what the rounds guarantee: a line depends on the game, its start, the moves it starts from, the level, the
-//! seed and the options only, never on the threads, and a run at E + 1 does the rounds of E first.
+//! seed and the options only, never on the threads, and a run at L + 1 does the rounds of L first.
 //!
 //! * **`fix`** is the range from which each neighborhood draws the share of the incumbent's promotions it keeps fixed
 //!   ([`Options::fix`](crate::search::finder::Options::fix)).  A smaller share frees more of the game to a
@@ -61,10 +62,9 @@
 //!   the incumbent of trajectory k mod T, T the trajectories, and the game's set is the heaviest incumbent, the
 //!   start's on a tie ([`Lns::rounds`](crate::search::finder::Lns::rounds)).  The line says which games the
 //!   trajectories began from (`trajectories`).  What survives of an earlier game may be heavier than the start; the
-//!   game's score is then that of the survivors from the first, which the line records as an improvement of round 0,
-//!   and at effort 0 the score is the heaviest of the trajectories' starts.  0 gives the start's trajectory alone.
-//!   The line records the score of what survives of each of these games, whether or not it began a trajectory
-//!   (`survivor_scores`).
+//!   game's score is then that of the survivors from the first, which the line records as an improvement of round 0.
+//!   0 gives the start's trajectory alone.  The line records the score of what survives of each of these games, whether
+//!   or not it began a trajectory (`survivor_scores`).
 //! * **`above`** J (0 by default) adds, after those of `back`, a trajectory for each distinct set that survives of the
 //!   moves for the games n + 1, ..., n + J that the run or its file has, or with `--from-known` the built-in table: the
 //!   moves above n are dropped ([`Board::seed`](crate::board::Board::seed)).  A game played in order has no line above
@@ -81,15 +81,15 @@
 //! `back` is [`DEFAULT_BACK`], `tilt` [`DEFAULT_TILT`] and `widen` [`DEFAULT_WIDEN`], so that a user names a level of
 //! effort and nothing else; `--back 0`, `--tilt 0` and `--widen 0` turn each off, and `fix` is the finder's share.  The
 //! three are the setting that two races chose on the 251 hard games of 3441-5060: `--back 8 --tilt 25 --widen 4`
-//! reaches the score that the built-in table has in 35.9, 78.1, 87.3, 91.2, 94.0, 95.2, 96.8 and 97.6% of them at the
-//! levels 0 to 7, against 35.1, 74.1, 78.1, 79.7, 81.3, 82.9, 86.1 and 89.6% with no option.  The first race is the
-//! notebook's entry
+//! reaches the score that the built-in table has in 87.3, 91.2, 94.0, 95.2, 96.8 and 97.6% of them at the levels 1 to
+//! 6, against 78.1, 79.7, 81.3, 82.9, 86.1 and 89.6% with no option.  The first race is the notebook's entry
 //! https://github.com/bvchess/taxman-notebook/blob/main/search/tilted-back-and-wider-rounds-2026-11/README.md; the
 //! second, the race R1, is
-//! https://github.com/bvchess/taxman-notebook/blob/main/search/a-share-of-tilted-neighborhoods-2026-11/README.md.  At
-//! level 2 and up, `--tilt 25` and `--tilt 50` (with `--back 8 --widen 4`) are within two games of each other, so 25 is
-//! chosen for its lead at the low levels, not by a significant margin.  The finder beside a proof search never tilts,
-//! widens or goes back, and its options ([`finder::Options::default`]) are not these.
+//! https://github.com/bvchess/taxman-notebook/blob/main/search/a-share-of-tilted-neighborhoods-2026-11/README.md.  The
+//! entries number the levels one higher than here (their effort E is level E − 1), and the numbers above are in this
+//! numbering.  At every level, `--tilt 25` and `--tilt 50` (with `--back 8 --widen 4`) are within two games of each
+//! other, so 25 is chosen for its lead at the low levels, not by a significant margin.  The finder beside a proof
+//! search never tilts, widens or goes back, and its options ([`finder::Options::default`]) are not these.
 //!
 //! # A range
 //!
@@ -174,9 +174,12 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
 
-/// The most effort a run may ask for: a budget of 2^31 rounds of work, far more than a game needs, and 2^47 work,
-/// which a 64-bit count holds.
-pub const MAX_EFFORT: u32 = 32;
+/// The least effort a run may ask for: a budget of 2 rounds of work.  The start alone is no level, since it never
+/// repairs a shortfall.
+pub const MIN_EFFORT: u32 = 1;
+
+/// The most effort a run may ask for: a budget of 64 rounds of work, which is 2^22 with the default.
+pub const MAX_EFFORT: u32 = 6;
 
 /// The games before a game that its trajectories may begin from: `back` goes up to this.
 pub const MAX_BACK: u32 = 8;
@@ -203,16 +206,16 @@ pub const DEFAULT_TILT: u32 = 25;
 /// [`DEFAULT_BACK`] and [`DEFAULT_TILT`]; the module documentation, "The defaults", has the races).
 pub const DEFAULT_WIDEN: u64 = 4;
 
-/// The budget of effort 1 ([`Plan::budget`]), in work: the steps of one round whose neighborhoods all take the step
-/// limit of a unit, [`finder::UNIT_STEPS`].  (The work of such a round is a little more, [`finder::NEIGHBORHOOD_WORK`]
-/// for each neighborhood.)
+/// The work of one round, which level L budgets 2^L times ([`Plan::budget`]): the steps of a round whose neighborhoods
+/// all take the step limit of a unit, [`finder::UNIT_STEPS`].  (The work of such a round is a little more,
+/// [`finder::NEIGHBORHOOD_WORK`] for each neighborhood.)
 pub const ROUND_WORK: u64 = NEIGHBORHOODS * finder::UNIT_STEPS;
 
 /// How the unsound mode plays: the level of effort, the seed of the rounds' random choices, the shape of the
 /// neighborhoods and of the rounds, and the measuring options.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Plan {
-    /// From 0 to [`MAX_EFFORT`].
+    /// From [`MIN_EFFORT`] to [`MAX_EFFORT`].
     pub effort: u32,
     pub seed: u64,
     /// `--fix LO,HI`: the share of the incumbent's promotions that each neighborhood keeps fixed is drawn from this
@@ -233,8 +236,8 @@ pub struct Plan {
     /// `--widen S`, S ≥ 1 ([`DEFAULT_WIDEN`] by default): a trajectory that has not grown heavier in S rounds moves its
     /// neighborhoods down the ladder of the share fixed.  `None` (`--widen 0`) is no widening, and takes `fix`.
     pub widen: Option<u64>,
-    /// The work that effort 1 budgets, [`ROUND_WORK`] unless a test or a measurement lowers it: no flag sets it, and a
-    /// line records the budget it gave (`budget`).
+    /// The work of one round, which level L budgets 2^L times: [`ROUND_WORK`] unless a test or a measurement lowers it.
+    /// No flag sets it, and a line records the budget it gave (`budget`).
     pub round_work: u64,
     /// `--stop-at-known`: a game's rounds end once its score is the built-in table's.
     pub stop_at_known: bool,
@@ -247,14 +250,14 @@ pub struct Plan {
     pub repair: bool,
 }
 
-/// Effort 0, the finder's seed and share fixed, the defaults of `tilt`, `back` and `widen` ([`DEFAULT_TILT`],
+/// The least effort, the finder's seed and share fixed, the defaults of `tilt`, `back` and `widen` ([`DEFAULT_TILT`],
 /// [`DEFAULT_BACK`], [`DEFAULT_WIDEN`]), no trajectory from above, the stop at the run's ceiling, the repair, and no
 /// measuring option.
 impl Default for Plan {
     fn default() -> Plan {
         let finder::Options { fix, seed, .. } = finder::Options::default();
         Plan {
-            effort: 0,
+            effort: MIN_EFFORT,
             seed,
             fix,
             tilt: DEFAULT_TILT,
@@ -271,11 +274,11 @@ impl Default for Plan {
 }
 
 impl Plan {
-    /// The work the rounds of the level run until: none at effort 0, 2^(E−1) × `round_work` at effort E (at most
-    /// 2^31 × [`ROUND_WORK`] = 2^47 with the default, which a count of work holds; a larger `round_work` stops at the
-    /// largest count).
+    /// The work the rounds of the level run until: 2^L × `round_work` at level L, at most 2^6 × [`ROUND_WORK`] = 2^22
+    /// with the default (a larger `round_work` stops at the largest count of work).  Meant for a plan that
+    /// [`check_plan`] accepts.
     pub fn budget(&self) -> u64 {
-        self.effort.checked_sub(1).map_or(0, |e| self.round_work.saturating_mul(1u64 << e))
+        self.round_work.saturating_mul(1u64 << self.effort)
     }
 
     /// How the rounds search: the finder's defaults, with this plan's seed, share fixed, tilt and widening.
@@ -321,6 +324,21 @@ pub fn check_fix(fix: (f64, f64)) -> Result<(), String> {
 /// The message of a `--fix` that is not `LO,HI` with 0 ≤ LO ≤ HI ≤ 1, quoting what it was given.
 fn fix_error(got: &str) -> String {
     format!("--fix takes LO,HI, two numbers with 0 <= LO <= HI <= 1, such as 0.7,0.9: got {got:?}")
+}
+
+/// Reads the value of `--effort`, L: a whole number from [`MIN_EFFORT`] to [`MAX_EFFORT`].
+///
+/// # Errors
+///
+/// What `text` should have been.
+pub fn parse_effort(text: &str) -> Result<u32, String> {
+    text.parse().ok().filter(|effort| (MIN_EFFORT..=MAX_EFFORT).contains(effort)).ok_or_else(|| effort_error(text))
+}
+
+/// The message of an `--effort` that is not a whole number from [`MIN_EFFORT`] to [`MAX_EFFORT`], quoting what it was
+/// given.
+fn effort_error(got: &str) -> String {
+    format!("--effort takes L, the level of effort, a whole number from {MIN_EFFORT} to {MAX_EFFORT}: got {got:?}")
 }
 
 /// Reads the value of `--tilt`, P: a whole number of percent, from 0 to [`MAX_TILT`].
@@ -401,16 +419,16 @@ pub fn widening(fix_given: bool, widen: Option<Option<u64>>) -> Result<Option<u6
     }
 }
 
-/// Checks the plan's options: an effort of at most [`MAX_EFFORT`], `fix` ([`check_fix`]), `tilt` of at most
+/// Checks the plan's options: an effort from [`MIN_EFFORT`] to [`MAX_EFFORT`], `fix` ([`check_fix`]), `tilt` of at most
 /// [`MAX_TILT`], `back` of at most [`MAX_BACK`], `widen` (if any) of at least 1 and not with a `fix` other than the
-/// default, and a step budget of effort 1 above 0.
+/// default, and a work of a round above 0.
 ///
 /// # Errors
 ///
 /// The first option that is out of range.
 pub fn check_plan(plan: &Plan) -> Result<(), String> {
-    if plan.effort > MAX_EFFORT {
-        return Err(format!("the effort {} is more than the most, {MAX_EFFORT}", plan.effort));
+    if !(MIN_EFFORT..=MAX_EFFORT).contains(&plan.effort) {
+        return Err(effort_error(&plan.effort.to_string()));
     }
     check_fix(plan.fix)?;
     if plan.tilt > MAX_TILT {
@@ -431,7 +449,7 @@ pub fn check_plan(plan: &Plan) -> Result<(), String> {
         }
     }
     if plan.round_work == 0 {
-        return Err("the work that effort 1 budgets is 0".to_owned());
+        return Err("the work of a round is 0".to_owned());
     }
     Ok(())
 }
@@ -990,11 +1008,11 @@ fn repaired_line(old: &str, repair: &Repair, prev: Option<&Moves>) -> Result<Jso
 ///
 /// # Errors
 ///
-/// A range that is empty or starts below 1; a plan that [`check_plan`] refuses (an effort above [`MAX_EFFORT`], a `fix`
-/// that [`check_fix`] refuses, a `tilt` above [`MAX_TILT`], a `back` above [`MAX_BACK`], an `above` above
-/// [`MAX_ABOVE`], a `widen` of `Some(0)` or with a `fix`); `--stop-at-known` or `--from-known` for a game the built-in
-/// table lacks; a file that cannot be opened or written, or holds a line it may not ([`UnsoundFile::open`]); and a game
-/// or a repair whose moves fail a check (the module documentation, "One game").
+/// A range that is empty or starts below 1; a plan that [`check_plan`] refuses (an effort outside [`MIN_EFFORT`] to
+/// [`MAX_EFFORT`], a `fix` that [`check_fix`] refuses, a `tilt` above [`MAX_TILT`], a `back` above [`MAX_BACK`], an
+/// `above` above [`MAX_ABOVE`], a `widen` of `Some(0)` or with a `fix`); `--stop-at-known` or `--from-known` for a game
+/// the built-in table lacks; a file that cannot be opened or written, or holds a line it may not
+/// ([`UnsoundFile::open`]); and a game or a repair whose moves fail a check (the module documentation, "One game").
 pub fn solve_range(
     lo: u32,
     hi: u32,
@@ -1547,13 +1565,13 @@ mod tests {
     #[test]
     fn the_budget_of_a_level_doubles_with_each_level_and_cannot_overflow() {
         let plan = |effort| Plan { effort, ..Plan::default() };
-        let budgets: Vec<u64> = (0..=4).map(|effort| plan(effort).budget()).collect();
-        assert_eq!(budgets, [0, 65_536, 131_072, 262_144, 524_288]);
+        let budgets: Vec<u64> = (MIN_EFFORT..=MAX_EFFORT).map(|effort| plan(effort).budget()).collect();
+        assert_eq!(budgets, [131_072, 262_144, 524_288, 1_048_576, 2_097_152, 4_194_304]);
         assert_eq!(ROUND_WORK, 65_536, "one round of 64 neighborhoods of 1,024 steps");
-        // The most effort budgets 2^31 rounds of work: 2^47, far below what a count of work holds.
-        assert_eq!(plan(MAX_EFFORT).budget(), ROUND_WORK << 31);
-        assert_eq!(plan(MAX_EFFORT).budget(), 1 << 47);
-        // A step budget of effort 1 that no flag can give still cannot overflow.
+        // The most effort budgets 64 rounds of work: 2^22, far below what a count of work holds.
+        assert_eq!(plan(MAX_EFFORT).budget(), ROUND_WORK << 6);
+        assert_eq!(plan(MAX_EFFORT).budget(), 1 << 22);
+        // A work of a round that no flag can give still cannot overflow.
         let huge = Plan { effort: MAX_EFFORT, round_work: u64::MAX, ..Plan::default() };
         assert_eq!(huge.budget(), u64::MAX);
     }
@@ -1562,7 +1580,7 @@ mod tests {
     fn the_default_plan_tilts_goes_back_and_widens_as_the_races_chose() {
         let plan = Plan::default();
         assert_eq!((DEFAULT_TILT, DEFAULT_BACK, DEFAULT_WIDEN), (25, 8, 4));
-        assert_eq!((plan.effort, plan.seed, plan.fix), (0, 1, (0.7, 0.9)));
+        assert_eq!((plan.effort, plan.seed, plan.fix), (MIN_EFFORT, 1, (0.7, 0.9)));
         assert_eq!((plan.tilt, plan.back, plan.widen, plan.round_work), (25, 8, Some(4), ROUND_WORK));
         assert!(!plan.stop_at_known && !plan.from_known && !plan.past_ceiling, "the stop at the ceiling is on");
         assert!(plan.repair && plan.above == 0, "the repair is on, and no trajectory begins from above");
@@ -1588,6 +1606,17 @@ mod tests {
         assert_eq!(widening(true, Some(None)), Ok(None), "--fix with --widen 0 is the same");
         for widen in [1, 4, 30] {
             assert_eq!(widening(true, Some(Some(widen))), Err(WIDEN_WITH_FIX.to_owned()), "--fix with --widen {widen}");
+        }
+    }
+
+    #[test]
+    fn an_effort_is_a_whole_number_from_the_least_level_to_the_most() {
+        assert_eq!((MIN_EFFORT, MAX_EFFORT), (1, 6));
+        assert_eq!((parse_effort("1"), parse_effort("3"), parse_effort("6")), (Ok(1), Ok(3), Ok(6)));
+        // The start alone is no level, and nothing above the most is.
+        for text in ["0", "7", "32", "-1", "", "a", "1.5", "1,2", " 1", "99999999999"] {
+            let err = parse_effort(text).unwrap_err();
+            assert_eq!(err, format!("--effort takes L, the level of effort, a whole number from 1 to 6: got {text:?}"));
         }
     }
 
@@ -1626,7 +1655,11 @@ mod tests {
         let plan = Plan { effort: 3, back: 8, widen: Some(1), ..Plan::default() };
         assert_eq!(check_plan(&plan), Ok(()));
         let refused = |plan: Plan| check_plan(&plan).unwrap_err();
-        assert!(refused(Plan { effort: MAX_EFFORT + 1, ..plan }).contains("more than the most"));
+        for effort in [MIN_EFFORT - 1, MAX_EFFORT + 1] {
+            let message =
+                format!("--effort takes L, the level of effort, a whole number from 1 to 6: got \"{effort}\"");
+            assert_eq!(refused(Plan { effort, ..plan }), message);
+        }
         assert!(refused(Plan { fix: (0.9, 0.7), ..Plan { widen: None, ..plan } }).starts_with("--fix takes LO,HI"));
         assert!(refused(Plan { tilt: MAX_TILT + 1, ..plan }).starts_with("--tilt takes P"));
         assert!(refused(Plan { back: MAX_BACK + 1, ..plan }).starts_with("--back takes J"));

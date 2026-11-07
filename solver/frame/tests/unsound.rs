@@ -9,16 +9,16 @@
 //! the defaults are one of the shapes that `shaped` plays.  What the command line does with the defaults is in
 //! `cli.rs`.
 //!
-//! A level of effort budgets 2^(E−1) × `round_work` work of rounds.  The tests lower `round_work` from the 65,536 of a
-//! round of full neighborhoods to the work of a round or two of the small games they play, so that a level is a few
-//! rounds and a test stays inside its CPU limit.
+//! A level of effort budgets 2^L × `round_work` work of rounds.  The tests lower `round_work` from the 65,536 of a
+//! round of full neighborhoods to about half the work of a round of the small games they play, so that a level is a
+//! few rounds and a test stays inside its CPU limit.
 
 mod common;
 
 use common::TempDir;
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::slice;
 use taxman::game::{replay, Optimal};
 use taxman::json::Json;
@@ -27,18 +27,18 @@ use taxman::search::finder::{NEIGHBORHOODS, NEIGHBORHOOD_WORK};
 use taxman::solver::unsound::{self, Line, Origin, Plan, Previous, Raised, Repair, Source};
 use taxman::solver::{solve_range, Method, SolveOptions};
 
-/// The work that effort 1 budgets in these tests: a little more than the work of a round of the small games (their
-/// steps are about 80 a round, and the neighborhoods' work is 64 × 32 = 2,048), so that effort E runs a few rounds more
-/// than effort E − 1.
-const WORK: u64 = 2_200;
+/// The work of a round in these tests, which level L budgets 2^L times: about half the work of a round of the small
+/// games (their steps are about 80 a round, and the neighborhoods' work is 64 × 32 = 2,048), so that level 1 runs two
+/// rounds and level L a few rounds more than level L − 1.
+const WORK: u64 = 1_100;
 
-/// The plan of a run at `effort`, with the default seed and no measuring option, and with `tilt`, `back`, `widen` and
-/// the repair off: the mode as it was before those options had defaults.
+/// The plan of a run at level `effort`, with the default seed and no measuring option, and with `tilt`, `back`, `widen`
+/// and the repair off: the mode as it was before those options had defaults.
 fn plan(effort: u32) -> Plan {
     Plan { effort, round_work: WORK, tilt: 0, back: 0, widen: None, repair: false, ..Plan::default() }
 }
 
-/// The plan of a run at `effort` with the defaults of `tilt`, `back` and `widen`.
+/// The plan of a run at level `effort` with the defaults of `tilt`, `back` and `widen`.
 fn by_default(effort: u32) -> Plan {
     Plan { effort, round_work: WORK, ..Plan::default() }
 }
@@ -120,14 +120,16 @@ fn raised_by(line: &Line) -> Vec<(u64, usize, usize, u64, u64, u64)> {
 
 #[test]
 fn lines_replay_to_their_scores_and_never_beat_the_table() {
-    let lines = lines((1, 160), &options(2, true), &plan(0), None);
+    // The rounds end at the table's score (`stop_at_known`), which most of these small games have at their start.
+    let measured = Plan { stop_at_known: true, ..plan(1) };
+    let lines = lines((1, 160), &options(2, true), &measured, None);
     assert_eq!(lines.len(), 160);
     for line in &lines {
         let n = line.n;
         let json = line.to_json();
         assert_eq!(json.get("unsound"), Some(&Json::Bool(true)), "n={n}");
         assert!(json.get("completed").is_none() && json.get("proof").is_none(), "n={n}: it claims nothing");
-        assert_eq!(json.get("budget"), Some(&Json::from(0u64)), "n={n}: effort 0 budgets no steps");
+        assert_eq!(json.get("budget"), Some(&Json::from(measured.budget())), "n={n}");
         if n > 1 {
             let prev = line.prev.as_ref().expect("the moves for n - 1");
             assert_eq!((prev.n, prev.source, prev.short_by), (n - 1, Source::Run, 0), "n={n}");
@@ -137,7 +139,12 @@ fn lines_replay_to_their_scores_and_never_beat_the_table() {
         assert!(lines.iter().any(|line| line.method == method), "no {} game", method.as_str());
     }
     let searched = lines.iter().filter(|line| line.method == Method::Search);
-    assert!(searched.clone().all(|line| line.start.is_some() && line.rounds == 0), "effort 0 is the start alone");
+    assert!(searched.clone().all(|line| line.start.is_some()), "a searched game has a start");
+    let at_known = |line: &Line| line.known.is_some_and(|known| known.round == Some(0));
+    assert!(
+        searched.clone().all(|line| line.rounds >= 1 || at_known(line)),
+        "it plays a round, or starts at the table's"
+    );
 }
 
 #[test]
@@ -158,7 +165,7 @@ fn a_higher_level_of_effort_does_the_rounds_of_a_lower_one_first() {
         assert!(raised(more).starts_with(&raised(less)), "n={}: {:?}, then {:?}", less.n, raised(less), raised(more));
         assert!(more.rounds > less.rounds && more.work > less.work, "n={}", less.n);
     }
-    // 375 is raised in its second round only at effort 1, and again in its third at effort 2, which 376 does not.
+    // 375 is raised in its second round only at level 1, and again in its third at level 2, which 376 does not.
     assert_eq!((raised(&less[0]).len(), raised(&more[0]).len()), (1, 2));
     assert_eq!((raised(&less[1]).len(), raised(&more[1]).len()), (2, 2));
 }
@@ -169,7 +176,7 @@ fn the_rounds_of_a_level_run_until_their_work_reaches_its_budget_and_the_round_t
     let rounds = |plan: &Plan| lines(FIRST, &opts, plan, None);
     for effort in 1..=3 {
         let plan = plan(effort);
-        assert_eq!(plan.budget(), WORK << (effort - 1));
+        assert_eq!(plan.budget(), WORK << effort);
         for line in rounds(&plan) {
             let n = line.n;
             assert!(line.work >= plan.budget(), "n={n}: {} work, a budget of {}", line.work, plan.budget());
@@ -184,12 +191,14 @@ fn the_rounds_of_a_level_run_until_their_work_reaches_its_budget_and_the_round_t
             }
         }
     }
-    // A budget of exactly the work that the rounds did is reached by the same rounds, the last of which reaches it;
-    // one more is not, and takes another round.
+    // A budget that the work the rounds did reaches is reached by the same rounds, the last of which reaches it, and
+    // the next budget is not, and takes another round.  The budget of level 1 is twice the work of a round, so it is
+    // even: the budgets are the work, if that is even, and the even numbers next to it.
     let n = FIRST.0;
     let line = &lines((n, n), &opts, &plan(3), None)[0];
-    let again = |round_work| lines((n, n), &opts, &Plan { round_work, ..plan(1) }, None).remove(0);
-    let (exact, more) = (again(line.work), again(line.work + 1));
+    let again = |budget: u64| lines((n, n), &opts, &Plan { round_work: budget / 2, ..plan(1) }, None).remove(0);
+    let reached = line.work - line.work % 2;
+    let (exact, more) = (again(reached), again(reached + 2));
     assert_eq!((exact.rounds, exact.work), (line.rounds, line.work), "n={n}");
     assert!(more.rounds > line.rounds && more.work > line.work, "n={n}: {} rounds", more.rounds);
 }
@@ -198,9 +207,9 @@ fn the_rounds_of_a_level_run_until_their_work_reaches_its_budget_and_the_round_t
 /// shape the rounds, and each starts from the table's moves, so it is the same game whatever the lines before it.
 const SHAPED: [u32; 4] = [375, 539, 544, 680];
 
-/// The plans of the options at `effort`, for the games [`SHAPED`] from the table's moves: a share fixed other than the
-/// default's, the tilted share, trajectories from the 8 games before, the widening after a round without growth, the
-/// last three together, half the neighborhoods tilted, and the defaults of the last three.
+/// The plans of the options at level `effort`, for the games [`SHAPED`] from the table's moves: a share fixed other than
+/// the default's, the tilted share, trajectories from the 8 games before, the widening after a round without growth,
+/// the last three together, half the neighborhoods tilted, and the defaults of the last three.
 fn shaped(effort: u32) -> [(&'static str, Plan); 7] {
     let known = Plan { from_known: true, ..plan(effort) };
     [
@@ -222,7 +231,7 @@ fn shaped_lines(opts: &SolveOptions, plan: &Plan) -> Vec<Line> {
 
 #[test]
 fn with_the_options_off_the_rounds_are_these() {
-    // The lines of this form of the mode at effort 3 (`--back 0 --tilt 0 --widen 0`), to see that no change to a
+    // The lines of this form of the mode at level 3 (`--back 0 --tilt 0 --widen 0`), to see that no change to a
     // neighborhood's draws or to the budget goes unseen: the neighborhoods of the finder's default are pinned beside, in
     // `search::finder`.
     let plan = Plan { from_known: true, ..plan(3) };
@@ -291,8 +300,8 @@ fn check_same_on_one_thread_and_on_four(shape: usize) {
 }
 for_each_option!(same_on_one_thread_and_on_four, check_same_on_one_thread_and_on_four);
 
-/// Under option `shape` of [`shaped`], the improvements of the games [`SHAPED`] at effort 1 are a prefix of those at
-/// effort 2, and those at effort 2 of those at effort 3: the rounds, the trajectories, the stages, the steps and the
+/// Under option `shape` of [`shaped`], the improvements of the games [`SHAPED`] at level 1 are a prefix of those at
+/// level 2, and those at level 2 of those at level 3: the rounds, the trajectories, the stages, the steps and the
 /// scores.
 fn check_lower_level_first(shape: usize) {
     let by_level: Vec<Vec<Line>> =
@@ -306,7 +315,7 @@ fn check_lower_level_first(shape: usize) {
     }
     // The longer run does more, so the comparison shows something.
     let rounds: Vec<u64> = by_level.iter().map(|lines| lines.iter().map(|line| line.rounds).sum()).collect();
-    assert!(rounds[0] < rounds[2], "rounds at efforts 1 to 3: {rounds:?}");
+    assert!(rounds[0] < rounds[2], "rounds at levels 1 to 3: {rounds:?}");
 }
 for_each_option!(lower_level_first, check_lower_level_first);
 
@@ -390,7 +399,7 @@ const SURVIVORS_AHEAD: [(u32, u64, u64); 2] = [(715, 161442, 161449), (805, 2049
 
 #[test]
 fn a_trajectory_that_begins_heavier_than_the_start_raises_the_score_before_any_round() {
-    let back = Plan { back: 8, from_known: true, stop_at_known: true, ..plan(0) };
+    let back = Plan { back: 8, from_known: true, stop_at_known: true, ..plan(1) };
     let opts = options(4, true);
     for (n, start, score) in SURVIVORS_AHEAD {
         let line = &lines((n, n), &opts, &back, None)[0];
@@ -408,7 +417,7 @@ fn a_trajectory_that_begins_heavier_than_the_start_raises_the_score_before_any_r
         let known = line.known.unwrap();
         assert_eq!(known.round, (score >= known.score).then_some(0), "n={n}");
         // A level above does the same first, and its rounds go on from there.
-        let more = &lines((n, n), &opts, &Plan { effort: 1, stop_at_known: false, ..back }, None)[0];
+        let more = &lines((n, n), &opts, &Plan { effort: 2, stop_at_known: false, ..back }, None)[0];
         assert_eq!(raised_by(more).first(), Some(&(0, raised.trajectory, 0, 0, 0, score)), "n={n}");
         assert!(more.rounds >= 1 && more.score >= score, "n={n}");
     }
@@ -458,10 +467,15 @@ fn a_plan_with_an_option_out_of_range_is_refused() {
     for fix in [(0.5, 0.7), (0.4, 0.6)] {
         assert_eq!(refused(Plan { widen: Some(2), fix, ..plan(1) }), unsound::WIDEN_WITH_FIX, "{fix:?}");
     }
-    assert!(refused(Plan { effort: unsound::MAX_EFFORT + 1, ..plan(1) }).contains("more than the most"));
-    // The most effort budgets 2^47 work, which no run reaches and no count overflows: the plan is accepted.
-    let most = Plan { effort: unsound::MAX_EFFORT, round_work: unsound::ROUND_WORK, ..plan(1) };
-    assert_eq!((unsound::check_plan(&most), most.budget()), (Ok(()), 1 << 47));
+    // The levels are 1 to 6: the start alone is no level, and nothing above the most is.
+    for effort in [0, unsound::MAX_EFFORT + 1] {
+        let err = refused(Plan { effort, ..plan(1) });
+        assert_eq!(err, format!("--effort takes L, the level of effort, a whole number from 1 to 6: got \"{effort}\""));
+    }
+    // The least and the most effort are accepted: the most budgets 2^22 work.
+    let (least, most) = (Plan { effort: 1, ..plan(1) }, Plan { effort: 6, round_work: unsound::ROUND_WORK, ..plan(1) });
+    assert_eq!((unsound::check_plan(&least), unsound::check_plan(&most)), (Ok(()), Ok(())));
+    assert_eq!((least.budget(), most.budget()), (2 * WORK, 1 << 22));
 }
 
 #[test]
@@ -524,7 +538,7 @@ fn stop_at_known_ends_the_rounds_at_the_tables_score() {
     );
 }
 
-/// The plan of a run at `effort` from the table's moves for n − 1, so that the run's ceiling is the proven one.
+/// The plan of a run at level `effort` from the table's moves for n − 1, so that the run's ceiling is the proven one.
 fn from_table(effort: u32) -> Plan {
     Plan { from_known: true, ..plan(effort) }
 }
@@ -547,12 +561,12 @@ fn a_game_whose_start_reaches_the_runs_ceiling_stops_before_any_round() {
     let opts = options(4, true);
     for n in AT_CEILING_AT_THE_START {
         let ceiling = proven_ceiling(n);
-        // The start is at the ceiling, whatever the effort: no round and no work.
-        for effort in [0, 3] {
+        // The start is at the ceiling, whatever the level: no round and no work.
+        for effort in [1, 3] {
             let line = &lines((n, n), &opts, &from_table(effort), None)[0];
             assert_eq!((line.method, line.start, line.score), (Method::Search, Some(ceiling), ceiling), "n={n}");
-            assert_eq!((line.ceiling, line.at_ceiling), (Some(ceiling), true), "n={n} at effort {effort}");
-            assert_eq!((line.rounds, line.steps, line.work), (0, 0, 0), "n={n} at effort {effort}");
+            assert_eq!((line.ceiling, line.at_ceiling), (Some(ceiling), true), "n={n} at level {effort}");
+            assert_eq!((line.rounds, line.steps, line.work), (0, 0, 0), "n={n} at level {effort}");
             assert!(line.improvements.is_empty(), "n={n}");
             let json = line.to_json();
             assert_eq!(json.get("ceiling"), Some(&Json::from(ceiling)), "n={n}");
@@ -586,7 +600,7 @@ fn a_game_that_reaches_the_runs_ceiling_in_a_round_stops_after_that_round() {
             let more = &lines((n, n), &opts, &from_table(effort), None)[0];
             let shown =
                 |line: &Line| (line.rounds, line.steps, line.work, line.score, raised_by(line), line.at_ceiling);
-            assert_eq!(shown(more), shown(stopped), "n={n} at effort {effort}");
+            assert_eq!(shown(more), shown(stopped), "n={n} at level {effort}");
         }
         let less = &lines((n, n), &opts, &from_table(1), None)[0];
         assert!(less.rounds <= stopped.rounds, "n={n}");
@@ -599,13 +613,24 @@ fn a_game_that_reaches_the_runs_ceiling_in_a_round_stops_after_that_round() {
     }
 }
 
+/// The line of game 395 as a run of level 1 plays it from game 390 on, without the moves for n − 1 ([`WALKED`] has the
+/// run: 390 falls 7 short of the table's score and the games after it keep the shortfall), and the file `name` of `dir`
+/// that holds that line alone, so that no line of 390 to 394 repairs with it.
+fn short_395_in(dir: &TempDir, name: &str, threads: usize) -> (Line, PathBuf) {
+    let walked = dir.join(format!("walked-{name}"));
+    let short = lines((WALKED.0, 395), &options(threads, false), &plan(1), Some(&walked)).pop().expect("a line");
+    let text = fs::read_to_string(&walked).unwrap();
+    let file = dir.join(name);
+    fs::write(&file, format!("{}\n", text.lines().last().expect("the line of 395"))).unwrap();
+    (short, file)
+}
+
 /// The lines of game 395 and then of game 396, played from a file that holds a short line of 395, on `threads` threads:
-/// 395 by its start alone, made without the moves for 394 (the table's, with `--from-known`), falls 7 short of the table's
-/// score; 396 then reads the file's line, not the table's, and stops at the lower ceiling that the line gives.
+/// 395, played from game 390 on without the moves for n − 1 ([`short_395_in`]), falls 7 short of the table's score; 396
+/// then reads the file's line, not the table's, and stops at the lower ceiling that the line gives.
 fn from_a_short_line(threads: usize, past_ceiling: bool) -> (Line, Line) {
     let (dir, opts) = (TempDir::new("unsound-short"), options(threads, false));
-    let file = dir.join("short.jsonl");
-    let short = lines((395, 395), &opts, &Plan { from_known: true, ..plan(0) }, Some(&file)).remove(0);
+    let (short, file) = short_395_in(&dir, "short.jsonl", threads);
     let game = lines((396, 396), &opts, &Plan { past_ceiling, ..plan(1) }, Some(&file)).remove(0);
     (short, game)
 }
@@ -656,12 +681,12 @@ fn the_lines_that_stop_at_the_ceiling_are_the_same_on_one_thread_and_on_four() {
 #[test]
 fn the_measuring_options_take_the_tables_games_only() {
     let past = Optimal::built_in().max_n() + 1;
-    for measured in [Plan { stop_at_known: true, ..plan(0) }, Plan { from_known: true, ..plan(0) }] {
+    for measured in [Plan { stop_at_known: true, ..plan(1) }, Plan { from_known: true, ..plan(1) }] {
         let err = unsound::solve_range(past - 1, past, &options(1, true), &measured, None, |_| (), |_| ()).unwrap_err();
         assert!(err.contains(&format!("lacks game {past}")), "{err}");
     }
     // With --from-known every game starts from the table's moves for n − 1.
-    let known = lines(FIRST, &options(1, true), &Plan { from_known: true, ..plan(0) }, None);
+    let known = lines(FIRST, &options(1, true), &Plan { from_known: true, ..plan(1) }, None);
     assert!(known.iter().all(|line| line.prev.as_ref().unwrap().source == Source::Table && line.plan.from_known));
 }
 
@@ -690,14 +715,14 @@ fn the_wall_between_unsound_and_proven_lines_holds_both_ways() {
     let err = verify_files(slice::from_ref(&mixed), Optimal::built_in(), 1).unwrap_err();
     assert!(err.contains("line 13: an unsound line"), "{err}");
     let err =
-        unsound::solve_range(13, 13, &options(1, true), &plan(0), Some(&proven_file), |_| (), |_| ()).unwrap_err();
+        unsound::solve_range(13, 13, &options(1, true), &plan(1), Some(&proven_file), |_| (), |_| ()).unwrap_err();
     assert!(err.contains("line 1: not an unsound line"), "{err}");
     fs::write(&mixed, format!("{unsound}{}\n", proven.lines().next().unwrap())).unwrap();
-    let err = unsound::solve_range(13, 13, &options(1, true), &plan(0), Some(&mixed), |_| (), |_| ()).unwrap_err();
+    let err = unsound::solve_range(13, 13, &options(1, true), &plan(1), Some(&mixed), |_| (), |_| ()).unwrap_err();
     assert!(err.contains("line 13: not an unsound line"), "{err}");
 }
 
-/// The plan of [`plan`] at `effort` with the repair.
+/// The plan of [`plan`] at level `effort` with the repair.
 fn repairing(effort: u32) -> Plan {
     Plan { repair: true, ..plan(effort) }
 }
@@ -734,22 +759,21 @@ fn games_of(path: &Path, optionless: bool) -> Vec<(u64, Json)> {
     games.into_iter().collect()
 }
 
-/// Games 390 to 396 at effort 1, with no seed: the search of 390 falls 7 short of the table's score, 391 to 395 keep
+/// Games 390 to 396 at level 1, with no seed: the search of 390 falls 7 short of the table's score, 391 to 395 keep
 /// the shortfall, as repeats and as searches stopped at the lower ceiling it gives, and 396 reaches the table's score.
 const WALKED: (u32, u32) = (390, 396);
 
 #[test]
 fn a_short_line_is_repaired_from_the_line_of_the_game_above_it() {
     let (dir, table) = (TempDir::new("unsound-repair"), Optimal::built_in());
-    let file = dir.join("repaired.jsonl");
-    // 395 falls 7 short, played by its start alone with no seed; 396, seeded with nothing, passes the ceiling that the
-    // short line gives, and what survives of its line in 395 scores more than the line of 395.
-    let short = lines((395, 395), &options(4, false), &Plan { from_known: true, ..plan(0) }, Some(&file)).remove(0);
+    // 395 falls 7 short, played from 390 on with no seed ([`short_395_in`]); 396, seeded with nothing, passes the
+    // ceiling that the short line gives, and what survives of its line in 395 scores more than the line of 395.
+    let (short, file) = short_395_in(&dir, "repaired.jsonl", 4);
     let (game, repairs) = played((396, 396), &options(4, false), &repairing(1), Some(&file));
     assert_eq!(short.score + 7, table.score(395).unwrap());
     assert!(game[0].prev.as_ref().unwrap().short_by > 0, "396 proves the line of 395 short");
     let [repair] = &repairs[..] else { panic!("one repair: {repairs:?}") };
-    assert_eq!((repair.n, repair.from, repair.method, repair.was), (395, 396, Method::Search, short.score));
+    assert_eq!((repair.n, repair.from, repair.method, repair.was), (395, 396, short.method, short.score));
     assert!(repair.score > short.score && repair.score <= table.score(395).unwrap(), "{repair:?}");
     // The file has the line of 395, then the line of 396, then the line of 395 again: the line played with the
     // repair's moves, which is the game's.
@@ -773,8 +797,7 @@ fn a_short_line_is_repaired_from_the_line_of_the_game_above_it() {
     // A game started from a repaired line starts from the line the file ends with.  In a file with the short line of
     // 395 alone, the prime 397, played from the table's moves for 396, repairs it two games below, and a run of 396
     // then starts from the repaired line.
-    let gap = dir.join("gap.jsonl");
-    lines((395, 395), &options(4, false), &Plan { from_known: true, ..plan(0) }, Some(&gap));
+    let (_, gap) = short_395_in(&dir, "gap.jsonl", 4);
     let (_, repairs) = played((397, 397), &options(4, false), &repairing(1), Some(&gap));
     assert_eq!(repairs.iter().map(|r| (r.n, r.from)).collect::<Vec<_>>(), [(395, 397)]);
     let next = lines((396, 396), &options(4, false), &repairing(1), Some(&gap)).remove(0);
@@ -883,7 +906,7 @@ fn a_file_holds_a_second_line_of_a_game_only_as_a_repair_that_scores_more() {
     let refused = |text: String, expected: &str| {
         let bad = dir.join("bad.jsonl");
         fs::write(&bad, text).unwrap();
-        let err = unsound::solve_range(400, 400, &options(1, true), &plan(0), Some(&bad), |_| (), |_| ()).unwrap_err();
+        let err = unsound::solve_range(400, 400, &options(1, true), &plan(1), Some(&bad), |_| (), |_| ()).unwrap_err();
         assert!(err.contains(expected), "{err}");
     };
     refused(format!("{played_395}\n{played_395}\n"), "line 2: a second line for n=395 that is no repair");

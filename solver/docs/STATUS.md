@@ -21,6 +21,11 @@ and the extended mode.  The prover's run of 2 to 2530 is done and committed.  Th
   PST, proved every game of 2 to 2530.  `prover.sh --verify 2 2530` passes on its file, which is committed as
   `solver/noframe/data/exact_parity_2_2530.jsonl` and replaced the older `exact_parity` files ([the prover's
   proofs](../noframe/docs/proofs.md#the-run-of-2-to-2530) record the run).
+* **The unsound mode.**  A mode of `taxman solve` that plays the games past 5060 with no proof, at six levels of effort,
+  and repairs a line that a line above it shows short; its lines are lower bounds, kept apart from the proven ones
+  ([the unsound mode](unsound.md)).  Two projects are in flight:
+  * the full measurement of the levels on the whole machine;
+  * the streaks of short games that a chain hands on.
 
 ## Open
 
@@ -29,7 +34,3 @@ and the extended mode.  The prover's run of 2 to 2530 is done and committed.  Th
   against the same gate of 1200 and build; and whether a gate scaled to the game's root gap, never tested, does better
   ([the full run at gate
   300](https://github.com/bvchess/taxman-notebook/blob/main/search/the-full-run-at-gate-300-2026-11/README.md)).
-* **The unsound mode.**  A mode of `taxman solve` that searches for a high score and skips the proof, for the games past
-  5060; its lines are lower bounds, kept apart from the proven ones ([the unsound mode](unsound.md#an-unsound-line)).
-  Its first form is built, with a level of effort that is a number of rounds; the next step measures, on the games
-  3441-5060, the rounds that each game needs to reach its proven score.

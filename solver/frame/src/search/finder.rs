@@ -249,12 +249,12 @@ pub const NEIGHBORHOODS: u64 = 64;
 /// What a neighborhood costs besides its steps, in steps' worth: the work of a neighborhood is its steps plus this.
 /// A neighborhood has a fixed cost (building its unit and starting the engine on it), so that rounds of small
 /// neighborhoods take longer than their steps say, and a budget of steps would give an option that frees more of the
-/// game far fewer rounds for the same time.  Effort 1 at n = 3000 and 5000, from the table's moves, on 4 threads,
-/// with and without `tilt` and at the shares fixed 0.7,0.9 and 0.5,0.7, took on average 3.3 to 68.6 ms a neighborhood
-/// at 18.5 to 1,452 steps at n = 3000, and 8.6 to 274 ms at 36 to 1,935 steps at n = 5000.  A line through the cheapest
-/// and the dearest of each size gives a fixed cost of about 54 steps' worth at n = 3000 and 25 at n = 5000 (a least
-/// squares line through all four, 94 and 33), and 32 steps' worth a neighborhood makes the wall time a work comes to
-/// 0.046 to 0.066 ms at n = 3000 and 0.126 to 0.143 ms at n = 5000 whatever the options.
+/// game far fewer rounds for the same time.  A budget of one round at n = 3000 and 5000, from the table's moves,
+/// on 4 threads, with and without `tilt` and at the shares fixed 0.7,0.9 and 0.5,0.7, took on average 3.3 to 68.6 ms a
+/// neighborhood at 18.5 to 1,452 steps at n = 3000, and 8.6 to 274 ms at 36 to 1,935 steps at n = 5000.  A line through
+/// the cheapest and the dearest of each size gives a fixed cost of about 54 steps' worth at n = 3000 and 25 at n = 5000
+/// (a least squares line through all four, 94 and 33), and 32 steps' worth a neighborhood makes the wall time a work
+/// comes to 0.046 to 0.066 ms at n = 3000 and 0.126 to 0.143 ms at n = 5000 whatever the options.
 pub const NEIGHBORHOOD_WORK: u64 = 32;
 
 /// What a round of the rounds on many threads came to ([`Lns::round`]).

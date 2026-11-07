@@ -25,7 +25,7 @@ use taxman::game::Optimal;
 use taxman::numtheory::Tables;
 use taxman::results::verify_files;
 use taxman::search::{finder, gate_trial, MAX_GATE};
-use taxman::solver::unsound::{self, Plan, MAX_EFFORT};
+use taxman::solver::unsound::{self, Plan, MAX_EFFORT, MIN_EFFORT};
 use taxman::solver::{self, GameResult, Method, SolveOptions};
 
 fn failed(message: String) -> CliError {
@@ -235,7 +235,7 @@ fn proof_search_flags() -> impl Iterator<Item = &'static str> {
     solve.chain(SEARCH_FLAGS).chain(SEARCH_SWITCHES).chain(["--force-search"])
 }
 
-/// `solve A-B --unsound --effort E --out FILE [--seed S] [--fix LO,HI] [--tilt P] [--back J] [--above J] [--widen S]
+/// `solve A-B --unsound --effort L --out FILE [--seed S] [--fix LO,HI] [--tilt P] [--back J] [--above J] [--widen S]
 /// [--past-ceiling] [--no-repair] [--stop-at-known] [--from-known]`, with `--threads`, `--tactic` and `--show`: plays
 /// the games in the unsound mode (`solver::unsound::solve_range`), with no proof, and appends their unsound lines to
 /// FILE, and the lines that the repair replaces.  An option not given has its default ([`Plan::default`]); `--fix`
@@ -246,13 +246,10 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
         return Err(CliError::Usage(format!("{flag} is a flag of the proof search, which --unsound does not run")));
     }
     let opts = solver_options(args)?;
-    let levels = format!("the level of effort, from 0 to {MAX_EFFORT}");
-    let effort = args
-        .parsed::<u32>("--effort")?
-        .ok_or_else(|| CliError::Usage(format!("--unsound needs --effort E, {levels}")))?;
-    if effort > MAX_EFFORT {
-        return Err(CliError::Usage(format!("--effort {effort}: {levels}")));
-    }
+    let effort = args.value("--effort").ok_or_else(|| {
+        CliError::Usage(format!("--unsound needs --effort L, the level of effort, from {MIN_EFFORT} to {MAX_EFFORT}"))
+    })?;
+    let effort = unsound::parse_effort(effort).map_err(CliError::Usage)?;
     let default = Plan::default();
     let fix = args.value("--fix").map(unsound::parse_fix).transpose().map_err(CliError::Usage)?;
     let tilt = args.value("--tilt").map(unsound::parse_tilt).transpose().map_err(CliError::Usage)?;

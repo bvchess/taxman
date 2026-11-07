@@ -30,14 +30,14 @@ proof.
 ## The command
 
 ```
-$ taxman solve 5061-5063 --unsound --effort 2 --out unsound.jsonl
+$ taxman solve 5061-5063 --unsound --effort 1 --out unsound.jsonl
 n=5061  score=8057912   search  rounds=5      improved=1      21.565 s  unsound
 n=5062  score=8062974   repeat  rounds=0      improved=0       0.427 s  unsound  at ceiling
 n=5063  score=8063376   repeat  rounds=0      improved=0       0.405 s  unsound
 repaired 0 lines; the repair took 0.027 s
 ```
 
-`solve A-B --unsound --effort E --out FILE` plays the games A to B in order, one at a time on all the threads, and
+`solve A-B --unsound --effort L --out FILE` plays the games A to B in order, one at a time on all the threads, and
 appends the line of each to FILE as its game ends, and each line that [the repair](#the-repair) replaces.  It needs
 `--effort` and `--out`.  A game starts from the moves for n − 1 that the run, else FILE, else the built-in table has,
 so the first game of a range past the table's end starts from the moves for the last game of the table.  A stop signal
@@ -60,7 +60,7 @@ reference](REFERENCE.md#1-the-flags-of-solve)), and refuses the flags of the pro
 
 | flag | meaning |
 |---|---|
-| `--effort E` | the level of effort, from 0 (the search's start alone) to 32; needed ([the levels](#the-level-of-effort)) |
+| `--effort L` | the level of effort, from 1 to 6; needed ([the levels](#the-level-of-effort)) |
 | `--seed S` | the seed of the rounds' random choices (default 1) |
 | `--back J` | J from 0 to 8, default 8: besides the start's, a game follows a trajectory from each distinct set that survives of the moves for the games n − 1, ..., n − J.  0: the start's alone |
 | `--above J` | J from 0 to 8, default 0: a game also follows a trajectory from each distinct set that survives of the moves for the games n + 1, ..., n + J that the run or FILE has, or with `--from-known` the built-in table.  A game played in order has no line above it in its own run, so this is for measuring |
@@ -77,7 +77,7 @@ unless given.  The three were chosen together by
 two races on the hard games of 3441-5060, at equal work ([the first
 race](https://github.com/bvchess/taxman-notebook/blob/main/search/tilted-back-and-wider-rounds-2026-11/README.md), [the
 second](https://github.com/bvchess/taxman-notebook/blob/main/search/a-share-of-tilted-neighborhoods-2026-11/README.md)).
-At level 2 and up, `--tilt 25` and `--tilt 50` are within two games of each other, so 25 is chosen for its lead at the
+At every level, `--tilt 25` and `--tilt 50` are within two games of each other, so 25 is chosen for its lead at the
 low levels, not by a significant margin.  `--fix` replaces the ladder of the widening with a share of its own, which is
 why it turns widening off.
 
@@ -123,14 +123,48 @@ long as its longest neighborhood, and it is the same round that it is on one thr
 
 ### The level of effort
 
-Effort 0 is the start alone.  Effort E ≥ 1 runs rounds until their work reaches a budget of 2^(E−1) × 65,536, the
-steps of a round of 64 neighborhoods that each take their limit of 1,024.  The work of a round is its steps and 32 for
-each of its 64 neighborhoods, which cost time beside their steps (`NEIGHBORHOOD_WORK` in `search::finder` has the
-measurements), so that work tracks time whatever the options.  The budget is checked after each round, and the round
-that reaches it is the last.  The most effort is 32.
+A level of effort is a budget of work for the rounds, and each of the six levels, 1 to 6, is twice the one below.  Level
+L runs rounds until their work reaches a budget of 2^L × 65,536, the steps of a round of 64 neighborhoods that each
+take their limit of 1,024.  The work of a round is its steps and 32 for each of its 64 neighborhoods, which cost time
+beside their steps (`NEIGHBORHOOD_WORK` in `search::finder` has the measurements), so that work tracks time whatever
+the options.  The budget is checked after each round, and the round that reaches it is the last.  The start alone is no
+level, since it never repairs a shortfall, and `--effort` refuses 0 and anything above 6.
 
 A level runs the rounds of every lower level first, so the `improvements` of a line at one level show what each lower
 level would have scored, and each records the steps and the work of the rounds up to its own.
+
+**What the levels gave.**  The notebook's [datasheet of the unsound
+mode](https://github.com/bvchess/taxman-notebook/blob/main/search/the-datasheet-of-the-unsound-mode-2026-11/README.md)
+played the known games 4561-5060 as five chains of 100 games at each level, each game starting from the run's own line
+of the game before and the first from the built-in table's, with the default options and the seed 1.  Of the 500 games,
+this share scored opt(n), and a chain of 100 games took this long on 4 threads of an idle machine (estimated from runs
+on a busy one):
+
+| level | budget (work) | games at opt(n) | hours per 100 games, 4 threads |
+|---|---|---|---|
+| 1 | 131,072 | 94.2% | 0.15 |
+| 2 | 262,144 | 95.8% | 0.24 |
+| 3 | 524,288 | 97.2% | 0.42 |
+| 4 | 1,048,576 | 97.2% | 0.77 |
+| 5 | 2,097,152 | 97.2% | 1.41 |
+| 6 | 4,194,304 | 98.8% | 2.46 |
+
+Each level took 1.6 to 1.8 times the time of the one below: less than twice, since a game's fixed costs, such as its
+start, do not double, and close to it, since the work of the search outweighs them.
+
+The table does not show:
+
+* **More than one seed.**  Levels 3 to 5 leave the same 14 games short, and level 6's gain of 1.6 points is two stuck
+  games and the games behind them, so a share has no interval.
+* **A longer chain.**  A chain of 100 games starts from a proven game.  A shortfall passes to the games after it, so a
+  chain of 200 games scored lower in the datasheet.
+* **This build.**  The chains ran before the repair, which can raise the shares, and before the rounds ran ahead of
+  their ends, which gives the same lines in less time on many threads.
+* **The games past 5060.**  The known games stand in for them, and their hardest games lie at the top of the range, so
+  the share past 5060 may be lower.
+
+The notebook's entries before this change number the levels one higher: their effort E is level E − 1 here, and their
+lines' `budget` gives the work.
 
 ### The options that shape the rounds
 
@@ -146,10 +180,9 @@ none of the sources has moves for adds none.  Neighborhood k of a round works fr
 T the trajectories, as the round starts, and a trajectory's next incumbent is the best set of its own, the lowest k's
 among equals, if that is heavier than before.  The game's set is the heaviest incumbent, the start's on a tie, and a
 round that makes it heavier is an improvement, which names the trajectory that made it.  What survives of an earlier
-game can be heavier than the start; the game's set is then that before any round, an improvement of round 0, and at
-effort 0 the game's score is the heaviest of the trajectories' starts.  The line says which games the trajectories
-began from (`trajectories`), and the score of what survives of each game's moves, whether or not it began one
-(`survivor_scores`).  A game that is not seeded follows the start's trajectory alone.
+game can be heavier than the start; the game's set is then that before any round, an improvement of round 0.  The line
+says which games the trajectories began from (`trajectories`), and the score of what survives of each game's moves,
+whether or not it began one (`survivor_scores`).  A game that is not seeded follows the start's trajectory alone.
 
 **`--above J`** adds, after those of `--back`, a trajectory for each distinct set that survives of the moves for the
 games n + 1, ..., n + J: the moves above n are left out, and what survives of the rest is taken as for `--back`.  The
@@ -218,7 +251,7 @@ the moves that later games start from, as a level does.
 ## An unsound line
 
 An unsound line holds legal moves for n and their score, a lower bound on opt(n) that nothing proves.  Here is the line
-of game 595 at effort 4 on four threads, with `--from-known` and `--stop-at-known`, with the moves and the promotions cut
+of game 595 at level 3 on four threads, with `--from-known` and `--stop-at-known`, with the moves and the promotions cut
 short, the fields regrouped and comments added:
 
 ```
@@ -228,7 +261,7 @@ short, the fields regrouped and comments added:
  "ceiling":110877, "at_ceiling":false,
  "repeats":null,                          # a repeat names the line whose promotions it plays here
  "setup":{"frames":6,"candidates":141,"max_total":33,"greedy_sum":8396,"digest":"c6fe37bd55f2b043"},
- "effort":4, "budget":524288, "seed":1, "fix":[0.7,0.9], "tilt":25, "back":8, "above":0, "widen":4,
+ "effort":3, "budget":524288, "seed":1, "fix":[0.7,0.9], "tilt":25, "back":8, "above":0, "widen":4,
  "start":110839,                          # the start fell 21 short of the table's score
  "trajectories":["start",594,593,591],    # the moves for 592 and for 590 to 587 gave a set one of these began from
  "survivor_scores":[[594,110682],[593,110489],[592,110489],[591,110303],...,[587,110303]],
@@ -237,13 +270,13 @@ short, the fields regrouped and comments added:
  "improvements":[{"round":1,"trajectory":1,"stage":0,"neighborhoods":64,"steps":699,"work":2747,"seconds":0.0433,
                   "score":110860}],
  "seconds":0.0454, "start_seconds":0.0158, "threads":4,
- "from_known":true, "stop_at_known":{"known":110860,"round":1},   # so effort 1 would have reached it
+ "from_known":true, "stop_at_known":{"known":110860,"round":1},   # so level 1 would have reached it
  "repair":true, "repaired":null,          # a line the repair wrote again says what replaced its moves
  "tactics":"default", "build":{"commit":"50db88e20150...","dirty":true}}
 ```
 
 A line that the repair replaced is the line as its game was played, with new moves, written again.  Game 5042 of a run
-of 5040-5045 at effort 4, which began from the lines of 4961-5039 of another run, played as a repeat 11 short of the
+of 5040-5045 at level 3, which began from the lines of 4961-5039 of another run, played as a repeat 11 short of the
 table's score, and what survived of the line of 5043, which reached it, replaced it; the summary lines on stdout were
 
 ```
@@ -267,7 +300,7 @@ the same way, each from the line above it.
 | `ceiling`, `at_ceiling` | the run's ceiling on the score (null without moves for n − 1, and with `--past-ceiling`), and whether the score reached it |
 | `repeats` | for a repeat, the n of the line whose promotions it plays; null otherwise |
 | `setup` | as in [a results line](REFERENCE.md#a-results-line---out-schema-5), without `cap`; null on a `trivial` or `prime` line |
-| `effort`, `budget`, `seed` | the level of effort, the work its rounds run until (0 at effort 0), and the seed of the rounds' random choices |
+| `effort`, `budget`, `seed` | the level of effort, the work its rounds run until, and the seed of the rounds' random choices |
 | `fix`, `tilt` | the range of `--fix` (the lowest and the highest share of the incumbent's promotions a neighborhood keeps fixed; a game that widens takes the ladder's shares instead, and this is the default range), and `--tilt`'s P (0 without it) |
 | `back`, `above`, `widen` | `--back`'s J (0 without it), `--above`'s J (0 without it), and `--widen`'s S (null without it) |
 | `start` | the score of a searched game's start; null on any other line |
