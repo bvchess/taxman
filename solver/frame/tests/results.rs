@@ -505,7 +505,8 @@ fn an_unsound_line_is_refused_by_both_verifiers() {
     let lines: Vec<Json> = games.iter().map(GameResult::to_json).collect();
     let plan = unsound::Plan::default();
     let mut unsound_lines = Vec::new();
-    unsound::solve_range(13, 13, &common::options(1), &plan, None, |line| unsound_lines.push(line.to_json())).unwrap();
+    let played = |line: &unsound::Line| unsound_lines.push(line.to_json());
+    unsound::solve_range(13, 13, &common::options(1), &plan, None, played, |_| ()).unwrap();
     let unsound_line = &unsound_lines[0];
     let expected = "an unsound line";
     let cases = vec![

@@ -40,8 +40,10 @@ fn help_lists_the_commands_and_every_tactic() {
             "--fix LO,HI",
             "--tilt P",
             "--back J",
+            "--above J",
             "--widen S",
             "--past-ceiling",
+            "--no-repair",
             "--stop-at-known",
             "--from-known",
             "tables N K...",
@@ -479,14 +481,16 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         let message = format!("{} is a flag of the proof search, which --unsound does not run", flag[0]);
         assert_usage_error(&[&base[..], flag].concat(), &message);
     }
-    let unsound_only: [&[&str]; 9] = [
+    let unsound_only: [&[&str]; 11] = [
         &["--effort", "1"],
         &["--seed", "2"],
         &["--fix", "0.5,0.7"],
         &["--tilt", "50"],
         &["--back", "2"],
+        &["--above", "2"],
         &["--widen", "3"],
         &["--past-ceiling"],
+        &["--no-repair"],
         &["--stop-at-known"],
         &["--from-known"],
     ];
@@ -519,6 +523,8 @@ fn the_options_that_shape_the_rounds_are_checked() {
     for back in ["9", "-1", "", "a", "1.5", "99999999999"] {
         let message = format!("--back takes J, a whole number from 0 to 8: got {back:?}");
         assert_usage_error(&[&base[..], &["--back", back]].concat(), &message);
+        let message = format!("--above takes J, a whole number from 0 to 8: got {back:?}");
+        assert_usage_error(&[&base[..], &["--above", back]].concat(), &message);
     }
     for widen in ["-1", "", "a", "2.5"] {
         let message = format!("--widen takes S, a whole number of rounds, or 0 for no widening: got {widen:?}");
@@ -667,8 +673,8 @@ fn zero_turns_the_three_options_off() {
     let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
     for (&n, line) in games.iter().zip(&off) {
         let mut played = None;
-        unsound::solve_range(n, n, &opts, &plain, None, |line| played = Some(without_times(&line.to_json())))
-            .expect("a run of the unsound mode");
+        let line_of = |line: &unsound::Line| played = Some(without_times(&line.to_json()));
+        unsound::solve_range(n, n, &opts, &plain, None, line_of, |_| ()).expect("a run of the unsound mode");
         assert_eq!(played.as_ref(), Some(line), "game {n}");
         assert_eq!(line.get("trajectories"), Some(&Json::array(["start"])), "game {n}: the start's alone");
     }

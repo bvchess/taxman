@@ -372,6 +372,9 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   on opt(n) that nothing proves, found by the large neighborhood search of the finder (above), with a level of
   **effort** that buys a better chance of opt(n) with more time.  Its key `"unsound"` keeps it out of every reader of
   results lines ([the unsound mode, "An unsound line"](../solver/docs/unsound.md#an-unsound-line)).
+* **repair**: in the unsound mode, the replacement of a game's line by what survives in it of a line above it, when
+  that scores more and so proves the line short; the run walks down from each line it records, and appends each line it
+  replaces ([the unsound mode, "The repair"](../solver/docs/unsound.md#the-repair)).
 
 ## Programs, files and documents
 

@@ -913,6 +913,10 @@ trait Job: Send + Sync {
     /// The promotion sum of what survives here of the `moves` for `n − 1` as a seed
     /// ([`search::seed_survivors_sum`]): a search seeded with those moves starts at least that high.
     fn survivors(&self, moves: &[u32]) -> u64;
+    /// What survives here of `moves`, another game's (a move above n is dropped, [`Board::seed`]), as promotions,
+    /// ascending: of the candidates among them, those that can still be promoted, from the largest down
+    /// ([`search::seed_survivors`]).  The unsound mode's repair makes a line of them ([`unsound`]).
+    fn surviving(&self, moves: &[u32]) -> Vec<u32>;
     /// The control through which the driver steers the search ([`engine::Control`]).
     fn control(&self) -> &Control;
     /// Arms the search's near-repeat cut by `prev`, the moves for `n − 1` once concluded ([`near_repeat`]): with
@@ -932,14 +936,14 @@ trait Job: Send + Sync {
     /// takes a seed, then the rounds of LNS on many threads that `plan` asks for ([`finder::Lns::rounds`]), which end
     /// once their work reaches the plan's budget ([`unsound::Plan::budget`]) or `enough` says so of the game's
     /// promotion sum (the run's ceiling and the table's score are the caller's).  If the search takes a seed, the
-    /// rounds follow a trajectory besides the start's from what survives of the moves in `back`, the games n − 1,
-    /// n − 2, ... and their moves, for each that is not a set an earlier trajectory began from
-    /// ([`unsound::trajectories`]).  `clock` is the game's seconds so far.  The start's dive is the one
-    /// [`ready`](Job::ready) made, if it was called.
+    /// rounds follow a trajectory besides the start's from what survives of the moves in `others`, games and their
+    /// moves (n − 1, n − 2, ..., then n + 1, n + 2, ...: a move above n is dropped, [`Board::seed`]), for each that is
+    /// not a set an earlier trajectory began from ([`unsound::trajectories`]).  `clock` is the game's seconds so far.
+    /// The start's dive is the one [`ready`](Job::ready) made, if it was called.
     fn improve(
         &self,
         seed: Option<&[u32]>,
-        back: &[(u32, &[u32])],
+        others: &[(u32, &[u32])],
         plan: &unsound::Plan,
         threads: usize,
         clock: &dyn Fn() -> f64,
@@ -997,6 +1001,10 @@ impl<const W: usize> Job for SearchJob<W> {
 
     fn survivors(&self, moves: &[u32]) -> u64 {
         search::seed_survivors_sum(&self.prepared, &self.board.seed(moves))
+    }
+
+    fn surviving(&self, moves: &[u32]) -> Vec<u32> {
+        search::seed_survivors(&self.prepared, &self.board.seed(moves)).to_vec()
     }
 
     fn control(&self) -> &Control {
@@ -1079,7 +1087,7 @@ impl<const W: usize> Job for SearchJob<W> {
     fn improve(
         &self,
         seed: Option<&[u32]>,
-        back: &[(u32, &[u32])],
+        others: &[(u32, &[u32])],
         plan: &unsound::Plan,
         threads: usize,
         clock: &dyn Fn() -> f64,
@@ -1095,10 +1103,12 @@ impl<const W: usize> Job for SearchJob<W> {
         // finder's seed rounds begin from what survives of the seed.  The start is at least as heavy as the survivors
         // of the moves for n − 1, since it began from them, but those of an earlier game may be heavier than the start:
         // the game's set then begins as theirs (`finder::Lns::rounds` records it as an improvement of round 0).
-        let survivors = back
+        let survivors: Vec<(u32, Bits<W>)> = others
             .iter()
             .filter(|_| self.seeds)
-            .map(|&(game, moves)| (game, search::seed_survivors(prepared, &self.board.seed(moves))));
+            .map(|&(game, moves)| (game, search::seed_survivors(prepared, &self.board.seed(moves))))
+            .collect();
+        let sums = survivors.iter().map(|(game, set)| (*game, set.sum())).collect();
         let (starts, trajectories) = unsound::trajectories(start, survivors);
         let space = SearchSpace::new(prepared);
         let lns = finder::Lns { p: prepared, space: &space, options: plan.lns() };
@@ -1107,6 +1117,7 @@ impl<const W: usize> Job for SearchJob<W> {
             start: start.sum(),
             start_seconds,
             trajectories,
+            survivors: sums,
             promotions: ran.set.to_vec(),
             moves: solution_for_promotions::<W>(&self.board.tables, ran.set),
             rounds: ran.rounds,
@@ -1636,6 +1647,10 @@ pub struct RangeSummary {
     pub solved: usize,
     /// Games already in the results file.
     pub skipped: usize,
+    /// Lines that the unsound mode's repair replaced, and the time its walks down took, those that replaced nothing
+    /// included (none in the proven mode).
+    pub repaired: usize,
+    pub repair_time: Duration,
     /// The game whose search stopped at a limit, or at a signal; the range ends there.
     pub stopped_at: Option<u32>,
 }

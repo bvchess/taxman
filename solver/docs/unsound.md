@@ -11,6 +11,7 @@ README](../frame/README.md) says how to build it), and the words of the search a
 * [The command](#the-command)
 * [The flags](#the-flags)
 * [How a game is played](#how-a-game-is-played)
+* [The repair](#the-repair)
 * [An unsound line](#an-unsound-line)
 
 ## What it is and is not
@@ -30,20 +31,25 @@ proof.
 
 ```
 $ taxman solve 5061-5063 --unsound --effort 2 --out unsound.jsonl
-n=5061  score=8057912   search  rounds=5      improved=1   30.027 s  unsound
-n=5062  score=8062974   repeat  rounds=0      improved=0    0.413 s  unsound  at ceiling
-n=5063  score=8063376   repeat  rounds=0      improved=0    0.418 s  unsound
+n=5061  score=8057912   search  rounds=5      improved=1      21.565 s  unsound
+n=5062  score=8062974   repeat  rounds=0      improved=0       0.427 s  unsound  at ceiling
+n=5063  score=8063376   repeat  rounds=0      improved=0       0.405 s  unsound
+repaired 0 lines; the repair took 0.027 s
 ```
 
 `solve A-B --unsound --effort E --out FILE` plays the games A to B in order, one at a time on all the threads, and
-appends the line of each to FILE as its game ends.  It needs `--effort` and `--out`.  A game starts from the moves for
-n − 1 that the run, else FILE, else the built-in table has, so the first game of a range past the table's end starts
-from the moves for the last game of the table.  A stop signal (SIGINT or SIGTERM) ends the run between rounds, and the
-game in play is not recorded; the same command goes on from the games FILE has.
+appends the line of each to FILE as its game ends, and each line that [the repair](#the-repair) replaces.  It needs
+`--effort` and `--out`.  A game starts from the moves for n − 1 that the run, else FILE, else the built-in table has,
+so the first game of a range past the table's end starts from the moves for the last game of the table.  A stop signal
+(SIGINT or SIGTERM) ends the run between rounds, and the game in play is not recorded; the same command goes on from
+the games FILE has, and from where the repair was.
 
 The summary line on stdout gives n, the score, the method, the rounds, how many of them raised the score and the
 seconds, then `unsound`, what `--stop-at-known` recorded, "at ceiling" if the game stopped at the run's ceiling, and
-"n-1 short by" a number of points if this game's score proves the line of n − 1 short by at least that many.
+"n-1 short by" a number of points if this game's score proves the line of n − 1 short by at least that many.  A line
+that the repair replaces has a summary line of its own: n, the new score, the method of the line replaced, the game its
+moves came from and how much they gain, and the seconds.  The run ends with the number of lines the repair replaced and
+the seconds its walks took, those that replaced nothing included.
 
 ## The flags
 
@@ -57,14 +63,17 @@ reference](REFERENCE.md#1-the-flags-of-solve)), and refuses the flags of the pro
 | `--effort E` | the level of effort, from 0 (the search's start alone) to 32; needed ([the levels](#the-level-of-effort)) |
 | `--seed S` | the seed of the rounds' random choices (default 1) |
 | `--back J` | J from 0 to 8, default 8: besides the start's, a game follows a trajectory from each distinct set that survives of the moves for the games n − 1, ..., n − J.  0: the start's alone |
+| `--above J` | J from 0 to 8, default 0: a game also follows a trajectory from each distinct set that survives of the moves for the games n + 1, ..., n + J that the run or FILE has, or with `--from-known` the built-in table.  A game played in order has no line above it in its own run, so this is for measuring |
 | `--tilt P` | P from 0 to 100, default 25: P percent of a round's neighborhoods free the small promotions more often.  0: none |
 | `--widen S` | S ≥ 1, default 4: a trajectory that has not grown heavier in S rounds moves to larger neighborhoods.  0: no widening |
 | `--fix LO,HI` | the share of the incumbent's promotions that each neighborhood keeps fixed, drawn at random from LO to HI, 0 ≤ LO ≤ HI ≤ 1 (default 0.7,0.9).  It turns widening off, and is refused with `--widen S` of 1 or more |
 | `--past-ceiling` | no stop at the [run's ceiling](#the-runs-ceiling) |
+| `--no-repair` | no [repair](#the-repair) of the lines below a line |
 | `--stop-at-known`, `--from-known` | to measure the mode on the games whose opt(n) the built-in table has, and refused for any other: end a game's rounds as soon as its score is the table's, and start every game from the table's moves for n − 1 |
 
 The options `--back`, `--tilt` and `--widen` shape the rounds ([the options](#the-options-that-shape-the-rounds)), and
-are on unless given 0, so that a user names a level of effort and nothing else.  The three were chosen together by
+are on unless given 0, so that a user names a level of effort and nothing else; `--above` shapes them too, and is off
+unless given.  The three were chosen together by
 two races on the hard games of 3441-5060, at equal work ([the first
 race](https://github.com/bvchess/taxman-notebook/blob/main/search/tilted-back-and-wider-rounds-2026-11/README.md), [the
 second](https://github.com/bvchess/taxman-notebook/blob/main/search/a-share-of-tilted-neighborhoods-2026-11/README.md)).
@@ -139,7 +148,14 @@ among equals, if that is heavier than before.  The game's set is the heaviest in
 round that makes it heavier is an improvement, which names the trajectory that made it.  What survives of an earlier
 game can be heavier than the start; the game's set is then that before any round, an improvement of round 0, and at
 effort 0 the game's score is the heaviest of the trajectories' starts.  The line says which games the trajectories
-began from (`trajectories`).  A game that is not seeded follows the start's trajectory alone.
+began from (`trajectories`), and the score of what survives of each game's moves, whether or not it began one
+(`survivor_scores`).  A game that is not seeded follows the start's trajectory alone.
+
+**`--above J`** adds, after those of `--back`, a trajectory for each distinct set that survives of the moves for the
+games n + 1, ..., n + J: the moves above n are left out, and what survives of the rest is taken as for `--back`.  The
+moves are the run's lines, else FILE's, and with `--from-known` the built-in table's, which are optimal; without it the
+table gives none.  A game played in order has no line above it in its own run, so the option is for measuring what the
+games above could give a game; [the repair](#the-repair) is what a run takes from them.
 
 **`--tilt P`** makes P percent of a round's neighborhoods free the small promotions more often than the large ones, with
 the same number freed as without it; the rest free them as a neighborhood does without the option.  Neighborhood k of a
@@ -165,6 +181,40 @@ one](../../docs/GLOSSARY.md#the-game) and the stop loses nothing.  Otherwise a g
 prove the line of n − 1 short (`prev.short_by`); the stop gives that up for the time it saves.  A game with no moves for
 n − 1 has no ceiling, and `--past-ceiling` takes the stop away.
 
+## The repair
+
+A game that falls short hands its shortfall on: the games above it start from its line, a prime and a repeat copy it,
+and a searched game stops at the lower ceiling it sets.  The repair takes the shortfall back down when a line above does
+better.  It rests on a fact of the game: the moves of a game of N, less those above n, are a game of n that scores the
+moves kept, since leaving a move out only leaves more numbers for the others ([the ceiling lemma
+(N4)](../../docs/theory/neighbors.md#the-ceiling-lemma), once for each number above n).  So what survives in game n of
+a line above it is a real game of n, and when it scores more than the line of n, that line is short and is replaced.
+
+* **When.**  After each line the run records, it walks down the games below it, from the highest: for each game, what
+  survives of the lines within 8 games above it that the walk has written, the line just recorded and those it has
+  replaced, the heaviest, the nearest on a tie.  If that scores more than the game's line, it replaces it, and the walk
+  goes on from it too.  The walk ends at the first game with none of its lines within 8 above.  What survives is taken
+  as `--back` takes it, so the new line is a set of promotions and the moves they make, which a repeat can play.
+* **Primes, trivial games and the table.**  A prime's line is not weighed: it follows from the line below it, and is
+  played again from it once that is replaced.  A trivial line is optimal, and the built-in table's lines are proven, so
+  neither is weighed.
+* **What it changes above.**  Nothing the walk does not reach: the games above the line just recorded are not played
+  yet, and those between it and a game repaired are weighed first.  A repeat of a game whose line is replaced plays its
+  new promotions, and the games that follow begin their trajectories from the new lines.
+* **The file.**  A replaced line is written again, appended: the line as its game was played, with the new moves,
+  promotions and score, `at_ceiling` and `prev.short_by` of the new score, and `repaired`, which says what replaced it.
+  The last line of a game is the game's.  A run that opens FILE goes on with the walk where its last lines leave it,
+  from the last line that is no repair and the repairs after it, so a run that a stop cuts short ends with the lines of
+  one that ran on.
+* **The cost.**  The repair runs no rounds, so the work of a level is that of its rounds, as without it.  Its time is
+  that of the survivors on the boards the run kept from playing the games, which is small beside a game's, and of the
+  boards it sets up again, a few seconds each at n ≈ 5,000: the run keeps the boards of its last 8 games, so a walk
+  that goes further needs them, and so does the walk that a run takes up from FILE.
+
+A line depends on the repair as on any option (`repair` in the line), and `--no-repair` turns it off.  The rounds of a
+game at a level begin with those of the levels below, from the same moves, as before; in a range the repair can change
+the moves that later games start from, as a level does.
+
 ## An unsound line
 
 An unsound line holds legal moves for n and their score, a lower bound on opt(n) that nothing proves.  Here is the line
@@ -178,17 +228,34 @@ short, the fields regrouped and comments added:
  "ceiling":110877, "at_ceiling":false,
  "repeats":null,                          # a repeat names the line whose promotions it plays here
  "setup":{"frames":6,"candidates":141,"max_total":33,"greedy_sum":8396,"digest":"c6fe37bd55f2b043"},
- "effort":4, "budget":524288, "seed":1, "fix":[0.7,0.9], "tilt":25, "back":8, "widen":4,
+ "effort":4, "budget":524288, "seed":1, "fix":[0.7,0.9], "tilt":25, "back":8, "above":0, "widen":4,
  "start":110839,                          # the start fell 21 short of the table's score
  "trajectories":["start",594,593,591],    # the moves for 592 and for 590 to 587 gave a set one of these began from
+ "survivor_scores":[[594,110682],[593,110489],[592,110489],[591,110303],...,[587,110303]],
  "rounds":1, "neighborhoods":64, "steps":699, "work":2747,
  "stage_rounds":[[1,0,0],[1,0,0],[1,0,0],[1,0,0]],
  "improvements":[{"round":1,"trajectory":1,"stage":0,"neighborhoods":64,"steps":699,"work":2747,"seconds":0.0433,
                   "score":110860}],
  "seconds":0.0454, "start_seconds":0.0158, "threads":4,
  "from_known":true, "stop_at_known":{"known":110860,"round":1},   # so effort 1 would have reached it
- "tactics":"default", "build":{"commit":"a2a1a2e695b1...","dirty":true}}
+ "repair":true, "repaired":null,          # a line the repair wrote again says what replaced its moves
+ "tactics":"default", "build":{"commit":"50db88e20150...","dirty":true}}
 ```
+
+A line that the repair replaced is the line as its game was played, with new moves, written again.  Game 5042 of a run
+of 5040-5045 at effort 4, which began from the lines of 4961-5039 of another run, played as a repeat 11 short of the
+table's score, and what survived of the line of 5043, which reached it, replaced it; the summary lines on stdout were
+
+```
+n=5042  score=8000285   repeat  rounds=0      improved=0       0.250 s  unsound  at ceiling
+n=5043  score=8002601   search  rounds=10     improved=1      61.890 s  unsound
+n=5042  score=8000296   repeat  repaired from 5043, +11     0.082 s  unsound
+```
+
+and the second line of 5042 in the file has `"score":8000296`, the new moves and promotions, `"at_ceiling":true`
+still, `prev.short_by` 11, since the new score proves the line of 5041 short by 11, and
+`"repaired":{"from":5043,"was":8000285,"seconds":0.082}`.  The walk went on to replace the lines of 5041 and 5040 in
+the same way, each from the line above it.
 
 | field | meaning |
 |---|---|
@@ -202,14 +269,17 @@ short, the fields regrouped and comments added:
 | `setup` | as in [a results line](REFERENCE.md#a-results-line---out-schema-5), without `cap`; null on a `trivial` or `prime` line |
 | `effort`, `budget`, `seed` | the level of effort, the work its rounds run until (0 at effort 0), and the seed of the rounds' random choices |
 | `fix`, `tilt` | the range of `--fix` (the lowest and the highest share of the incumbent's promotions a neighborhood keeps fixed; a game that widens takes the ladder's shares instead, and this is the default range), and `--tilt`'s P (0 without it) |
-| `back`, `widen` | `--back`'s J (0 without it), and `--widen`'s S (null without it) |
+| `back`, `above`, `widen` | `--back`'s J (0 without it), `--above`'s J (0 without it), and `--widen`'s S (null without it) |
 | `start` | the score of a searched game's start; null on any other line |
 | `trajectories` | for a searched game, what each incumbent its rounds kept began from: `"start"`, then the games whose survivors it began from, such as `["start",4231,4224]`; null on any other line |
+| `survivor_scores` | for a searched game, each game whose moves a trajectory could begin from, in the order of `trajectories`, with the score of what survives of its moves here, whether or not it began one, such as `[[594,110682],[593,110489]]`; null on any other line |
 | `rounds`, `neighborhoods`, `steps`, `work` | the rounds done, their neighborhoods, the engine's steps in them, and their work (the steps and 32 for each neighborhood) |
 | `stage_rounds` | for a searched game, for each trajectory, the rounds it spent at each of the three stages of `--widen` (all at stage 0 without it); null on any other line |
 | `improvements` | for each round that raised the score: `round` (0: before any round, a trajectory that began heavier than the start), the `trajectory` (an index in `trajectories`) that made it and its `stage` in that round, the `neighborhoods`, the `steps` and the `work` of the rounds up to and including this one, the `seconds` until it ended, and the new `score` |
-| `seconds`, `start_seconds` | the game's wall time, from the end of the game before (or the start of the run) to its line, and the part of it before the rounds; a game's setup is made while the game before plays, so it counts only in the first game of a run |
+| `seconds`, `start_seconds` | the game's wall time, from the end of the game before and of the repair's walk after it (or the start of the run) to its line, and the part of it before the rounds; a game's setup is made while the game before plays, so it counts only in the first game of a run |
 | `threads` | the threads it ran on |
 | `from_known` | true if `--from-known` started the game from the built-in table's moves for n − 1 |
 | `stop_at_known` | with `--stop-at-known`: `known`, the built-in table's score, and `round`, the round after which the game had that score (0: the start or the start of a trajectory, or a game that runs no round), or null if it never had; null without the flag |
-| `tactics`, `build` | as in a results line |
+| `repair` | true unless `--no-repair` |
+| `repaired` | null on a line as its game was played; on a line that [the repair](#the-repair) wrote again, `from`, the game whose line gave the new moves (a game above, or for a prime the game below), `was`, the score of the line it replaced, and `seconds`, the time the repair took |
+| `tactics`, `build` | as in a results line, `build` the one that wrote the line |

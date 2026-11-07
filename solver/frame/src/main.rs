@@ -12,7 +12,9 @@ use cli::{errln, outln, CliError, CliResult};
 use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, gate_trial, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
-use taxman::solver::unsound::{DEFAULT_BACK, DEFAULT_TILT, DEFAULT_WIDEN, MAX_BACK, MAX_EFFORT, MAX_TILT, ROUND_WORK};
+use taxman::solver::unsound::{
+    DEFAULT_BACK, DEFAULT_TILT, DEFAULT_WIDEN, MAX_ABOVE, MAX_BACK, MAX_EFFORT, MAX_TILT, REPAIR_REACH, ROUND_WORK,
+};
 use taxman::tactics::Tactics;
 
 /// The usage text with its `{...}` parts to fill in by [`usage`].
@@ -90,11 +92,17 @@ commands:
                                for each of the games n-1 .. n-J (J from 0 to {max_back}, default {back}) that differs
                                from the ones before, each with its share of a round's neighborhoods.  0: the start's
                                alone
+      --above J                with --unsound: follow an incumbent from what survives of the moves for each of the
+                               games n+1 .. n+J that the run or --out has (the built-in table's with --from-known),
+                               J from 0 to {max_above}, as --back does (default 0: none)
       --widen S                with --unsound: an incumbent that has not grown heavier for S rounds (S >= 1, default
                                {widen}) moves its neighborhoods down a ladder of the shares fixed,
                                {ladder}.  0: no widening
       --past-ceiling           with --unsound: do not end a game's rounds at the run's ceiling, n + the score of the
                                moves for n-1 it starts from (which they do by default, when it has such moves)
+      --no-repair              with --unsound: do not repair lines: by default, what survives of each line in each of
+                               the {repair_reach} games below it replaces the line of that game if it scores more, and
+                               so on down, with the line appended again
       --stop-at-known          with --unsound: end a game's rounds once its score is the built-in table's
       --from-known             with --unsound: start every game from the built-in table's moves for n-1
   regress [--from A] [--to N] [--threads K] [--window K] [--tactic ...]
@@ -138,6 +146,8 @@ fn usage() -> String {
         .replace("{tilt}", &DEFAULT_TILT.to_string())
         .replace("{max_back}", &MAX_BACK.to_string())
         .replace("{back}", &DEFAULT_BACK.to_string())
+        .replace("{max_above}", &MAX_ABOVE.to_string())
+        .replace("{repair_reach}", &REPAIR_REACH.to_string())
         .replace("{widen}", &DEFAULT_WIDEN.to_string())
         .replace("{ladder}", &ladder.join(" -> "))
 }

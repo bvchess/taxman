@@ -16,6 +16,7 @@
 mod common;
 
 use common::TempDir;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::slice;
@@ -23,7 +24,7 @@ use taxman::game::{replay, Optimal};
 use taxman::json::Json;
 use taxman::results::{verify_files, ResultsFile};
 use taxman::search::finder::{NEIGHBORHOODS, NEIGHBORHOOD_WORK};
-use taxman::solver::unsound::{self, Line, Origin, Plan, Previous, Raised, Source};
+use taxman::solver::unsound::{self, Line, Origin, Plan, Previous, Raised, Repair, Source};
 use taxman::solver::{solve_range, Method, SolveOptions};
 
 /// The work that effort 1 budgets in these tests: a little more than the work of a round of the small games (their
@@ -31,10 +32,10 @@ use taxman::solver::{solve_range, Method, SolveOptions};
 /// than effort E − 1.
 const WORK: u64 = 2_200;
 
-/// The plan of a run at `effort`, with the default seed and no measuring option, and with `tilt`, `back` and `widen`
-/// off: the rounds as they were before those options had defaults.
+/// The plan of a run at `effort`, with the default seed and no measuring option, and with `tilt`, `back`, `widen` and
+/// the repair off: the mode as it was before those options had defaults.
 fn plan(effort: u32) -> Plan {
-    Plan { effort, round_work: WORK, tilt: 0, back: 0, widen: None, ..Plan::default() }
+    Plan { effort, round_work: WORK, tilt: 0, back: 0, widen: None, repair: false, ..Plan::default() }
 }
 
 /// The plan of a run at `effort` with the defaults of `tilt`, `back` and `widen`.
@@ -58,12 +59,21 @@ const FIRST: (u32, u32) = (375, 376);
 /// score), and 386, a repeat of 385.
 const SECOND: (u32, u32) = (384, 387);
 
-/// The lines of the games `range` played with `plan` and `opts`, appended to the file `out` if there is one; each line
-/// replays to its score, which is no more than the table's.
-fn lines((lo, hi): (u32, u32), opts: &SolveOptions, plan: &Plan, out: Option<&Path>) -> Vec<Line> {
+/// The lines of the games `range` played with `plan` and `opts`, appended to the file `out` if there is one, and the
+/// repairs of the run; each line and each repair replays to its score, which is no more than the table's.
+fn played((lo, hi): (u32, u32), opts: &SolveOptions, plan: &Plan, out: Option<&Path>) -> (Vec<Line>, Vec<Repair>) {
     let optimal = Optimal::built_in();
-    let mut lines = Vec::new();
-    unsound::solve_range(lo, hi, opts, plan, out, |line| lines.push(line.clone())).expect("a run of the unsound mode");
+    let (mut lines, mut repairs) = (Vec::new(), Vec::new());
+    unsound::solve_range(
+        lo,
+        hi,
+        opts,
+        plan,
+        out,
+        |line| lines.push(line.clone()),
+        |repair| repairs.push(repair.clone()),
+    )
+    .expect("a run of the unsound mode");
     for line in &lines {
         let n = line.n;
         assert_eq!(replay(n, &line.moves), Ok(line.score), "n={n}: the moves do not replay to the score");
@@ -71,7 +81,18 @@ fn lines((lo, hi): (u32, u32), opts: &SolveOptions, plan: &Plan, out: Option<&Pa
         let sum: u64 = line.promotions.iter().map(|&p| u64::from(p)).sum();
         assert!(line.in_the_bag.is_none_or(|bag| bag + sum == line.score), "n={n}");
     }
-    lines
+    for repair in &repairs {
+        let n = repair.n;
+        assert_eq!(replay(n, &repair.moves), Ok(repair.score), "n={n}: the repair's moves do not replay to its score");
+        assert!(repair.was < repair.score && repair.score <= optimal.score(n).unwrap(), "n={n}: {repair:?}");
+    }
+    (lines, repairs)
+}
+
+/// The lines of the games `range` played with `plan` and `opts`, appended to the file `out` if there is one
+/// ([`played`]).
+fn lines(range: (u32, u32), opts: &SolveOptions, plan: &Plan, out: Option<&Path>) -> Vec<Line> {
+    played(range, opts, plan, out).0
 }
 
 /// `line` without what varies from run to run: its times and its threads.
@@ -418,7 +439,8 @@ fn a_game_has_no_trajectory_from_the_moves_nothing_has() {
 
 #[test]
 fn a_plan_with_an_option_out_of_range_is_refused() {
-    let refused = |plan: Plan| unsound::solve_range(12, 12, &options(1, true), &plan, None, |_| ()).unwrap_err();
+    let refused =
+        |plan: Plan| unsound::solve_range(12, 12, &options(1, true), &plan, None, |_| (), |_| ()).unwrap_err();
     for fix in [(0.9, 0.7), (-0.1, 0.5), (0.5, 1.1), (f64::NAN, 0.5), (0.5, f64::INFINITY)] {
         let err = refused(Plan { fix, ..plan(1) });
         assert!(err.starts_with("--fix takes LO,HI") && err.contains("0 <= LO <= HI <= 1"), "{fix:?}: {err}");
@@ -635,7 +657,7 @@ fn the_lines_that_stop_at_the_ceiling_are_the_same_on_one_thread_and_on_four() {
 fn the_measuring_options_take_the_tables_games_only() {
     let past = Optimal::built_in().max_n() + 1;
     for measured in [Plan { stop_at_known: true, ..plan(0) }, Plan { from_known: true, ..plan(0) }] {
-        let err = unsound::solve_range(past - 1, past, &options(1, true), &measured, None, |_| ()).unwrap_err();
+        let err = unsound::solve_range(past - 1, past, &options(1, true), &measured, None, |_| (), |_| ()).unwrap_err();
         assert!(err.contains(&format!("lacks game {past}")), "{err}");
     }
     // With --from-known every game starts from the table's moves for n − 1.
@@ -667,9 +689,217 @@ fn the_wall_between_unsound_and_proven_lines_holds_both_ways() {
     fs::write(&mixed, format!("{proven}{}\n", unsound.lines().next().unwrap())).unwrap();
     let err = verify_files(slice::from_ref(&mixed), Optimal::built_in(), 1).unwrap_err();
     assert!(err.contains("line 13: an unsound line"), "{err}");
-    let err = unsound::solve_range(13, 13, &options(1, true), &plan(0), Some(&proven_file), |_| ()).unwrap_err();
+    let err =
+        unsound::solve_range(13, 13, &options(1, true), &plan(0), Some(&proven_file), |_| (), |_| ()).unwrap_err();
     assert!(err.contains("line 1: not an unsound line"), "{err}");
     fs::write(&mixed, format!("{unsound}{}\n", proven.lines().next().unwrap())).unwrap();
-    let err = unsound::solve_range(13, 13, &options(1, true), &plan(0), Some(&mixed), |_| ()).unwrap_err();
+    let err = unsound::solve_range(13, 13, &options(1, true), &plan(0), Some(&mixed), |_| (), |_| ()).unwrap_err();
     assert!(err.contains("line 13: not an unsound line"), "{err}");
+}
+
+/// The plan of [`plan`] at `effort` with the repair.
+fn repairing(effort: u32) -> Plan {
+    Plan { repair: true, ..plan(effort) }
+}
+
+/// `json` without what varies from run to run: the times (the game's, each improvement's and a repair's), the threads
+/// and the build; and without `repair`, the option, where `optionless`.
+fn timeless_json(json: &Json, optionless: bool) -> Json {
+    const VARIES: [&str; 4] = ["seconds", "start_seconds", "threads", "build"];
+    match json {
+        Json::Obj(pairs) => Json::Obj(
+            pairs
+                .iter()
+                .filter(|(key, _)| !VARIES.contains(&key.as_str()) && !(optionless && key == "repair"))
+                .map(|(key, value)| (key.clone(), timeless_json(value, false)))
+                .collect(),
+        ),
+        Json::Arr(items) => Json::Arr(items.iter().map(|item| timeless_json(item, false)).collect()),
+        other => other.clone(),
+    }
+}
+
+/// The lines of the file `path`, in order, without what varies from run to run ([`timeless_json`]).
+fn file_lines(path: &Path, optionless: bool) -> Vec<Json> {
+    let text = fs::read_to_string(path).unwrap();
+    text.lines().map(|line| timeless_json(&Json::parse(line).unwrap(), optionless)).collect()
+}
+
+/// The last line of each game of the file `path` ([`file_lines`]), the game's.
+fn games_of(path: &Path, optionless: bool) -> Vec<(u64, Json)> {
+    let mut games = BTreeMap::new();
+    for line in file_lines(path, optionless) {
+        games.insert(line.get("n").and_then(Json::as_u64).unwrap(), line);
+    }
+    games.into_iter().collect()
+}
+
+/// Games 390 to 396 at effort 1, with no seed: the search of 390 falls 7 short of the table's score, 391 to 395 keep
+/// the shortfall, as repeats and as searches stopped at the lower ceiling it gives, and 396 reaches the table's score.
+const WALKED: (u32, u32) = (390, 396);
+
+#[test]
+fn a_short_line_is_repaired_from_the_line_of_the_game_above_it() {
+    let (dir, table) = (TempDir::new("unsound-repair"), Optimal::built_in());
+    let file = dir.join("repaired.jsonl");
+    // 395 falls 7 short, played by its start alone with no seed; 396, seeded with nothing, passes the ceiling that the
+    // short line gives, and what survives of its line in 395 scores more than the line of 395.
+    let short = lines((395, 395), &options(4, false), &Plan { from_known: true, ..plan(0) }, Some(&file)).remove(0);
+    let (game, repairs) = played((396, 396), &options(4, false), &repairing(1), Some(&file));
+    assert_eq!(short.score + 7, table.score(395).unwrap());
+    assert!(game[0].prev.as_ref().unwrap().short_by > 0, "396 proves the line of 395 short");
+    let [repair] = &repairs[..] else { panic!("one repair: {repairs:?}") };
+    assert_eq!((repair.n, repair.from, repair.method, repair.was), (395, 396, Method::Search, short.score));
+    assert!(repair.score > short.score && repair.score <= table.score(395).unwrap(), "{repair:?}");
+    // The file has the line of 395, then the line of 396, then the line of 395 again: the line played with the
+    // repair's moves, which is the game's.
+    let written = file_lines(&file, false);
+    assert_eq!(
+        written.iter().map(|line| line.get("n").and_then(Json::as_u64).unwrap()).collect::<Vec<_>>(),
+        [395, 396, 395]
+    );
+    let (first, again) = (&written[0], &written[2]);
+    assert_eq!(again.get("score"), Some(&Json::from(repair.score)));
+    assert_eq!(again.get("moves"), Some(&Json::array(repair.moves.iter().copied())));
+    let repaired = again.get("repaired").unwrap();
+    assert_eq!(
+        (repaired.get("from"), repaired.get("was")),
+        (Some(&Json::from(396u32)), Some(&Json::from(short.score)))
+    );
+    assert_eq!(first.get("repaired"), Some(&Json::Null));
+    for key in ["method", "start", "rounds", "work", "improvements", "setup", "ceiling"] {
+        assert_eq!(again.get(key), first.get(key), "{key} is the line played's");
+    }
+    // A game started from a repaired line starts from the line the file ends with.  In a file with the short line of
+    // 395 alone, the prime 397, played from the table's moves for 396, repairs it two games below, and a run of 396
+    // then starts from the repaired line.
+    let gap = dir.join("gap.jsonl");
+    lines((395, 395), &options(4, false), &Plan { from_known: true, ..plan(0) }, Some(&gap));
+    let (_, repairs) = played((397, 397), &options(4, false), &repairing(1), Some(&gap));
+    assert_eq!(repairs.iter().map(|r| (r.n, r.from)).collect::<Vec<_>>(), [(395, 397)]);
+    let next = lines((396, 396), &options(4, false), &repairing(1), Some(&gap)).remove(0);
+    let prev = next.prev.unwrap();
+    assert_eq!((prev.n, prev.score, prev.source), (395, repairs[0].score, Source::Results));
+}
+
+/// `line` with the source of the moves for n − 1 that it started from named as this run's, as a run in one go would
+/// name the file's line of the game before the break.
+fn as_one_run(line: Json) -> Json {
+    let Json::Obj(pairs) = line else { return line };
+    let pairs = pairs.into_iter().map(|(key, value)| match (key.as_str(), value) {
+        ("prev", Json::Obj(prev)) => {
+            let prev = prev.into_iter().map(|(key, value)| match (key.as_str(), value) {
+                ("source", Json::Str(source)) if source == "results" => (key, Json::from("run")),
+                (_, value) => (key, value),
+            });
+            (key, Json::Obj(prev.collect()))
+        }
+        (_, value) => (key, value),
+    });
+    Json::Obj(pairs.collect())
+}
+
+#[test]
+fn the_repair_walks_down_from_a_line_through_each_game_it_raises() {
+    let (dir, table) = (TempDir::new("unsound-walk"), Optimal::built_in());
+    let file = dir.join("walked.jsonl");
+    let (lines, repairs) = played(WALKED, &options(4, false), &repairing(1), Some(&file));
+    let short: Vec<u64> = lines.iter().map(|line| table.score(line.n).unwrap() - line.score).collect();
+    assert_eq!(short, [7, 7, 7, 7, 7, 7, 0]);
+    // After 396, the walk raises 395 from it, then 394 from 395, and so on down to 390, each by 5, from the top down.
+    let walked: Vec<(u32, u32, u64)> = repairs.iter().map(|r| (r.n, r.from, r.score - r.was)).collect();
+    assert_eq!(walked, [(395, 396, 5), (394, 395, 5), (393, 394, 5), (392, 393, 5), (391, 392, 5), (390, 391, 5)]);
+    let methods: Vec<Method> = repairs.iter().map(|r| r.method).collect();
+    assert_eq!(
+        methods,
+        [Method::Repeat, Method::Repeat, Method::Repeat, Method::Search, Method::Repeat, Method::Search]
+    );
+    // The last line of each game is the game's: the repair's, which records where it came from, or the line played.
+    for ((n, line), played) in games_of(&file, false).into_iter().zip(&lines) {
+        let (from, score) = match repairs.iter().find(|r| r.n == played.n) {
+            Some(repair) => (Json::from(repair.from), repair.score),
+            None => (Json::Null, played.score),
+        };
+        let repaired = line.get("repaired").unwrap();
+        assert_eq!(
+            (repaired.get("from").unwrap_or(repaired), line.get("score")),
+            (&from, Some(&Json::from(score))),
+            "n={n}"
+        );
+    }
+    // Without the repair the run writes the lines played alone, the same but for the option.
+    let unrepaired = dir.join("unrepaired.jsonl");
+    let (again, none) = played(WALKED, &options(4, false), &plan(1), Some(&unrepaired));
+    assert!(none.is_empty());
+    let without =
+        |lines: &[Line]| lines.iter().map(|line| Line { plan: plan(1), ..timeless(line) }).collect::<Vec<_>>();
+    assert_eq!(without(&again), without(&lines));
+}
+
+#[test]
+fn a_run_takes_up_the_repair_from_its_file() {
+    let dir = TempDir::new("unsound-repair-resume");
+    let opts = options(4, false);
+    let whole = dir.join("whole.jsonl");
+    played((WALKED.0, WALKED.1 + 1), &opts, &repairing(1), Some(&whole));
+    // A file whose last line was never weighed against the lines below it: the next run walks down from it first.
+    let unweighed = dir.join("unweighed.jsonl");
+    played(WALKED, &opts, &plan(1), Some(&unweighed));
+    let (_, repairs) = played((WALKED.0, WALKED.1 + 1), &opts, &repairing(1), Some(&unweighed));
+    assert_eq!(repairs.iter().map(|r| r.n).collect::<Vec<_>>(), [395, 394, 393, 392, 391, 390]);
+    let one_run =
+        |games: Vec<(u64, Json)>| games.into_iter().map(|(n, line)| (n, as_one_run(line))).collect::<Vec<_>>();
+    assert_eq!(one_run(games_of(&unweighed, true)), one_run(games_of(&whole, true)));
+    // A walk that a stop cut short after its first step: the file ends with the line of 396 and the repair of 395.
+    let cut = dir.join("cut.jsonl");
+    played(WALKED, &opts, &repairing(1), Some(&cut));
+    let text = fs::read_to_string(&cut).unwrap();
+    let kept: Vec<&str> = text.lines().take(8).collect();
+    fs::write(&cut, kept.join("\n") + "\n").unwrap();
+    let (_, repairs) = played((WALKED.0, WALKED.1 + 1), &opts, &repairing(1), Some(&cut));
+    assert_eq!(repairs.iter().map(|r| r.n).collect::<Vec<_>>(), [394, 393, 392, 391, 390], "it goes on from 394");
+    let one_run = |path: &Path| file_lines(path, false).into_iter().map(as_one_run).collect::<Vec<_>>();
+    assert_eq!(one_run(&cut), one_run(&whole), "line for line, the file of a run in one go");
+}
+
+#[test]
+fn the_lines_of_a_run_that_repairs_are_the_same_on_one_thread_and_on_four() {
+    let dir = TempDir::new("unsound-repair-threads");
+    let (one, four) = (dir.join("one.jsonl"), dir.join("four.jsonl"));
+    let (_, repairs) = played(WALKED, &options(1, false), &repairing(1), Some(&one));
+    played(WALKED, &options(4, false), &repairing(1), Some(&four));
+    assert_eq!(repairs.len(), 6);
+    assert_eq!(file_lines(&one, false), file_lines(&four, false));
+}
+
+#[test]
+fn a_file_holds_a_second_line_of_a_game_only_as_a_repair_that_scores_more() {
+    let dir = TempDir::new("unsound-repair-file");
+    let file = dir.join("walked.jsonl");
+    played(WALKED, &options(4, false), &repairing(1), Some(&file));
+    let text = fs::read_to_string(&file).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    let (played_395, repair_395) = (lines[5], lines[7]);
+    let refused = |text: String, expected: &str| {
+        let bad = dir.join("bad.jsonl");
+        fs::write(&bad, text).unwrap();
+        let err = unsound::solve_range(400, 400, &options(1, true), &plan(0), Some(&bad), |_| (), |_| ()).unwrap_err();
+        assert!(err.contains(expected), "{err}");
+    };
+    refused(format!("{played_395}\n{played_395}\n"), "line 2: a second line for n=395 that is no repair");
+    refused(format!("{repair_395}\n"), "line 1: a repair of n=395, which has no line before it");
+    refused(format!("{played_395}\n{repair_395}\n{played_395}\n"), "line 3: a second line for n=395 that is no repair");
+    // A repair of a line other than the one before it, and one that scores no more than the line it replaced.
+    let was = |was: u64| {
+        let Json::Obj(pairs) = Json::parse(repair_395).unwrap() else { panic!("an object") };
+        let repaired =
+            Json::object([("from", Json::from(396u32)), ("was", Json::from(was)), ("seconds", Json::Num(0.0))]);
+        let line = pairs
+            .into_iter()
+            .map(|(key, value)| if key == "repaired" { (key, repaired.clone()) } else { (key, value) });
+        Json::Obj(line.collect()).to_string()
+    };
+    refused(format!("{played_395}\n{}\n", was(1)), "line 2: a repair of a line of n=395 that scored 1, not");
+    let score = Json::parse(repair_395).unwrap().get("score").and_then(Json::as_u64).unwrap();
+    refused(format!("{played_395}\n{}\n", was(score)), "line 2: (n=395) it records a repair, and scores");
 }
