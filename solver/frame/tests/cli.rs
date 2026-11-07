@@ -36,7 +36,7 @@ fn help_lists_the_commands_and_every_tactic() {
             "--effort E",
             "--seed S",
             "--fix LO,HI",
-            "--tilt",
+            "--tilt P",
             "--back J",
             "--widen S",
             "--stop-at-known",
@@ -466,7 +466,7 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         &["--effort", "1"],
         &["--seed", "2"],
         &["--fix", "0.5,0.7"],
-        &["--tilt"],
+        &["--tilt", "50"],
         &["--back", "2"],
         &["--widen", "3"],
         &["--stop-at-known"],
@@ -480,8 +480,9 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
     assert_usage_error(&[&base[..], &["--survivors"]].concat(), "unknown option --survivors");
 }
 
-/// `--fix LO,HI` takes two numbers with 0 <= LO <= HI <= 1, `--back J` a whole number from 0 to 8 and `--widen S` a
-/// whole number from 1, `--widen` is refused with `--fix`, and the line records the options.
+/// `--fix LO,HI` takes two numbers with 0 <= LO <= HI <= 1, `--tilt P` a whole number from 0 to 100, `--back J` a whole
+/// number from 0 to 8 and `--widen S` a whole number from 1, `--widen` is refused with `--fix`, and the line records the
+/// options.
 #[test]
 fn the_options_that_shape_the_rounds_are_checked_and_the_line_records_them() {
     let dir = TempDir::new("unsound-fix");
@@ -491,6 +492,12 @@ fn the_options_that_shape_the_rounds_are_checked_and_the_line_records_them() {
         let message = format!("--fix takes LO,HI, two numbers with 0 <= LO <= HI <= 1, such as 0.7,0.9: got {fix:?}");
         assert_usage_error(&[&base[..], &["--fix", fix]].concat(), &message);
     }
+    for tilt in ["101", "-1", "", "a", "50.5", "99999999999"] {
+        let message = format!("--tilt takes P, a whole number of percent from 0 to 100: got {tilt:?}");
+        assert_usage_error(&[&base[..], &["--tilt", tilt]].concat(), &message);
+    }
+    // The switch it replaced is gone: a `--tilt` with no value is a missing value, like any other.
+    assert_usage_error(&[&base[..], &["--tilt"]].concat(), "--tilt needs a value");
     for back in ["9", "-1", "", "a", "1.5", "99999999999"] {
         let message = format!("--back takes J, a whole number from 0 to 8: got {back:?}");
         assert_usage_error(&[&base[..], &["--back", back]].concat(), &message);
@@ -505,13 +512,13 @@ fn the_options_that_shape_the_rounds_are_checked_and_the_line_records_them() {
         assert_usage_error(&[&base[..], &["--widen", "2", "--fix", fix]].concat(), message);
     }
     assert!(!file.exists(), "a refused run plays no game");
-    let options = ["--fix", "0.4,0.6", "--tilt", "--back", "1"];
+    let options = ["--fix", "0.4,0.6", "--tilt", "30", "--back", "1"];
     let run = taxman(&[&base[..], &options].concat());
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     let line = Json::parse(fs::read_to_string(&file).unwrap().lines().next().unwrap()).unwrap();
     assert_eq!(line.get("fix"), Some(&Json::array([0.4, 0.6])));
     let (tilt, back, widen) = (line.get("tilt"), line.get("back"), line.get("widen"));
-    assert_eq!((tilt, back, widen), (Some(&Json::Bool(true)), Some(&Json::from(1u64)), Some(&Json::Null)));
+    assert_eq!((tilt, back, widen), (Some(&Json::from(30u64)), Some(&Json::from(1u64)), Some(&Json::Null)));
     assert!(line.get("survivors").is_none(), "--back replaced --survivors");
     // The widening alone, and without the options, the line records the defaults.
     let widened = dir.join("widen.jsonl");
@@ -526,7 +533,7 @@ fn the_options_that_shape_the_rounds_are_checked_and_the_line_records_them() {
     assert_eq!(line.get("fix"), Some(&Json::array([0.7, 0.9])));
     assert_eq!(
         (line.get("tilt"), line.get("back"), line.get("widen")),
-        (Some(&Json::Bool(false)), Some(&Json::from(0u64)), Some(&Json::Null))
+        (Some(&Json::from(0u64)), Some(&Json::from(0u64)), Some(&Json::Null))
     );
     assert_eq!(line.get("budget"), Some(&Json::from(0u64)), "effort 0 budgets no steps");
 
@@ -535,7 +542,7 @@ fn the_options_that_shape_the_rounds_are_checked_and_the_line_records_them() {
     // of 65,536 steps.
     let rounds = dir.join("rounds.jsonl");
     let args = ["solve", "375", "--unsound", "--effort", "1", "--from-known", "--stop-at-known", "--threads", "1"];
-    let options = ["--tilt", "--back", "8", "--widen", "2", "--out", path(&rounds)];
+    let options = ["--tilt", "100", "--back", "8", "--widen", "2", "--out", path(&rounds)];
     let run = taxman(&[&args[..], &options].concat());
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     let line = Json::parse(fs::read_to_string(&rounds).unwrap().lines().next().unwrap()).unwrap();

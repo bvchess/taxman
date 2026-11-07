@@ -156,11 +156,12 @@ const SOLVE_FLAGS: [&str; 10] = [
 ];
 
 /// The flags of the unsound mode that take a value, besides `--out` and the solver's: the level of effort, the seed,
-/// and the options that shape the rounds (the share fixed, the games the trajectories begin from, the widening).
-const UNSOUND_FLAGS: [&str; 5] = ["--effort", "--seed", "--fix", "--back", "--widen"];
+/// and the options that shape the rounds (the share fixed, the share tilted, the games the trajectories begin from, the
+/// widening).
+const UNSOUND_FLAGS: [&str; 6] = ["--effort", "--seed", "--fix", "--tilt", "--back", "--widen"];
 
-/// The switches of the unsound mode: the mode itself, the tilted share, and its measuring options.
-const UNSOUND_SWITCHES: [&str; 4] = ["--unsound", "--tilt", "--stop-at-known", "--from-known"];
+/// The switches of the unsound mode: the mode itself, and its measuring options.
+const UNSOUND_SWITCHES: [&str; 3] = ["--unsound", "--stop-at-known", "--from-known"];
 
 /// `solve N|A-B [options]`: solves game N or a range, each from the one before (`solver::solve_range_each`); with
 /// `--unsound`, plays them in the unsound mode ([`solve_unsound`]).
@@ -233,7 +234,7 @@ fn proof_search_flags() -> impl Iterator<Item = &'static str> {
     solve.chain(SEARCH_FLAGS).chain(SEARCH_SWITCHES).chain(["--force-search"])
 }
 
-/// `solve A-B --unsound --effort E --out FILE [--seed S] [--fix LO,HI] [--tilt] [--back J] [--widen S]
+/// `solve A-B --unsound --effort E --out FILE [--seed S] [--fix LO,HI] [--tilt P] [--back J] [--widen S]
 /// [--stop-at-known] [--from-known]`, with `--threads`, `--tactic` and `--show`: plays the games in the unsound mode
 /// (`solver::unsound::solve_range`), with no proof, and appends their unsound lines to FILE.  It stops on SIGINT and
 /// SIGTERM between rounds, the game in play unrecorded.
@@ -251,6 +252,7 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     }
     let default = Plan::default();
     let fix = args.value("--fix").map(unsound::parse_fix).transpose().map_err(CliError::Usage)?;
+    let tilt = args.value("--tilt").map(unsound::parse_tilt).transpose().map_err(CliError::Usage)?;
     let back = args.value("--back").map(unsound::parse_back).transpose().map_err(CliError::Usage)?;
     let widen = args.value("--widen").map(unsound::parse_widen).transpose().map_err(CliError::Usage)?;
     if args.has("--fix") && widen.is_some() {
@@ -260,7 +262,7 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
         effort,
         seed: args.parsed("--seed")?.unwrap_or(default.seed),
         fix: fix.unwrap_or(default.fix),
-        tilt: args.has("--tilt"),
+        tilt: tilt.unwrap_or(default.tilt),
         back: back.unwrap_or(default.back),
         widen,
         stop_at_known: args.has("--stop-at-known"),

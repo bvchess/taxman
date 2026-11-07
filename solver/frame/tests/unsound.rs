@@ -167,16 +167,17 @@ fn the_rounds_of_a_level_run_until_their_work_reaches_its_budget_and_the_round_t
 const SHAPED: [u32; 4] = [375, 539, 544, 680];
 
 /// The plans of the options at `effort`, for the games [`SHAPED`] from the table's moves: a share fixed other than the
-/// default's, the tilted share, trajectories from the 8 games before, the widening after a round without growth, and
-/// the last three together.
-fn shaped(effort: u32) -> [(&'static str, Plan); 5] {
+/// default's, the tilted share, trajectories from the 8 games before, the widening after a round without growth, the
+/// last three together, and half the neighborhoods tilted.
+fn shaped(effort: u32) -> [(&'static str, Plan); 6] {
     let known = Plan { from_known: true, ..plan(effort) };
     [
         ("fix", Plan { fix: (0.4, 0.6), ..known }),
-        ("tilt", Plan { tilt: true, ..known }),
+        ("tilt", Plan { tilt: 100, ..known }),
         ("back", Plan { back: 8, ..known }),
         ("widen", Plan { widen: Some(1), ..known }),
-        ("tilt, back and widen", Plan { tilt: true, back: 8, widen: Some(1), ..known }),
+        ("tilt, back and widen", Plan { tilt: 100, back: 8, widen: Some(1), ..known }),
+        ("half tilt", Plan { tilt: 50, ..known }),
     ]
 }
 
@@ -201,15 +202,15 @@ fn without_the_options_the_rounds_are_these() {
     ];
     assert_eq!(now, was);
     for line in &lines {
-        assert_eq!((line.plan.fix, line.plan.tilt, line.plan.back, line.plan.widen), ((0.7, 0.9), false, 0, None));
+        assert_eq!((line.plan.fix, line.plan.tilt, line.plan.back, line.plan.widen), ((0.7, 0.9), 0, 0, None));
         assert_eq!(line.trajectories, Some(vec![Origin::Start]), "n={}: the start's trajectory alone", line.n);
         assert_eq!(line.stage_rounds, Some(vec![[line.rounds, 0, 0]]), "n={}: every round at stage 0", line.n);
         assert!(line.improvements.iter().all(|raised| (raised.trajectory, raised.stage) == (0, 0)), "n={}", line.n);
     }
 }
 
-/// The module `$module` of five tests, `fix`, `tilt`, `back`, `widen` and `all_three`, each calling `$check` with the
-/// index of that option in [`shaped`]: one test of all five would use more CPU than a test may.
+/// The module `$module` of six tests, `fix`, `tilt`, `back`, `widen`, `all_three` and `half_tilt`, each calling `$check`
+/// with the index of that option in [`shaped`]: one test of all six would use more CPU than a test may.
 macro_rules! for_each_option {
     ($module:ident, $check:ident) => {
         mod $module {
@@ -232,6 +233,10 @@ macro_rules! for_each_option {
             #[test]
             fn all_three() {
                 super::$check(4);
+            }
+            #[test]
+            fn half_tilt() {
+                super::$check(5);
             }
         }
     };
@@ -275,7 +280,7 @@ fn check_what_the_line_records(shape: usize) {
         let (n, json) = (line.n, line.to_json());
         assert_eq!(line.plan, shape, "{what}");
         assert_eq!(json.get("fix"), Some(&Json::array([shape.fix.0, shape.fix.1])), "n={n}");
-        assert_eq!(json.get("tilt"), Some(&Json::Bool(shape.tilt)), "n={n}");
+        assert_eq!(json.get("tilt"), Some(&Json::from(shape.tilt)), "n={n}");
         assert_eq!(json.get("back"), Some(&Json::from(shape.back)), "n={n}");
         assert_eq!(json.get("widen"), Some(&shape.widen.map_or(Json::Null, Json::from)), "n={n}");
         assert_eq!(json.get("budget"), Some(&Json::from(shape.budget())), "n={n}");
@@ -397,6 +402,10 @@ fn a_plan_with_an_option_out_of_range_is_refused() {
     for fix in [(0.9, 0.7), (-0.1, 0.5), (0.5, 1.1), (f64::NAN, 0.5), (0.5, f64::INFINITY)] {
         let err = refused(Plan { fix, ..plan(1) });
         assert!(err.starts_with("--fix takes LO,HI") && err.contains("0 <= LO <= HI <= 1"), "{fix:?}: {err}");
+    }
+    for tilt in [101, 1000] {
+        let err = refused(Plan { tilt, ..plan(1) });
+        assert!(err.starts_with("--tilt takes P, a whole number of percent from 0 to 100"), "{tilt}: {err}");
     }
     for back in [9, 100] {
         assert!(refused(Plan { back, ..plan(1) }).starts_with("--back takes J, a whole number from 0 to 8"), "{back}");

@@ -35,7 +35,7 @@ of the repository.
 | `--effort E` | with `--unsound`: the level of effort, from 0 (the search's start alone) to 32; level E ≥ 1 runs rounds of the large neighborhood search of the [finder](../../docs/GLOSSARY.md#the-search) until their work reaches a budget of 2^(E−1) × 65,536 (65,536 is the steps of a round of 64 neighborhoods that each take their limit of 1,024), and does the rounds of every lower level first.  The work of a round is its engine's steps and 32 for each of its 64 neighborhoods, which cost time beside their steps (`NEIGHBORHOOD_WORK` in `search::finder` has the measurements), so that a budget takes much the same time whatever the options.  The budget is checked after each round, and the round that reaches it is the last |
 | `--seed S` | with `--unsound`: the seed of the rounds' random choices (default 1) |
 | `--fix LO,HI` | with `--unsound`: the share of the incumbent's promotions that each neighborhood keeps fixed, drawn at random from LO to HI (default 0.7,0.9); a smaller share leaves a neighborhood more to search.  Refused unless 0 ≤ LO ≤ HI ≤ 1 |
-| `--tilt` | with `--unsound`: a neighborhood frees the small promotions more often than the large ones, with the same number freed as without it: which ones is a weighted draw without replacement, the weight of a promotion x of game n set by x/n in ten bins of width 0.025 from 0.25, from 487 for the lowest down to 33 for the highest (`TILT` in `search::finder`).  Each promotion freed is drawn in whole numbers, so that a line is the same on every machine: a number from the generator below the total weight of the promotions left, and the promotion whose cumulative weight covers it, over the promotions in ascending order |
+| `--tilt P` | with `--unsound`: P from 0 to 100, default 0.  P percent of a round's neighborhoods free the small promotions more often than the large ones, with the same number freed as without it, and the rest free them as a neighborhood does without the flag.  Neighborhood k of a round of T trajectories is the jth of its trajectory, j = k div T, and it is tilted if and only if ⌊(j + 1) P / 100⌋ > ⌊j P / 100⌋ (`draws_tilted` in `search::finder`): 0 tilts none, 100 every neighborhood and 50 the odd j, and every trajectory has P percent of its neighborhoods tilted to within one, whatever T is.  A tilted neighborhood's draw of which promotions to free is a weighted draw without replacement, the weight of a promotion x of game n set by x/n in ten bins of width 0.025 from 0.25, from 487 for the lowest down to 33 for the highest (`TILT` in `search::finder`).  Each promotion freed is drawn in whole numbers, so that a line is the same on every machine: a number from the generator below the total weight of the promotions left, and the promotion whose cumulative weight covers it, over the promotions in ascending order |
 | `--back J` | with `--unsound`: J from 0 to 8, default 0.  Besides the start's [trajectory](#an-unsound-line), a game follows one from what survives of the moves for each of the games n − 1, n − 2, ..., n − J, in that order, each only if no trajectory before it (the start's included) began from the same set; a game none of the sources has moves for has no trajectory from it.  The moves are found as those for n − 1 are: this run's line, else the file's, else the built-in table's, and with `--from-known` the table's |
 | `--widen S` | with `--unsound`: S ≥ 1.  A trajectory whose incumbent has not grown heavier in S rounds moves its neighborhoods one stage down a ladder of the share kept fixed, 0.7,0.9 → 0.5,0.7 → 0.4,0.6, and stays at the last; when its incumbent grows heavier it returns to the first.  Refused with `--fix` |
 | `--stop-at-known`, `--from-known` | with `--unsound`, to measure it on the games whose opt(n) the built-in table has, and refused for any other: end a game's rounds as soon as its score is the table's, and start every game from the table's moves for n − 1 |
@@ -205,8 +205,8 @@ round r draws its choices from a generator of the seed, n, r and k alone; the be
 among equals, is the next incumbent.  The steps of a neighborhood depend on its unit alone, so the rounds that a level
 runs, until their work (their steps and 32 for each neighborhood) reaches its budget (`budget`), are the same on any
 number of threads, and a level runs the rounds of the levels below it first.  A neighborhood keeps a share of the incumbent's promotions fixed, drawn from the range
-`--fix` gives, and searches the rest; with `--tilt` the promotions it frees are drawn by their size.  A stop signal ends
-the run between rounds, and the game in play is not recorded.  The summary line on stdout gives n, the score, the
+`--fix` gives, and searches the rest; with `--tilt P` the promotions that P percent of the neighborhoods free are drawn
+by their size.  A stop signal ends the run between rounds, and the game in play is not recorded.  The summary line on stdout gives n, the score, the
 method, the rounds, how many raised the score and the seconds, then `unsound`, what `--stop-at-known` recorded, and a
 `short_by` above 0.
 
@@ -235,7 +235,7 @@ Here is the line of game 595 at effort 4 on four threads, with `--from-known`, `
  "prev":{"n":594,"score":110282,"source":"table","moves_digest":"623c70271b00b128","short_by":0},
  "repeats":null,                          # a repeat names the line whose promotions it plays here
  "setup":{"frames":6,"candidates":141,"max_total":33,"greedy_sum":8396,"digest":"c6fe37bd55f2b043"},
- "effort":4, "budget":524288, "seed":1, "fix":[0.7,0.9], "tilt":false, "back":8, "widen":2,
+ "effort":4, "budget":524288, "seed":1, "fix":[0.7,0.9], "tilt":0, "back":8, "widen":2,
  "start":110839,                          # the start fell 21 short of the table's score
  "trajectories":["start",594,593,591],    # the moves for 592 and for 590 to 587 gave a set one of these began from
  "rounds":1, "neighborhoods":64, "steps":770, "work":2818,
@@ -257,7 +257,7 @@ Here is the line of game 595 at effort 4 on four threads, with `--from-known`, `
 | `repeats` | for a repeat, the n of the line whose promotions it plays; null otherwise |
 | `setup` | as in a results line, without `cap`; null on a `trivial` or `prime` line |
 | `effort`, `budget`, `seed` | the level of effort, the work its rounds run until (0 at effort 0), and the seed of the rounds' random choices |
-| `fix`, `tilt` | the range of `--fix` (the lowest and the highest share of the incumbent's promotions a neighborhood keeps fixed), and whether `--tilt` was given |
+| `fix`, `tilt` | the range of `--fix` (the lowest and the highest share of the incumbent's promotions a neighborhood keeps fixed), and `--tilt`'s P (0 without it) |
 | `back`, `widen` | `--back`'s J (0 without it), and `--widen`'s S (null without it) |
 | `start` | the score of a searched game's start; null on any other line |
 | `trajectories` | for a searched game, what each incumbent its rounds kept began from: `"start"`, then the games whose survivors it began from, such as `["start",4231,4224]`; null on any other line |

@@ -45,8 +45,10 @@
 //! * **`fix`** is the range from which each neighborhood draws the share of the incumbent's promotions it keeps fixed
 //!   ([`Options::fix`](crate::search::finder::Options::fix)).  A smaller share frees more of the game to a
 //!   neighborhood, which then takes more of its steps.
-//! * **`tilt`** chooses the promotions a neighborhood frees by their size, the small ones more often, with the same
-//!   number freed ([`Options::tilt`](crate::search::finder::Options::tilt)).
+//! * **`tilt`** P makes P percent of a round's neighborhoods, an equal share of each trajectory's, choose the
+//!   promotions they free by their size, the small ones more often, with the same number freed; the others draw
+//!   uniformly ([`Options::tilt`](crate::search::finder::Options::tilt), [`draws_tilted`](finder::draws_tilted)).  0
+//!   tilts none, and 100 every neighborhood.
 //! * **`back`** J gives a game a trajectory of incumbents for each distinct set that survives of the moves for the
 //!   games n − 1, n − 2, ..., n − J ([`seed_survivors`](crate::search::seed_survivors)), as the finder beside a proof
 //!   search starts its seed rounds, beside the first, the start's.  A set that an earlier trajectory (the start's
@@ -103,6 +105,9 @@ pub const MAX_EFFORT: u32 = 32;
 /// The games before a game that its trajectories may begin from: `back` goes up to this.
 pub const MAX_BACK: u32 = 8;
 
+/// The most percent of a round's neighborhoods that may draw tilted: all of them.
+pub const MAX_TILT: u32 = 100;
+
 /// The budget of effort 1 ([`Plan::budget`]), in work: the steps of one round whose neighborhoods all take the step
 /// limit of a unit, [`finder::UNIT_STEPS`].  (The work of such a round is a little more, [`finder::NEIGHBORHOOD_WORK`]
 /// for each neighborhood.)
@@ -118,8 +123,9 @@ pub struct Plan {
     /// `--fix LO,HI`: the share of the incumbent's promotions that each neighborhood keeps fixed is drawn from this
     /// range, 0 ≤ LO ≤ HI ≤ 1 ([`check_fix`]).
     pub fix: (f64, f64),
-    /// `--tilt`: a neighborhood frees the small promotions more often than the large ones.
-    pub tilt: bool,
+    /// `--tilt P`, P from 0 to [`MAX_TILT`]: P percent of a round's neighborhoods free the small promotions more often
+    /// than the large ones, and the rest draw uniformly.
+    pub tilt: u32,
     /// `--back J`, J from 0 to [`MAX_BACK`]: a game follows a trajectory from each distinct set that survives of the
     /// moves for the games n − 1, ..., n − J, beside the start's.
     pub back: u32,
@@ -143,7 +149,7 @@ impl Default for Plan {
             effort: 0,
             seed,
             fix,
-            tilt: false,
+            tilt: 0,
             back: 0,
             widen: None,
             round_work: ROUND_WORK,
@@ -206,6 +212,20 @@ fn fix_error(got: &str) -> String {
     format!("--fix takes LO,HI, two numbers with 0 <= LO <= HI <= 1, such as 0.7,0.9: got {got:?}")
 }
 
+/// Reads the value of `--tilt`, P: a whole number of percent, from 0 to [`MAX_TILT`].
+///
+/// # Errors
+///
+/// What `text` should have been.
+pub fn parse_tilt(text: &str) -> Result<u32, String> {
+    text.parse().ok().filter(|&tilt| tilt <= MAX_TILT).ok_or_else(|| tilt_error(text))
+}
+
+/// The message of a `--tilt` that is not a whole number from 0 to [`MAX_TILT`], quoting what it was given.
+fn tilt_error(got: &str) -> String {
+    format!("--tilt takes P, a whole number of percent from 0 to {MAX_TILT}: got {got:?}")
+}
+
 /// Reads the value of `--back`, J: a whole number from 0 to [`MAX_BACK`].
 ///
 /// # Errors
@@ -237,9 +257,9 @@ fn widen_error(got: &str) -> String {
 /// The message of a plan that widens the neighborhoods and also gives the share fixed: the ladder is the share fixed.
 pub const WIDEN_WITH_FIX: &str = "--widen takes the share fixed from its own ladder, so --fix is refused with it";
 
-/// Checks the plan's options: an effort of at most [`MAX_EFFORT`], `fix` ([`check_fix`]), `back` of at most
-/// [`MAX_BACK`], `widen` of at least 1 and not with a `fix` other than the default, and a step budget of effort 1 above
-/// 0.
+/// Checks the plan's options: an effort of at most [`MAX_EFFORT`], `fix` ([`check_fix`]), `tilt` of at most
+/// [`MAX_TILT`], `back` of at most [`MAX_BACK`], `widen` of at least 1 and not with a `fix` other than the default, and
+/// a step budget of effort 1 above 0.
 ///
 /// # Errors
 ///
@@ -249,6 +269,9 @@ pub fn check_plan(plan: &Plan) -> Result<(), String> {
         return Err(format!("the effort {} is more than the most, {MAX_EFFORT}", plan.effort));
     }
     check_fix(plan.fix)?;
+    if plan.tilt > MAX_TILT {
+        return Err(tilt_error(&plan.tilt.to_string()));
+    }
     if plan.back > MAX_BACK {
         return Err(back_error(&plan.back.to_string()));
     }
@@ -469,7 +492,7 @@ impl Line {
             ("budget", Json::from(self.plan.budget())),
             ("seed", Json::from(self.plan.seed)),
             ("fix", Json::array([self.plan.fix.0, self.plan.fix.1])),
-            ("tilt", Json::Bool(self.plan.tilt)),
+            ("tilt", Json::from(self.plan.tilt)),
             ("back", Json::from(self.plan.back)),
             ("widen", self.plan.widen.map_or(Json::Null, Json::from)),
             ("start", self.start.map_or(Json::Null, Json::from)),
@@ -661,7 +684,8 @@ fn read_line(json: &Json, optimal: &Optimal) -> Result<(u32, Stored), String> {
 /// # Errors
 ///
 /// A range that is empty or starts below 1; a plan that [`check_plan`] refuses (an effort above [`MAX_EFFORT`], a `fix`
-/// that [`check_fix`] refuses, a `back` above [`MAX_BACK`], a `widen` of 0 or with a `fix`);
+/// that [`check_fix`] refuses, a `tilt` above [`MAX_TILT`], a `back` above [`MAX_BACK`], a `widen` of 0 or with a
+/// `fix`);
 /// `--stop-at-known` or `--from-known` for a game the built-in table lacks; a file that cannot be opened or written, or
 /// holds a line it may not ([`UnsoundFile::open`]); and a game whose moves fail a check (the module documentation, "One
 /// game").
@@ -923,14 +947,23 @@ mod tests {
     #[test]
     fn the_default_plan_searches_as_the_first_form_did() {
         let plan = Plan::default();
-        assert_eq!((plan.effort, plan.seed, plan.fix, plan.tilt), (0, 1, (0.7, 0.9), false));
+        assert_eq!((plan.effort, plan.seed, plan.fix, plan.tilt), (0, 1, (0.7, 0.9), 0));
         assert_eq!((plan.back, plan.widen, plan.round_work), (0, None, ROUND_WORK));
         assert!(!plan.stop_at_known && !plan.from_known);
         let lns = plan.lns();
         let default = finder::Options::default();
         assert_eq!((lns.fix, lns.unit_nodes, lns.seed), (default.fix, default.unit_nodes, default.seed));
-        assert!(!lns.tilt && lns.widen.is_none());
+        assert!(lns.tilt == 0 && lns.widen.is_none());
         assert_eq!(check_plan(&plan), Ok(()));
+    }
+
+    #[test]
+    fn a_tilt_is_a_whole_number_of_percent() {
+        assert_eq!((parse_tilt("0"), parse_tilt("50"), parse_tilt("100")), (Ok(0), Ok(50), Ok(100)));
+        for text in ["101", "-1", "", "a", "50.5", "5e1", "50%", " 50", "99999999999"] {
+            let err = parse_tilt(text).unwrap_err();
+            assert!(err.starts_with("--tilt takes P, a whole number of percent from 0 to 100"), "{text:?}: {err}");
+        }
     }
 
     #[test]
@@ -954,6 +987,7 @@ mod tests {
         let refused = |plan: Plan| check_plan(&plan).unwrap_err();
         assert!(refused(Plan { effort: MAX_EFFORT + 1, ..plan }).contains("more than the most"));
         assert!(refused(Plan { fix: (0.9, 0.7), ..Plan { widen: None, ..plan } }).starts_with("--fix takes LO,HI"));
+        assert!(refused(Plan { tilt: MAX_TILT + 1, ..plan }).starts_with("--tilt takes P"));
         assert!(refused(Plan { back: MAX_BACK + 1, ..plan }).starts_with("--back takes J"));
         assert!(refused(Plan { widen: Some(0), ..plan }).starts_with("--widen takes S"));
         assert_eq!(refused(Plan { fix: (0.5, 0.7), ..plan }), WIDEN_WITH_FIX);

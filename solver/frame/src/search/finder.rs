@@ -57,10 +57,15 @@
 //! rest on: a neighborhood's draws still come from its own generator, and its freeing depends on nothing else but its
 //! trajectory's incumbent and stage.
 //!
-//! * **`tilt`** frees the small promotions more often than the large ones.  The number a neighborhood frees is the
-//!   same, drawn from `fix` (the share fixed); which ones is a weighted draw without replacement, the weight of a
-//!   promotion by its size x/n ([`tilt_weight`]), in whole numbers so that it is the same on every machine
-//!   ([`tilted_freed`]).  The small promotions are where the optimal game changes from n − 1 to n ([`TILT`]).
+//! * **`tilt`** P makes P percent of a round's neighborhoods free the small promotions more often than the large
+//!   ones, and the others free them as before (the uniform draw).  Which neighborhoods tilt is a rule of their place in
+//!   their trajectory alone ([`draws_tilted`]), so that each trajectory has its share whatever the trajectories are.
+//!   The number a tilted neighborhood frees is the same as a uniform one's, drawn from `fix` (the share fixed); which
+//!   ones is a weighted draw without replacement, the weight of a promotion by its size x/n ([`tilt_weight`]), in
+//!   whole numbers so that it is the same on every machine ([`tilted_freed`]).  The small promotions are where the
+//!   optimal game changes from n − 1 to n ([`TILT`]).  A tilted neighborhood takes many more steps than a uniform
+//!   one, so at a small budget of work the tilted rounds are few, while the uniform draw finds the easy games in its
+//!   first cheap rounds; a share of each keeps the uniform draw's quick finds and the tilt's reach.
 //! * **`widen`** moves a trajectory whose incumbent has not grown heavier in its last S rounds down a ladder of shares
 //!   fixed ([`LADDER`]), one stage for each S rounds without growth, and back to the first stage when it grows
 //!   ([`Standing::after`]).  A trajectory's stage in a round depends only on the rounds before it.
@@ -131,6 +136,17 @@ pub fn tilt_weight(x: u32, n: u32) -> u64 {
     TILT[bin.min(TILT.len() as u64 - 1) as usize]
 }
 
+/// Whether neighborhood `k` of a round of `trajectories` trajectories draws tilted ([`tilted_freed`]) when `percent`
+/// of the round's neighborhoods do (`Options::tilt`), and uniform otherwise.  Neighborhood k is the jth of its
+/// trajectory, j = k div T (its trajectory is k mod T, as in [`Lns::round`]), and it draws tilted if and only if
+/// floor((j + 1) P / 100) > floor(j P / 100), P the percent.  So 0 tilts none and 100 every neighborhood, 50 the odd j
+/// and 25 every fourth, from j = 3; the first m neighborhoods of a trajectory tilt floor(m P / 100) of them, so every
+/// trajectory has its share to within one neighborhood, whatever T is.
+pub fn draws_tilted(k: u64, trajectories: usize, percent: u32) -> bool {
+    let (j, percent) = (k / trajectories as u64, u64::from(percent));
+    (j + 1) * percent / 100 > j * percent / 100
+}
+
 /// How LNS searches, with the defaults the finders' measurements chose.
 #[derive(Clone, Copy, Debug)]
 pub struct Options {
@@ -140,9 +156,10 @@ pub struct Options {
     pub unit_nodes: u64,
     /// The seed of the random choices (mixed with n, so that each game has its own: [`rng`](Self::rng)).
     pub seed: u64,
-    /// A unit frees the small promotions more often than the large ones ([`Lns::neighborhood`]).  The finder beside a
-    /// proof search never does.
-    pub tilt: bool,
+    /// The percent, from 0 to 100, of a round's neighborhoods that free the small promotions more often than the large
+    /// ones ([`draws_tilted`] says which, [`Lns::neighborhood`] the draw); the others draw uniformly.  The finder beside
+    /// a proof search never tilts.
+    pub tilt: u32,
     /// The rounds on many threads move a trajectory that has not grown heavier in this many rounds one stage down the
     /// [`LADDER`], which then replaces `fix`.  The finder beside a proof search never does.
     pub widen: Option<u64>,
@@ -150,7 +167,7 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Options {
-        Options { fix: LADDER[0], unit_nodes: UNIT_STEPS, seed: 1, tilt: false, widen: None }
+        Options { fix: LADDER[0], unit_nodes: UNIT_STEPS, seed: 1, tilt: 0, widen: None }
     }
 }
 
@@ -296,17 +313,17 @@ pub struct Lns<'a, const W: usize> {
 impl<const W: usize> Lns<'_, W> {
     /// The unit that searches a neighborhood of the incumbent `best`: a random share of its promotions (drawn from
     /// `options.fix`) fixed, and every other candidate free.  The promotions fixed are the first of a shuffle of the
-    /// members; with `options.tilt` the promotions freed, as many as the share leaves, are a draw that favors the small
-    /// ones ([`tilted_freed`]).
-    pub fn neighborhood(&self, best: &Bits<W>, rng: &mut Rng) -> TaxUnit<W> {
-        let Options { fix, tilt, .. } = self.options;
+    /// members; if the neighborhood is `tilted` (the rule is [`draws_tilted`]) the promotions freed, as many as the share
+    /// leaves, are a draw that favors the small ones ([`tilted_freed`]).
+    pub fn neighborhood(&self, best: &Bits<W>, rng: &mut Rng, tilted: bool) -> TaxUnit<W> {
+        let fix = self.options.fix;
         let mut members = best.to_vec();
-        if !tilt {
+        if !tilted {
             rng.shuffle(&mut members);
         }
         let share = fix.0 + rng.unit() * (fix.1 - fix.0);
         let kept = (members.len() as f64 * share).round() as usize;
-        let fixed: Bits<W> = if tilt {
+        let fixed: Bits<W> = if tilted {
             let freed: Bits<W> = tilted_freed(&members, self.p.n, members.len() - kept, rng).into_iter().collect();
             best.difference(&freed)
         } else {
@@ -315,16 +332,16 @@ impl<const W: usize> Lns<'_, W> {
         TaxUnit { promoted: fixed, cands: self.p.candidates.difference(&fixed) }
     }
 
-    /// A neighborhood of the incumbent `best` ([`neighborhood`](Self::neighborhood), drawn with `rng`) searched from it
-    /// as a unit, for at most `unit_nodes` steps, steered by `control` ([`run_unit`]).
-    pub fn unit(&self, best: &Bits<W>, rng: &mut Rng, control: &Arc<Control>) -> Ran<W> {
-        run_unit(self.space, control, self.neighborhood(best, rng), best, Some(self.options.unit_nodes))
+    /// A neighborhood of the incumbent `best` ([`neighborhood`](Self::neighborhood), drawn with `rng`, `tilted` or not)
+    /// searched from it as a unit, for at most `unit_nodes` steps, steered by `control` ([`run_unit`]).
+    pub fn unit(&self, best: &Bits<W>, rng: &mut Rng, control: &Arc<Control>, tilted: bool) -> Ran<W> {
+        run_unit(self.space, control, self.neighborhood(best, rng, tilted), best, Some(self.options.unit_nodes))
     }
 
     /// Searches from the incumbent `start` until `over` says to stop (asked before each unit).  Each unit fixes a
-    /// random share of the incumbent's promotions and searches the rest exactly, with every other candidate, for at
-    /// most `unit_nodes` steps; a better set becomes the incumbent.  `control` steers the units (stopping it ends the
-    /// one in progress); `clock` is the caller's seconds so far, read when a better set is found.
+    /// random share of the incumbent's promotions, uniformly drawn, and searches the rest exactly, with every other
+    /// candidate, for at most `unit_nodes` steps; a better set becomes the incumbent.  `control` steers the units
+    /// (stopping it ends the one in progress); `clock` is the caller's seconds so far, read when a better set is found.
     pub fn search(
         &self,
         start: &Bits<W>,
@@ -351,7 +368,7 @@ impl<const W: usize> Lns<'_, W> {
         let (mut best, mut nodes) = (*start, 0);
         let (mut units, mut finished, mut improved, mut found) = (0, 0, 0, 0.0);
         while !over() {
-            let ran = run(self.neighborhood(&best, rng), &best);
+            let ran = run(self.neighborhood(&best, rng, false), &best);
             (units, nodes, finished) = (units + 1, nodes + ran.nodes, finished + u64::from(ran.completed));
             if ran.set.sum() > best.sum() {
                 (best, improved, found) = (ran.set, improved + 1, clock());
@@ -363,16 +380,17 @@ impl<const W: usize> Lns<'_, W> {
     /// Round `round` (counted from 1) of the rounds on many threads (see the module documentation, "On many threads,
     /// alone"), from the incumbents `bases`, at least one, on `threads` threads: the [`NEIGHBORHOODS`] neighborhoods,
     /// the kth of the incumbent `bases[k % bases.len()]`, at the stage of the ladder `stages[k % bases.len()]`
-    /// ([`Options::at_stage`]), drawn from [`Options::rng_of`] and searched as a unit ([`unit`](Self::unit)) with a
-    /// control of its own, since a control passes the incumbent of one run on to the next.  The answer is the same on
-    /// any number of threads.
+    /// ([`Options::at_stage`]), drawn from [`Options::rng_of`], tilted or not as [`draws_tilted`] says of
+    /// `options.tilt`, and searched as a unit ([`unit`](Self::unit)) with a control of its own, since a control passes
+    /// the incumbent of one run on to the next.  The answer is the same on any number of threads.
     pub fn round(&self, bases: &[Bits<W>], stages: &[usize], round: u64, threads: usize) -> Round<W> {
         debug_assert_eq!(bases.len(), stages.len(), "a stage for each trajectory");
         let n = self.p.n;
         let ran = in_parallel(NEIGHBORHOODS as usize, threads, |k| {
             let trajectory = k % bases.len();
             let at = Lns { options: self.options.at_stage(stages[trajectory]), ..*self };
-            at.unit(&bases[trajectory], &mut self.options.rng_of(n, round, k as u64), &Control::new())
+            let tilted = draws_tilted(k as u64, bases.len(), self.options.tilt);
+            at.unit(&bases[trajectory], &mut self.options.rng_of(n, round, k as u64), &Control::new(), tilted)
         });
         let mut out = Round { sets: bases.to_vec(), nodes: 0, finished: 0 };
         for (k, ran) in ran.into_iter().enumerate() {
@@ -659,7 +677,7 @@ fn rounds<const W: usize>(
                     best = theirs;
                 }
             }
-            let ran = lns.unit(&best, &mut rng, &units);
+            let ran = lns.unit(&best, &mut rng, &units, false);
             if ran.set.sum() <= best.sum() {
                 continue;
             }
@@ -789,6 +807,9 @@ mod tests {
     /// A budget of work that every round reaches, so that the rounds it allows are one.
     const ONE_ROUND: u64 = 1;
 
+    /// Whether the jth neighborhood of a trajectory draws tilted: the places of a trajectory that a tilt names.
+    type Places = fn(u64) -> bool;
+
     #[test]
     fn the_rounds_on_many_threads_are_the_same_on_any_number_of_threads() {
         let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
@@ -870,9 +891,13 @@ mod tests {
         let space = SearchSpace::new(&p);
         let lns = Lns { p: &p, space: &space, options: Options::default() };
         let poorer = p.greedy.without(p.greedy.max().unwrap());
-        // With widening, each trajectory's neighborhoods work at the stage of their trajectory.
-        let widened = Lns { options: Options { widen: Some(1), ..lns.options }, ..lns };
-        for (lns, stages) in [(&lns, [0, 0, 0]), (&widened, [0, 2, 1])] {
+        // With widening, each trajectory's neighborhoods work at the stage of their trajectory; with a tilt of 50, the
+        // odd j of each trajectory draw tilted, and with 100 every one does.
+        let widened = Lns { options: Options { widen: Some(1), tilt: 50, ..lns.options }, ..lns };
+        let every = Lns { options: Options { tilt: 100, ..lns.options }, ..lns };
+        let cases: [(&Lns<'_, W>, [usize; 3], Places); 3] =
+            [(&lns, [0, 0, 0], |_| false), (&widened, [0, 2, 1], |j| j % 2 == 1), (&every, [0, 0, 0], |_| true)];
+        for (lns, stages, tilts) in cases {
             for bases in [vec![p.greedy], vec![p.greedy, poorer], vec![poorer, p.greedy, poorer]] {
                 let stages = &stages[..bases.len()];
                 let ran = lns.round(&bases, stages, 3, 4);
@@ -881,7 +906,8 @@ mod tests {
                 for k in 0..NEIGHBORHOODS {
                     let t = k as usize % bases.len();
                     let at = Lns { options: lns.options.at_stage(stages[t]), ..*lns };
-                    let unit = at.unit(&bases[t], &mut lns.options.rng_of(p.n, 3, k), &Control::new());
+                    let tilted = tilts(k / bases.len() as u64);
+                    let unit = at.unit(&bases[t], &mut lns.options.rng_of(p.n, 3, k), &Control::new(), tilted);
                     if unit.set.sum() > expected[t].sum() {
                         expected[t] = unit.set;
                     }
@@ -962,7 +988,7 @@ mod tests {
     #[test]
     fn a_neighborhood_with_no_option_fixes_what_it_fixed_before_the_options() {
         let options = Options::default();
-        assert!(!options.tilt && options.widen.is_none(), "the finder beside a search draws as it did");
+        assert!(options.tilt == 0 && options.widen.is_none(), "the finder beside a search draws as it did");
         let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
         let space = SearchSpace::new(&p);
         let lns = Lns { p: &p, space: &space, options };
@@ -974,7 +1000,7 @@ mod tests {
             (7, 63, 2763, [98, 150, 153, 156, 165, 171]),
         ];
         for (round, k, sum, first) in pinned {
-            let unit = lns.neighborhood(&p.greedy, &mut options.rng_of(p.n, round, k));
+            let unit = lns.neighborhood(&p.greedy, &mut options.rng_of(p.n, round, k), false);
             let fixed = unit.promoted.to_vec();
             assert_eq!(
                 (fixed.len(), unit.promoted.sum(), fixed[..6].to_vec()),
@@ -997,18 +1023,56 @@ mod tests {
         assert_eq!((tilt_weight(10, 40), tilt_weight(11, 40), tilt_weight(20, 40)), (TILT[0], TILT[1], TILT[9]));
     }
 
+    /// The neighborhoods k of a round of `trajectories` trajectories that draw tilted at `percent`.
+    fn tilted_ks(trajectories: usize, percent: u32) -> Vec<u64> {
+        (0..NEIGHBORHOODS).filter(|&k| draws_tilted(k, trajectories, percent)).collect()
+    }
+
+    /// The jth neighborhood of every trajectory draws tilted for the j that the rule names, whatever the trajectories
+    /// are, and each trajectory has its percent of tilted neighborhoods to within one.
+    #[test]
+    fn the_neighborhoods_that_draw_tilted_are_the_same_places_of_every_trajectory() {
+        // The places j of a trajectory that tilt, for the percents the rule names plainly: none, every fourth from the
+        // third, the odd ones, and all.
+        let places: [(u32, Places); 4] = [(0, |_| false), (25, |j| j % 4 == 3), (50, |j| j % 2 == 1), (100, |_| true)];
+        for (percent, tilts) in places {
+            for trajectories in [1usize, 2, 9] {
+                let expected: Vec<u64> = (0..NEIGHBORHOODS).filter(|&k| tilts(k / trajectories as u64)).collect();
+                assert_eq!(tilted_ks(trajectories, percent), expected, "{percent} percent of {trajectories}");
+            }
+        }
+        // Half the neighborhoods of two trajectories: k = 2 and 3, 6 and 7, ... (j = 1, 3, ... of both).
+        assert_eq!(&tilted_ks(2, 50)[..6], [2, 3, 6, 7, 10, 11]);
+        assert_eq!(tilted_ks(1, 50).len(), 32);
+        for percent in [0, 1, 25, 33, 50, 99, 100] {
+            for trajectories in [1usize, 2, 9] {
+                for t in 0..trajectories {
+                    // The neighborhoods of trajectory t, in order: the first m of them tilt floor(m P / 100) in all.
+                    let ks = (t as u64..NEIGHBORHOODS).step_by(trajectories);
+                    let mut tilted = 0u64;
+                    for (m, k) in (1u64..).zip(ks) {
+                        tilted += u64::from(draws_tilted(k, trajectories, percent));
+                        let share = m * u64::from(percent);
+                        assert_eq!(tilted, share / 100, "{percent} percent: {m} of trajectory {t} of {trajectories}");
+                        assert!((tilted * 100).abs_diff(share) < 100);
+                    }
+                }
+            }
+        }
+    }
+
     /// The tilted draw is in whole numbers, so it is the same on every machine: these are the promotions that four
     /// tilted neighborhoods of the greedy set of game 400 (21 promotions) free, the draws of the untilted test above.
     #[test]
     fn a_tilted_neighborhood_frees_the_same_promotions_on_every_machine() {
-        let options = Options { tilt: true, ..Options::default() };
+        let options = Options::default();
         let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
         let space = SearchSpace::new(&p);
         let lns = Lns { p: &p, space: &space, options };
         let freed: Vec<Vec<u32>> = [(1, 0), (1, 1), (2, 5), (7, 63)]
             .into_iter()
             .map(|(round, k)| {
-                let unit = lns.neighborhood(&p.greedy, &mut options.rng_of(p.n, round, k));
+                let unit = lns.neighborhood(&p.greedy, &mut options.rng_of(p.n, round, k), true);
                 assert_eq!(unit.cands, p.candidates.difference(&unit.promoted));
                 p.greedy.difference(&unit.promoted).to_vec()
             })
@@ -1046,11 +1110,12 @@ mod tests {
         }
     }
 
-    /// The members freed by `lns` in `draws` neighborhoods of `best`: how many, and the sum of their sizes x/n.
-    fn freed_by(lns: &Lns<'_, W>, best: &Bits<W>, draws: u64) -> (u64, f64) {
+    /// The members freed by `lns` in `draws` neighborhoods of `best`, all `tilted` or all uniform: how many, and the sum
+    /// of their sizes x/n.
+    fn freed_by(lns: &Lns<'_, W>, best: &Bits<W>, draws: u64, tilted: bool) -> (u64, f64) {
         let (mut count, mut sizes) = (0, 0.0);
         for k in 0..draws {
-            let fixed = lns.neighborhood(best, &mut lns.options.rng_of(lns.p.n, 1, k)).promoted;
+            let fixed = lns.neighborhood(best, &mut lns.options.rng_of(lns.p.n, 1, k), tilted).promoted;
             for x in best.difference(&fixed).iter() {
                 count += 1;
                 sizes += f64::from(x) / f64::from(lns.p.n);
@@ -1066,18 +1131,17 @@ mod tests {
         // The candidates stand in for an incumbent: the draw only splits a set in two.
         let best = p.candidates;
         assert!(best.len() > 100);
-        let uniform = Lns { p: &p, space: &space, options: Options::default() };
-        let tilted = Lns { options: Options { tilt: true, ..uniform.options }, ..uniform };
+        let lns = Lns { p: &p, space: &space, options: Options::default() };
         // With a share fixed that is one number, the number freed is the same.
         for share in [0.0, 0.3, 0.8, 1.0] {
-            let options = Options { fix: (share, share), ..uniform.options };
-            let freed = |tilt| Lns { options: Options { tilt, ..options }, ..uniform };
+            let options = Options { fix: (share, share), ..lns.options };
+            let lns = Lns { options, ..lns };
             let expected = u64::from(best.len()) - (f64::from(best.len()) * share).round() as u64;
             for k in 0..20 {
                 let counts: Vec<u32> = [false, true]
                     .into_iter()
-                    .map(|tilt| {
-                        let fixed = freed(tilt).neighborhood(&best, &mut options.rng_of(1000, 1, k)).promoted;
+                    .map(|tilted| {
+                        let fixed = lns.neighborhood(&best, &mut options.rng_of(1000, 1, k), tilted).promoted;
                         best.len() - fixed.len()
                     })
                     .collect();
@@ -1085,8 +1149,8 @@ mod tests {
             }
         }
         // With the default share, the numbers freed average alike, and the tilted ones are smaller.
-        let (uniform_count, uniform_sizes) = freed_by(&uniform, &best, 300);
-        let (tilted_count, tilted_sizes) = freed_by(&tilted, &best, 300);
+        let (uniform_count, uniform_sizes) = freed_by(&lns, &best, 300, false);
+        let (tilted_count, tilted_sizes) = freed_by(&lns, &best, 300, true);
         let mean = |count: u64, sizes: f64| sizes / count as f64;
         let per_draw = |count: u64| count as f64 / 300.0;
         assert!((per_draw(uniform_count) - per_draw(tilted_count)).abs() < 0.1 * per_draw(uniform_count));
@@ -1119,22 +1183,24 @@ mod tests {
     }
 
     /// Cases of the options that shape the rounds, each with the starts of its trajectories: the tilted share, the
-    /// widening (after a round without growth), two trajectories, and all three.
+    /// widening (after a round without growth), two trajectories, all three, and half the neighborhoods tilted, of two
+    /// trajectories.
     fn shaped_cases(p: &Prepared<W>) -> Vec<(&'static str, Options, Vec<Bits<W>>)> {
         let half = p.greedy.to_vec();
         let poor: Bits<W> = half[..half.len() / 2].iter().copied().collect();
         let options = Options::default();
-        let (tilt, widen) = (Options { tilt: true, ..options }, Options { widen: Some(1), ..options });
-        let all = Options { tilt: true, widen: Some(1), ..options };
+        let (tilt, widen) = (Options { tilt: 100, ..options }, Options { widen: Some(1), ..options });
+        let all = Options { tilt: 100, widen: Some(1), ..options };
         vec![
             ("tilt", tilt, vec![p.greedy]),
             ("widen", widen, vec![p.greedy]),
             ("two trajectories", options, vec![p.greedy, poor]),
             ("all three", all, vec![p.greedy, poor]),
+            ("half tilt", Options { tilt: 50, ..options }, vec![p.greedy, poor]),
         ]
     }
 
-    /// The module `$module` of four tests, one for each case of [`shaped_cases`], each calling `$check` with the index
+    /// The module `$module` of five tests, one for each case of [`shaped_cases`], each calling `$check` with the index
     /// of its case: the cases together use more CPU than a test may.
     macro_rules! for_each_case {
         ($module:ident, $check:ident) => {
@@ -1154,6 +1220,10 @@ mod tests {
                 #[test]
                 fn all_three() {
                     super::$check(3);
+                }
+                #[test]
+                fn half_tilt() {
+                    super::$check(4);
                 }
             }
         };

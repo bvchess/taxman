@@ -12,7 +12,7 @@ use cli::{errln, outln, CliError, CliResult};
 use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, gate_trial, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
-use taxman::solver::unsound::{Plan, MAX_BACK, MAX_EFFORT, ROUND_WORK};
+use taxman::solver::unsound::{Plan, MAX_BACK, MAX_EFFORT, MAX_TILT, ROUND_WORK};
 use taxman::tactics::Tactics;
 
 /// The usage text with its `{...}` parts to fill in by [`usage`].
@@ -81,8 +81,9 @@ commands:
       --seed S                 with --unsound: the seed of the rounds' random choices (default {seed})
       --fix LO,HI              with --unsound: the share of the incumbent's promotions that each neighborhood keeps
                                fixed, drawn from LO to HI, 0 <= LO <= HI <= 1 (default {fix})
-      --tilt                   with --unsound: a neighborhood frees the small promotions more often than the large ones
-                               (the share freed is the same)
+      --tilt P                 with --unsound: P percent of a round's neighborhoods (P from 0 to {max_tilt}, default
+                               {tilt}), the same share of each incumbent's, free the small promotions more often than
+                               the large ones (the number freed is the same); the others draw uniformly
       --back J                 with --unsound: besides the start's, follow an incumbent from what survives of the moves
                                for each of the games n-1 .. n-J (J from 0 to {max_back}, default {back}) that differs
                                from the ones before, each with its share of a round's neighborhoods
@@ -127,6 +128,8 @@ fn usage() -> String {
         .replace("{neighborhood_work}", &finder::NEIGHBORHOOD_WORK.to_string())
         .replace("{seed}", &finder::Options::default().seed.to_string())
         .replace("{fix}", &format!("{lo},{hi}"))
+        .replace("{max_tilt}", &MAX_TILT.to_string())
+        .replace("{tilt}", &Plan::default().tilt.to_string())
         .replace("{max_back}", &MAX_BACK.to_string())
         .replace("{back}", &Plan::default().back.to_string())
         .replace("{ladder}", &ladder.join(" -> "))
