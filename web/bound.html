@@ -73,10 +73,11 @@
     <aside class="note card" aria-label="The parity bound, proved">
       <div class="note-head"><span class="note-name">The parity bound<span class="note-label">Theorem W1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#the-parity-bound">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">The heaviest set that passes the test bounds opt(n).</p>
-      <p class="precise"><span class="run">Precisely.</span>A <a class="gloss" href="glossary.html#playable">playable</a>
-      set is independent with its own coordinates over GF(2) (the independence lemma, P10), which is independence at
-      both parities of the layer.  So opt(n) is at most the heaviest set independent at both parities.  Weighted
-      matroid intersection finds it, and a weight split checks its value.</p>
+      <p class="precise"><span class="run">Precisely.</span>A
+      <a class="gloss" href="glossary.html#playable">playable</a> set passes the parity test (the independence lemma,
+      P10), so opt(n) is at most the heaviest set that passes it.  A number’s maximal factors lie one layer below it, so
+      the test splits in two, one for the numbers of the odd layers and one for those of the even layers.  Weighted
+      matroid intersection finds the heaviest set that passes both, and a weight split checks its value.</p>
     </aside>
     <p>The parity bound needs no frames.  Apply it to the numbers of the whole <a class="gloss"
     href="glossary.html#board">board</a>, rather than to the promotions of a frame, and it bounds <a class="gloss"
@@ -150,18 +151,21 @@
   </div>
 
   <figure class="fig parity-table-fig" id="parity-table" aria-label="The tables of 6, 10 and 15 and of 9, 10 and 15: a row for each number, a column for each of the factors 2, 3 and 5, and a 1 where the number can pay with the factor.">
-    <div class="parity-tables"></div> <figcaption class="fig-caption">A 1 marks a factor the number can pay with.  A
-    pick, which the figure outlines, takes a 1 in every row, no two in the same column: it is one payment scheme.
-    Choose rows to add them up; the bottom row says whether each column comes out even or odd.</figcaption> </figure>
-    </section>  <section class="chapter" id="odd-cores" data-toc="odd-cores" aria-labelledby="h-odd-cores"> <h2
-    id="h-odd-cores">Odd cores</h2> <div class="para"> <aside class="note card" aria-label="The first odd core, proved">
-    <div class="note-head"><span class="note-name">The first odd core<span class="note-label">Proposition
-    C3</span></span><a class="standing is-proved"
-    href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-first-odd-core">proved<span
-    class="sr-only">, proof on GitHub</span></a></div> <p class="plain">Below game 45 every set that passes the parity
-    test is playable.</p>
-      <p class="precise"><span class="run">Precisely.</span>Every S ⊆ {2, …, 44} independent with its own coordinates
-      over GF(2) is playable, so the parity bound is opt(n) for n ≤ 44, and {12, 18, 20, 30, 45} is an odd core.</p>
+    <div class="parity-tables"></div>
+    <figcaption class="fig-caption">A 1 marks a factor the number can pay with.  A pick, which the figure outlines,
+    takes a 1 in every row, no two in the same column: it is one payment scheme.  Choose rows to add them up; the
+    bottom row says whether each column comes out even or odd.</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="odd-cores" data-toc="odd-cores" aria-labelledby="h-odd-cores">
+  <h2 id="h-odd-cores">Odd cores</h2>
+  <div class="para">
+    <aside class="note card" aria-label="The first odd core, proved">
+      <div class="note-head"><span class="note-name">The first odd core<span class="note-label">Proposition C3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-first-odd-core">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">Below game 45 every set that passes the parity test is playable.</p>
+      <p class="precise"><span class="run">Precisely.</span>Every S ⊆ {2, …, 44} that passes the parity test is
+      playable, so the parity bound is opt(n) for n ≤ 44, and {12, 18, 20, 30, 45} is an odd core.</p>
     </aside>
     <p>The five numbers 12, 18, 20, 30 and 45 pass the parity test, yet they are not playable, because <a class="gloss"
     href="glossary.html#peel">peel</a>, which decides whether a set is playable, cannot even begin. Every number has at

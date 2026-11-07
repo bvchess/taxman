@@ -200,16 +200,16 @@
   <div class="para">
     <aside class="note card" aria-label="The two-factor proposition, proved">
       <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Numbers that each have at most two maximal factors outside their set make a playable set exactly
+      <p class="plain">Numbers that each have one or two maximal factors outside their set make a playable set exactly
       when they and those factors make no loop.</p>
-      <p class="precise"><span class="run">Precisely.</span>An instance whose members each list at most two factors
-      is <a class="gloss" href="glossary.html#playable">playable</a> iff its lists are linearly independent over GF(2), iff its graph is a forest.  The graph
-      joins each member to the factors it lists, and a member that lists only one also to one more vertex, the
-      ground.</p>
+      <p class="precise"><span class="run">Precisely.</span>An instance whose members each list one or two factors is
+      <a class="gloss" href="glossary.html#playable">playable</a> iff its lists are linearly independent over GF(2), iff
+      its graph is a forest.  The graph joins each member to the factors it lists, and a member that lists only one also
+      to one more vertex, the ground.  A member that lists none can never be played.</p>
     </aside>
     <p>Whatever order you choose, the first number takes both of its primes as <a class="gloss" href="glossary.html#tax">tax</a>.  That leaves two primes for the
     other three numbers, and one of them is always stuck.</p>
-    <p>The same holds for any numbers that each have at most two maximal factors left to pay with, outside the set: they
+    <p>The same holds for any numbers that each have one or two maximal factors left to pay with, outside the set: they
     make a playable set exactly when they and those factors make no loop.  A number with only one such factor also joins
     the <em>ground</em>, one more point that all such numbers share.  The ground matters:
     <span class="n" data-n="4">4</span> can pay only with 2, <span class="n" data-n="9">9</span> only with 3, and
@@ -218,7 +218,7 @@
     <p>Three maximal factors are too many for the rule.  With 4, 6, 10 and 15 left to pay with, the lines of
     <span class="n" data-n="12">12</span>, <span class="n" data-n="20">20</span> and
     <span class="n" data-n="30">30</span> close a loop, 30 – 6 – 12 – 4 – 20 – 10 – 30, yet you can play all three: 20,
-    then 12, then 30.  The rule holds only for numbers with at most two maximal factors to pay with, and for the others
+    then 12, then 30.  The rule holds only for numbers with one or two maximal factors to pay with, and for the others
     the question goes back to peel.</p>
     <p>So the rule covers only part of the game, but an important part.  Every number with two prime factors, such as 95
     = 5 · 19 or 49 = 7 · 7, has at most two maximal factors, all of them primes.  These numbers make up

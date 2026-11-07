@@ -116,9 +116,10 @@
       <li>Among the <a class="gloss" href="glossary.html#source">sources</a> alone, U* is the heaviest playable set,
       in every game up to 100,000.  In those games, giving up a number of U* never pays within the top
       half.</li>
-      <li>The prover can leave out one number of U* at a time and bound what any game without it could score.  For
-      about 85% of the numbers statement U is about, in games 2,531 to 3,440, that bound is below the recorded score,
-      so a game that beats the score, if there is one, plays them.  In no game does it cover all of them; if it did,
+      <li>The prover can fix layers 1 and 2 as every optimal game plays them, leave out one number of U* at a time, and
+      bound what any such game without that number could score.  For about 85% of the numbers statement U is about, in
+      the games from 2,531 to 3,440 that need a search or repeat one, that bound is at most the recorded score, so an
+      optimal game that beats the score, if there is one, plays them.  In no game does it cover all of them; if it did,
       the prover would prove that game's score.</li>
       <li>In every game up to 3,440 that needs a search, a heaviest set that the parity bound allows, with layers 1
       and 2 as every optimal game plays them, holds all of them.</li>

@@ -57,12 +57,12 @@
     <aside class="note tech" aria-label="Sources, precisely">
       <div class="note-head"><span class="note-name">Sources, precisely</span></div>
       <p>The sources of game n are the s with n/2 &lt; s ≤ n.  Since 2s &gt; n, no multiple of s but s itself is on the
-      board, so s is never <a class="gloss" href="glossary.html#tax">tax</a>.  The factors are 1 to ⌊n/2⌋.</p>
+      board, so no move takes s as <a class="gloss" href="glossary.html#tax">tax</a>.  The factors are 1 to ⌊n/2⌋.</p>
     </aside>
-    <p data-follows="fig21" data-state="3">Now <a class="go" href="?fig21=3#fig21" data-fig="fig21"
-    data-state="3">cut every column at n/2</a>.  A number above n/2 divides no other number on the board, since twice
-    it is already more than n.  So the taxman can never take it as tax: it is a
-    <a class="gloss" href="glossary.html#move">move</a> or nothing.  We call the numbers above n/2 the
+    <p data-follows="fig21" data-state="3">Now <a class="go" href="?fig21=3#fig21" data-fig="fig21" data-state="3">cut
+    every column at n/2</a>.  A number above n/2 divides no other number on the board, since twice it is already more
+    than n.  So no move takes it as tax: the player plays it as a <a class="gloss" href="glossary.html#move">move</a>,
+    or the taxman takes it at the end.  We call the numbers above n/2 the
     <a class="gloss" href="glossary.html#source"><em>sources</em></a>, and the numbers up to n/2 the
     <a class="gloss" href="glossary.html#factor"><em>factors</em></a>.  In game 21 the sources are
     <span class="n" data-n="11">11</span> to <span class="n" data-n="21">21</span>, below the line.</p>
@@ -228,16 +228,16 @@
       <div class="note-head"><span class="note-name">The sources conjecture<span class="note-label">Conjecture S1</span></span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#the-open-statements-about-the-sources">open, proved to game 100,000<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">No playable set of sources outweighs U*.</p>
       <p class="precise"><span class="run">Precisely.</span>Every playable set S of sources of game n has
-      ΣS ≤ ΣU*.  A check of the span conjecture (♦) by the
+      ΣS ≤ ΣU*.  A check of the span conjecture by the
       <a class="gloss" href="glossary.html#prover">prover</a> proves it in games 2 to 100,000
       (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#the-span-theorem">the span
       theorem</a>; <a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/README.md">the prover's
       record</a>).</p>
     </aside>
-    <p>We have never caught greedy producing a suboptimal set of choices.  In every game up to 100,000, a computation
-    proves that no playable set of sources outweighs <a class="gloss" href="glossary.html#u-star">U*</a>.  It is linear
-    algebra: for each source that greedy rejects, the computation shows its list of maximal factors to be a sum of the
-    lists of sources it kept above it, in the arithmetic where 1 + 1 = 0.</p>
+    <p>We have never caught descending greedy producing a suboptimal set of choices.  In every game up to 100,000, a
+    computation proves that no playable set of sources outweighs <a class="gloss" href="glossary.html#u-star">U*</a>.
+    It is linear algebra: for each source that greedy rejects, the computation shows its list of maximal factors to be a
+    sum of the lists of sources it kept above it, in the arithmetic where 1 + 1 = 0.</p>
   </div>
 </section>
 
@@ -248,8 +248,10 @@
       <div class="note-head"><span class="note-name">The uniqueness theorem<span class="note-label">Theorem Q1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-uniqueness-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Wherever no playable set of sources has more members than U* above any threshold, U* is the only
       heaviest playable set of <a class="gloss" href="glossary.html#source">sources</a>.</p>
-      <p class="precise"><span class="run">Precisely.</span>Given (★), every <a class="gloss" href="glossary.html#playable">playable</a> set S of sources has
-      |S ∩ [t, n]| ≤ |U* ∩ [t, n]| for every t.  The check of (♦) proves (★) wherever it passes.</p>
+      <p class="precise"><span class="run">Precisely.</span>If every
+      <a class="gloss" href="glossary.html#playable">playable</a> set S of sources has |S ∩ [t, n]| ≤ |U* ∩ [t, n]| for
+      every t, then U* is the only heaviest playable set of sources, for every weighting that increases with value.  The
+      check of the span conjecture, the computation above, proves the condition wherever it passes.</p>
     </aside>
     <p>So wherever that computation succeeds, as it does in every game up to 100,000, <a class="gloss"
     href="glossary.html#u-star">U*</a> is the heaviest set of sources, and the only one.  That does not yet make it the
@@ -276,10 +278,10 @@
     href="glossary.html#layer">layers</a> 1 and 2 we have proved it, so statement U is about the sources with three or
     more prime factors.  While we have evidence in support of statement U, we do not have proof it always holds.</p>
     <p>A second program, the <a class="gloss" href="glossary.html#prover">prover</a>, has found the best score on the
-      whole board for every game up to 2,530, without assuming statement U, and in each of those games some optimal
-      game plays all of U*.  Past game 2,530 our scores rest
-      on statement U: each is the best score of a game that plays U*, and that is the best possible score assuming
-      it holds.</p>
+    whole board for every game up to 2,530, without assuming statement U, and in each of those games some optimal game
+    plays all of U*.  Game 2,531 follows from game 2,530 by the prime formula, and from game 2,532 on, our scores rest
+    on statement U: each is the best score of a game that plays U*, and that is the best possible score assuming it
+    holds.</p>
   </div>
 </section>
 

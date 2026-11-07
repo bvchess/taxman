@@ -125,9 +125,9 @@
     that n <em>fits</em> into that optimal set.</p>
     <p>Game 9's optimal set scores <span data-opt="9">30</span>, and <span class="n" data-n="10">10</span> fits into it.
     The <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a> of 10 are 2 and 5, and its half,
-    <span class="n" data-n="5">5</span>, divides nothing else up to 9, so it is never tax, and game 9's optimal set does
-    not hold it.  So an optimal game of 9 leaves 5 in the <a class="gloss" href="glossary.html#pot">pot</a> at the end,
-    and 10 can follow it, with 5 paying for it.  Game 10's best score is <span data-opt="9">30</span> + 10 =
+    <span class="n" data-n="5">5</span>, divides nothing else up to 9, so no move takes it as tax, and game 9's optimal
+    set does not hold it.  So an optimal game of 9 leaves 5 in the <a class="gloss" href="glossary.html#pot">pot</a> at
+    the end, and 10 can follow it, with 5 paying for it.  Game 10's best score is <span data-opt="9">30</span> + 10 =
     <span data-opt="10">40</span>, its ceiling.</p>
   </div>
 
@@ -162,7 +162,7 @@
       leaves p alone, and since it divides nothing else up to n − 1, it is still in the pot at the end.  Then n can
       follow, with p paying for it.</p>
       <p>Game 14 is one.  An optimal game of 13 opens with 13 and leaves 7 in the pot, and 14 follows, with 7 paying for
-      it: game 14 scores <span data-opt="13">52</span> + 14 = <span data-opt="14">66</span>, its ceiling.</p>
+      it: game 14’s best score is <span data-opt="13">52</span> + 14 = <span data-opt="14">66</span>, its ceiling.</p>
       <p>That a prime always lies between m and 2m, for every m from 2 up, is Bertrand's postulate.  Joseph Bertrand
       guessed it in 1845 and checked it for every m below three million, and Pafnuty Chebyshev proved it a few years
       later.  In 1932 Paul Erdős, still a student, published a much simpler proof, his first paper.</p>
@@ -340,13 +340,14 @@
       no <a class="gloss" href="glossary.html#frame">frame</a> of <a class="gloss" href="glossary.html#layer">layer</a>
       2 has a <a class="gloss" href="glossary.html#freedom">freedom</a> in game n or in game m, as for every n ≥ 188,
       then game n has the root problem of game m if its cofactor is a prime or twice a prime, and is at its ceiling if
-      its cofactor is 9.  The layer-2 corollary (J2) proves the first case; we measured the other two.</p>
+      its cofactor is 9.  The layer-2 corollary (J2) proves the first case.  We checked the second on every board from
+      188 to 8,191, and the third in every game from 188 to the end of the chain.</p>
     </aside>
     <p>The number n alone usually tells, before any work, whether a game needs a
     <a class="gloss" href="glossary.html#search">search</a>.  Write n as its largest prime factor times what remains,
     the <em>cofactor</em> of n: in game 3,002, n = 38 · 79 has the cofactor 38, and a prime has the cofactor 1.  From
-    game 188 on, no game whose cofactor is 1, a prime, twice a prime or 9 needed a search.  Why it works for twice a
-    prime and for 9 is still a mystery.</p>
+    game 188 to the end of the chain, no game whose cofactor is 1, a prime, twice a prime or 9 needed a search.  Why it
+    works for twice a prime and for 9 is still a mystery.</p>
   </div>
 
   <figure class="chart" id="cofactor-fig">

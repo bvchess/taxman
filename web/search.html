@@ -54,25 +54,33 @@
     <p>A <a class="gloss" href="glossary.html#search">search</a> tries the sets one candidate at a time.  At each step
     it takes one candidate and splits the search tree: one branch promotes it, the other goes on without it.  Each point
     the search reaches is a <a class="gloss" href="glossary.html#node">node</a>.  All the while the search keeps the
-    best game it has found, and each node has a <a class="gloss" href="glossary.html#bound">bound</a>: a limit on what
-    the promotions of that branch could still add.  A branch whose bound cannot beat the best game found is a dead end,
-    so the search stops exploring that path.  We call this way of searching branch and bound.</p>
+    best game it has found, and each node has a <a class="gloss" href="glossary.html#bound">bound</a>: a limit on the
+    sum of the promotions of any game in that branch, counting those already made.  Every game in the search plays
+    <a class="gloss" href="glossary.html#u-star">U*</a>, so its promotions decide its score.  A branch whose bound
+    cannot beat the best game found is a dead end, so the search stops exploring that path.  We call this way of
+    searching branch and bound.</p>
   </div>
 
   <figure class="fig fig-panel search-tree-fig" id="tree">
-    <p class="chart-title">The search of game <span data-tree="n">45</span> (roll over a node to learn more)</p>
-    <div class="st-strip"></div> <svg role="img" aria-label="The search of game 45, node by node. The text under the
-    figure describes the current step."></svg> <div class="fig-timeline"></div> <figcaption
-    class="fig-caption"></figcaption> </figure>  <div class="para"> <aside class="note tech" aria-label="The figure's
-    bound"> <div class="note-head"><span class="note-name">The figure's bound</span></div> <p>The figure prunes with a
-    simpler bound than the solver's: the sum of every candidate that the player could still promote alone with the
-    node's promotions.  In its search, the player can promote candidates together exactly when <a class="gloss"
-    href="glossary.html#u-star">U*</a> with them is <a class="gloss" href="glossary.html#playable">playable</a> (Theorem
-    X7).</p>
+    <p class="chart-title">A simple search of game <span data-tree="n">45</span> (roll over a node to learn more)</p>
+    <div class="st-strip"></div>
+    <svg role="img" aria-label="A simple search of game 45, node by node. The text under the figure describes the
+    current step."></svg>
+    <div class="fig-timeline"></div>
+    <figcaption class="fig-caption"></figcaption>
+  </figure>
+
+  <div class="para">
+    <aside class="note tech" aria-label="The figure's bound">
+      <div class="note-head"><span class="note-name">The figure's bound</span></div>
+      <p>The figure prunes with a simpler bound than the solver's: the sum of every candidate that the player could
+      still promote alone with the node's promotions.  In its search, the player can promote candidates together
+      exactly when <a class="gloss" href="glossary.html#u-star">U*</a> with them is <a class="gloss"
+      href="glossary.html#playable">playable</a> (Theorem X7).</p>
     </aside>
-    <p>The whole search of game 45 takes <span data-tree="nodes">13</span> nodes, and its bound drops <span
-    data-tree="dropped">6</span> branches without looking inside them.  When no branch remains, no set of promotions can
-    beat the best one found.</p>
+    <p>The figure’s search of game 45 takes <span data-tree="nodes">13</span> nodes, and its bound drops
+    <span data-tree="dropped">6</span> branches without looking inside them.  When no branch remains, no set of
+    promotions can beat the best one found.</p>
   </div>
 </section>
 
@@ -120,14 +128,14 @@
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/design/gf2-bound.md#prime-exchanges">prime
       exchanges</a>).</p>
     </aside>
-    <p>Some pairs of primes play the same part in a game.  In game 1,300, 41 and 43 are such a pair.  Its <a
-    class="gloss" href="glossary.html#candidate">candidates</a> include 41 times 4, 6, 8, 9, 10, 12, 14 and 15, and 43
-    times the same eight numbers, and swapping 41 and 43 in every number leaves the <a class="gloss"
-    href="glossary.html#frame">frames</a>, all together, exactly as they were.  So every set of promotions has a twin,
-    made by the same swap, and the player can promote the twin exactly when the player can promote the set.  A set that
-    promotes 164 = 4 × 41 has a twin that promotes 172 = 4 × 43 in its place, 8 more.  Each swap trades a multiple of 41
-    for the same multiple of 43, or back, so it is easy to tell which twin is heavier, and the search tries only the
-    heavier one.</p>
+    <p>Some pairs of primes play the same part in a game.  In game 1,300, 41 and 43 are such a pair.  Its
+    <a class="gloss" href="glossary.html#candidate">candidates</a> include 41 times 4, 6, 8, 9, 10, 12, 14 and 15, and
+    43 times the same eight numbers, and swapping 41 and 43 in every number leaves the
+    <a class="gloss" href="glossary.html#frame">frames</a>, all together, exactly as they were.  So every set of
+    promotions has a twin, made by the same swap, and the player can promote the twin exactly when the player can
+    promote the set.  A set that promotes 164 = 4 × 41, and no other of the sixteen, has a twin that promotes 172 = 4 ×
+    43 in its place, and the twin weighs 8 more.  Each swap trades a multiple of 41 for the same multiple of 43, or
+    back, so it is easy to tell which twin is heavier, and the search tries only the heavier one.</p>
   </div>
 </section>
 

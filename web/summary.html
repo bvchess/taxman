@@ -25,15 +25,15 @@
 <section class="chapter" id="in-brief" data-toc="in-brief" aria-labelledby="h-brief">
   <h2 id="h-brief">The optimal games</h2>
   <div class="para">
-    <p>For every game from game 1 to game <span data-last-n>5,060</span>, we give a sequence of <a class="gloss"
-    href="glossary.html#move">moves</a> that reaches the best possible score, and say how we know that no sequence
-    scores more.  Up to game 2,530 the prover proves that outright; past it, it rests on <a class="gloss"
-    href="glossary.html#statement-u">statement U</a>, which is open (<a
-    href="statement-u.html#what-supports-the-scores">chapter 7</a>).  The best scores, opt(1), opt(2), …, are the <a
-    class="gloss" href="glossary.html#taxman-sequence">Taxman sequence</a>, <a
-    href="https://oeis.org/A019312">A019312</a> in the OEIS, and <a
-    href="https://github.com/bvchess/taxman/blob/master/results/b019312.txt">results/b019312.txt</a> holds them in the
-    OEIS's own format.</p>
+    <p>For every game from game 1 to game <span data-last-n>5,060</span>, we give a sequence of
+    <a class="gloss" href="glossary.html#move">moves</a> that reaches the best possible score, and say how we know that
+    no sequence scores more.  Up to game 2,530 the prover proves that outright, and game 2,531 follows by the prime
+    formula; from game 2,532 on, it rests on <a class="gloss" href="glossary.html#statement-u">statement U</a>, which is
+    open (<a href="statement-u.html#what-supports-the-scores">chapter 7</a>).  The best scores, opt(1), opt(2), …, are
+    the <a class="gloss" href="glossary.html#taxman-sequence">Taxman sequence</a>,
+    <a href="https://oeis.org/A019312">A019312</a> in the OEIS, and
+    <a href="https://github.com/bvchess/taxman/blob/master/results/b019312.txt">results/b019312.txt</a> holds them in
+    the OEIS's own format.</p>
     <p>One file, <a
     href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a>, has a
     line for each game: its best score, a sequence of moves that reaches it, in the order of play, and how we know no
@@ -75,11 +75,10 @@
     Each number stands in the column of its count of prime factors, with a line to each of its <a class="gloss"
     href="glossary.html#maximal-factor">maximal factors</a>, the numbers that can pay for it (<a
     href="sets.html#payment">chapter 1</a>).</li>
-    <li><a class="go" href="?fig21=3#fig21" data-fig="fig21" data-state="3"><span
-    class="sr-only">Sources</span></a>
-    The numbers above n/2, 11 to 21, divide nothing else on the board, so each is a move or nothing.  They are the <a
-    class="gloss" href="glossary.html#source">sources</a>, and the numbers up to 10 are the factors that pay for them
-    (<a href="top-half.html#sources-section">chapter 3</a>).</li>
+    <li><a class="go" href="?fig21=3#fig21" data-fig="fig21" data-state="3"><span class="sr-only">Sources</span></a> The
+    numbers above n/2, 11 to 21, divide nothing else on the board, so no move takes them as tax: the player plays each,
+    or the taxman takes it at the end.  They are the <a class="gloss" href="glossary.html#source">sources</a>, and the
+    numbers up to 10 are the factors that pay for them (<a href="top-half.html#sources-section">chapter 3</a>).</li>
     <li><a class="go" href="?fig21=4#fig21" data-fig="fig21" data-state="4"><span
     class="sr-only">Descending greedy</span></a>
     From 21 down, descending greedy keeps each source still playable with those it has kept before: 21, 20, 19, 18, 16,

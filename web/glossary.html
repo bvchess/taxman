@@ -81,15 +81,15 @@
       <dd>A number divided by one of its primes.  12 has the maximal factors 6 and 4, 9 has only 3, and a prime has
       only 1.  A move is legal exactly when one of its maximal factors is still in the pot.</dd>
       <dt id="maximal-factor-graph">maximal-factor graph</dt>
-      <dd>The board as a directed graph, with an edge from each number to each of its maximal factors.  Every
-      edge leads to a smaller number, so the figures draw the edges as lines without arrowheads.  Each number the player
-      takes leaves the graph with its edges.  A move is legal exactly when it still has an edge, and its tax is
+      <dd>The board as a directed graph, with an edge from each number to each of its maximal factors.  Every edge leads
+      to a smaller number, so the figures draw the edges as lines without arrowheads.  Each number the player takes
+      leaves the graph with its edges.  A move is legal exactly when an edge still leads from it, and its tax is
       everything it still reaches along its edges.</dd>
       <dt id="pays-for">pays for</dt>
       <dd>A maximal factor of a move, still in the pot when the player makes the move, <em>pays for</em> it.  Two moves
       can never share a payment.</dd>
       <dt id="payment-scheme">payment scheme</dt>
-      <dd>A choice of a maximal factor to pay for each number of a set, no two the same.</dd>
+      <dd>A choice, for each number of a set, of a maximal factor outside the set to pay for it, no two the same.</dd>
       <dt id="peel">peel</dt>
       <dd>The quick test of whether a set is playable.  It pairs numbers with their payments one at a time by two
       safe steps: a number with only one maximal factor left to pay with takes it (a <em>front move</em>), and a
@@ -104,7 +104,7 @@
       with 3, and with 6 they make the loop ground – 4 – 2 – 6 – 3 – 9 – ground.</dd>
       <dt id="forest">forest</dt>
       <dd>Numbers and the maximal factors they could pay with, with lines between them and no loop among them.  Numbers
-      with at most two such factors each are playable exactly when they form a forest with those factors.  10, 15 and 21
+      with one or two such factors each are playable exactly when they form a forest with those factors.  10, 15 and 21
       alone make 2 – 10 – 5 – 15 – 3 – 21 – 7, with no loop, and they are playable: 10, then 15, then 21.</dd>
     </dl>
   </div>
@@ -154,8 +154,8 @@
     </aside>
     <dl class="glossary">
       <dt id="source">source</dt>
-      <dd>A number above n/2.  It divides nothing else on the board, so it is never tax: it is a move or nothing.  On
-      the board of game 21 the sources are 11 to 21.</dd>
+      <dd>A number above n/2.  It divides nothing else on the board, so no move takes it as tax: the player plays it, or
+      the taxman takes it at the end.  On the board of game 21 the sources are 11 to 21.</dd>
       <dt id="factor">factor</dt>
       <dd>A number up to n/2.  It divides some larger number on the board, so a move can take it as tax, and any factor
       but 1 can also be a move.</dd>
@@ -231,8 +231,8 @@
     <dt id="node">node</dt>
     <dd>One point of a search: where it has decided some promotions and left the rest open.</dd>
     <dt id="bound">bound</dt>
-    <dd>An upper limit on what a node could still gain.  The search drops a node whose bound cannot beat the best game
-    it has found.</dd>
+    <dd>An upper limit on the sum of the promotions of any game in a node’s branch, counting those already made.  The
+    search drops a node whose bound cannot beat the best game it has found.</dd>
     <dt id="gap">gap</dt>
     <dd>How far a bound is above the best game the search has found.  The larger the gap, the larger the search.</dd>
       <dt id="branch-and-bound">branch and bound</dt>

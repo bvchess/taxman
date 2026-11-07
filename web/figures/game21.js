@@ -409,7 +409,7 @@ function captions(f) {
   return {
     pot: `The pot holds the numbers 1 to ${N}.`,
     layers: 'Each number stands in the column of its layer, its count of prime factors, with layer 1 at the right. A line runs rightward from each number to each of its maximal factors: 12 to 6 and 4.',
-    sources: `The line cuts each column at n/2. Below it are the sources, ${M.sources(N)[0]} to ${N}: they divide no other number on the board, so each is a move or nothing. Above it are the factors, 1 to ${half}.`,
+    sources: `The line cuts each column at n/2. Below it are the sources, ${M.sources(N)[0]} to ${N}: they divide no other number on the board, so no move takes them as tax. Above it are the factors, 1 to ${half}.`,
     greedy: `From ${N} down, descending greedy keeps ${listWords(f.keptDown)}, each still playable with those it kept before. It rejects ${listWords(f.rejectedDown)}: their one maximal factor, 1, already pays for ${f1.kept[0]}. U* scores ${f.inTheBag}.`,
     layered: 'Game 21 as descending greedy left it, in its layers, with a line cutting them at n/2: the sources it kept in gray, those it ' +
       'rejected dashed. The lines of each source run to factors one layer down, in the column to its right.',
