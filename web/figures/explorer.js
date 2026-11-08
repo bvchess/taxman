@@ -241,7 +241,8 @@ export function mountExplorer(host, { games, small }) {
       captions.push(defaultCaption(g, b));
       for (let x = 1; x <= g.n; x++) captions.push(aboutNumber(g, b, x));
     }
-    const subs = statCells.map((_, k) => longest(all.map((r) => stats(r)[k][2]), 2));
+    const allStats = all.map(stats);
+    const subs = statCells.map((_, k) => longest(allStats.map((s) => s[k][2]), 2));
     return {
       share: longest(all.map(shareText)),
       settled: longest(all.map((r) => settledHTML(r.settled))),

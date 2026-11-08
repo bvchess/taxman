@@ -598,9 +598,12 @@ export function standingBadge(kind, href) {
 // Words
 // ---------------------------------------------------------------------------------------------------------------
 
+// One formatter for every call: toLocaleString builds a new one each time, which is slow, in Safari above all.
+const NUMBER_FORMAT = new Intl.NumberFormat('en-US');
+
 /** A number written for reading: 218226 as 218,226. */
 export function fmt(n) {
-  return Number(n).toLocaleString('en-US');
+  return NUMBER_FORMAT.format(Number(n));
 }
 
 const NUMBER_WORDS = [
