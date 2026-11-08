@@ -272,14 +272,15 @@ to 2531.
 **Right column.**  The corollary of statement U (X8), statement U and its evidence (`docs/theory/evidence.md`), the
 prover (its README and `proofs.md`).
 
-The checks that replay every game, the referee and the two verifiers, are not part of the story: chapter 8's "The data,
-and how to check it" gives the commands, and the repository documents them.
+The checks that replay every game, the referee and the two verifiers, are not part of the story: the repository
+documents them.
 
 ### 8. Results
 
 **Point.**  Here are the games, how each was proven, and what they show.
 
 * The explorer: choose n, see the moves of an optimal game, its frames, its promotions and how its score was proven.
+* The computing: one machine with 88 threads, the frame solver's run of about five days and the prover's 19 hours.
 * The player's share: Hensley proved it tends to a constant between 1/2 and 35/48; our games put it near 0.63
   (measured).
 * What the games show: a game usually has one optimal set, and game 425 is the first with two; an optimal game need
@@ -296,10 +297,9 @@ and how to check it" gives the commands, and the repository documents them.
 introduction offers it at its top: "In a hurry? Go straight to the summary."
 
 * The optimal games: how far they reach and what the proofs rest on, the Taxman sequence (OEIS A019312), the file
-  results/optimal.jsonl.gz, and commands that download it and take out the moves.  The two verifiers that check every
-  line, what a replay does and doesn't show, and commands that run them.
-* Game 21, step by step: the bounds from game 20, then the eight steps of the game 21 figure, each linked to the
-  chapter that explains it, ending at 144.
+  results/optimal.jsonl.gz, and commands that download it and take out the moves.
+* Game 21, step by step: the bounds from game 20 and the parity bound, then the eight steps of the game 21 figure,
+  each linked to the chapter that explains it, ending at 144.
 
 **Figures.**  Game 21, all eight steps.
 
