@@ -42,14 +42,16 @@ tools/summarize.py check 2 2531 data/exact_parity_2_2531.jsonl
                                     # search, each line has the game's two bounds and the score replayed from the
                                     # chain.  The build of commit d5a5b7ca took 1,245 s on two threads; sort the lines
                                     # by n
-./target/release/exact --from 2 --to 989 --parity 1 --threads 2 --out data/compare_parity_2_989.jsonl
-./target/release/exact --from 2 --to 989 --parity 0 --threads 2 --out data/compare_fm_2_989.jsonl
+./target/release/exact --from 2 --to 989 --parity 1 --threads 2 --out data/compare_parity_2_1000.jsonl      # 14 s
+./target/release/exact --from 2 --to 989 --parity 0 --threads 2 --out data/compare_fm_2_1000.jsonl          # 159 s
+./target/release/exact --from 990 --to 1000 --parity 1 --threads 2 --out data/compare_parity_2_1000.jsonl   # 6 s
+./target/release/exact --from 990 --to 1000 --parity 0 --threads 2 --out data/compare_fm_2_1000.jsonl       # 385 s
                                     # the same searches with only the bound changed, to compare what the bounds cost: the
                                     # parity bound, then the Franklín–Moniot bound alone, both from the roles of the
-                                    # bottom-layers theorem.  The build of commit d5a5b7ca, at nice 10 on two threads, took
-                                    # 14 s and 159 s.  A game counts as searched when its "search" is proven and its
-                                    # "relation" is none: 236 games and 34,926 nodes with the parity bound, 289 and
-                                    # 3,941,139 with the other.  Sort the lines by n
+                                    # bottom-layers theorem, made as two runs each into one file (sort the lines by n).
+                                    # The build of commit d5a5b7ca ran them at nice 10 on two threads.  A game counts as
+                                    # searched when its "search" is proven and its "relation" is none: 241 games and
+                                    # 66,945 nodes with the parity bound, 294 and 9,423,960 with the other
 ./target/release/upper --from 1301 --to 2175 --out data/upper_1301_2175.jsonl          # one thread, 5 minutes
 ./target/release/upper --from 2176 --to 3314 --out data/upper_2176_3314.jsonl          # 21 minutes
 ./target/release/upper --from 3315 --to 3440 --out data/upper_3315_3440.jsonl          # 5 minutes

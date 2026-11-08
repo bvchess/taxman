@@ -368,30 +368,30 @@ same('the groups add up to every game', sum(Object.values(sorted.groupCounts)), 
   same('the prover\'s record has a line for every n from 2 to PROVER_TO',
     [...record].sort((x, y) => x - y), Array.from({ length: PROVER_TO - 1 }, (_, k) => k + 2));
 }
-// Chapter 6 compares the prover's search under the two bounds on games 2..989 (solver/noframe/data/compare_*.jsonl).
+// Chapter 6 compares the prover's search under the two bounds on games 2..1000 (solver/noframe/data/compare_*.jsonl).
 {
   const readRun = (name) => readFileSync(join(repoRoot, 'solver', 'noframe', 'data', name), 'utf8')
     .split('\n').filter((line) => line.trim() !== '').map((line) => JSON.parse(line));
   const searched = (run, from, to) => run.filter((r) => r.n >= from && r.n <= to && r.search === 'proven' && r.relation === 'none');
   const nodes = (run, from, to) => sum(searched(run, from, to).map((r) => r.nodes));
-  const parityRun = readRun('compare_parity_2_989.jsonl');
-  const fmRun = readRun('compare_fm_2_989.jsonl');
+  const parityRun = readRun('compare_parity_2_1000.jsonl');
+  const fmRun = readRun('compare_fm_2_1000.jsonl');
   for (const run of [parityRun, fmRun]) {
-    same('a comparison run has a line for every n from 2 to 989', run.map((r) => r.n), Array.from({ length: 988 }, (_, k) => k + 2));
+    same('a comparison run has a line for every n from 2 to 1000', run.map((r) => r.n), Array.from({ length: 999 }, (_, k) => k + 2));
   }
   same('games searched with Franklín and Moniot\'s bound, and with the parity bound',
-    [searched(fmRun, 2, 989).length, searched(parityRun, 2, 989).length], [289, 236]);
-  const million = (nodes(fmRun, 2, 989) / 1e6).toFixed(1);
-  const thousand = Math.round(nodes(parityRun, 2, 989) / 1000);
+    [searched(fmRun, 2, 1000).length, searched(parityRun, 2, 1000).length], [294, 241]);
+  const million = (nodes(fmRun, 2, 1000) / 1e6).toFixed(1);
+  const thousand = Math.round(nodes(parityRun, 2, 1000) / 1000);
   const ratio = (from, to) => Math.round(nodes(fmRun, from, to) / nodes(parityRun, from, to));
   const bound = readFileSync(join(repoRoot, 'web', 'bound.html'), 'utf8').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ');
   const states = (words) => {
     checks++;
     if (!bound.includes(words)) failures.push(`bound.html does not say "${words}"`);
   };
-  states(`With Franklín and Moniot's bound, ${searched(fmRun, 2, 989).length} games needed a search, and the searches took ${million} million nodes in all`);
-  states(`With the parity bound, ${searched(parityRun, 2, 989).length} did, and they took ${thousand},000`);
-  states(`below game 500 the parity bound's searches are ${ratio(2, 499)} times smaller, and from game 900 to 989, ${ratio(900, 989)} times smaller`);
+  states(`With Franklín and Moniot's bound, ${searched(fmRun, 2, 1000).length} games needed a search, and the searches took ${million} million nodes in all`);
+  states(`With the parity bound, ${searched(parityRun, 2, 1000).length} did, and they took ${thousand},000`);
+  states(`below game 500 the parity bound's searches are ${ratio(2, 499)} times smaller, and from game 900 to 1,000, ${ratio(900, 1000)} times smaller`);
 }
 const badGroup = [];
 const badSearch = [];
