@@ -282,13 +282,13 @@ and how to check it" gives the commands, and the repository documents them.
 * The explorer: choose n, see the moves of an optimal game, its frames, its promotions and how its score was proven.
 * The player's share: Hensley proved it tends to a constant between 1/2 and 35/48; our games put it near 0.63
   (measured).
-* What is open: statement U, the sources conjecture, the complexity of Taxman.
-* The data, and how to check it.
+* What the games show: a game usually has one optimal set, and game 425 is the first with two; an optimal game need
+  not make the most moves its board allows (games 833 to 835).
 
 **Figures.**  The explorer.  The player's share against n, with Hensley's bounds.
 
-**Right column.**  Hensley (1988), Franklín and Moniot (2023), OEIS A019312, `results/README.md`, the verifiers'
-commands, the open questions (`docs/theory/statements.md#open-questions`).
+**Right column.**  A game's record, precisely; Hensley (1988); Franklín and Moniot's Theorem 5; the share near 63%
+(measured); one optimal set to game 424 (measured); how far an optimal game falls short (measured).
 
 ### 9. Summary
 
@@ -296,7 +296,8 @@ commands, the open questions (`docs/theory/statements.md#open-questions`).
 introduction offers it at its top: "In a hurry? Go straight to the summary."
 
 * The optimal games: how far they reach and what the proofs rest on, the Taxman sequence (OEIS A019312), the file
-  results/optimal.jsonl.gz, and commands that download it and take out the moves.
+  results/optimal.jsonl.gz, and commands that download it and take out the moves.  The two verifiers that check every
+  line, what a replay does and doesn't show, and commands that run them.
 * Game 21, step by step: the bounds from game 20, then the eight steps of the game 21 figure, each linked to the
   chapter that explains it, ending at 144.
 

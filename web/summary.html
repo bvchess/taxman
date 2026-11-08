@@ -34,18 +34,36 @@
     <a href="https://oeis.org/A019312">A019312</a> in the OEIS, and
     <a href="https://github.com/bvchess/taxman/blob/master/results/b019312.txt">results/b019312.txt</a> holds them in
     the OEIS's own format.</p>
-    <p>One file, <a
-    href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a>, has a
+    <p>One file,
+    <a href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a>, has a
     line for each game: its best score, a sequence of moves that reaches it, in the order of play, and how we know no
-    sequence scores more.  The explorer of <a href="results.html#explorer">chapter 8</a> shows any game, and <a
-    href="results.html#data">its last section</a> says what each field holds.  These commands download the file and take
-    out the moves; they need <a href="https://jqlang.org">jq</a>.</p>
+    sequence scores more.  The explorer of <a href="results.html#explorer">chapter 8</a> shows any game, and
+    <a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#a-results-line---out-schema-5">the
+    format of a line</a> says what each field holds.  These commands download the file and take out the moves; they need
+    <a href="https://jqlang.org">jq</a>.</p>
   </div>
   <dl class="commands">
     <dt>Moves that reach the best score of game 21, in the order of play (change 21 to any game)</dt>
     <dd><code>curl -sL https://github.com/bvchess/taxman/raw/master/results/optimal.jsonl.gz | gzip -dc | jq -c 'select(.n == 21) | .moves'</code></dd>
     <dt>Every game, a line each: n, its best score, and moves that reach it</dt>
     <dd><code>curl -sL https://github.com/bvchess/taxman/raw/master/results/optimal.jsonl.gz | gzip -dc | jq -r '"\(.n) \(.score) \(.moves | join(" "))"' &gt; games.txt</code></dd>
+  </dl>
+  <div class="para">
+    <p>Two programs that share no code check every line of the file: the
+    <a class="gloss" href="glossary.html#frame-solver">frame solver</a>'s verifier and a verifier in Python.  Each
+    replays every game, checks that every move is legal and that the moves score what the line says, and works out
+    again what proves the score and what that rests on, so that an edit to the file can't change either
+    (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/verifiers.md">the verifiers</a>).  A replay
+    shows that the moves reach the score, but not that no other moves score more.  That rests on the proof each line
+    names, and <a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/reproducing.md">the
+    prover's guide</a> gives the commands that prove games 2 to 2,531 again.  These commands run the two verifiers on a
+    copy of the <a href="https://github.com/bvchess/taxman">repository</a>; the second needs Rust.</p>
+  </div>
+  <dl class="commands">
+    <dt>Copy the repository and check every game with the verifier in Python</dt>
+    <dd><code>git clone --depth 1 https://github.com/bvchess/taxman &amp;&amp; cd taxman &amp;&amp; python3 solver/tools/check_results.py results/optimal.jsonl.gz</code></dd>
+    <dt>Check every game again with the frame solver's verifier</dt>
+    <dd><code>cd solver/frame &amp;&amp; cargo build --release &amp;&amp; cd ../.. &amp;&amp; solver/frame/target/release/taxman verify-results results/optimal.jsonl.gz</code></dd>
   </dl>
 </section>
 

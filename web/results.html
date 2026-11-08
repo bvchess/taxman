@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Results · Taxman</title>
-<meta name="description" content="For every game of the chain, its best score, moves that reach it and what proves it; the player's share of the board against Hensley's bounds; what the scores show, what is still open, and how to check the data.">
+<meta name="description" content="For every game of the chain, its best score, moves that reach it and what proves it; the player's share of the board against Hensley's bounds; and what the games show.">
 <meta name="author" content="Brian Chess">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <script src="js/tone.js"></script>
@@ -22,8 +22,7 @@
   <h1>Results</h1>
   <p class="lede">For every game from game 1 to game <span data-last-n>the end of the chain</span>, the chain records
   an optimal game and the rule or search behind its score.  Together the games show where the player's share
-  settles.  A few questions are
-  still open.</p>
+  settles.</p>
 </header>
 
 <section class="chapter" id="explorer" data-toc="explorer" aria-labelledby="h-explorer">
@@ -104,11 +103,11 @@
       game from game 4,000 to game <span data-last-n>5060</span>, by the scores of results/optimal.jsonl.gz.  It
       measures finitely many games, and proves nothing about C.</p>
     </aside>
-    <p>The chain’s games put the limit near 63%.  The share swings widely in the first games and settles as n
-    grows: from game 4,000 on it stays between <span data-fact="settledLo">62.8%</span> and
+    <p>The chain’s games put the limit near 63%.  The share swings widely in the first games and settles as n grows:
+    from game 4,000 on it stays between <span data-fact="settledLo">62.8%</span> and
     <span data-fact="settledHi">63.0%</span>, and game <span data-last-n>5060</span> wins
-    <span data-fact="endShare">62.9%</span>.  That is a measurement across a finite number of games, not a proof about the
-    limit.</p>
+    <span data-fact="endShare">62.9%</span>.  That is a measurement across a finite number of games, not a proof about
+    the limit.</p>
   </div>
 </section>
 
@@ -125,13 +124,13 @@
       evidence</a>).</p>
     </aside>
     <p>A game usually has just one <a class="gloss" href="glossary.html#optimal-set">optimal set</a>.  The prover has
-    listed every optimal set of the games 2 to 989, and all but 30 of those have exactly one.  Game 425 is the first
-    with two.  The two differ by an exchange: one plays 110, 132 and 168, the other
-    98, 150 and 162, and both trios sum to 410 (<a href="frames.html#game-425">chapter 4</a>).</p>
-    <p>So the best score of a game might be obtainable using more than one set of moves.  Where a
-    game has several optimal sets, the chain keeps the one its search found
-    (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#games-with-several-optimal-sets">the
-    games with several</a>).</p>
+    listed every optimal set of 954 of the games 2 to 989, and all but 30 of those have exactly one.  Game 425 is the
+    first with two.  The two differ by an exchange: one plays 110, 132 and 168, the other 98, 150 and 162, and both
+    trios sum to 410 (<a href="frames.html#game-425">chapter 4</a>).</p>
+    <p>So a game’s best score can be reached by more than one set of moves.  Where a game has several optimal sets, the
+    chain keeps the one its search found
+    (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#games-with-several-optimal-sets">the games
+    with several</a>).</p>
   </div>
 
   <div class="para">
@@ -174,7 +173,6 @@ const large = (x) => (x >= 1e9 ? `${(x / 1e9).toFixed(1)} billion` : x >= 1e6 ? 
 const facts = {
   nodes21: fmt(c.nodes[21 - 1]),
   nodesLast: large(c.nodes[last - 1]),
-  timeLast: `${(c.seconds[last - 1] / 3600).toFixed(1)} hours`,
   notWon: listWords(notWon(c)),
   settledLo: pct(settledLo, 2),
   settledHi: pct(settledHi, 2),
