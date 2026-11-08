@@ -26,7 +26,6 @@
 //!   (`prev.short_by`, as before); the stop gives that chance up, for the rounds it saves in every other game.  So the
 //!   stop is a heuristic and no proof: the line stays unsound, and records the ceiling and whether the game is at it
 //!   (`ceiling`, `at_ceiling`).  A game is not held below the ceiling, and a round that reaches it may pass it.
-//!   `--past-ceiling` takes the stop away, to measure what it costs.
 //! * The moves are replayed before they count ([`replay`]), and a score above the built-in table's, which is proven, is
 //!   a hard error.
 //!
@@ -44,18 +43,15 @@
 //!
 //! # The shape of the rounds
 //!
-//! Five options of the plan change what the rounds search, and so the line.  Every value of them, alone or together,
-//! keeps what the rounds guarantee: a line depends on the game, its start, the moves it starts from, the level, the
-//! seed and the options only, never on the threads, and a run at L + 1 does the rounds of L first.
+//! Four settings change what the rounds search, and so the line.  Three are built in ([`BACK`], [`TILT`] and
+//! [`WIDEN`]), and the plan's `above` is an option.  Every value keeps what the rounds guarantee: a line depends on the
+//! game, its start, the moves it starts from, the level, the seed and `above` only, never on the threads, and a run at
+//! L + 1 does the rounds of L first.
 //!
-//! * **`fix`** is the range from which each neighborhood draws the share of the incumbent's promotions it keeps fixed
-//!   ([`Options::fix`](crate::search::finder::Options::fix)).  A smaller share frees more of the game to a
-//!   neighborhood, which then takes more of its steps.
-//! * **`tilt`** P makes P percent of a round's neighborhoods, an equal share of each trajectory's, choose the
+//! * **`TILT`** P makes P percent of a round's neighborhoods, an equal share of each trajectory's, choose the
 //!   promotions they free by their size, the small ones more often, with the same number freed; the others draw
-//!   uniformly ([`Options::tilt`](crate::search::finder::Options::tilt), [`draws_tilted`](finder::draws_tilted)).  0
-//!   tilts none, and 100 every neighborhood.
-//! * **`back`** J gives a game a trajectory of incumbents for each distinct set that survives of the moves for the
+//!   uniformly ([`Options::tilt`](crate::search::finder::Options::tilt), [`draws_tilted`](finder::draws_tilted)).
+//! * **`BACK`** J gives a game a trajectory of incumbents for each distinct set that survives of the moves for the
 //!   games n − 1, n − 2, ..., n − J ([`seed_survivors`](crate::search::seed_survivors)), as the finder beside a proof
 //!   search starts its seed rounds, beside the first, the start's.  A set that an earlier trajectory (the start's
 //!   included) began from is skipped, and so is a game whose moves nothing has.  Neighborhood k of a round works from
@@ -63,42 +59,30 @@
 //!   start's on a tie ([`Lns::rounds`](crate::search::finder::Lns::rounds)).  The line says which games the
 //!   trajectories began from (`trajectories`).  What survives of an earlier game may be heavier than the start; the
 //!   game's score is then that of the survivors from the first, which the line records as an improvement of round 0.
-//!   0 gives the start's trajectory alone.  The line records the score of what survives of each of these games, whether
-//!   or not it began a trajectory (`survivor_scores`).
-//! * **`above`** J (0 by default) adds, after those of `back`, a trajectory for each distinct set that survives of the
-//!   moves for the games n + 1, ..., n + J that the run or its file has, or with `--from-known` the built-in table: the
-//!   moves above n are dropped ([`Board::seed`](crate::board::Board::seed)).  A game played in order has no line above
-//!   it in its own run, so this is for measuring: with `--from-known` it shows what the games above could give a game
-//!   if their lines were optimal.
-//! * **`widen`** S moves the neighborhoods of a trajectory whose incumbent has not grown heavier in S rounds down the
+//!   The line records the score of what survives of each of these games, whether or not it began a trajectory
+//!   (`survivor_scores`).
+//! * **`above`** J (0 by default) adds, after those of `BACK`, a trajectory for each distinct set that survives of the
+//!   moves for the games n + 1, ..., n + J that the run or its files have: the moves above n are dropped
+//!   ([`Board::seed`](crate::board::Board::seed)).  A game played in order has no line above it in its own run, so
+//!   this is for a run over a range whose files already hold lines above it.
+//! * **`WIDEN`** S moves the neighborhoods of a trajectory whose incumbent has not grown heavier in S rounds down the
 //!   ladder of the share kept fixed ([`LADDER`](crate::search::finder::LADDER)), and back to its first stage when it
-//!   grows ([`Options::widen`](crate::search::finder::Options::widen)).  The line records the rounds each trajectory
-//!   spent at each stage (`stage_rounds`) and the stage of each improvement.  The ladder replaces `fix`, so a plan
-//!   that widens has the default `fix`, and `--fix` turns widening off ([`widening`]).  `None` is no widening.
+//!   grows ([`Options::widen`](crate::search::finder::Options::widen)).  The ladder's first stage is the finder's
+//!   share fixed.  The line records the rounds each trajectory spent at each stage (`stage_rounds`) and the stage of
+//!   each improvement.
 //!
-//! # The defaults
+//! # The built-in settings
 //!
-//! `back` is [`DEFAULT_BACK`], `tilt` [`DEFAULT_TILT`] and `widen` [`DEFAULT_WIDEN`], so that a user names a level of
-//! effort and nothing else; `--back 0`, `--tilt 0` and `--widen 0` turn each off, and `fix` is the finder's share.
-//! `stop_growth` is [`DEFAULT_STOP_GROWTH`], `stop_quiet` [`DEFAULT_STOP_QUIET`] and `push_growth`
-//! [`DEFAULT_PUSH_GROWTH`] ("The bound and the gap", below), and `--stop-growth off` and `--push-growth off` turn each
-//! off; `unseeded_every` is [`DEFAULT_UNSEEDED_EVERY`], 0, so that no game is played twice for its n alone ("Games
-//! played twice").  The first three are the setting that two races chose on the 251 hard games of 3441-5060:
-//! `--back 8 --tilt 25 --widen 4` reaches the score that the built-in table has in 87.3, 91.2, 94.0, 95.2, 96.8 and
-//! 97.6% of them at the levels 1 to 6, against 78.1, 79.7, 81.3, 82.9, 86.1 and 89.6% with no option.  The first race
-//! is the notebook's entry
-//! https://github.com/bvchess/taxman-notebook/blob/main/search/tilted-back-and-wider-rounds-2026-11/README.md; the
-//! second, the race R1, is
-//! https://github.com/bvchess/taxman-notebook/blob/main/search/a-share-of-tilted-neighborhoods-2026-11/README.md.  The
-//! entries number the levels one higher than here (their effort E is level E − 1), and the numbers above are in this
-//! numbering.  At every level, `--tilt 25` and `--tilt 50` (with `--back 8 --widen 4`) are within two games of each
-//! other, so 25 is chosen for its lead at the low levels, not by a significant margin.  The finder beside a proof
-//! search never tilts, widens or goes back, and its options ([`finder::Options::default`]) are not these.
+//! The user names a level of effort and nothing else: `BACK` is 8, `TILT` 25 and `WIDEN` 4, the setting that two races
+//! chose on the 251 hard games of 3441-5060, and `STOP_QUIET` and `PUSH_GROWTH` ("The bound and the gap", below) are 4
+//! and 25.  solver/docs/unsound/play.md ("The options that shape the rounds") has the races and their numbers, and
+//! solver/docs/unsound/shortfalls.md ("The bound and the gap") those of the stop and the push.  The finder beside a
+//! proof search never tilts, widens or goes back, and its options ([`finder::Options::default`]) are not these.
 //!
 //! # A range
 //!
 //! [`solve_range`] plays the games lo..=hi in order, one at a time, on all the threads given.  The moves for n − j that
-//! a game starts from, for j = 1 and the j up to `back`, are this run's line of n − j, else the file's, or the
+//! a game starts from, for j = 1 and the j up to [`BACK`], are this run's line of n − j, else the file's, or the
 //! best-known file's if that scores more ("The best-known file"), else the built-in table's (as a seed only, never a
 //! line).  Each line is appended to the file and synced as soon as its game ends, and a restarted run skips the games
 //! the file has.  A stop signal (SIGINT, SIGTERM) ends the run between rounds, and the game in play is not recorded.
@@ -119,7 +103,7 @@
 //! game of n, scoring the moves kept, since leaving a move out only leaves more numbers on the board for the others
 //! (the ceiling lemma (N4) of docs/theory/neighbors.md, applied once for each number above n).  So what survives in
 //! game n of a line above it is a real game of n, and if it scores more than the line of n, that line is short, and is
-//! replaced.  What survives is the set a trajectory of `back` begins from
+//! replaced.  What survives is the set a trajectory of `BACK` begins from
 //! ([`seed_survivors`](crate::search::seed_survivors)): the promotions of those moves that n's board can still promote,
 //! from the largest down, and the moves they make, so the new line is one of the frame model, whose promotions a
 //! repeat can play.
@@ -141,42 +125,34 @@
 //!   that opens the file takes the walk up where the file's last lines leave it, from its last line that is no repair
 //!   and the repairs after it.  So a run that a stop cut short between two steps of the walk ends with the lines of one
 //!   that ran on.
-//! * **The work.**  The repair runs no rounds: the work of a level is that of its rounds, as without it.  Its time is
-//!   that of the survivors on the boards kept, small beside a game's, and of the boards it sets up again, a few seconds
-//!   each at n ≈ 5,000: a walk past the boards kept needs them, and so does a walk that a run takes up from its file.
-//!   The run's summary has the time of its walks ([`RangeSummary::repair_time`](super::RangeSummary::repair_time)).
+//! * **The work.**  The repair runs no rounds: the work of a level is that of its rounds.  Its time is that of the
+//!   survivors on the boards kept, small beside a game's, and of the boards it sets up again, a few seconds each at
+//!   n ≈ 5,000: a walk past the boards kept needs them, and so does a walk that a run takes up from its file.  The
+//!   run's summary has the time of its walks ([`RangeSummary::repair_time`](super::RangeSummary::repair_time)).
 //! * **What a line depends on.**  The walk's steps depend on the lines alone, never on the threads, so a line still
-//!   depends on nothing but the game, its start, the moves it starts from, the level, the seed and the options, of
-//!   which the repair is one (`repair`; `--no-repair` turns it off).  The rounds of a game at E + 1 begin with those at
-//!   E from the same moves, as before; in a range the repair can change the moves that later games start from, as a
-//!   level does.
+//!   depends on nothing but the game, its start, the moves it starts from, the level, the seed and `above`.  The rounds
+//!   of a game at E + 1 begin with those at E from the same moves; in a range the repair can change the moves that later
+//!   games start from, as a level does.
 //!
 //! # Games played twice
 //!
 //! The repair can pull a short line up only from a line above it that does better, and in a run the lines above a
 //! short game are made from it: they start from it, copy it or stop at the ceiling it sets.  A game that takes nothing
-//! from the games below escapes that.  So `unseeded_every` K plays a game whose n is a multiple of K twice, and
-//! `push_growth` T a game whose gap grew by more than T ("The bound and the gap"): as any game is played, then
-//! *unseeded*, searched on the same board with no seed, no trajectory of `back` and no run's ceiling (the trajectories
-//! of `above` as given), as `unseeded` plays every game.  The line is the better play's, the seeded one on a tie, with
-//! what the other came to (`other`), so the games above start from it and the repair walks down from it as from any
-//! line.  A prime has no board, and its unseeded play takes the one set up for its bound; a trivial game is played
-//! once.  `unseeded_effort` sets the level of the unseeded play, for measuring.
+//! from the games below escapes that.  So the push `PUSH_GROWTH` T plays a game whose gap grew by more than T twice
+//! ("The bound and the gap"): as any game is played, then *unseeded*, searched on the same board at the game's level
+//! with no seed, no trajectory of `BACK` and no run's ceiling (the trajectories of `above` as given).  The line is the
+//! better play's, the seeded one on a tie, with what the other came to (`other`), so the games above start from it and
+//! the repair walks down from it as from any line.  A prime has no board, and its unseeded play takes the one set up
+//! for its bound; a trivial game is played once.
 //!
 //! * **The work.**  The unseeded play runs the rounds of its level to the budget, as a game does, so a game played
-//!   twice does up to twice a level's work; with no ceiling, its rounds stop only at the budget (or the table's score
-//!   with `--stop-at-known`).  The line's `work` is its own play's and `other` has the other's.
-//! * **What a line depends on.**  Which games are played twice depends on n and the growth of the gap, which depends on
-//!   n and the moves for n − 1, and each play on what a game's line depends on, so a line still depends on nothing but
-//!   the game, its start, the moves it starts from, the level, the seed and the options, never on the threads.  Each
-//!   play of a level runs the rounds of the levels below first.
-//! * **The default**, [`DEFAULT_UNSEEDED_EVERY`], is 0.  With every eighth game played twice and no push, the chain of
-//!   4861-5060 at level 3 had 198 of 200 games at opt(n), against 182 with neither; with the push, every eighth game
-//!   played twice changed no score of 4861-5060 or 5061-5260 and took about half again the time.
-//!   solver/docs/unsound/shortfalls.md ("Games played twice") has the numbers, and the measurements are the notebook's
-//!   entries
-//!   https://github.com/bvchess/taxman-notebook/blob/main/search/unseeded-games-above-a-short-game-2026-11/README.md
-//!   and https://github.com/bvchess/taxman-notebook/blob/main/search/stopping-and-pushing-by-the-gap-2026-11/README.md.
+//!   twice does up to twice a level's work; with no ceiling, its rounds stop only at the budget.  The line's `work` is
+//!   its own play's and `other` has the other's.
+//! * **What a line depends on.**  Which games are played twice depends on the growth of the gap, which depends on n and
+//!   the moves for n − 1, and each play on what a game's line depends on, so a line still depends on nothing but the
+//!   game, its start, the moves it starts from, the level, the seed and `above`, never on the threads.  Each play of a
+//!   level runs the rounds of the levels below first.
+//! * **Where the push comes from.**  solver/docs/unsound/shortfalls.md ("Games played twice") has the measurements.
 //!
 //! # The bound and the gap
 //!
@@ -192,37 +168,28 @@
 //! jump at the game where a streak of short games begins, while a game that a short game hands its shortfall on to
 //! carries the gap on, with a growth of about 0.  The bound and the growth depend on n and the moves for n − 1 alone.
 //!
-//! * **The stop on growth** (`stop_growth` T, `stop_quiet` K): a searched game's rounds end once its gap is within T of
-//!   the gap below, its growth from −T to T, and the last K rounds raised nothing, asked after each round from the one
-//!   that reaches the budget of level 1 ([`Plan::stop_floor`]) on.  Most games reach their score in level 1's rounds,
-//!   and a gap that stayed as it was says that they are probably done.  A gap that shrank by more than T says that the
-//!   game below may be short, or that this one has more to give, so the rounds go on.  They go on too while the game
-//!   still gains, since a game that gained late went on to gain again: the stop waits until K rounds in a row have
-//!   raised nothing ([`Rounds::quiet`](finder::Rounds::quiet) counts them, the start being round 0; K = 0 asks the
-//!   band alone).  The floor keeps the rounds of level 1 whole, so a line at level 1 is as without the stop, and a
-//!   level still runs the rounds of the levels below it first: the stop is asked of the same rounds at every level,
-//!   with the same count of quiet rounds, which the rounds in their order give.  The line says whether it ended the
-//!   rounds (`growth_stop`) and with how many quiet rounds (`quiet_rounds`).
-//! * **The push on growth** (`push_growth` T): a game whose growth after its play is above T is played twice, as a
-//!   game whose n is a multiple of `unseeded_every` is ("Games played twice"), and keeps the better line (`pushed`).  A
-//!   gap that jumps says that the game is probably short, and an unseeded play is the play that a short line below
-//!   cannot hold down.  Its unseeded play counts against a budget of its own, the level's.  A game played twice at a
-//!   lower level may keep its unseeded play where a higher level, whose seeded play brings the growth to T or below,
-//!   plays it once and scores less: the push breaks the rule that a higher level scores at least as much, which the
-//!   seeded play keeps.
+//! * **The stop on growth** (`stop_growth` T, [`STOP_QUIET`] K): a searched game's rounds end once its gap is within T
+//!   of the gap below, its growth from −T to T, and the last K rounds raised nothing, asked after each round from the
+//!   one that reaches the budget of level 1 ([`Plan::stop_floor`]) on.  Most games reach their score in level 1's
+//!   rounds, and a gap that stayed as it was says that they are probably done.  A gap that shrank by more than T says
+//!   that the game below may be short, or that this one has more to give, so the rounds go on.  They go on too while
+//!   the game still gains, since a game that gained late went on to gain again: the stop waits until K rounds in a row
+//!   have raised nothing ([`Rounds::quiet`](finder::Rounds::quiet) counts them, the start being round 0).  The floor
+//!   keeps the rounds of level 1 whole, so a line at level 1 is as without the stop, and a level still runs the rounds
+//!   of the levels below it first: the stop is asked of the same rounds at every level, with the same count of quiet
+//!   rounds, which the rounds in their order give.  The line says whether it ended the rounds (`growth_stop`) and with
+//!   how many quiet rounds (`quiet_rounds`).  `--stop-growth off` is `stop_growth` of `None`.
+//! * **The push on growth** ([`PUSH_GROWTH`] T): a game whose growth after its play is above T is played twice
+//!   ("Games played twice"), and keeps the better line (`pushed`).  A gap that jumps says that the game is probably
+//!   short, and an unseeded play is the play that a short line below cannot hold down.  Its unseeded play counts
+//!   against a budget of its own, the level's.  A game played twice at a lower level may keep its unseeded play where a
+//!   higher level, whose seeded play brings the growth to T or below, plays it once and scores less: the push breaks
+//!   the rule that a higher level scores at least as much, which the seeded play keeps.
 //! * **What a line depends on.**  The bound is a function of n, and the growth of n and of the moves for n − 1, so a
-//!   line still depends on nothing but the game, its start, the moves it starts from, the level, the seed and the
-//!   options, never on the threads.  With both rules off, the lines are those of the mode without them.
-//! * **The defaults**, [`DEFAULT_STOP_GROWTH`], [`DEFAULT_STOP_QUIET`] and [`DEFAULT_PUSH_GROWTH`].  The stop's 25
-//!   was chosen on the lines of the chains of the datasheet of the unsound mode and measured with the push's 50 on two
-//!   chains of 200 games at level 3: solver/docs/unsound/shortfalls.md ("The bound and the gap") says what they gained
-//!   and cost, and the notebook's entry
-//!   https://github.com/bvchess/taxman-notebook/blob/main/search/stopping-and-pushing-by-the-gap-2026-11/README.md
-//!   has the measurement.  The push's 25 was chosen on a chain of 1,060 games, in the notebook's entry
-//!   https://github.com/bvchess/taxman-notebook/blob/main/search/tuning-the-unsound-mode-on-a-long-chain-2026-11/README.md,
-//!   and the 4 quiet rounds by simulating stop rules on lines made with no stop, in
-//!   https://github.com/bvchess/taxman-notebook/blob/main/search/simulating-stop-rules-on-lines-already-made-2026-11/README.md.
-//!   The mode itself has not been measured with the 4 quiet rounds.
+//!   line still depends on nothing but the game, its start, the moves it starts from, the level, the seed and `above`,
+//!   never on the threads.
+//! * **The built-in values**, [`DEFAULT_STOP_GROWTH`], [`STOP_QUIET`] and [`PUSH_GROWTH`], and the measurements that
+//!   chose them are in solver/docs/unsound/shortfalls.md ("The bound and the gap").
 //!
 //! # The best-known file
 //!
@@ -253,20 +220,13 @@
 //!   run that must not depend on the others, such as one of an experiment that compares settings, uses
 //!   `--best-known off`, or a best-known file of its own.
 //!
-//! # Measuring
+//! # Rehearsing
 //!
-//! Two options measure the mode on the games whose opt(n) is proven, and are refused for a game the built-in table
-//! lacks.  `--stop-at-known` ends a game's rounds as soon as its score is the table's (or reaches the run's ceiling, if
-//! that comes first), and the line records the round at which it was the table's, or that it never was.  `--from-known`
-//! seeds every game with the table's moves for n − 1, not with this run's line, so that the run's ceiling is the proven
-//! one.  A third, `--unseeded`, plays every game unseeded alone (above), to measure what a game makes of its board with
-//! nothing from the games below.  solver/docs/unsound/line.md has the keys of the line ("An unsound line").
-//!
-//! A fourth, `--known-to N`, is for a rehearsal on games whose opt(n) is proven: the run takes the built-in table as
-//! holding the games up to N only ([`Optimal::up_to`], once, in [`solve_range`]), so a game above N is as if unproven.
-//! No game takes the table's moves for a game above N, the best-known file may hold the games above N and refuses those
-//! up to N, and the checks against the table apply up to N.  The line records N (`known_to`).  It is refused with
-//! `--stop-at-known` and `--from-known`, which measure against the table.
+//! `--known-to N` is for a rehearsal on games whose opt(n) is proven: the run takes the built-in table as holding the
+//! games up to N only ([`Optimal::up_to`], once, in [`solve_range`]), so a game above N is as if unproven.  No game
+//! takes the table's moves for a game above N, the best-known file may hold the games above N and refuses those up to
+//! N, and the checks against the table apply up to N.  The line records N (`known_to`).  solver/docs/unsound/line.md
+//! has the keys of the line ("An unsound line").
 
 use super::{
     prime_game, set_up, Before, Derived, Earlier, Failure, Job, Method, RangeSummary, SearchSetUp, SearchSetup, SetUp,
@@ -307,9 +267,6 @@ pub const MIN_EFFORT: u32 = 1;
 /// The most effort a run may ask for: a budget of 64 rounds of work, which is 2^22 with the default.
 pub const MAX_EFFORT: u32 = 6;
 
-/// The games before a game that its trajectories may begin from: `back` goes up to this.
-pub const MAX_BACK: u32 = 8;
-
 /// The games above a game that its trajectories may begin from: `above` goes up to this.
 pub const MAX_ABOVE: u32 = 8;
 
@@ -317,137 +274,71 @@ pub const MAX_ABOVE: u32 = 8;
 /// many below it (the module documentation, "The repair").
 pub const REPAIR_REACH: u32 = 8;
 
-/// The most percent of a round's neighborhoods that may draw tilted: all of them.
-pub const MAX_TILT: u32 = 100;
+/// The games before a game that its trajectories begin from: one from each distinct set that survives of the moves for
+/// the 8 games before.  The races that chose it, with [`TILT`] and [`WIDEN`], are in the module documentation, "The
+/// built-in settings".
+pub const BACK: u32 = 8;
 
-/// The default of `back`: a trajectory from each distinct set that survives of the moves for the 8 games before.  The
-/// races that chose it, with [`DEFAULT_TILT`] and [`DEFAULT_WIDEN`], are in the module documentation, "The defaults".
-pub const DEFAULT_BACK: u32 = 8;
+/// The percent of a round's neighborhoods that draw tilted: 25 (chosen with [`BACK`] and [`WIDEN`]; the module
+/// documentation, "The built-in settings", has the races).
+pub const TILT: u32 = 25;
 
-/// The default of `tilt`: 25 percent of a round's neighborhoods draw tilted (chosen with [`DEFAULT_BACK`] and
-/// [`DEFAULT_WIDEN`]; the module documentation, "The defaults", has the races).
-pub const DEFAULT_TILT: u32 = 25;
-
-/// The default of `widen`: a trajectory that has not grown heavier in 4 rounds moves down the ladder (chosen with
-/// [`DEFAULT_BACK`] and [`DEFAULT_TILT`]; the module documentation, "The defaults", has the races).
-pub const DEFAULT_WIDEN: u64 = 4;
-
-/// The default of `unseeded_every`: no game is played twice for its n alone, since the push on growth
-/// ([`DEFAULT_PUSH_GROWTH`]) plays twice the games that it caught (the module documentation, "Games played twice", says
-/// how it was chosen).
-pub const DEFAULT_UNSEEDED_EVERY: u32 = 0;
+/// The rounds without growth after which a trajectory moves down the ladder: 4 (chosen with [`BACK`] and [`TILT`]; the
+/// module documentation, "The built-in settings", has the races).
+pub const WIDEN: u64 = 4;
 
 /// The default of `stop_growth`: a searched game's rounds end once its gap is within 25 of the gap below, from the end
 /// of the rounds of level 1 on (the module documentation, "The bound and the gap", says how it was chosen).
 pub const DEFAULT_STOP_GROWTH: Option<u64> = Some(25);
 
-/// The default of `stop_quiet`: the stop on growth waits until the last 4 rounds raised nothing (the module
-/// documentation, "The bound and the gap", says how it was chosen).
-pub const DEFAULT_STOP_QUIET: u64 = 4;
+/// The quiet rounds that the stop on growth waits for: the last 4 rounds raised nothing (the module documentation,
+/// "The bound and the gap", says how it was chosen).
+pub const STOP_QUIET: u64 = 4;
 
-/// The default of `push_growth`: a game whose gap grew by more than 25 in its play is played twice (the module
-/// documentation, "The bound and the gap", says how it was chosen).
-pub const DEFAULT_PUSH_GROWTH: Option<i64> = Some(25);
+/// The growth of the gap above which a game is played twice: 25 (the module documentation, "The bound and the gap",
+/// says how it was chosen).
+pub const PUSH_GROWTH: i64 = 25;
 
 /// The work of one round, which level L budgets 2^L times ([`Plan::budget`]): the steps of a round whose neighborhoods
 /// all take the step limit of a unit, [`finder::UNIT_STEPS`].  (The work of such a round is a little more,
 /// [`finder::NEIGHBORHOOD_WORK`] for each neighborhood.)
 pub const ROUND_WORK: u64 = NEIGHBORHOODS * finder::UNIT_STEPS;
 
-/// How the unsound mode plays: the level of effort, the seed of the rounds' random choices, the shape of the
-/// neighborhoods and of the rounds, and the measuring options.
+/// How the unsound mode plays: the level of effort, the seed of the rounds' random choices, the games above that the
+/// rounds may use, the cut of the built-in table, and the stop on growth.  The rest of how the rounds are shaped is
+/// built in ([`BACK`], [`TILT`], [`WIDEN`], [`STOP_QUIET`], [`PUSH_GROWTH`]).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Plan {
     /// From [`MIN_EFFORT`] to [`MAX_EFFORT`].
     pub effort: u32,
     pub seed: u64,
-    /// `--fix LO,HI`: the share of the incumbent's promotions that each neighborhood keeps fixed is drawn from this
-    /// range, 0 ≤ LO ≤ HI ≤ 1 ([`check_fix`]).  A plan that widens takes the shares from the ladder instead, and keeps
-    /// the default here.
-    pub fix: (f64, f64),
-    /// `--tilt P`, P from 0 to [`MAX_TILT`] ([`DEFAULT_TILT`] by default): P percent of a round's neighborhoods free
-    /// the small promotions more often than the large ones, and the rest draw uniformly.  0 tilts none.
-    pub tilt: u32,
-    /// `--back J`, J from 0 to [`MAX_BACK`] ([`DEFAULT_BACK`] by default): a game follows a trajectory from each
-    /// distinct set that survives of the moves for the games n − 1, ..., n − J, beside the start's.  0 follows the
-    /// start's alone.
-    pub back: u32,
     /// `--above J`, J from 0 to [`MAX_ABOVE`]: a game also follows a trajectory from each distinct set that survives of
-    /// the moves for the games n + 1, ..., n + J that the run or its file has (the built-in table's with
-    /// `from_known`).  0 takes none.
+    /// the moves for the games n + 1, ..., n + J that the run or its files have.  0 takes none.
     pub above: u32,
-    /// `--widen S`, S ≥ 1 ([`DEFAULT_WIDEN`] by default): a trajectory that has not grown heavier in S rounds moves its
-    /// neighborhoods down the ladder of the share fixed.  `None` (`--widen 0`) is no widening, and takes `fix`.
-    pub widen: Option<u64>,
     /// The work of one round, which level L budgets 2^L times: [`ROUND_WORK`] unless a test or a measurement lowers it.
     /// No flag sets it, and a line records the budget it gave (`budget`).
     pub round_work: u64,
-    /// `--stop-at-known`: a game's rounds end once its score is the built-in table's.
-    pub stop_at_known: bool,
-    /// `--from-known`: every game starts from the built-in table's moves for n − 1.
-    pub from_known: bool,
     /// `--known-to N`: the run takes the table as holding the games up to N only ([`Optimal::up_to`]), and treats the
-    /// games above N as unproven (the module documentation, "Measuring").  `None` takes the whole table.  Refused with
-    /// `stop_at_known` and `from_known`, which measure against the table.
+    /// games above N as unproven (the module documentation, "Rehearsing").  `None` takes the whole table.
     pub known_to: Option<u32>,
-    /// `--past-ceiling`: a game's rounds do not end at the run's ceiling, n + score(n − 1) of the moves it starts from.
-    pub past_ceiling: bool,
-    /// The repair, on unless `--no-repair`: a line that what survives of a line above it beats is replaced (the module
-    /// documentation, "The repair").
-    pub repair: bool,
-    /// `--unseeded`: every game takes nothing from the moves for the games below it.  It is searched, never played by
-    /// the prime formula or as a repeat; its start has no seed, its rounds follow no trajectory of `back`, and it has
-    /// no run's ceiling (the module documentation, "Measuring").  No game is played twice.
-    pub unseeded: bool,
-    /// `--unseeded-every K` ([`DEFAULT_UNSEEDED_EVERY`] by default): a game whose n is a multiple of K is played twice,
-    /// as any game is and unseeded, as `unseeded` plays every game, and its line is the better play's (the module
-    /// documentation, "Games played twice").  0 plays no game twice.
-    pub unseeded_every: u32,
-    /// `--unseeded-effort L`: the level of effort of the unseeded play of a game played twice, from [`MIN_EFFORT`] to
-    /// [`MAX_EFFORT`]; `None` is the plan's `effort`.
-    pub unseeded_effort: Option<u32>,
     /// `--stop-growth T` ([`DEFAULT_STOP_GROWTH`] by default): a searched game's rounds end once its growth is from −T
-    /// to T and the last `stop_quiet` rounds raised nothing, asked after each round from the one that reaches the
+    /// to T and the last [`STOP_QUIET`] rounds raised nothing, asked after each round from the one that reaches the
     /// budget of level 1 on (the module documentation, "The bound and the gap").  `None` (`--stop-growth off`) ends no
     /// rounds this way.
     pub stop_growth: Option<u64>,
-    /// `--stop-quiet K` ([`DEFAULT_STOP_QUIET`] by default): the stop on growth ends a game's rounds only when the last
-    /// K rounds raised nothing ([`finder::Rounds::quiet`], the start being round 0).  0 asks the band alone.  It does
-    /// nothing without `stop_growth`.
-    pub stop_quiet: u64,
-    /// `--push-growth T` ([`DEFAULT_PUSH_GROWTH`] by default): a game whose growth after its play is above T is played
-    /// twice, as a game whose n is a multiple of `unseeded_every` is (the module documentation, "The bound and the
-    /// gap").  `None` (`--push-growth off`) plays no game twice this way.
-    pub push_growth: Option<i64>,
 }
 
-/// The least effort, the finder's seed and share fixed, the defaults of `tilt`, `back` and `widen` ([`DEFAULT_TILT`],
-/// [`DEFAULT_BACK`], [`DEFAULT_WIDEN`]), no trajectory from above, the stop at the run's ceiling, the repair, the stop
-/// and the push on growth ([`DEFAULT_STOP_GROWTH`], [`DEFAULT_STOP_QUIET`], [`DEFAULT_PUSH_GROWTH`]), no game played
-/// twice for its n alone ([`DEFAULT_UNSEEDED_EVERY`]), and no measuring option.
+/// The least effort, the finder's seed, no trajectory from above, the whole built-in table, and the stop on growth
+/// ([`DEFAULT_STOP_GROWTH`]).
 impl Default for Plan {
     fn default() -> Plan {
-        let finder::Options { fix, seed, .. } = finder::Options::default();
         Plan {
             effort: MIN_EFFORT,
-            seed,
-            fix,
-            tilt: DEFAULT_TILT,
-            back: DEFAULT_BACK,
+            seed: finder::Options::default().seed,
             above: 0,
-            widen: Some(DEFAULT_WIDEN),
             round_work: ROUND_WORK,
-            stop_at_known: false,
-            from_known: false,
             known_to: None,
-            past_ceiling: false,
-            repair: true,
-            unseeded: false,
-            unseeded_every: DEFAULT_UNSEEDED_EVERY,
-            unseeded_effort: None,
             stop_growth: DEFAULT_STOP_GROWTH,
-            stop_quiet: DEFAULT_STOP_QUIET,
-            push_growth: DEFAULT_PUSH_GROWTH,
         }
     }
 }
@@ -466,54 +357,11 @@ impl Plan {
         Plan { effort: MIN_EFFORT, ..*self }.budget()
     }
 
-    /// The plan of the unseeded play of a game played twice: this plan, at the level `unseeded_effort` if it gives one.
-    fn unseeded_play(&self) -> Plan {
-        Plan { effort: self.unseeded_effort.unwrap_or(self.effort), ..*self }
-    }
-
-    /// How the rounds search: the finder's defaults, with this plan's seed, share fixed, tilt and widening.
+    /// How the rounds search: the finder's defaults, with this plan's seed, and the built-in tilt and widening
+    /// ([`TILT`], [`WIDEN`]).
     pub fn lns(&self) -> finder::Options {
-        finder::Options {
-            seed: self.seed,
-            fix: self.fix,
-            tilt: self.tilt,
-            widen: self.widen,
-            ..finder::Options::default()
-        }
+        finder::Options { seed: self.seed, tilt: TILT, widen: Some(WIDEN), ..finder::Options::default() }
     }
-}
-
-/// Whether `fix` is a range of shares: 0 ≤ LO ≤ HI ≤ 1 (which no NaN is).
-fn is_range((lo, hi): (f64, f64)) -> bool {
-    (0.0..=1.0).contains(&lo) && (lo..=1.0).contains(&hi)
-}
-
-/// Reads the value of `--fix`, `LO,HI`: two numbers, 0 ≤ LO ≤ HI ≤ 1.
-///
-/// # Errors
-///
-/// What `text` should have been.
-pub fn parse_fix(text: &str) -> Result<(f64, f64), String> {
-    let numbers = text.split_once(',').and_then(|(lo, hi)| Some((lo.parse().ok()?, hi.parse().ok()?)));
-    numbers.filter(|&fix| is_range(fix)).ok_or_else(|| fix_error(text))
-}
-
-/// Checks that `fix` is a range of shares: 0 ≤ LO ≤ HI ≤ 1.
-///
-/// # Errors
-///
-/// What `fix` should have been.
-pub fn check_fix(fix: (f64, f64)) -> Result<(), String> {
-    if is_range(fix) {
-        Ok(())
-    } else {
-        Err(fix_error(&format!("{},{}", fix.0, fix.1)))
-    }
-}
-
-/// The message of a `--fix` that is not `LO,HI` with 0 ≤ LO ≤ HI ≤ 1, quoting what it was given.
-fn fix_error(got: &str) -> String {
-    format!("--fix takes LO,HI, two numbers with 0 <= LO <= HI <= 1, such as 0.7,0.9: got {got:?}")
 }
 
 /// Reads the value of `--effort`, L: a whole number from [`MIN_EFFORT`] to [`MAX_EFFORT`].
@@ -531,34 +379,6 @@ fn effort_error(got: &str) -> String {
     format!("--effort takes L, the level of effort, a whole number from {MIN_EFFORT} to {MAX_EFFORT}: got {got:?}")
 }
 
-/// Reads the value of `--tilt`, P: a whole number of percent, from 0 to [`MAX_TILT`].
-///
-/// # Errors
-///
-/// What `text` should have been.
-pub fn parse_tilt(text: &str) -> Result<u32, String> {
-    text.parse().ok().filter(|&tilt| tilt <= MAX_TILT).ok_or_else(|| tilt_error(text))
-}
-
-/// The message of a `--tilt` that is not a whole number from 0 to [`MAX_TILT`], quoting what it was given.
-fn tilt_error(got: &str) -> String {
-    format!("--tilt takes P, a whole number of percent from 0 to {MAX_TILT}: got {got:?}")
-}
-
-/// Reads the value of `--back`, J: a whole number from 0 to [`MAX_BACK`].
-///
-/// # Errors
-///
-/// What `text` should have been.
-pub fn parse_back(text: &str) -> Result<u32, String> {
-    text.parse().ok().filter(|&back| back <= MAX_BACK).ok_or_else(|| back_error(text))
-}
-
-/// The message of a `--back` that is not a whole number from 0 to [`MAX_BACK`], quoting what it was given.
-fn back_error(got: &str) -> String {
-    format!("--back takes J, a whole number from 0 to {MAX_BACK}: got {got:?}")
-}
-
 /// Reads the value of `--above`, J: a whole number from 0 to [`MAX_ABOVE`].
 ///
 /// # Errors
@@ -573,101 +393,22 @@ fn above_error(got: &str) -> String {
     format!("--above takes J, a whole number from 0 to {MAX_ABOVE}: got {got:?}")
 }
 
-/// Reads the value of `--widen`, S: a whole number of rounds, `None` for 0 (no widening) and `Some(S)` for S at least 1.
-///
-/// # Errors
-///
-/// What `text` should have been.
-pub fn parse_widen(text: &str) -> Result<Option<u64>, String> {
-    let widen: u64 = text.parse().map_err(|_| widen_error(text))?;
-    Ok((widen >= 1).then_some(widen))
-}
-
-/// The message of a `--widen` that is not a whole number of rounds, quoting what it was given.
-fn widen_error(got: &str) -> String {
-    format!("--widen takes S, a whole number of rounds, or 0 for no widening: got {got:?}")
-}
-
 /// Reads the value of `--stop-growth`: T, a whole number of points from 0 up, as `Some(T)`, or `off`, `None`.
 ///
 /// # Errors
 ///
 /// What `text` should have been.
 pub fn parse_stop_growth(text: &str) -> Result<Option<u64>, String> {
-    parse_or_off(text)
-        .map_err(|_| format!("--stop-growth takes T, a whole number of points from 0 up, or off: got {text:?}"))
-}
-
-/// Reads the value of `--stop-quiet`, K: a whole number of rounds from 0 up.
-///
-/// # Errors
-///
-/// What `text` should have been.
-pub fn parse_stop_quiet(text: &str) -> Result<u64, String> {
-    text.parse().map_err(|_| format!("--stop-quiet takes K, a whole number of rounds from 0 up: got {text:?}"))
-}
-
-/// Reads the value of `--push-growth`: T, a whole number of points, which may be below 0, as `Some(T)`, or `off`,
-/// `None`.
-///
-/// # Errors
-///
-/// What `text` should have been.
-pub fn parse_push_growth(text: &str) -> Result<Option<i64>, String> {
-    parse_or_off(text).map_err(|_| {
-        format!("--push-growth takes T, a whole number of points (it may be below 0), or off: got {text:?}")
-    })
-}
-
-/// `text` as a number, or `off`, `None`.
-fn parse_or_off<T: std::str::FromStr>(text: &str) -> Result<Option<T>, T::Err> {
     if text == "off" {
         return Ok(None);
     }
-    text.parse().map(Some)
+    text.parse()
+        .map(Some)
+        .map_err(|_| format!("--stop-growth takes T, a whole number of points from 0 up, or off: got {text:?}"))
 }
 
-/// Reads the value of `--unseeded-effort`, L: a level of effort, as `--effort` takes it ([`parse_effort`]).
-///
-/// # Errors
-///
-/// What `text` should have been.
-pub fn parse_unseeded_effort(text: &str) -> Result<u32, String> {
-    parse_effort(text).map_err(|_| unseeded_effort_error(text))
-}
-
-/// The message of an `--unseeded-effort` that is not a level of effort, quoting what it was given.
-fn unseeded_effort_error(got: &str) -> String {
-    format!(
-        "--unseeded-effort takes L, a level of effort, a whole number from {MIN_EFFORT} to {MAX_EFFORT}: got {got:?}"
-    )
-}
-
-/// The message of a plan that widens the neighborhoods and also gives the share fixed: the ladder is the share fixed.
-pub const WIDEN_WITH_FIX: &str =
-    "--widen S of 1 or more takes the share fixed from its own ladder, so --fix is refused with it; --fix alone, or with \
-     --widen 0, turns widening off";
-
-/// The widening of a plan from the command line: `fix_given` says whether `--fix` was, and `widen` is the value of
-/// `--widen` ([`parse_widen`]) if it was.  Without either, it is the default, [`DEFAULT_WIDEN`].  The ladder of the
-/// widening replaces the share fixed, so `--fix` turns widening off.
-///
-/// # Errors
-///
-/// [`WIDEN_WITH_FIX`], for `--fix` with a `--widen` of 1 or more.
-pub fn widening(fix_given: bool, widen: Option<Option<u64>>) -> Result<Option<u64>, String> {
-    match (fix_given, widen) {
-        (true, Some(Some(_))) => Err(WIDEN_WITH_FIX.to_owned()),
-        (true, _) => Ok(None),
-        (false, Some(widen)) => Ok(widen),
-        (false, None) => Ok(Plan::default().widen),
-    }
-}
-
-/// Checks the plan's options: an effort from [`MIN_EFFORT`] to [`MAX_EFFORT`], `fix` ([`check_fix`]), `tilt` of at most
-/// [`MAX_TILT`], `back` of at most [`MAX_BACK`], `widen` (if any) of at least 1 and not with a `fix` other than the
-/// default, a work of a round above 0, an `unseeded_effort` (if any) from [`MIN_EFFORT`] to [`MAX_EFFORT`], and no
-/// `known_to` with `stop_at_known` or `from_known`.
+/// Checks the plan's options: an effort from [`MIN_EFFORT`] to [`MAX_EFFORT`], `above` of at most [`MAX_ABOVE`], and a
+/// work of a round above 0.
 ///
 /// # Errors
 ///
@@ -676,36 +417,11 @@ pub fn check_plan(plan: &Plan) -> Result<(), String> {
     if !(MIN_EFFORT..=MAX_EFFORT).contains(&plan.effort) {
         return Err(effort_error(&plan.effort.to_string()));
     }
-    check_fix(plan.fix)?;
-    if plan.tilt > MAX_TILT {
-        return Err(tilt_error(&plan.tilt.to_string()));
-    }
-    if plan.back > MAX_BACK {
-        return Err(back_error(&plan.back.to_string()));
-    }
     if plan.above > MAX_ABOVE {
         return Err(above_error(&plan.above.to_string()));
     }
-    if let Some(widen) = plan.widen {
-        if widen < 1 {
-            return Err(format!("the plan widens after {widen} rounds: no widening is `None`, as --widen 0 gives"));
-        }
-        if plan.fix != Plan::default().fix {
-            return Err(WIDEN_WITH_FIX.to_owned());
-        }
-    }
     if plan.round_work == 0 {
         return Err("the work of a round is 0".to_owned());
-    }
-    if let Some(effort) = plan.unseeded_effort.filter(|effort| !(MIN_EFFORT..=MAX_EFFORT).contains(effort)) {
-        return Err(unseeded_effort_error(&effort.to_string()));
-    }
-    if plan.known_to.is_some() && (plan.stop_at_known || plan.from_known) {
-        return Err(
-            "--known-to cuts the built-in table, and --stop-at-known and --from-known measure against it, so they are \
-             refused with it"
-                .to_owned(),
-        );
     }
     Ok(())
 }
@@ -793,15 +509,6 @@ pub struct Previous {
     pub short_by: u64,
 }
 
-/// What `--stop-at-known` recorded of a game: the built-in table's score, and the round after which the game's score
-/// was that (0 for the start or the start of a trajectory, or for a game with no rounds to run), or `None` if it never
-/// was.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Known {
-    pub score: u64,
-    pub round: Option<u64>,
-}
-
 /// A round whose better set raised the game's score: the round (0 is a trajectory that begins heavier than the start,
 /// before any round), the trajectory that made it (0 is the start's) and the stage of the ladder its neighborhoods
 /// worked at in the round, the steps and the work of the rounds up to and including this one, the time on the game's
@@ -832,7 +539,7 @@ pub struct Line {
     pub in_the_bag: Option<u64>,
     pub prev: Option<Previous>,
     /// The run's ceiling on the game's score, n + score(n − 1) of the moves it started from ([`ceiling_over`]); `None`
-    /// with no such moves, and with `--past-ceiling`.
+    /// with no such moves.
     pub ceiling: Option<u64>,
     /// The game's score reached its `ceiling`: a searched game's rounds stopped there (and had none to run if the
     /// start was there).
@@ -845,7 +552,7 @@ pub struct Line {
     pub plan: Plan,
     /// The score of a searched game's start.
     pub start: Option<u64>,
-    /// What each trajectory of a searched game's rounds began from: the start, then the games `--back` and `--above`
+    /// What each trajectory of a searched game's rounds began from: the start, then the games [`BACK`] and `--above`
     /// took distinct sets from.
     pub trajectories: Option<Vec<Origin>>,
     /// For a searched game, each game whose moves a trajectory could begin from, in the order of `trajectories`, and
@@ -859,7 +566,7 @@ pub struct Line {
     /// The rounds since the score last rose, when a searched game's rounds ended ([`finder::Rounds::quiet`]; 0 on any
     /// other line).  The line records it as `quiet_rounds` where the stop on growth ended the rounds.
     pub quiet: u64,
-    /// For each trajectory, the rounds it worked at each stage of the ladder of `--widen` (all at the first without).
+    /// For each trajectory, the rounds it worked at each stage of the ladder ([`WIDEN`]).
     pub stage_rounds: Option<Vec<[u64; STAGES]>>,
     /// Each round that raised the score, in order.
     pub improvements: Vec<Raised>,
@@ -869,26 +576,23 @@ pub struct Line {
     pub seconds: f64,
     pub start_seconds: f64,
     pub threads: usize,
-    /// What `--stop-at-known` recorded, if it was given.
-    pub known: Option<Known>,
     pub tactics: Tactics,
-    /// The line is of a play that took nothing from the games below ([`Plan::unseeded`], or the unseeded play of a game
-    /// played twice).
+    /// The line is of the unseeded play of a game played twice, which took nothing from the games below.
     pub unseeded: bool,
-    /// For a game played twice ([`Plan::unseeded_every`]), the play that this line is not: the line is the better of
-    /// the two, the seeded play on a tie.
+    /// For a game played twice ([`PUSH_GROWTH`]), the play that this line is not: the line is the better of the two,
+    /// the seeded play on a tie.
     pub other: Option<OtherPlay>,
     /// The game's bound: `in_the_bag` plus the GF(2) bound of the root's node, which no play of the game exceeds (the
     /// module documentation, "The bound and the gap").
     pub bound: u64,
     /// The growth of the gap: the line's gap (`bound` less `score`) less the gap of the moves for n − 1 that the game
     /// started from, the run's line when it played the game (or the file's, or the table's); `None` if the run had no
-    /// moves for n − 1, or plays every game unseeded ([`Plan::unseeded`]).
+    /// moves for n − 1.
     pub growth: Option<i64>,
     /// A searched game's rounds ended before the budget with its growth from −T to T, T the plan's `stop_growth`, and
-    /// the last K rounds raised nothing, K the plan's `stop_quiet`.
+    /// the last [`STOP_QUIET`] rounds raised nothing.
     pub growth_stop: bool,
-    /// The game was played twice because its growth after the seeded play was above the plan's `push_growth`.
+    /// The game was played twice because its growth after the seeded play was above [`PUSH_GROWTH`].
     pub pushed: bool,
 }
 
@@ -942,9 +646,8 @@ impl Line {
             seconds: 0.0,
             start_seconds: 0.0,
             threads: opts.threads,
-            known: None,
             tactics: opts.tactics,
-            unseeded: plan.unseeded,
+            unseeded: false,
             other: None,
             bound,
             growth: None,
@@ -994,9 +697,6 @@ impl Line {
             .stage_rounds
             .as_ref()
             .map_or(Json::Null, |t| Json::array(t.iter().map(|stages| Json::array(stages.iter().copied()))));
-        let known = self.known.map_or(Json::Null, |known| {
-            Json::object([("known", Json::from(known.score)), ("round", known.round.map_or(Json::Null, Json::from))])
-        });
         let other = self.other.map_or(Json::Null, |other| {
             Json::object([
                 ("unseeded", Json::Bool(other.unseeded)),
@@ -1029,16 +729,8 @@ impl Line {
             ("effort", Json::from(self.plan.effort)),
             ("budget", Json::from(self.plan.budget())),
             ("seed", Json::from(self.plan.seed)),
-            ("fix", Json::array([self.plan.fix.0, self.plan.fix.1])),
-            ("tilt", Json::from(self.plan.tilt)),
-            ("back", Json::from(self.plan.back)),
             ("above", Json::from(self.plan.above)),
-            ("widen", self.plan.widen.map_or(Json::Null, Json::from)),
-            ("unseeded_every", Json::from(self.plan.unseeded_every)),
-            ("unseeded_effort", self.plan.unseeded_effort.map_or(Json::Null, Json::from)),
             ("stop_growth", self.plan.stop_growth.map_or(Json::Null, Json::from)),
-            ("stop_quiet", Json::from(self.plan.stop_quiet)),
-            ("push_growth", self.plan.push_growth.map_or(Json::Null, Json::from)),
             ("unseeded", Json::Bool(self.unseeded)),
             ("start", self.start.map_or(Json::Null, Json::from)),
             ("trajectories", trajectories),
@@ -1053,10 +745,7 @@ impl Line {
             ("seconds", Json::Num(self.seconds)),
             ("start_seconds", Json::Num(self.start_seconds)),
             ("threads", Json::from(self.threads)),
-            ("from_known", Json::Bool(self.plan.from_known)),
-            ("stop_at_known", known),
             ("known_to", self.plan.known_to.map_or(Json::Null, Json::from)),
-            ("repair", Json::Bool(self.plan.repair)),
             // A line as a game is played; the repair writes it again with what replaced its moves ([`Repair`]).
             ("repaired", Json::Null),
             ("tactics", Json::from(self.tactics.description())),
@@ -1064,16 +753,11 @@ impl Line {
         ])
     }
 
-    /// One line for a person: n, score, method, the rounds and how many raised the score, the time, `unsound`, and what
-    /// `--stop-at-known` recorded, whether the game is at the run's ceiling and a line of n − 1 that this one proves
-    /// short, if anything, the growth of the gap and whether it stopped the rounds, and for a game played twice whether
-    /// the push played it and what its unseeded play scored.
+    /// One line for a person: n, score, method, the rounds and how many raised the score, the time, `unsound`, and
+    /// whether the game is at the run's ceiling and a line of n − 1 that this one proves short, if anything, the growth
+    /// of the gap and whether it stopped the rounds, and for a game the push played twice what its unseeded play
+    /// scored.
     pub fn summary_line(&self) -> String {
-        let known = match self.known {
-            None => String::new(),
-            Some(Known { round: Some(round), .. }) => format!("  known reached in round {round}"),
-            Some(Known { round: None, .. }) => "  known not reached".to_owned(),
-        };
         let ceiling = if self.at_ceiling { "  at ceiling" } else { "" };
         let short = self
             .prev
@@ -1085,13 +769,14 @@ impl Line {
             Some(growth) if self.growth_stop => format!("  growth {growth}, stopped"),
             Some(growth) => format!("  growth {growth}"),
         };
-        let play = if self.pushed { "pushed, unseeded play" } else { "unseeded play" };
         let twice = match self.other {
             None => String::new(),
-            Some(other) if self.unseeded => format!("  {play} kept, +{} on the seeded", self.score - other.score),
-            Some(other) => format!("  {play} {}", other.score),
+            Some(other) if self.unseeded => {
+                format!("  pushed, unseeded play kept, +{} on the seeded", self.score - other.score)
+            }
+            Some(other) => format!("  pushed, unseeded play {}", other.score),
         };
-        let notes = format!("{known}{ceiling}{short}{growth}{twice}");
+        let notes = format!("{ceiling}{short}{growth}{twice}");
         format!(
             "n={:<5} score={:<9} {:<7} rounds={:<6} improved={:<3} {:>9.3} s  unsound{notes}",
             self.n,
@@ -1438,21 +1123,19 @@ fn same_file(a: &Path, b: &Path) -> Result<bool, String> {
 
 /// Plays the games `lo..=hi` in the unsound mode with `plan` (see the module documentation), on `opts.threads` threads
 /// with `opts.tactics`, appending each line to the file `files.out`, if there is one, then handing it to `on_game`.
-/// The games the file has are skipped.  With the repair, each line the run records is weighed against the lines below
-/// it, and each that it replaces is appended and handed to `on_repair` (the module documentation, "The repair"); first,
-/// a walk down that a stop cut short in the file goes on.  A run with a best-known file `files.best_known` seeds from
-/// it, offers it every line of the file and every line it records, and repairs its lines of the games below the range
-/// (the module documentation, "The best-known file").  A stop signal ends the range with the game in play unrecorded
+/// The games the file has are skipped.  Each line the run records is weighed against the lines below it, and each that
+/// it replaces is appended and handed to `on_repair` (the module documentation, "The repair"); first, a walk down that
+/// a stop cut short in the file goes on.  A run with a best-known file `files.best_known` seeds from it, offers it every
+/// line of the file and every line it records, and repairs its lines of the games below the range (the module
+/// documentation, "The best-known file").  A stop signal ends the range with the game in play unrecorded
 /// (`stopped_at`).
 ///
 /// # Errors
 ///
 /// A range that is empty or starts below 1; a plan that [`check_plan`] refuses (an effort outside [`MIN_EFFORT`] to
-/// [`MAX_EFFORT`], a `fix` that [`check_fix`] refuses, a `tilt` above [`MAX_TILT`], a `back` above [`MAX_BACK`], an
-/// `above` above [`MAX_ABOVE`], a `widen` of `Some(0)` or with a `fix`, a `known_to` with `--stop-at-known` or
-/// `--from-known`); `--stop-at-known` or `--from-known` for a game the table lacks; the same file for `out` and
-/// `best_known`; a file that cannot be opened or written, or holds a line it may not ([`UnsoundFile::open`],
-/// [`BestKnownFile::open`]); and a game or a repair whose moves fail a check (the module documentation, "One game").
+/// [`MAX_EFFORT`], an `above` above [`MAX_ABOVE`], a work of a round of 0); the same file for `out` and `best_known`; a
+/// file that cannot be opened or written, or holds a line it may not ([`UnsoundFile::open`], [`BestKnownFile::open`]);
+/// and a game or a repair whose moves fail a check (the module documentation, "One game").
 pub fn solve_range(
     lo: u32,
     hi: u32,
@@ -1469,14 +1152,6 @@ pub fn solve_range(
     // With `--known-to N` the run knows the table's games up to N only: every use of the table below is of the cut one.
     let cut = plan.known_to.map(|n| files.table.up_to(n));
     let optimal = cut.as_ref().unwrap_or(files.table);
-    if plan.stop_at_known || plan.from_known {
-        if let Some(n) = (lo..=hi).find(|&n| optimal.score(n).is_none()) {
-            return Err(format!(
-                "--stop-at-known and --from-known measure the games whose opt(n) is proven, and the built-in table \
-                 lacks game {n}"
-            ));
-        }
-    }
     if let (Some(out), Some(best_known)) = (files.out, files.best_known) {
         if same_file(out, best_known)? {
             return Err(format!("{}: --out and --best-known are the same file", out.display()));
@@ -1506,10 +1181,8 @@ pub fn solve_range(
         summary: RangeSummary::default(),
     };
     run.offer_file()?;
-    if plan.repair {
-        let walk = run.lines.walk.clone();
-        run.walk(walk, &mut on_repair)?;
-    }
+    let walk = run.lines.walk.clone();
+    run.walk(walk, &mut on_repair)?;
     for n in lo..=hi {
         if run.lines.games.contains_key(&n) {
             run.summary.skipped += 1;
@@ -1522,16 +1195,16 @@ pub fn solve_range(
         if let Some(best_known) = &mut run.best_known {
             best_known.refresh()?;
         }
-        let past = moves_before(n, &run.recent, &run.lines, run.best_known.as_ref(), plan, optimal);
-        let above = moves_above(n, &run.recent, &run.lines, run.best_known.as_ref(), plan, optimal);
+        let past = moves_before(n, &run.recent, &run.lines, run.best_known.as_ref(), optimal);
+        let above = moves_above(n, &run.recent, &run.lines, run.best_known.as_ref(), plan);
         // The gap of the moves for n − 1 that the game starts from, unless it takes none.
-        let gap_below = match past.first().and_then(Option::as_ref).filter(|_| !plan.unseeded) {
+        let gap_below = match past.first().and_then(Option::as_ref) {
             Some(below) => Some(gap(below.n, run.bound_of(below.n)?, below.score)?),
             None => None,
         };
-        // The next game to play has the moves for its n − 1, this game's line or the file's, unless it takes none.
+        // The next game to play has the moves for its n − 1, this game's line or the file's.
         if let Some(next) = (n + 1..=hi).find(|m| !run.lines.games.contains_key(m)) {
-            run.boards.start(next, !plan.unseeded);
+            run.boards.start(next);
         }
         let played = play(n, &past, &above, gap_below, opts, plan, &mut run.earlier, &mut run.boards, optimal)?;
         let Some((line, board)) = played else {
@@ -1539,9 +1212,7 @@ pub fn solve_range(
             break;
         };
         run.record(line, board, &mut on_game)?;
-        if plan.repair {
-            run.walk(BTreeSet::from([n]), &mut on_repair)?;
-        }
+        run.walk(BTreeSet::from([n]), &mut on_repair)?;
     }
     Ok(run.summary)
 }
@@ -1599,7 +1270,7 @@ impl Run<'_> {
             self.earlier.add(n, setup.size(), setup.digest, line.promotions.clone(), ());
         }
         self.recent.insert(n, Moves { n, moves: line.moves, score: line.score, source: Source::Run });
-        self.recent.retain(|&m, _| m + MAX_BACK > n);
+        self.recent.retain(|&m, _| m + BACK > n);
         self.bounds.insert(n, line.bound);
         self.bounds.retain(|&m, _| m >= n);
         self.mine.insert(n);
@@ -1836,26 +1507,19 @@ fn kept_moves(
     }
 }
 
-/// The moves for the games `n − 1`, `n − 2`, ... that game `n` starts from and begins its trajectories from, as many as
-/// `plan.back` and at least the first, from game `n − 1` down: each is, with `--from-known`, the built-in table's,
-/// else this run's line of the game (`run`), else the file's line, or the best-known file's if that scores more, else
-/// the table's; none for a game below 1, or that nothing has the moves for.  A game that lacks the moves for `n − 1`
-/// has a note on stderr.
+/// The moves for the games `n − 1`, `n − 2`, ..., `n − BACK` that game `n` starts from and begins its trajectories
+/// from, from game `n − 1` down: each is this run's line of the game (`run`), else the file's line, or the best-known
+/// file's if that scores more, else the table's; none for a game below 1, or that nothing has the moves for.  A game
+/// that lacks the moves for `n − 1` has a note on stderr.
 fn moves_before(
     n: u32,
     run: &BTreeMap<u32, Moves>,
     file: &UnsoundFile,
     best_known: Option<&BestKnownFile>,
-    plan: &Plan,
     optimal: &Optimal,
 ) -> Vec<Option<Moves>> {
-    let moves_of = |game: u32| {
-        if plan.from_known {
-            return table_moves(game, optimal);
-        }
-        kept_moves(game, run, file, best_known).or_else(|| table_moves(game, optimal))
-    };
-    (1..=plan.back.max(1))
+    let moves_of = |game: u32| kept_moves(game, run, file, best_known).or_else(|| table_moves(game, optimal));
+    (1..=BACK)
         .map(|j| {
             let found = n.checked_sub(j).filter(|&game| game >= 1).and_then(moves_of);
             if found.is_none() && j == 1 && n > 1 {
@@ -1871,24 +1535,17 @@ fn moves_before(
         .collect()
 }
 
-/// The moves for the games `n + 1`, ..., `n + plan.above` that game `n` begins trajectories from: each is, with
-/// `--from-known`, the built-in table's, else this run's line of the game (`run`), else the file's line, or the
-/// best-known file's if that scores more; a game that none of them has gives none.  Without `--from-known` the table
-/// gives none: a run never takes the proven game above one it plays.
+/// The moves for the games `n + 1`, ..., `n + plan.above` that game `n` begins trajectories from: each is this run's
+/// line of the game (`run`), else the file's line, or the best-known file's if that scores more; a game that none of
+/// them has gives none.  The table gives none: a run never takes the proven game above one it plays.
 fn moves_above(
     n: u32,
     run: &BTreeMap<u32, Moves>,
     file: &UnsoundFile,
     best_known: Option<&BestKnownFile>,
     plan: &Plan,
-    optimal: &Optimal,
 ) -> Vec<Moves> {
-    let moves_of = |game: u32| {
-        if plan.from_known {
-            return table_moves(game, optimal);
-        }
-        kept_moves(game, run, file, best_known)
-    };
+    let moves_of = |game: u32| kept_moves(game, run, file, best_known);
     (1..=plan.above).filter_map(|j| n.checked_add(j).filter(|&game| game <= super::MAX_N).and_then(moves_of)).collect()
 }
 
@@ -1946,10 +1603,9 @@ struct Boards {
     latest: u32,
 }
 
-/// A setup being made ahead: the game's, with moves for n − 1 if `seeded`, and the thread that makes it.
+/// A setup being made ahead: the game's, with moves for n − 1, and the thread that makes it.
 struct Making {
     n: u32,
-    seeded: bool,
     thread: thread::JoinHandle<Result<Ready, Failure>>,
 }
 
@@ -1959,19 +1615,19 @@ impl Boards {
         Boards { opts: opts.clone(), making: Vec::new(), kept: BTreeMap::new(), latest: 0 }
     }
 
-    /// Starts making the setup of game `n`, which will have moves for n − 1 if `seeded`, else none.
-    fn start(&mut self, n: u32, seeded: bool) {
+    /// Starts making the setup of game `n`, which will have moves for n − 1.
+    fn start(&mut self, n: u32) {
         let opts = self.opts.clone();
-        let make = move || Ready::of(n, if seeded { &Before::Run } else { &Before::None }, &opts, true);
-        self.making.push(Making { n, seeded, thread: thread::spawn(make) });
+        let make = move || Ready::of(n, &Before::Run, &opts, true);
+        self.making.push(Making { n, thread: thread::spawn(make) });
     }
 
     /// The setup of game `n`, with `given` for its moves for n − 1, and its bound: the one made ahead if there is one
-    /// with the same `given`, else one made now with `opts`.
+    /// and `given` has moves for n − 1, else one made now with `opts`.
     fn take(&mut self, n: u32, given: &Before, opts: &SolveOptions) -> Result<Ready, Failure> {
         let made = self.making.iter().position(|making| making.n == n).map(|i| self.making.swap_remove(i));
         match made {
-            Some(making) if making.seeded == matches!(given, Before::Run) => {
+            Some(making) if matches!(given, Before::Run) => {
                 making.thread.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))
             }
             Some(making) => {
@@ -2021,8 +1677,8 @@ impl Drop for Boards {
 }
 
 /// Game `n` played in the unsound mode, from the moves for the games before it, `past` ([`moves_before`]: the first is
-/// the moves for `n − 1`, which the start is seeded with, and the others begin trajectories if `plan.back` asks; see
-/// the module documentation, "One game"), and for the games above it that `above` has ([`moves_above`]), which begin
+/// the moves for `n − 1`, which the start is seeded with, and the others begin trajectories; see the module
+/// documentation, "One game"), and for the games above it that `above` has ([`moves_above`]), which begin
 /// trajectories too; and its line, checked, with the board it set up if it searched or repeated, which the repair may
 /// weigh lines on; `None` if a stop signal ended its rounds.  `gap_below` is the gap of the moves for `n − 1` that the
 /// game starts from, over which the gap grows ([`Line::growth`]).  `earlier` has the lines a repeat may repeat, and is
@@ -2042,23 +1698,19 @@ fn play(
 ) -> Result<Option<(Line, Option<KeptBoard>)>, String> {
     let began = Instant::now();
     let clock = || began.elapsed().as_secs_f64();
-    // An unseeded game takes nothing from the games below it: no prime formula, no seed, no trajectory of `back` and no
-    // ceiling, and (below) no repeat.
-    let past = if plan.unseeded { &[] } else { past };
     let before = past.first().and_then(Option::as_ref);
     // The moves for n − 1 are a seed and the prime shortcut's moves, which nothing checks again: the run's and the
     // file's lines were replayed before they were kept, and the table's are proven.
     let given = if before.is_some() { Before::Run } else { Before::None };
-    let ceiling = before.filter(|_| !plan.past_ceiling).map(|before| ceiling_over(n, before));
+    let ceiling = before.map(|before| ceiling_over(n, before));
     let Ready { set, bound, prime } = boards.take(n, &given, opts).map_err(Failure::message)?;
     let mut line = Line::blank(n, plan, opts, ceiling, bound);
-    let known = plan.stop_at_known.then(|| optimal.score(n).expect("the range was checked against the table"));
     // The stop on growth: from the end of the rounds of the least level on, a score whose gap is within the plan's T of
-    // the gap below, after the last K rounds that raised nothing.
+    // the gap below, after the last `STOP_QUIET` rounds that raised nothing.
     let floor = plan.stop_floor();
     let stops = |score: u64, work: u64, quiet: u64| {
         let within = |(most, below)| growth(bound, score, below).unsigned_abs() <= most;
-        work >= floor && quiet >= plan.stop_quiet && plan.stop_growth.zip(gap_below).is_some_and(within)
+        work >= floor && quiet >= STOP_QUIET && plan.stop_growth.zip(gap_below).is_some_and(within)
     };
     let mut board = None;
     match set {
@@ -2071,8 +1723,7 @@ fn play(
             (line.moves, line.promotions) = prime_game(n, &candidates, &before.moves);
         }
         SetUp::Search(set, problem) => {
-            let repeats = opts.tactics.same_search && !plan.unseeded;
-            let repeated = repeats.then(|| earlier.find(n, &problem)).flatten();
+            let repeated = opts.tactics.same_search.then(|| earlier.find(n, &problem)).flatten();
             earlier.remember(n, problem);
             line.setup = Some(set.setup);
             line.in_the_bag = Some(set.in_the_bag);
@@ -2084,17 +1735,16 @@ fn play(
                 line.promotions = promotions;
             } else {
                 let bag = set.in_the_bag;
-                // The rounds end at the table's score (`--stop-at-known`), the run's ceiling or the stop on growth,
-                // whichever comes first.
+                // The rounds end at the run's ceiling or the stop on growth, whichever comes first.
                 let enough = |sum: u64, work: u64, quiet: u64| {
                     let score = bag + sum;
                     let at_ceiling = ceiling.is_some_and(|ceiling| score >= ceiling);
-                    known.is_some_and(|known| score >= known) || at_ceiling || stops(score, work, quiet)
+                    at_ceiling || stops(score, work, quiet)
                 };
                 let seed = before.map(|before| before.moves.as_slice());
                 // The games a trajectory may begin from, from n − 1 down, then from n + 1 up.
-                let back = past.iter().take(plan.back as usize).flatten();
-                let others: Vec<(u32, &[u32])> = back.chain(above).map(|m| (m.n, m.moves.as_slice())).collect();
+                let others: Vec<(u32, &[u32])> =
+                    past.iter().flatten().chain(above).map(|m| (m.n, m.moves.as_slice())).collect();
                 if !searched(&mut line, &kept, seed, &others, &clock, &enough) {
                     return Ok(None);
                 }
@@ -2102,13 +1752,13 @@ fn play(
             board = Some(kept);
         }
     }
-    conclude(&mut line, before, known, optimal).map_err(|e| format!("n={n}: {e}"))?;
+    conclude(&mut line, before, optimal).map_err(|e| format!("n={n}: {e}"))?;
     line.seconds = clock();
     line.growth = gap_below.map(|below| growth(bound, line.score, below));
     line.growth_stop =
         line.method == Method::Search && line.work < plan.budget() && stops(line.score, line.work, line.quiet);
-    line.pushed = line.method != Method::Trivial && plan.push_growth.zip(line.growth).is_some_and(|(most, g)| g > most);
-    if !(plays_twice(n, plan) || line.pushed) || line.method == Method::Trivial {
+    line.pushed = line.method != Method::Trivial && line.growth.is_some_and(|growth| growth > PUSH_GROWTH);
+    if !line.pushed {
         return Ok(Some((line, board)));
     }
     // The unseeded play of a game played twice, on the game's board; a prime has none, and takes the one set up for its
@@ -2120,15 +1770,13 @@ fn play(
     };
     let began = Instant::now();
     let clock = || began.elapsed().as_secs_f64();
-    let mut unseeded = Line { unseeded: true, ..Line::blank(n, &plan.unseeded_play(), opts, None, bound) };
+    let mut unseeded = Line { unseeded: true, ..Line::blank(n, plan, opts, None, bound) };
     (unseeded.setup, unseeded.in_the_bag) = (Some(board.setup), Some(board.in_the_bag));
-    let bag = board.in_the_bag;
-    let enough = |sum: u64, _, _| known.is_some_and(|known| bag + sum >= known);
     let others: Vec<(u32, &[u32])> = above.iter().map(|m| (m.n, m.moves.as_slice())).collect();
-    if !searched(&mut unseeded, &board, None, &others, &clock, &enough) {
+    if !searched(&mut unseeded, &board, None, &others, &clock, &|_, _, _| false) {
         return Ok(None);
     }
-    conclude(&mut unseeded, None, known, optimal).map_err(|e| format!("n={n}, unseeded: {e}"))?;
+    conclude(&mut unseeded, None, optimal).map_err(|e| format!("n={n}, unseeded: {e}"))?;
     unseeded.seconds = clock();
     unseeded.growth = gap_below.map(|below| growth(bound, unseeded.score, below));
     let (seconds, pushed) = (line.seconds + unseeded.seconds, line.pushed);
@@ -2139,13 +1787,6 @@ fn play(
         earlier.remember(n, problem);
     }
     Ok(Some((Line { other: Some(OtherPlay::of(&other)), seconds, pushed, ..kept }, Some(board))))
-}
-
-/// Whether game `n` is played twice for its n ([`Plan::unseeded_every`]): n is a multiple of K, and the run is not
-/// unseeded already.  A trivial game, whose line is optimal, is played once whatever this says; the push plays a game
-/// twice for the growth of its gap ([`Plan::push_growth`]).
-fn plays_twice(n: u32, plan: &Plan) -> bool {
-    !plan.unseeded && plan.unseeded_every > 0 && n.is_multiple_of(plan.unseeded_every)
 }
 
 /// The gap of the moves for game `n` that score `score`, on the game's bound `bound`: `bound` less `score`.
@@ -2212,9 +1853,8 @@ fn ceiling_over(n: u32, before: &Moves) -> u64 {
 }
 
 /// The checks of the moves of `line` before they count (the module documentation, "One game"), and what they give the
-/// line: its score, whether that is at its ceiling, its record of the moves for n − 1 it started from, `before`, and
-/// what `--stop-at-known` recorded, if it was given (`known`, the table's score).
-fn conclude(line: &mut Line, before: Option<&Moves>, known: Option<u64>, optimal: &Optimal) -> Result<(), String> {
+/// line: its score, whether that is at its ceiling, and its record of the moves for n − 1 it started from, `before`.
+fn conclude(line: &mut Line, before: Option<&Moves>, optimal: &Optimal) -> Result<(), String> {
     let n = line.n;
     let method = line.method.as_str();
     line.score = replay(n, &line.moves).map_err(|e| format!("the {method} moves do not stand up: {e}"))?;
@@ -2246,11 +1886,6 @@ fn conclude(line: &mut Line, before: Option<&Moves>, known: Option<u64>, optimal
         moves_digest: moves_digest(&before.moves),
         short_by: score.saturating_sub(ceiling_over(n, before)),
     });
-    line.known = known.map(|known| {
-        // The round after which the score was the table's: the first improvement's that reached it, else the start's.
-        let reached = line.improvements.iter().find(|raised| raised.score >= known).map(|raised| raised.round);
-        Known { score: known, round: reached.or_else(|| (line.start.unwrap_or(score) >= known).then_some(0)) }
-    });
     Ok(())
 }
 
@@ -2273,42 +1908,25 @@ mod tests {
     }
 
     #[test]
-    fn the_default_plan_tilts_goes_back_and_widens_as_the_races_chose() {
+    fn the_plan_tilts_goes_back_and_widens_as_the_races_chose() {
         let plan = Plan::default();
-        assert_eq!((DEFAULT_TILT, DEFAULT_BACK, DEFAULT_WIDEN), (25, 8, 4));
-        assert_eq!((plan.effort, plan.seed, plan.fix), (MIN_EFFORT, 1, (0.7, 0.9)));
-        assert_eq!((plan.tilt, plan.back, plan.widen, plan.round_work), (25, 8, Some(4), ROUND_WORK));
-        assert!(!plan.stop_at_known && !plan.from_known && !plan.past_ceiling, "the stop at the ceiling is on");
-        assert!(plan.repair && plan.above == 0, "the repair is on, and no trajectory begins from above");
-        assert_eq!(plan.known_to, None, "the whole built-in table is known");
-        let twice = (DEFAULT_UNSEEDED_EVERY, plan.unseeded_every, plan.unseeded, plan.unseeded_effort);
-        assert_eq!(twice, (0, 0, false, None), "no game is played twice for its n, and no game unseeded alone");
-        let growth = (DEFAULT_STOP_GROWTH, DEFAULT_PUSH_GROWTH, plan.stop_growth, plan.push_growth);
-        assert_eq!(growth, (Some(25), Some(25), Some(25), Some(25)), "the stop and the push on growth are on");
-        assert_eq!((DEFAULT_STOP_QUIET, plan.stop_quiet), (4, 4), "the stop waits for 4 rounds that raised nothing");
-        // The rounds search with the plan's seed, tilt and widening, and the finder's other options.
+        assert_eq!((TILT, BACK, WIDEN), (25, 8, 4));
+        assert_eq!((plan.effort, plan.seed, plan.round_work), (MIN_EFFORT, 1, ROUND_WORK));
+        assert_eq!(
+            (plan.above, plan.known_to),
+            (0, None),
+            "no trajectory begins from above, and the whole table is known"
+        );
+        let growth = (DEFAULT_STOP_GROWTH, plan.stop_growth, STOP_QUIET, PUSH_GROWTH);
+        assert_eq!(growth, (Some(25), Some(25), 4, 25), "the stop and the push on growth are on");
+        // The rounds search with the plan's seed, the built-in tilt and widening, and the finder's other options.
         let lns = plan.lns();
         let default = finder::Options::default();
         assert_eq!((lns.fix, lns.unit_nodes, lns.seed), (default.fix, default.unit_nodes, default.seed));
         assert_eq!((lns.tilt, lns.widen), (25, Some(4)));
         assert_eq!(check_plan(&plan), Ok(()));
-        // The finder beside a proof search never tilts or widens, whatever the defaults of the unsound mode are.
+        // The finder beside a proof search never tilts or widens, whatever the built-in settings of the unsound mode are.
         assert!(default.tilt == 0 && default.widen.is_none());
-        // Each is turned off with 0.
-        let off = Plan { tilt: 0, back: 0, widen: None, ..plan };
-        assert_eq!((off.lns().tilt, off.lns().widen, check_plan(&off)), (0, None, Ok(())));
-    }
-
-    #[test]
-    fn a_fix_turns_widening_off_and_is_refused_with_a_widening() {
-        assert_eq!(widening(false, None), Ok(Some(DEFAULT_WIDEN)));
-        assert_eq!(widening(false, Some(Some(2))), Ok(Some(2)));
-        assert_eq!(widening(false, Some(None)), Ok(None), "--widen 0 turns it off");
-        assert_eq!(widening(true, None), Ok(None), "--fix alone turns it off");
-        assert_eq!(widening(true, Some(None)), Ok(None), "--fix with --widen 0 is the same");
-        for widen in [1, 4, 30] {
-            assert_eq!(widening(true, Some(Some(widen))), Err(WIDEN_WITH_FIX.to_owned()), "--fix with --widen {widen}");
-        }
     }
 
     #[test]
@@ -2323,89 +1941,30 @@ mod tests {
     }
 
     #[test]
-    fn a_tilt_is_a_whole_number_of_percent() {
-        assert_eq!((parse_tilt("0"), parse_tilt("50"), parse_tilt("100")), (Ok(0), Ok(50), Ok(100)));
-        for text in ["101", "-1", "", "a", "50.5", "5e1", "50%", " 50", "99999999999"] {
-            let err = parse_tilt(text).unwrap_err();
-            assert!(err.starts_with("--tilt takes P, a whole number of percent from 0 to 100"), "{text:?}: {err}");
-        }
-    }
-
-    #[test]
-    fn a_number_of_games_back_or_above_and_a_widening_are_whole_numbers_in_range() {
-        assert_eq!((parse_back("0"), parse_back("1"), parse_back("8")), (Ok(0), Ok(1), Ok(8)));
+    fn a_number_of_games_above_is_a_whole_number_in_range() {
         for text in ["9", "-1", "", "a", "1.5", "1,2", " 1", "99999999999"] {
-            let err = parse_back(text).unwrap_err();
-            assert!(err.starts_with("--back takes J, a whole number from 0 to 8"), "{text:?}: {err}");
             let err = parse_above(text).unwrap_err();
             assert!(err.starts_with("--above takes J, a whole number from 0 to 8"), "{text:?}: {err}");
         }
         assert_eq!((parse_above("0"), parse_above("4"), parse_above("8")), (Ok(0), Ok(4), Ok(8)));
-        assert_eq!((parse_widen("1"), parse_widen("30")), (Ok(Some(1)), Ok(Some(30))));
-        assert_eq!(parse_widen("0"), Ok(None), "0 is no widening");
-        for text in ["-1", "", "a", "2.5", "1,2", " 3"] {
-            let err = parse_widen(text).unwrap_err();
-            assert!(
-                err.starts_with("--widen takes S, a whole number of rounds, or 0 for no widening"),
-                "{text:?}: {err}"
-            );
-        }
     }
 
     #[test]
-    fn a_growth_is_a_whole_number_of_points_or_off_and_an_unseeded_effort_a_level() {
-        // The stop's T is a distance from the gap below, 0 or more; the push's a growth, which may be below 0.
+    fn a_growth_is_a_whole_number_of_points_or_off() {
+        // The stop's T is a distance from the gap below, 0 or more.
         assert_eq!(["0", "25", "off"].map(parse_stop_growth), [Ok(Some(0)), Ok(Some(25)), Ok(None)]);
-        assert_eq!(
-            ["0", "50", "-25", "off"].map(parse_push_growth),
-            [Ok(Some(0)), Ok(Some(50)), Ok(Some(-25)), Ok(None)]
-        );
-        for text in ["", "a", "1.5", "Off", " 1", "none", "99999999999999999999999"] {
-            let err = parse_push_growth(text).unwrap_err();
-            assert_eq!(
-                err,
-                format!("--push-growth takes T, a whole number of points (it may be below 0), or off: got {text:?}")
-            );
+        for text in ["", "a", "1.5", "Off", " 1", "none", "-1", "99999999999999999999999"] {
             let err = parse_stop_growth(text).unwrap_err();
             assert_eq!(err, format!("--stop-growth takes T, a whole number of points from 0 up, or off: got {text:?}"));
         }
-        assert!(parse_stop_growth("-1").unwrap_err().starts_with("--stop-growth takes T"));
-        assert_eq!((parse_unseeded_effort("1"), parse_unseeded_effort("6")), (Ok(1), Ok(6)));
-        for text in ["0", "7", "", "a"] {
-            let err = parse_unseeded_effort(text).unwrap_err();
-            assert!(
-                err.starts_with("--unseeded-effort takes L, a level of effort, a whole number from 1 to 6"),
-                "{err}"
-            );
-        }
-        // The floor of the stop on growth is the budget of level 1, at every level, and the unseeded play's plan is the
-        // plan at the level of `unseeded_effort`.
-        let plan = Plan { effort: 3, unseeded_effort: Some(1), ..Plan::default() };
+        // The floor of the stop on growth is the budget of level 1, at every level.
+        let plan = Plan { effort: 3, ..Plan::default() };
         assert_eq!((plan.stop_floor(), Plan { effort: 6, ..plan }.stop_floor()), (2 * ROUND_WORK, 2 * ROUND_WORK));
-        assert_eq!(
-            (plan.unseeded_play().effort, Plan { unseeded_effort: None, ..plan }.unseeded_play().effort),
-            (1, 3)
-        );
-        assert_eq!(plan.unseeded_play(), Plan { effort: 1, ..plan });
-    }
-
-    #[test]
-    fn the_quiet_rounds_of_the_stop_are_a_whole_number_from_0_up() {
-        // 0 asks the band of the stop alone, so there is no `off`.
-        assert_eq!(["0", "4", "99"].map(parse_stop_quiet), [Ok(0), Ok(4), Ok(99)]);
-        for text in ["", "a", "1.5", "-1", "off", " 1", "99999999999999999999999"] {
-            let err = parse_stop_quiet(text).unwrap_err();
-            assert_eq!(err, format!("--stop-quiet takes K, a whole number of rounds from 0 up: got {text:?}"));
-        }
-        // Any K is a plan, and the plan of K = 0 is the stop of the band alone.
-        for stop_quiet in [0, DEFAULT_STOP_QUIET, u64::MAX] {
-            assert_eq!(check_plan(&Plan { stop_quiet, ..Plan::default() }), Ok(()));
-        }
     }
 
     #[test]
     fn a_plan_with_an_option_out_of_range_is_refused() {
-        let plan = Plan { effort: 3, back: 8, widen: Some(1), ..Plan::default() };
+        let plan = Plan { effort: 3, above: 8, ..Plan::default() };
         assert_eq!(check_plan(&plan), Ok(()));
         let refused = |plan: Plan| check_plan(&plan).unwrap_err();
         for effort in [MIN_EFFORT - 1, MAX_EFFORT + 1] {
@@ -2413,27 +1972,11 @@ mod tests {
                 format!("--effort takes L, the level of effort, a whole number from 1 to 6: got \"{effort}\"");
             assert_eq!(refused(Plan { effort, ..plan }), message);
         }
-        assert!(refused(Plan { fix: (0.9, 0.7), ..Plan { widen: None, ..plan } }).starts_with("--fix takes LO,HI"));
-        assert!(refused(Plan { tilt: MAX_TILT + 1, ..plan }).starts_with("--tilt takes P"));
-        assert!(refused(Plan { back: MAX_BACK + 1, ..plan }).starts_with("--back takes J"));
         assert!(refused(Plan { above: MAX_ABOVE + 1, ..plan }).starts_with("--above takes J"));
-        assert!(refused(Plan { widen: Some(0), ..plan }).starts_with("the plan widens after 0 rounds"));
-        assert_eq!(refused(Plan { fix: (0.5, 0.7), ..plan }), WIDEN_WITH_FIX);
         assert!(refused(Plan { round_work: 0, ..plan }).contains("is 0"));
-        for effort in [MIN_EFFORT - 1, MAX_EFFORT + 1] {
-            assert_eq!(
-                refused(Plan { unseeded_effort: Some(effort), ..plan }),
-                unseeded_effort_error(&effort.to_string())
-            );
-        }
-        let measured = Plan { unseeded_effort: Some(MAX_EFFORT), stop_growth: Some(9), push_growth: Some(-9), ..plan };
-        assert_eq!(check_plan(&measured), Ok(()));
-        // A cut table is refused where the run measures against the table.
-        assert_eq!(check_plan(&Plan { known_to: Some(0), ..plan }), Ok(()));
-        for cut in [Plan { stop_at_known: true, ..plan }, Plan { from_known: true, ..plan }] {
-            assert!(refused(Plan { known_to: Some(3000), ..cut }).starts_with("--known-to cuts the built-in table"));
-            assert_eq!(check_plan(&cut), Ok(()));
-        }
+        // Any cut of the table, and any stop on growth, is a plan.
+        let cut = Plan { known_to: Some(0), stop_growth: Some(9), ..plan };
+        assert_eq!(check_plan(&cut), Ok(()));
     }
 
     #[test]
@@ -2499,33 +2042,5 @@ mod tests {
         assert_eq!((line.get("ceiling"), prev.get("short_by")), (Some(&Json::from(466u64)), Some(&Json::from(34u64))));
         // The moves below gained 10, and their gap is 10 smaller.
         assert_eq!(line.get("growth"), Some(&Json::from(30 - 400 + 10i64)));
-    }
-
-    #[test]
-    fn a_share_fixed_is_a_range_inside_0_to_1() {
-        for (text, fix) in
-            [("0.7,0.9", (0.7, 0.9)), ("0,1", (0.0, 1.0)), ("0.5,0.5", (0.5, 0.5)), ("1e-1,.2", (0.1, 0.2))]
-        {
-            assert_eq!(parse_fix(text), Ok(fix), "{text}");
-        }
-        for text in [
-            "",
-            "0.5",
-            "0.5,",
-            ",0.5",
-            "0.5,0.7,0.9",
-            "a,b",
-            "0.7;0.9",
-            "0.9,0.7",
-            "-0.1,0.5",
-            "0.5,1.1",
-            "nan,0.5",
-            "0.5,inf",
-        ] {
-            let err = parse_fix(text).unwrap_err();
-            assert!(err.starts_with("--fix takes LO,HI") && err.contains("0 <= LO <= HI <= 1"), "{text:?}: {err}");
-        }
-        assert_eq!(check_fix((0.3, 0.5)), Ok(()));
-        assert!(check_fix((f64::NAN, 0.5)).is_err() && check_fix((0.5, f64::NAN)).is_err());
     }
 }

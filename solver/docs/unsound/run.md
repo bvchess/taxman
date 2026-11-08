@@ -21,11 +21,11 @@ signal (SIGINT or SIGTERM) ends the run between rounds, and the game in play is 
 from the games FILE has, and from where the repair was.
 
 The summary line on stdout gives n, the score, the method, the rounds, how many of them raised the score and the
-seconds, then `unsound`, what `--stop-at-known` recorded, "at ceiling" if the game stopped at the run's ceiling,
-"n-1 short by" a number of points if this game's score proves the line of n − 1 short by at least that many, the
-[growth of its gap](shortfalls.md#the-bound-and-the-gap), with "stopped" if the growth ended its rounds, and for a [game
-played twice](shortfalls.md#games-played-twice) whether the push played it, and what its unseeded play scored, or that
-it was kept.  A line that the repair replaces has a summary line of its own: n, the new score, the method of the line
+seconds, then `unsound`, "at ceiling" if the game stopped at the run's ceiling, "n-1 short by" a number of points if
+this game's score proves the line of n − 1 short by at least that many, the [growth of its
+gap](shortfalls.md#the-bound-and-the-gap), with "stopped" if the growth ended its rounds, and for a [game played
+twice](shortfalls.md#games-played-twice) that the push played it, and what its unseeded play scored, or that it was
+kept.  A line that the repair replaces has a summary line of its own: n, the new score, the method of the line
 replaced, the game its moves came from and how much they gain, and the seconds; a repair of the best-known file's line
 alone says "best-known file only".  The run ends with the number of lines the repair replaced and the seconds its walks
 took, those that replaced nothing included, and the number of lines it added to the best-known file, and how many of
@@ -42,28 +42,12 @@ reference](../REFERENCE.md#1-the-flags-of-solve)), and refuses the flags of the 
 |---|---|
 | `--effort L` | the level of effort, from 1 to 6; needed ([the levels](play.md#the-level-of-effort)) |
 | `--seed S` | the seed of the rounds' random choices (default 1) |
-| `--back J` | J from 0 to 8, default 8: besides the start's, a game follows a trajectory from each distinct set that survives of the moves for the games n − 1, ..., n − J.  0: the start's alone |
-| `--above J` | J from 0 to 8, default 0: a game also follows a trajectory from each distinct set that survives of the moves for the games n + 1, ..., n + J that the run, FILE or the best-known file has, or with `--from-known` the built-in table.  A game played in order has no line above it in its own run, so this is for measuring |
-| `--tilt P` | P from 0 to 100, default 25: P percent of a round's neighborhoods free the small promotions more often.  0: none |
-| `--widen S` | S ≥ 1, default 4: a trajectory that has not grown heavier in S rounds moves to larger neighborhoods.  0: no widening |
-| `--fix LO,HI` | the share of the incumbent's promotions that each neighborhood keeps fixed, drawn at random from LO to HI, 0 ≤ LO ≤ HI ≤ 1 (default 0.7,0.9).  It turns widening off, and is refused with `--widen S` of 1 or more |
-| `--unseeded-every K` | K ≥ 0, default 0: a game whose n is a multiple of K is played twice, also unseeded, and keeps the better line ([games played twice](shortfalls.md#games-played-twice)).  0: none |
-| `--stop-growth T` | T ≥ 0 or `off`, default 25: a searched game's rounds end once its [gap](shortfalls.md#the-bound-and-the-gap) is within T of the gap below, from the end of the rounds of level 1 on |
-| `--stop-quiet K` | K ≥ 0, default 4: the stop on growth also needs K [quiet rounds](shortfalls.md#the-bound-and-the-gap).  0: the gap alone |
-| `--push-growth T` | T or `off`, default 25: a game whose gap grows by more than T in its play is [played twice](shortfalls.md#games-played-twice) |
-| `--unseeded-effort L` | the level of effort of the unseeded play of a game played twice, from 1 to 6 (default: `--effort`'s), for measuring |
-| `--best-known FILE` | FILE or `off`, default `best-known.jsonl` in the directory of `--out`: the [best-known file](best-known.md) that the run starts its games from, adds its lines to, and repairs lines in.  `off`: none.  The measuring options `--stop-at-known` and `--from-known` have none by default |
-| `--known-to N` | to rehearse the mode on games whose opt(n) the built-in table has: the run takes the table as holding the games up to N only, and a game above N is as if unproven.  No game starts from the table's moves for a game above N, the [best-known file](best-known.md#a-rehearsal-on-proven-games) may hold the games above N, and the checks against the table apply up to N.  Refused with `--stop-at-known` and `--from-known`, which measure against the table.  The line records N |
-| `--past-ceiling` | no stop at the [run's ceiling](play.md#the-runs-ceiling) |
-| `--no-repair` | no [repair](shortfalls.md#the-repair) of the lines below a line |
-| `--stop-at-known`, `--from-known` | to measure the mode on the games whose opt(n) the built-in table has, and refused for any other: end a game's rounds as soon as its score is the table's, and start every game from the table's moves for n − 1 |
-| `--unseeded` | to measure what a game makes of its board alone: every game is played [unseeded](shortfalls.md#games-played-twice), and none twice |
+| `--above J` | J from 0 to 8, default 0: besides the games before it, a game also follows a trajectory from each distinct set that survives of the moves for the games n + 1, ..., n + J that the run, FILE or the best-known file has.  A game played in order has no line above it in its own run, so this is for a run over a range whose files hold lines above it |
+| `--stop-growth T` | T ≥ 0 or `off`, default 25: a searched game's rounds end once its [gap](shortfalls.md#the-bound-and-the-gap) is within T of the gap below and its last 4 rounds raised nothing, from the end of the rounds of level 1 on |
+| `--best-known FILE` | FILE or `off`, default `best-known.jsonl` in the directory of `--out`: the [best-known file](best-known.md) that the run starts its games from, adds its lines to, and repairs lines in.  `off`: none |
+| `--known-to N` | to rehearse the mode on games whose opt(n) the built-in table has: the run takes the table as holding the games up to N only, and a game above N is as if unproven.  No game starts from the table's moves for a game above N, the [best-known file](best-known.md#a-rehearsal-on-proven-games) may hold the games above N, and the checks against the table apply up to N.  The line records N |
 
-The options `--back`, `--tilt` and `--widen` shape the rounds ([the options](play.md#the-options-that-shape-the-rounds)),
-and are on unless given 0, as `--stop-growth` and `--push-growth` are unless given `off`, so that a user names a level
-of effort and nothing else; `--above` shapes them too, and is off unless given.  The three were chosen together by
-two races on the hard games of 3441-5060, at equal work ([the first
-race](https://github.com/bvchess/taxman-notebook/blob/main/search/tilted-back-and-wider-rounds-2026-11/README.md), [the
-second](https://github.com/bvchess/taxman-notebook/blob/main/search/a-share-of-tilted-neighborhoods-2026-11/README.md)).
-At every level, `--tilt 25` and `--tilt 50` are within two games of each other, so 25 is chosen for its lead at the
-low levels, not by a significant margin.
+Everything else is built in, so that a user names a level of effort, a seed and a few files: the shape of the rounds, the
+[push](shortfalls.md#games-played-twice) of a game whose gap grows, the [repair](shortfalls.md#the-repair) of the lines
+below a line, and the stop at the [run's ceiling](play.md#the-runs-ceiling).  [The options that shape the
+rounds](play.md#the-options-that-shape-the-rounds) says what the settings are and which races chose them.

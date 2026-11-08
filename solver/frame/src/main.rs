@@ -13,9 +13,7 @@ use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, gate_trial, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
 use taxman::solver::unsound::{
-    DEFAULT_BACK, DEFAULT_BEST_KNOWN, DEFAULT_PUSH_GROWTH, DEFAULT_STOP_GROWTH, DEFAULT_STOP_QUIET, DEFAULT_TILT,
-    DEFAULT_UNSEEDED_EVERY, DEFAULT_WIDEN, MAX_ABOVE, MAX_BACK, MAX_EFFORT, MAX_TILT, MIN_EFFORT, REPAIR_REACH,
-    ROUND_WORK,
+    DEFAULT_BEST_KNOWN, DEFAULT_STOP_GROWTH, MAX_ABOVE, MAX_EFFORT, MIN_EFFORT, ROUND_WORK, STOP_QUIET,
 };
 use taxman::tactics::Tactics;
 
@@ -77,43 +75,22 @@ commands:
       --unsound                play each game as well as --effort finds, with no proof, on all the threads: each
                                line, appended to --out (needed), holds legal moves and their score, a lower bound,
                                and is marked unsound, which every reader of proven lines refuses.  It takes
-                               --threads, --tactic, --show and the flags below, and refuses the others.  The rounds
-                               are shaped by --tilt, --back and --widen, which are on unless given 0
+                               --threads, --tactic, --show and the flags below, and refuses the others.  A game
+                               follows trajectories from the games before it, and a game whose gap to its bound
+                               grows is played twice, also unseeded; the repair replaces a line that a line above
+                               it shows short
       --effort L               with --unsound: the level of effort, from {min_effort} to {max_effort}.
                                Level L runs rounds of {neighborhoods} neighborhoods of the finder's search until
                                their work (their steps and {neighborhood_work} for each neighborhood) reaches
                                2^L x {round_work}; a higher level does the rounds of a lower one first
       --seed S                 with --unsound: the seed of the rounds' random choices (default {seed})
-      --fix LO,HI              with --unsound: the share of the incumbent's promotions that each neighborhood keeps
-                               fixed, drawn from LO to HI, 0 <= LO <= HI <= 1 (default {fix}); turns widening off,
-                               and is refused with --widen S of 1 or more
-      --tilt P                 with --unsound: P percent of a round's neighborhoods (P from 0 to {max_tilt}, default
-                               {tilt}), the same share of each incumbent's, free the small promotions more often than
-                               the large ones (the number freed is the same); the others draw uniformly.  0: none
-      --back J                 with --unsound: besides the start's, follow an incumbent from what survives of the moves
-                               for each of the games n-1 .. n-J (J from 0 to {max_back}, default {back}) that differs
-                               from the ones before, each with its share of a round's neighborhoods.  0: the start's
-                               alone
-      --above J                with --unsound: follow an incumbent from what survives of the moves for each of the
-                               games n+1 .. n+J that the run or --out has (the built-in table's with --from-known),
-                               J from 0 to {max_above}, as --back does (default 0: none)
-      --widen S                with --unsound: an incumbent that has not grown heavier for S rounds (S >= 1, default
-                               {widen}) moves its neighborhoods down a ladder of the shares fixed,
-                               {ladder}.  0: no widening
-      --unseeded-every K       with --unsound: play each game whose n is a multiple of K twice, as any game and also
-                               unseeded, as --unseeded plays it, and keep the better line (default {unseeded_every}).
-                               0: no game twice
-      --unseeded-effort L      with --unsound: the level of effort of the unseeded play of a game played twice (default:
-                               --effort's)
+      --above J                with --unsound: besides the games before, follow an incumbent from what survives of the
+                               moves for each of the games n+1 .. n+J that the run, --out or the best-known file has
+                               (J from 0 to {max_above}, default 0: none)
       --stop-growth T|off      with --unsound: end a searched game's rounds once its gap is within T of the gap of the
-                               moves for n-1 it starts from (T >= 0), from the end of the rounds of level {min_effort}
-                               on (default {stop_growth}).  The gap is the game's bound less its score, and its growth
-                               the gap less that of the moves for n-1
-      --stop-quiet K           with --unsound: the stop of --stop-growth ends a game's rounds only when the last K
-                               rounds raised nothing (default {stop_quiet}); the start counts as round 0.  0: the gap
-                               alone
-      --push-growth T|off      with --unsound: play a game twice, as --unseeded-every does, if the growth of its gap
-                               after its play is above T (default {push_growth})
+                               moves for n-1 it starts from (T >= 0) and the last {stop_quiet} rounds raised nothing,
+                               from the end of the rounds of level {min_effort} on (default {stop_growth}).  The gap is
+                               the game's bound less its score, and its growth the gap less that of the moves for n-1
       --best-known FILE|off    with --unsound: the best-known file of unproven lines, the best-known line of each game
                                past the built-in table, from any run (default {default_best_known} in the directory of
                                --out; off: none).  A game starts from the file's moves for the games around it when
@@ -125,16 +102,7 @@ commands:
                                game above N is as if unproven: no game starts from the table's moves for a game above
                                N, the best-known file may hold the games above N and refuses those up to N, and the
                                checks against the table apply up to N.  For a rehearsal on games whose opt(n) is
-                               proven; refused with --stop-at-known and --from-known.  The line records N
-      --past-ceiling           with --unsound: do not end a game's rounds at the run's ceiling, n + the score of the
-                               moves for n-1 it starts from (which they do by default, when it has such moves)
-      --no-repair              with --unsound: do not repair lines: by default, what survives of each line in each of
-                               the {repair_reach} games below it replaces the line of that game if it scores more, and
-                               so on down, with the line appended again
-      --stop-at-known          with --unsound: end a game's rounds once its score is the built-in table's
-      --from-known             with --unsound: start every game from the built-in table's moves for n-1
-      --unseeded               with --unsound: take nothing from the games below: search every game, with no seed,
-                               no trajectory of --back and no run's ceiling (for measuring)
+                               proven.  The line records N
   regress [--from A] [--to N] [--threads K] [--window K] [--tactic ...]
                           solve A..N (default 1..400) in memory and check every score against the built-in table
   verify-results [--threads K] FILE...
@@ -151,8 +119,6 @@ commands:
 fn usage() -> String {
     let rows: Vec<String> = Tactics::names().chunks(4).map(|row| row.join(", ")).collect();
     let gates = gate_trial::GATES.map(|gate| gate.to_string()).join(",");
-    let (lo, hi) = finder::Options::default().fix;
-    let ladder: Vec<String> = finder::LADDER.iter().map(|(lo, hi)| format!("{lo},{hi}")).collect();
     USAGE
         .replace("{tactics}", &rows.join(&format!(",\n{:31}", "")))
         .replace("{finder_after}", &finder::AFTER.to_string())
@@ -172,20 +138,10 @@ fn usage() -> String {
         .replace("{round_work}", &ROUND_WORK.to_string())
         .replace("{neighborhood_work}", &finder::NEIGHBORHOOD_WORK.to_string())
         .replace("{seed}", &finder::Options::default().seed.to_string())
-        .replace("{fix}", &format!("{lo},{hi}"))
-        .replace("{max_tilt}", &MAX_TILT.to_string())
-        .replace("{tilt}", &DEFAULT_TILT.to_string())
-        .replace("{max_back}", &MAX_BACK.to_string())
-        .replace("{back}", &DEFAULT_BACK.to_string())
         .replace("{max_above}", &MAX_ABOVE.to_string())
-        .replace("{repair_reach}", &REPAIR_REACH.to_string())
-        .replace("{unseeded_every}", &DEFAULT_UNSEEDED_EVERY.to_string())
         .replace("{stop_growth}", &DEFAULT_STOP_GROWTH.map_or("off".to_owned(), |t| t.to_string()))
-        .replace("{stop_quiet}", &DEFAULT_STOP_QUIET.to_string())
-        .replace("{push_growth}", &DEFAULT_PUSH_GROWTH.map_or("off".to_owned(), |t| t.to_string()))
+        .replace("{stop_quiet}", &STOP_QUIET.to_string())
         .replace("{default_best_known}", DEFAULT_BEST_KNOWN)
-        .replace("{widen}", &DEFAULT_WIDEN.to_string())
-        .replace("{ladder}", &ladder.join(" -> "))
 }
 
 fn main() -> ExitCode {

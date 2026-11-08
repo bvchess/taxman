@@ -15,23 +15,24 @@ A game is set up as a proven run sets it up: the board and its frames.  Four met
 
 A `prime` or `repeat` game searches nothing, and keeps what the line it starts from falls short by, if it does.  The
 moves for n − 1 are the run's line, else the file's, or the [best-known file's](best-known.md) if that scores more, else
-the built-in table's, and `--from-known` takes the table's always.  A [game played
+the built-in table's.  A [game played
 twice](shortfalls.md#games-played-twice) is also searched with nothing from the games below it.
 
 The setup does not depend on the moves for n − 1, so a run makes each game's setup, with the dive of a searched game's
 start and the game's [bound](shortfalls.md#the-bound-and-the-gap), on a thread of its own while the game before it
 plays.  On many threads they would otherwise be a large part of the time of a run at a low level of effort.
 
-A line depends on the game, its start, the moves it starts from, the level, the seed and the options, and not on the
+A line depends on the game, its start, the moves it starts from, the level, the seed and `--above`, and not on the
 threads or the machine, but for its times and threads.
 
 ### The rounds
 
 A round is 64 neighborhoods (`NEIGHBORHOODS` in `search::finder`) of the large neighborhood search of the finder.  A
-neighborhood keeps fixed a share of the incumbent's promotions, drawn from the range of `--fix`, and searches the rest
-exactly as a unit of at most 1,024 steps, starting from the incumbent as the round starts.  A smaller share fixed
-leaves a neighborhood more to search.  Neighborhood k of round r draws its choices from a generator of the seed, n, r
-and k alone, and the best set of the round, the lowest k's among equals, is the next incumbent.
+neighborhood keeps fixed a share of the incumbent's promotions, drawn from the range of its trajectory's stage (0.7 to
+0.9 at the first; [the widening](#the-options-that-shape-the-rounds) has the others), and searches the rest exactly as
+a unit of at most 1,024 steps, starting from the incumbent as the round starts.  A smaller share fixed leaves a
+neighborhood more to search.  Neighborhood k of round r draws its choices from a generator of the seed, n, r and k
+alone, and the best set of the round, the lowest k's among equals, is the next incumbent.
 
 The steps of a neighborhood depend on its unit alone, so the rounds are the same on any number of threads.  A stop
 signal ends the run between rounds.
@@ -90,46 +91,64 @@ lines' `budget` gives the work.
 
 ### The options that shape the rounds
 
-A game follows one *trajectory* of incumbents, the one that begins from the start.  The options change what the rounds
-search, and so the line, and every value of them keeps what the rounds guarantee above: a level runs the rounds of the
-levels below it first.
+Three settings of the rounds are built in, so that a user names a level of effort and nothing else: the games back that
+the trajectories begin from (8), the share of the neighborhoods that are tilted (25 percent), and the rounds after which
+a stalled trajectory widens its neighborhoods (4).  The fourth, `--above`, is an option, and off unless given.  A game
+follows one *trajectory* of incumbents, the one that begins from the start; the settings change what the rounds search,
+and so the line, and every value of them keeps what the rounds guarantee above: a level runs the rounds of the levels
+below it first.
 
-**`--back J`** adds a trajectory for each distinct set that survives of the moves for the games n − 1, n − 2, ..., n − J:
-their promotions that can still be promoted here, from the largest down, as the proven finder's seed rounds begin.  A
-trajectory is added only if no trajectory before it, the start's included, began from the same set, and a game that
-none of the sources has moves for adds none.  Neighborhood k of a round works from the incumbent of trajectory k mod T,
-T the trajectories, as the round starts, and a trajectory's next incumbent is the best set of its own, the lowest k's
-among equals, if that is heavier than before.  The game's set is the heaviest incumbent, the start's on a tie, and a
-round that makes it heavier is an improvement, which names the trajectory that made it.  What survives of an earlier
-game can be heavier than the start; the game's set is then that before any round, an improvement of round 0.  The line
-says which games the trajectories began from (`trajectories`), and the score of what survives of each game's moves,
-whether or not it began one (`survivor_scores`).  A game that is not seeded follows the start's trajectory alone.
+**Back: 8 games.**  A game adds a trajectory for each distinct set that survives of the moves for the games n − 1, n − 2,
+..., n − 8: their promotions that can still be promoted here, from the largest down, as the proven finder's seed rounds
+begin.  A trajectory is added only if no trajectory before it, the start's included, began from the same set, and a game
+that none of the sources has moves for adds none.  Neighborhood k of a round works from the incumbent of trajectory k
+mod T, T the trajectories, as the round starts, and a trajectory's next incumbent is the best set of its own, the
+lowest k's among equals, if that is heavier than before.  The game's set is the heaviest incumbent, the start's on a
+tie, and a round that makes it heavier is an improvement, which names the trajectory that made it.  What survives of an
+earlier game can be heavier than the start; the game's set is then that before any round, an improvement of round 0.
+The line says which games the trajectories began from (`trajectories`), and the score of what survives of each game's
+moves, whether or not it began one (`survivor_scores`).  A game that is not seeded follows the start's trajectory
+alone.
 
-**`--above J`** adds, after those of `--back`, a trajectory for each distinct set that survives of the moves for the
-games n + 1, ..., n + J: the moves above n are left out, and what survives of the rest is taken as for `--back`.  The
-moves are the run's lines, else FILE's, and with `--from-known` the built-in table's, which are optimal; without it the
-table gives none.  A game played in order has no line above it in its own run, so the option is for measuring what the
-games above could give a game; [the repair](shortfalls.md#the-repair) is what a run takes from them.
+**`--above J`** adds, after those of the games back, a trajectory for each distinct set that survives of the moves for
+the games n + 1, ..., n + J: the moves above n are left out, and what survives of the rest is taken as for the games
+back.  The moves are the run's lines, else FILE's, else the best-known file's; the built-in table gives none.  A game
+played in order has no line above it in its own run, so the option is for a run over a range whose files hold lines
+above it; [the repair](shortfalls.md#the-repair) is what a run takes from the lines above it.
 
-**`--tilt P`** makes P percent of a round's neighborhoods free the small promotions more often than the large ones, with
-the same number freed as without it; the rest free them as a neighborhood does without the option.  Neighborhood k of a
-round of T trajectories is the jth of its trajectory, j = k div T, and it is tilted if and only if ⌊(j + 1) P / 100⌋ >
-⌊j P / 100⌋ (`draws_tilted` in `search::finder`).  So 0 tilts none, 100 every neighborhood, 50 the odd j and 25 every
-fourth j (3, 7, 11, ...), and every trajectory has P percent of its neighborhoods tilted to within one, whatever T is.
-A tilted neighborhood draws the promotions to free by weights that fall as x/n of a promotion x of game n rises, in
-whole numbers so that a line is the same on every machine (`TILT` in `search::finder` has them).
+**Tilt: 25 percent.**  A quarter of a round's neighborhoods free the small promotions more often than the large ones,
+with the same number freed as without the tilt; the rest free them uniformly.  Neighborhood k of a round of T
+trajectories is the jth of its trajectory, j = k div T, and it is tilted if and only if ⌊(j + 1) × 25 / 100⌋ >
+⌊j × 25 / 100⌋ (`draws_tilted` in `search::finder`), which is every fourth j (3, 7, 11, ...), so every trajectory has a
+quarter of its neighborhoods tilted to within one, whatever T is.  A tilted neighborhood draws the promotions to free by
+weights that fall as x/n of a promotion x of game n rises, in whole numbers so that a line is the same on every machine
+(`TILT` in `search::finder` has them).
 
-**`--widen S`** gives a trajectory a *stage*, 0 to 2, which sets the range of the share its neighborhoods keep fixed:
-0.7,0.9, then 0.5,0.7, then 0.4,0.6.  It starts at stage 0 and moves one stage down after S rounds in which its
-incumbent did not grow heavier, counting from its first round and again after each move, stays at stage 2, and returns
-to stage 0 when its incumbent grows heavier.  A trajectory's stage in a round depends only on the rounds before it.  The
-line records the rounds each trajectory spent at each stage (`stage_rounds`) and the stage of each improvement.
+**Widening: after 4 rounds.**  A trajectory has a *stage*, 0 to 2, which sets the range of the share its neighborhoods
+keep fixed: 0.7,0.9, then 0.5,0.7, then 0.4,0.6.  It starts at stage 0 and moves one stage down after 4 rounds in which
+its incumbent did not grow heavier, counting from its first round and again after each move, stays at stage 2, and
+returns to stage 0 when its incumbent grows heavier.  A trajectory's stage in a round depends only on the rounds before
+it.  The line records the rounds each trajectory spent at each stage (`stage_rounds`) and the stage of each
+improvement.
+
+**Where the values come from.**  Two races chose the three settings together, on the 251 hard games of 3441-5060 (the
+entries define them), at equal work.  With back 8, tilt 25 and widening 4, the share of those games that reach the
+score that the built-in table has is 87.3, 91.2, 94.0, 95.2, 96.8 and 97.6% at the levels 1 to 6, against 78.1, 79.7,
+81.3, 82.9, 86.1 and 89.6% with none of the three.  [The first
+race](https://github.com/bvchess/taxman-notebook/blob/main/search/tilted-back-and-wider-rounds-2026-11/README.md)
+chose the three together; [the
+second](https://github.com/bvchess/taxman-notebook/blob/main/search/a-share-of-tilted-neighborhoods-2026-11/README.md)
+chose the tilted share, since at every level a tilt of 25 and one of 50 are within two games of each other, and 25 leads
+at the low levels, though not by a significant margin.  The shares of the ladder come from [a race of larger
+neighborhoods](https://github.com/bvchess/taxman-notebook/blob/main/search/larger-neighborhoods-and-a-second-base-2026-11/README.md),
+which cost 10 to 22 times as much per round as the first stage's and reach games that it misses, so a trajectory moves
+to them only after it stalls.
 
 ### The run's ceiling
 
 A searched game stops at the *run's ceiling*, n + score(n − 1) of the moves it starts from: its rounds end once its
 score reaches it, before the first round if the start does, else after the round that does (which may pass it).  When
-those moves are optimal, as the built-in table's are with `--from-known`, the ceiling is the [proven
+those moves are optimal, as the built-in table's are, the ceiling is the [proven
 one](../../../docs/GLOSSARY.md#the-game) and the stop loses nothing.  Otherwise a game could score above it, which would
 prove the line of n − 1 short (`prev.short_by`); the stop gives that up for the time it saves.  A game with no moves for
-n − 1 has no ceiling, and `--past-ceiling` takes the stop away.
+n − 1 has no ceiling.

@@ -34,8 +34,7 @@ a line above it is a real game of n, and when it scores more than the line of n,
   boards it sets up again, a few seconds each at n ≈ 5,000: the run keeps the boards of its last 8 games, so a walk
   that goes further needs them, and so does the walk that a run takes up from FILE.
 
-A line depends on the repair as on any option (`repair` in the line), and `--no-repair` turns it off.  In a range the
-repair can change the moves that later games start from, as a level does.
+In a range the repair can change the moves that later games start from, as a level does.
 
 ## Games played twice
 
@@ -46,27 +45,26 @@ and a searched game starts from it and stops at the ceiling it sets.  An unseede
 below, so the short line does not hold it down; once it does better, the games above start from it and the repair walks
 down from it.
 
-* **Which games.**  With `--push-growth T`, on by default, a game whose [gap grows](#the-bound-and-the-gap) by more
-  than T in its play, and with `--unseeded-every K` a game whose n is a multiple of K (K = 8: games 4952, 4960 and so
-  on), unless it is trivial.  Which games depends on n and on the moves for n − 1 alone.
-* **The unseeded play.**  It is searched on the game's board, never played by the prime formula or as a repeat: its
-  start has no seed, its rounds follow the start's trajectory alone (and those of `--above`, if given), and it has no
-  run's ceiling and no stop on growth.  A prime, which has no board, takes the one set up for its bound.  `--unseeded`
-  plays every game this way and none twice, to measure what a game makes of its board alone.
+* **Which games.**  The *push* plays a game twice when its [gap grows](#the-bound-and-the-gap) by more than 25 in its
+  play, unless the game is trivial.  Which games depends on n and on the moves for n − 1 alone.
+* **The unseeded play.**  It is searched on the game's board at the game's level, never played by the prime formula or
+  as a repeat: its start has no seed, its rounds follow the start's trajectory alone (and those of `--above`, if
+  given), and it has no run's ceiling and no stop on growth.  A prime, which has no board, takes the one set up for its
+  bound.
 * **The line.**  The better play's, the seeded one on a tie, as that play alone writes it, with `other`, what the other
   play came to.  A line of the unseeded play has no `prev` and no ceiling.  Its `seconds` are those of both plays.
-* **The work.**  The unseeded play runs its rounds to the level's budget (or `--unseeded-effort`'s), as a searched game
-  does that is not stopped at a ceiling, so a game played twice does up to twice a level's work: each play counts
-  against a budget of its own, whether the game is played twice for its n or by the push.  Each play of a level runs
-  the rounds of the levels below first.
-* **What it gains.**  A streak of short games ends within K games of where it starts, if the unseeded play there
-  reaches a better score: in the chain of 4861-5060 at level 3 (524,288 work), K = 8 took the games at opt(n) from 182
-  to 198 of 200, since the unseeded play of 4952 ended the streak that the stuck 4950 starts after 2 games, not 18, for
-  24% more time ([the
+* **The work.**  The unseeded play runs its rounds to the level's budget, as a searched game does that is not stopped
+  at a ceiling, so a game played twice does up to twice a level's work: each play counts against a budget of its own.
+  Each play of a level runs the rounds of the levels below first.
+* **What it gains.**  A streak of short games ends where the unseeded play reaches a better score than the seeded one.
+  In the chain of 4861-5060 at level 3 (524,288 work), the unseeded play of every eighth game took the games at opt(n)
+  from 182 to 198 of 200, since the unseeded play of 4952 ended the streak that the stuck 4950 starts after 2 games,
+  not 18 ([the
   measurement](https://github.com/bvchess/taxman-notebook/blob/main/search/unseeded-games-above-a-short-game-2026-11/README.md)).
-  The push plays 4950 itself twice, and with it K = 8 changed no score of 4861-5060 or 5061-5260 for half again the
-  time, so the default is 0 ([the bound and the gap](#the-bound-and-the-gap)).  An unseeded play alone is weaker than
-  a seeded one, and reaches opt(n) less often; it pays only where the seeded play is held down.
+  The push plays 4950 itself twice, and with it the unseeded play of every eighth game changed no score of 4861-5060 or
+  5061-5260 and took half again the time, so the push is the only rule that plays a game twice ([the bound and the
+  gap](#the-bound-and-the-gap)).  An unseeded play alone is weaker than a seeded one, and reaches opt(n) less often;
+  it pays only where the seeded play is held down.
 
 ## The bound and the gap
 
@@ -83,24 +81,27 @@ fell: they end the rounds of a game that is probably done, and play twice a game
   grows by more than 50 in 5.6% and by more than 200 in 1.0%.  A short game makes it jump where a streak of short games
   begins (by 376 at the stuck 4950), and the games that it hands its shortfall on to carry the gap on, with a growth of
   about 0.
-* **`--stop-growth T`** ends a searched game's rounds once its gap is within T of the gap below, asked after each
-  round from the one that reaches the budget of level 1 on.  Most games reach their score in level 1's rounds; a gap
-  that shrank by more than T says that the game below may be short or that this one has more to give, so the rounds go
-  on.  Level 1 plays as without the stop, and a level still plays the rounds of the levels below first.
-* **`--stop-quiet K`** makes the stop wait for K *quiet rounds*, K rounds in a row that did not raise the game's
-  score, since a game that gains late may gain again.  The start counts as round 0, and K = 0 asks the gap alone.
-* **`--push-growth T`** plays a game twice, as `--unseeded-every` does, when its gap has grown by more than T in its
-  play: the unseeded play is the one that a short line below cannot hold down.  It counts against a budget of its own,
-  the level's.  A pushed game at one level may score more than the same game at a higher level, whose seeded play
-  brought the growth to T or below and was not pushed.
-* **What they gave.**  At level 3, with a push of 50, the gap alone for the stop and no game played twice for its n,
-  they took the chain of 4861-5060 from 198 of 200 games at opt(n) to 200 in 44% less time: the push played the stuck
-  4950 twice, and its streak never began.  On 5061-5260 no line changed, in 43% less time ([the
+* **`--stop-growth T`** (default 25; `off` for none) ends a searched game's rounds once its gap is within T of the gap
+  below, asked after each round from the one that reaches the budget of level 1 on.  Most games reach their score in
+  level 1's rounds; a gap that shrank by more than T says that the game below may be short or that this one has more to
+  give, so the rounds go on.  Level 1 plays as without the stop, and a level still plays the rounds of the levels below
+  first.
+* **The quiet rounds** are built in: the stop waits for 4 *quiet rounds*, 4 rounds in a row that did not raise the
+  game's score, since a game that gains late may gain again.  The start counts as round 0.
+* **The push** is built in at 25: a game whose gap has grown by more than 25 in its play is played twice, since the
+  unseeded play is the one that a short line below cannot hold down.  It counts against a budget of its own, the
+  level's.  A pushed game at one level may score more than the same game at a higher level, whose seeded play brought
+  the growth to 25 or below and was not pushed.
+* **What they gave.**  At level 3, with a push of 50 and the gap alone for the stop, they took the chain of 4861-5060
+  from 198 of 200 games at opt(n) to 200 in 44% less time: the push played the stuck 4950 twice, and its streak never
+  began.  On 5061-5260 no line changed, in 43% less time ([the
   measurement](https://github.com/bvchess/taxman-notebook/blob/main/search/stopping-and-pushing-by-the-gap-2026-11/README.md)).
-* **Where the defaults come from.**  A push of 25 took level 2 from 1,015 games at opt(n) to 1,039 on 4001-5060, for 4%
-  more time ([the
+* **Where the built-in values come from.**  A push of 25 took level 2 from 1,015 games at opt(n) to 1,039 on 4001-5060,
+  for 4% more time ([the
   measurement](https://github.com/bvchess/taxman-notebook/blob/main/search/tuning-the-unsound-mode-on-a-long-chain-2026-11/README.md)).
   On lines made with no stop, 4 quiet rounds would have lost 7 of 2,060 games of level 2 where the gap alone loses 12,
   and saved 28.5% of the work against 28.9% ([the
-  simulation](https://github.com/bvchess/taxman-notebook/blob/main/search/simulating-stop-rules-on-lines-already-made-2026-11/README.md)).
-  The mode itself has not been measured with `--stop-quiet 4`.
+  simulation](https://github.com/bvchess/taxman-notebook/blob/main/search/simulating-stop-rules-on-lines-already-made-2026-11/README.md)),
+  and played by the mode, on 3001-4000 they took level 2 from 932 games at opt(n) of 1,000 with the gap alone to 954,
+  for 1.0% more work ([the
+  measurement](https://github.com/bvchess/taxman-notebook/blob/main/search/the-stop-that-waits-for-quiet-rounds-2026-11/README.md)).

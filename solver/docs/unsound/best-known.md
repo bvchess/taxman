@@ -13,8 +13,7 @@ built-in table is never in it, since the table's proven line is that game's best
 [rehearsal](#a-rehearsal-on-proven-games).
 
 `--best-known FILE` names the file.  By default it is `best-known.jsonl` in the directory of `--out`, and
-`--best-known off` gives a run none.  The file is created if it is missing.  The measuring options `--stop-at-known` and
-`--from-known`, which play the games of the built-in table, have none unless `--best-known` names one.
+`--best-known off` gives a run none.  The file is created if it is missing.
 
 ## How a run uses it
 

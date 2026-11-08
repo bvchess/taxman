@@ -156,31 +156,12 @@ const SOLVE_FLAGS: [&str; 10] = [
 ];
 
 /// The flags of the unsound mode that take a value, besides `--out` and the solver's: the level of effort, the seed,
-/// the options that shape the rounds (the share fixed, the share tilted, the games before and above that the
-/// trajectories begin from, the widening), of which `--tilt`, `--back` and `--widen` have defaults that 0 turns off,
-/// the games played twice and the level of their unseeded play, the stop and the push on the growth of the gap (the
-/// stop with the quiet rounds it waits for), the best-known file, and the game the built-in table is cut at.
-const UNSOUND_FLAGS: [&str; 14] = [
-    "--effort",
-    "--seed",
-    "--fix",
-    "--tilt",
-    "--back",
-    "--above",
-    "--widen",
-    "--unseeded-every",
-    "--unseeded-effort",
-    "--stop-growth",
-    "--stop-quiet",
-    "--push-growth",
-    "--best-known",
-    "--known-to",
-];
+/// the games above that the trajectories begin from, the stop on the growth of the gap, the best-known file, and the
+/// game the built-in table is cut at.
+const UNSOUND_FLAGS: [&str; 6] = ["--effort", "--seed", "--above", "--stop-growth", "--best-known", "--known-to"];
 
-/// The switches of the unsound mode: the mode itself, the end of the stop at the run's ceiling, the end of the repair,
-/// and its measuring options, of which the last plays every game unseeded.
-const UNSOUND_SWITCHES: [&str; 6] =
-    ["--unsound", "--past-ceiling", "--no-repair", "--stop-at-known", "--from-known", "--unseeded"];
+/// The switch of the unsound mode: the mode itself.
+const UNSOUND_SWITCHES: [&str; 1] = ["--unsound"];
 
 /// `solve N|A-B [options]`: solves game N or a range, each from the one before (`solver::solve_range_each`); with
 /// `--unsound`, plays them in the unsound mode ([`solve_unsound`]).
@@ -253,17 +234,13 @@ fn proof_search_flags() -> impl Iterator<Item = &'static str> {
     solve.chain(SEARCH_FLAGS).chain(SEARCH_SWITCHES).chain(["--force-search"])
 }
 
-/// `solve A-B --unsound --effort L --out FILE [--seed S] [--fix LO,HI] [--tilt P] [--back J] [--above J] [--widen S]
-/// [--unseeded-every K] [--unseeded-effort L] [--stop-growth T|off] [--stop-quiet K] [--push-growth T|off]
-/// [--best-known FILE|off] [--known-to N] [--past-ceiling] [--no-repair] [--stop-at-known] [--from-known]
-/// [--unseeded]`, with `--threads`, `--tactic` and `--show`: plays the games in the unsound mode
+/// `solve A-B --unsound --effort L --out FILE [--seed S] [--above J] [--stop-growth T|off] [--best-known FILE|off]
+/// [--known-to N]`, with `--threads`, `--tactic` and `--show`: plays the games in the unsound mode
 /// (`solver::unsound::solve_range`), with no proof, and appends their unsound lines to FILE, and the lines that the
-/// repair replaces.  An option not given has its default ([`Plan::default`]); `--fix` turns widening off
-/// (`unsound::widening`).  The run keeps a best-known file, `best-known.jsonl` beside FILE unless `--best-known` says
-/// otherwise (`unsound::best_known_path`); the measuring options `--stop-at-known` and `--from-known`, which play the
-/// games of the built-in table, have none unless `--best-known` names one.  `--known-to N` has `solve_range` cut the
-/// built-in table at N, so that the games above N are as if unproven.  It stops on SIGINT and SIGTERM between rounds,
-/// the game in play unrecorded.
+/// repair replaces.  An option not given has its default ([`Plan::default`]).  The run keeps a best-known file,
+/// `best-known.jsonl` beside FILE unless `--best-known` says otherwise (`unsound::best_known_path`).  `--known-to N`
+/// has `solve_range` cut the built-in table at N, so that the games above N are as if unproven.  It stops on SIGINT
+/// and SIGTERM between rounds, the game in play unrecorded.
 fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     if let Some(flag) = proof_search_flags().find(|flag| args.has(flag)) {
         return Err(CliError::Usage(format!("{flag} is a flag of the proof search, which --unsound does not run")));
@@ -274,46 +251,20 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     })?;
     let effort = unsound::parse_effort(effort).map_err(CliError::Usage)?;
     let default = Plan::default();
-    let fix = args.value("--fix").map(unsound::parse_fix).transpose().map_err(CliError::Usage)?;
-    let tilt = args.value("--tilt").map(unsound::parse_tilt).transpose().map_err(CliError::Usage)?;
-    let back = args.value("--back").map(unsound::parse_back).transpose().map_err(CliError::Usage)?;
     let above = args.value("--above").map(unsound::parse_above).transpose().map_err(CliError::Usage)?;
-    let widen = args.value("--widen").map(unsound::parse_widen).transpose().map_err(CliError::Usage)?;
-    let widen = unsound::widening(fix.is_some(), widen).map_err(CliError::Usage)?;
-    let unseeded_effort =
-        args.value("--unseeded-effort").map(unsound::parse_unseeded_effort).transpose().map_err(CliError::Usage)?;
     let stop_growth =
         args.value("--stop-growth").map(unsound::parse_stop_growth).transpose().map_err(CliError::Usage)?;
-    let stop_quiet = args.value("--stop-quiet").map(unsound::parse_stop_quiet).transpose().map_err(CliError::Usage)?;
-    let push_growth =
-        args.value("--push-growth").map(unsound::parse_push_growth).transpose().map_err(CliError::Usage)?;
     let plan = Plan {
         effort,
         seed: args.parsed("--seed")?.unwrap_or(default.seed),
-        fix: fix.unwrap_or(default.fix),
-        tilt: tilt.unwrap_or(default.tilt),
-        back: back.unwrap_or(default.back),
         above: above.unwrap_or(default.above),
-        widen,
-        stop_at_known: args.has("--stop-at-known"),
-        from_known: args.has("--from-known"),
         known_to: args.parsed("--known-to")?,
-        past_ceiling: args.has("--past-ceiling"),
-        repair: !args.has("--no-repair"),
-        unseeded: args.has("--unseeded"),
-        unseeded_every: args.parsed("--unseeded-every")?.unwrap_or(default.unseeded_every),
-        unseeded_effort,
         stop_growth: stop_growth.unwrap_or(default.stop_growth),
-        stop_quiet: stop_quiet.unwrap_or(default.stop_quiet),
-        push_growth: push_growth.unwrap_or(default.push_growth),
         ..default
     };
     let out = args.value("--out").map(Path::new);
     let out = out.ok_or_else(|| CliError::Usage("--unsound needs --out FILE, the file of its lines".into()))?;
-    // The measuring options play the games of the built-in table, which the best-known file never holds.
-    let given = args.value("--best-known");
-    let measuring = plan.stop_at_known || plan.from_known;
-    let best_known = if measuring && given.is_none() { None } else { unsound::best_known_path(Some(out), given) };
+    let best_known = unsound::best_known_path(Some(out), args.value("--best-known"));
     let files = unsound::Files { table: Optimal::built_in(), out: Some(out), best_known: best_known.as_deref() };
     // Before any thread starts: the neighborhoods of the rounds allocate and free a searcher's memory each.
     finder::keep_freed_memory();
@@ -342,10 +293,8 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     if summary.skipped > 0 {
         outln!("skipped {} games already done in {}", summary.skipped, out.display());
     }
-    if plan.repair {
-        let seconds = summary.repair_time.as_secs_f64();
-        outln!("repaired {} lines; the repair took {seconds:.3} s", summary.repaired);
-    }
+    let seconds = summary.repair_time.as_secs_f64();
+    outln!("repaired {} lines; the repair took {seconds:.3} s", summary.repaired);
     if let Some(best_known) = &best_known {
         let (added, repaired) = (summary.best_known_added, summary.best_known_repaired);
         outln!(
