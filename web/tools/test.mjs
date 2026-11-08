@@ -391,7 +391,12 @@ same('the groups add up to every game', sum(Object.values(sorted.groupCounts)), 
       .split('\n').filter((line) => line.trim() !== '').map((line) => JSON.parse(line)));
   same('the upper files have a line for every n from 2 to the last game',
     upper.map((r) => r.n).sort((x, y) => x - y), Array.from({ length: games.lastN - 1 }, (_, k) => k + 2));
-  const needing = upper.filter((r) => r.needs === 1);
+  // Semiprime games rest on the game before, not on the frame model (the four older files cannot tell them apart).
+  const relation = new Map(['exact_parity_2_2531', 'rootbounds_2532_5060']
+    .flatMap((name) => readFileSync(join(repoRoot, 'solver', 'noframe', 'data', `${name}.jsonl`), 'utf8')
+      .split('\n').filter((line) => line.trim() !== '').map((line) => JSON.parse(line)))
+    .map((r) => [r.n, r.relation]));
+  const needing = upper.filter((r) => r.needs === 1 && relation.get(r.n) !== 'semiprime');
   same('the root\'s heaviest set plays all of U* in every game that needs the barred bounds',
     needing.filter((r) => r.root_has_upper !== 1).length, 0);
   const past = needing.filter((r) => r.n > PROVER_TO);
