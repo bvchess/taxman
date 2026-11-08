@@ -88,6 +88,61 @@
   </div>
 </section>
 
+<section class="chapter" id="odd-cores" data-toc="odd-cores" aria-labelledby="h-odd-cores">
+  <h2 id="h-odd-cores">Odd cores</h2>
+  <div class="para">
+    <aside class="note card" aria-label="The first odd core, proved">
+      <div class="note-head"><span class="note-name">The first odd core<span class="note-label">Proposition C3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-first-odd-core">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">Below game 45 every set that passes the parity test is playable.</p>
+      <p class="precise"><span class="run">Precisely.</span>Every S ⊆ {2, …, 44} that passes the parity test is
+      playable, so the parity bound is opt(n) for n ≤ 44, and {12, 18, 20, 30, 45} is an odd core.</p>
+    </aside>
+    <p>The five numbers 12, 18, 20, 30 and 45 pass the parity test, yet they are not playable, because <a class="gloss"
+    href="glossary.html#peel">peel</a>, which decides whether a set is playable, cannot even begin. Every number has at
+    least two factors to pay with, and every factor at least two numbers that could use it, so peel has no safe first
+    step.  A set like this, which passes the test, is not playable, and holds no smaller such set, is an <a
+    class="gloss" href="glossary.html#odd-core">odd core</a>.  Game 45 is the first board with one.</p>
+  </div>
+
+  <div class="para">
+    <p>What lets an odd core exist?  A number's maximal factors are the number divided by each of its primes, so a
+    number with two different primes has two, and a number with three has three: 30 = 2 · 3 · 5, with 15, 10 and 6, is
+    the smallest.  Numbers that each list at most two factors are playable exactly when they pass the parity test (the
+    <a href="sets.html#loop-section">loop rule</a> of chapter 1), so a set of them is never an odd core.  One number
+    with three is enough.  In game 45's core, 12, 18, 20 and 45 each list two factors and make a chain, 10 – 20 – 4 – 12
+    – 6 – 18 – 9 – 45 – 15, and 30 joins it at 6, 10 and 15.</p>
+  </div>
+
+  <div class="para">
+    <aside class="note card" aria-label="The exactness of the parity bound to game 77, measured">
+      <div class="note-head"><span class="note-name">Exact to game 77</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#what-the-parity-bound-misses">measured<span class="sr-only">, evidence on GitHub</span></a></div>
+      <p class="plain">The parity bound equals opt(n) for every game up to 77, and exceeds it at game 78.</p>
+      <p class="precise"><span class="run">Precisely.</span>The prover's run on games 2 to 2,531 records each bound and
+      checks it by its weight split: at game 78 it is 1,992 against opt(78) = 1,991 (<a
+      href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#observations">the evidence</a>). U*
+      with <span data-78="promotions">28, 30, 36 and 39</span> passes the test at that weight; the nine numbers the
+      figure draws are what peel leaves of it.</p>
+    </aside>
+    <p>An odd core makes the bound miss only when no heaviest set that passes the test is playable.  Up to game 77 that
+    never happens, and the parity bound is exactly opt(n): below game 45 no board has an odd core, and in each of games
+    45 to 77 some heaviest set that passes the test is playable.  Game 78 is the first where it happens, and the bound
+    misses by one point: <span data-78="bound">1,992</span> against opt(78) = <span data-78="opt">1,991</span>.  Take an
+    optimal set of game 78 and put <span data-78="inn">28</span> in place of <span data-78="out">27</span>.  The set
+    gains a point and still passes the test, but these nine of its numbers are not playable.</p>
+  </div>
+
+  <figure class="fig exact-78-fig" id="exact-78">
+    <svg role="img" aria-label="The odd core of game 78."></svg>
+    <figcaption class="fig-caption">Each number sits between two factors it can pay with, and
+    <span data-78="threes">30 and 42</span> reach across the ring to a third.  Double outline: the promotions,
+    <span data-78="promoted">28 and 30</span>.</figcaption>
+  </figure>
+
+  <p>Each of the nine numbers can pay with two or three of the nine factors, and each factor could pay for two or more
+  of them, so again peel has no safe first step.  Yet no group of the nine lists every factor an even number of times,
+  so they pass the test.  They are the first odd core that raises the bound.</p>
+</section>
+
 <section class="chapter" id="comparing" data-toc="comparing" aria-labelledby="h-comparing">
   <h2 id="h-comparing">Comparing bounds</h2>
   <div class="para">
@@ -184,62 +239,6 @@
     takes a 1 in every row, no two in the same column: it is one payment scheme.  Choose rows to add them up; the
     bottom row says whether each column comes out even or odd.</figcaption>
   </figure>
-</section>
-
-<section class="chapter" id="odd-cores" data-toc="odd-cores" aria-labelledby="h-odd-cores">
-  <h2 id="h-odd-cores">Odd cores</h2>
-  <div class="para">
-    <aside class="note card" aria-label="The first odd core, proved">
-      <div class="note-head"><span class="note-name">The first odd core<span class="note-label">Proposition C3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-first-odd-core">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Below game 45 every set that passes the parity test is playable.</p>
-      <p class="precise"><span class="run">Precisely.</span>Every S ⊆ {2, …, 44} that passes the parity test is
-      playable, so the parity bound is opt(n) for n ≤ 44, and {12, 18, 20, 30, 45} is an odd core.</p>
-    </aside>
-    <p>The five numbers 12, 18, 20, 30 and 45 pass the parity test, yet they are not playable, because <a class="gloss"
-    href="glossary.html#peel">peel</a>, which decides whether a set is playable, cannot even begin. Every number has at
-    least two factors to pay with, and every factor at least two numbers that could use it, so peel has no safe first
-    step.  A set like this, which passes the test, is not playable, and holds no smaller such set, is an <a
-    class="gloss" href="glossary.html#odd-core">odd core</a>.  Game 45 is the first board with one.</p>
-  </div>
-
-  <div class="para">
-    <p>What lets an odd core exist?  A number's maximal factors are the number divided by each of its primes, so a
-    number with two different primes has two, and a number with three has three: 30 = 2 · 3 · 5, with 15, 10 and 6, is
-    the smallest.  Numbers that each list at most two factors are playable exactly when they pass the parity test (the
-    <a href="sets.html#loop-section">loop rule</a> of chapter 1), so a set of them is never an odd core.  One number
-    with three is enough.  In game 45's core, 12, 18, 20 and 45 each list two factors and make a chain, 10 – 20 – 4 – 12
-    – 6 – 18 – 9 – 45 – 15, and 30 joins it at 6, 10 and 15.  Whichever of the three 30 pays with, the rest of the chain
-    has just one way to pay, so the set has three schemes: an odd number, but never exactly one.</p>
-  </div>
-
-  <div class="para">
-    <aside class="note card" aria-label="The exactness of the parity bound to game 77, measured">
-      <div class="note-head"><span class="note-name">Exact to game 77</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#what-the-parity-bound-misses">measured<span class="sr-only">, evidence on GitHub</span></a></div>
-      <p class="plain">The parity bound equals opt(n) for every game up to 77, and exceeds it at game 78.</p>
-      <p class="precise"><span class="run">Precisely.</span>The prover's run on games 2 to 2,531 records each bound and
-      checks it by its weight split: at game 78 it is 1,992 against opt(78) = 1,991 (<a
-      href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#observations">the evidence</a>). U*
-      with <span data-78="promotions">28, 30, 36 and 39</span> passes the test at that weight; the nine numbers the
-      figure draws are what peel leaves of it.</p>
-    </aside>
-    <p>An odd core makes the bound miss only when no heaviest set that passes the test is playable.  Up to game 77 that
-    never happens, and the parity bound is exactly opt(n): below game 45 no board has an odd core, and in each of games
-    45 to 77 some heaviest set that passes the test is playable.  Game 78 is the first where it happens, and the bound
-    misses by one point: <span data-78="bound">1,992</span> against opt(78) = <span data-78="opt">1,991</span>.  Take an
-    optimal set of game 78 and put <span data-78="inn">28</span> in place of <span data-78="out">27</span>.  The set
-    gains a point and still passes the test, but these nine of its numbers are not playable.</p>
-  </div>
-
-  <figure class="fig exact-78-fig" id="exact-78">
-    <svg role="img" aria-label="The odd core of game 78."></svg>
-    <figcaption class="fig-caption">Each number sits between two factors it can pay with, and
-    <span data-78="threes">30 and 42</span> reach across the ring to a third.  Double outline: the promotions,
-    <span data-78="promoted">28 and 30</span>.</figcaption>
-  </figure>
-
-  <p>Each of the nine numbers can pay with two or three of the nine factors, and each factor could pay for two or more
-  of them, so again peel has no safe first step.  Yet no group of the nine lists every factor an even number of times,
-  so they pass the test.  They are the first odd core that raises the bound.</p>
 </section>
 
 <nav class="chapter-nav" aria-label="Pages"></nav>

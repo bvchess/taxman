@@ -240,17 +240,18 @@ a quick test of even and odd, on the frames of a search or on the whole board.
 * The whole board: the same test needs no frames, and on the whole board it bounds opt(n), the parity bound; at the
   root, the frame bound plus ΣU* equals it on every board from 2 to 8191 (measured).  It is the prover's bound
   (chapter 7).
-* Comparing bounds: Franklín and Moniot's bound is looser, its gap about ten times the parity bound's
-  (measured); a set is allowed by theirs, by the parity bound, or playable when some set of factors gets at least one,
-  an odd number, or exactly one scheme.
 * Odd cores: game 45's is the first; the parity bound is exact to 77 and first misses at 78, where an odd core weighs
   in (measured).
+* Comparing bounds, last because it rests on measurements: Franklín and Moniot's bound is looser, its gap about ten
+  times the parity bound's in every game to the end of the chain (measured), and a search with it explores far more
+  (the prover's searches of every game to 1,000 under each bound); a set is allowed by theirs, by the parity bound, or
+  playable when some set of factors gets at least one, an odd number, or exactly one scheme.
 
-**Figures.**  The ladder of three conditions, at least one, an odd number, exactly one payment scheme, on small
-examples.  Game 78's odd core.
+**Figures.**  Game 78's odd core.  Each bound's height above opt(n) in every game of the chain.  The ladder of three
+conditions, at least one, an odd number, exactly one payment scheme, on small examples, and the tables of two of them.
 
-**Right column.**  The signed frame theorem (B1) and the frame bound (B2) over GF(2), the parity bound (W1), the two
-gaps (measured), the counting theorem (C2), the first odd core (C3), the parity bound exact to 77 (measured).
+**Right column.**  The signed frame theorem (B1) and the frame bound (B2) over GF(2), the parity bound (W1), the first
+odd core (C3), the parity bound exact to 77 (measured), the two gaps (measured), the counting theorem (C2).
 
 ### 7. Statement U
 
