@@ -7,9 +7,10 @@
 // game does not play.
 //
 // The explorer fills the center column: the controls, then the record, then the board under it.  Every number keeps
-// its place on the board from game to game, the board keeps the room of its largest game, and each line of words keeps
-// the room of its longest form at the present width, measured when the width changes, never when n does.  The caption
-// stands above the board.  A game past those of small.json has no board: its board area is not shown.
+// its place on the board from game to game, and the board has the rows of the game shown.  Each line of the record
+// keeps the room of its longest form at the present width, measured when the width changes, never when n does.  The
+// caption stands above the board and keeps the room of the longest of the game's captions, measured when the game or
+// the width changes.  A game past those of small.json has no board: its board area is not shown.
 //
 // URL parameters: n=N opens game N, and at=x, with a game up to 100, opens it pointing at the number x.
 
@@ -153,9 +154,7 @@ const at = (x) => ({ x: CELL / 2 + CELL * ((x - 1) % COLS), y: CELL / 2 + CELL *
 export function mountExplorer(host, { games, small }) {
   const last = games.lastN;
   const smallGames = new Map(small.map((g) => [g.n, g]));
-  const smallLast = Math.max(...smallGames.keys());
   const W = CELL * COLS;
-  const H = CELL * ROWS_OF(smallLast);
 
   host.innerHTML = `
     <div class="ex-controls">
@@ -183,7 +182,8 @@ export function mountExplorer(host, { games, small }) {
       </div>
       <div class="ex-board">
         <p class="ex-caption"></p>
-        <svg class="v-figure is-flat ex-svg" viewBox="0 0 ${W} ${H}" role="img" tabindex="0"></svg>
+        <svg class="v-figure is-flat ex-svg" viewBox="0 0 ${W} ${CELL}" role="img" tabindex="0"></svg>
+        <p class="ex-caption ex-ruler"></p>
       </div>
     </div>`;
 
@@ -192,6 +192,7 @@ export function mountExplorer(host, { games, small }) {
   const range = $('.ex-range');
   const svg = $('.ex-svg');
   const caption = $('.ex-caption');
+  const ruler = $('.ex-ruler');
   const board$ = $('.ex-board');
   const field = (name) => host.querySelector(`[data-f="${name}"]`);
   const statsBox = $('.ex-stats');
@@ -235,19 +236,12 @@ export function mountExplorer(host, { games, small }) {
   const longest = (strings, k = 4) => [...new Set(strings)].sort((a, b) => b.length - a.length).slice(0, k);
   const samples = (() => {
     const all = Array.from({ length: last }, (_, i) => record(games, i + 1));
-    const captions = [];
-    for (const g of smallGames.values()) {
-      const b = boardOf(g);
-      captions.push(defaultCaption(g, b));
-      for (let x = 1; x <= g.n; x++) captions.push(aboutNumber(g, b, x));
-    }
     const allStats = all.map(stats);
     const subs = statCells.map((_, k) => longest(allStats.map((s) => s[k][2]), 2));
     return {
       share: longest(all.map(shareText)),
       settled: longest(all.map((r) => settledHTML(r.settled))),
       rests: longest(all.map((r) => r.rests)),
-      captions: longest(captions),
       subs,
     };
   })();
@@ -266,10 +260,23 @@ export function mountExplorer(host, { games, small }) {
     fit(field('share'), samples.share);
     fit(field('settled'), samples.settled, true);
     fit(field('rests'), samples.rests);
-    fit(caption, samples.captions);
     statCells.forEach((cell, k) => fit(cell.querySelector('.ex-sub'), samples.subs[k].filter(Boolean).length ? samples.subs[k] : ['\u00a0']));
     render(true);
     if (held) point(held);
+  }
+
+  // The caption keeps the room of the tallest of the game's captions, its own and the one for each number, so that
+  // pointing along the board never moves the board.  Each is set in a hidden copy of the caption and measured, when
+  // the board is drawn and when the width changes.
+  function fitCaption() {
+    const g = smallGames.get(n);
+    let h = 0;
+    for (const s of [defaultCaption(g, board), ...Array.from({ length: n }, (_, i) => aboutNumber(g, board, i + 1))]) {
+      ruler.textContent = s;
+      h = Math.max(h, ruler.getBoundingClientRect().height);
+    }
+    ruler.textContent = '';
+    caption.style.minHeight = `${Math.ceil(h)}px`;
   }
 
   // ---- drawing ----------------------------------------------------------------------------------------------
@@ -286,6 +293,7 @@ export function mountExplorer(host, { games, small }) {
     }
     if (g.score !== record(games, n).score) throw new Error(`game ${n}: small.json and games.json differ`);
     board = boardOf(g);
+    svg.setAttribute('viewBox', `0 0 ${W} ${CELL * ROWS_OF(n)}`);
     svg.tabIndex = 0;
     const moves = board.turns.map((t) => t.move);
     svg.setAttribute('aria-label', `The board of game ${n}, ten numbers a row. The player takes ${listWords(moves)}, in that order, and the taxman takes the rest. Use the arrow keys to step through the moves.`);
@@ -340,7 +348,10 @@ export function mountExplorer(host, { games, small }) {
       cell.querySelector('.ex-sub').textContent = sub;
     });
     board$.hidden = !board;
-    if (board) point(null);
+    if (board) {
+      fitCaption();
+      point(null);
+    }
   }
 
   // The address keeps the game chosen, a little after the reader stops, so that a slider dragged across the chain

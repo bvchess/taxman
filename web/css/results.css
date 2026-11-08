@@ -55,10 +55,11 @@
 .ex-sub { display: block; font-size: 0.74rem; line-height: 1.35; color: var(--ink-3); }
 
 /* The board, under the record: game n drawn in place.  Past the games drawn, the board area is not shown. */
-.ex-board { max-width: 26rem; }
+.ex-board { position: relative; max-width: 26rem; }
 .ex-svg { width: 100%; height: auto; outline: none; }
 .ex-svg:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 4px; border-radius: 6px; }
 .ex-caption { margin: 0 2px 10px; font-size: 0.86rem; line-height: 1.5; color: var(--ink-2); }
+.ex-ruler { position: absolute; top: 0; left: 0; right: 0; visibility: hidden; pointer-events: none; }
 
 /* ---- the chart of the player's share ----------------------------------------------------------------------------- */
 
