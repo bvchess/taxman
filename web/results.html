@@ -31,7 +31,7 @@
   <div class="para">
     <p>Choose any game of the <a class="gloss" href="glossary.html#chain">chain</a>.  The explorer below shows what
     the chain records for it: what the player and the taxman each collect in an
-    <a class="gloss" href="glossary.html#optimal-game">optimal game</a>, what proves the score, how many
+    <a class="gloss" href="glossary.html#optimal-game">optimal game</a>, what proves the score is optimal, how many
     <a class="gloss" href="glossary.html#promote">promotions</a> the optimal game makes, and what its
     <a class="gloss" href="glossary.html#search">search</a> cost.  For games up to 100 it also draws the moves on the
     <a class="gloss" href="glossary.html#board">board</a>.</p>
@@ -53,7 +53,7 @@
     </aside>
     <p>Most of each score comes from the top half: <a class="gloss" href="glossary.html#u-star">U*</a>, the numbers
     above n/2 that <a class="gloss" href="glossary.html#descending-greedy">descending greedy</a> keeps.  The promotions
-    add the rest, and the search chooses them.  The search grows steeply with n: in game 21 it explores
+    chosen by the search add the rest.  The search grows steeply with n: in game 21 it explores
     <span data-fact="nodes21">1</span> <a class="gloss" href="glossary.html#node">node</a>, and in game
     <span data-last-n>5,060</span> it explores <span data-fact="nodesLast">1.2 billion</span>.
   </div>
@@ -107,7 +107,7 @@
     <p>The chain’s games put the limit near 63%.  The share swings widely in the first games and settles as n
     grows: from game 4,000 on it stays between <span data-fact="settledLo">62.8%</span> and
     <span data-fact="settledHi">63.0%</span>, and game <span data-last-n>5060</span> wins
-    <span data-fact="endShare">62.9%</span>.  That is a measurement of finitely many games, not a proof about the
+    <span data-fact="endShare">62.9%</span>.  That is a measurement across a finite number of games, not a proof about the
     limit.</p>
   </div>
 </section>
@@ -125,10 +125,10 @@
       evidence</a>).</p>
     </aside>
     <p>A game usually has just one <a class="gloss" href="glossary.html#optimal-set">optimal set</a>.  The prover has
-    listed every optimal set of 954 of the games 2 to 989, and all but 30 of those have exactly one.  Every game up to
-    424 has one, and game 425 is the first with two.  They differ by an exchange: one plays 110, 132 and 168, the other
+    listed every optimal set of the games 2 to 989, and all but 30 of those have exactly one.  Game 425 is the first
+    with two.  The two differ by an exchange: one plays 110, 132 and 168, the other
     98, 150 and 162, and both trios sum to 410 (<a href="frames.html#game-425">chapter 4</a>).</p>
-    <p>So the best score of a game is the same whoever finds it, but the moves that reach it need not be.  Where a
+    <p>So the best score of a game might be obtainable using more than one set of moves.  Where a
     game has several optimal sets, the chain keeps the one its search found
     (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#games-with-several-optimal-sets">the
     games with several</a>).</p>
@@ -148,108 +148,6 @@
     of those scores <span data-833="gap">29</span> less.  <a href="sets.html#game-833">Chapter 1</a> shows the
     trade.</p>
   </div>
-</section>
-
-<section class="chapter" id="open-questions" data-toc="open-questions" aria-labelledby="h-open">
-  <h2 id="h-open">What is open</h2>
-  <div class="para">
-    <aside class="note card" aria-label="Statement U, open, proved to game 2,531">
-      <div class="note-head"><span class="note-name">Statement U<span class="note-label">and corollary X8</span></span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">open, proved to game 2,531<span class="sr-only">, evidence on GitHub</span></a></div>
-      <p class="plain">Some optimal game plays every source descending greedy keeps in
-      <a class="gloss" href="glossary.html#layer">layers</a> 3 and up.</p>
-      <p class="precise"><span class="run">Precisely.</span>Some optimal set of n contains U*<sub>≥3</sub>, and then ΣU* +
-      P*(Π<sub>n</sub>) = opt(n)
-      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">statement U</a>).
-      It holds wherever the prover has proven opt(n), from 2 to 2,531.</p>
-    </aside>
-    <p>Four statements of the theory are open, and one of them matters most:
-    <a class="gloss" href="glossary.html#statement-u">statement U</a>, that some
-    <a class="gloss" href="glossary.html#optimal-game">optimal game</a> plays every number of
-    <a class="gloss" href="glossary.html#u-star">U*</a> with three or more prime factors.  The scores past game 2,531
-    rest on it, and <a href="statement-u.html">chapter 7</a> gives the evidence for it.</p>
-  </div>
-
-  <div class="para">
-    <aside class="note card" aria-label="The sources conjecture, open, proved to game 100,000">
-      <div class="note-head"><span class="note-name">The sources conjecture<span class="note-label">Conjecture S1</span></span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#the-open-statements-about-the-sources">open, proved to game 100,000<span class="sr-only">, evidence on GitHub</span></a></div>
-      <p class="plain">No <a class="gloss" href="glossary.html#playable">playable</a> set of sources outweighs U*.</p>
-      <p class="precise"><span class="run">Precisely.</span>Every playable set S of sources has ΣS ≤ ΣU*
-      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#the-sources-conjecture">S1</a>).
-      The span conjecture <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#the-span-conjecture">(♦)</a> gives
-      <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#the-cardinality-conjecture">(★)</a>,
-      which gives S1, and the check of (♦) passes in every game up to 100,000.</p>
-    </aside>
-    <p>The other three are about the top half alone.  The sources conjecture says that U* is the heaviest set of
-    <a class="gloss" href="glossary.html#source">sources</a>, the numbers above n/2, that are playable together: that
-    <a class="gloss" href="glossary.html#descending-greedy">descending greedy</a>, which keeps each source it can from
-    the largest down, always chooses best.  Two stronger statements would each prove it, and a computation checks
-    the stronger of the two: it holds in every game up to 100,000.  No score rests on these three: the frame model plays
-    U* whether or not it is the heaviest set of sources.</p>
-  </div>
-
-  <div class="para">
-    <aside class="note card" aria-label="The complexity of Taxman, open">
-      <div class="note-head"><span class="note-name">The complexity of Taxman<span class="note-label">An open question</span></span><a class="standing is-open" href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-hardness">open<span class="sr-only">, evidence on GitHub</span></a></div>
-      <p class="plain">How hard is it to find opt(n)?</p>
-      <p class="precise"><span class="run">Precisely.</span>Their Theorem 2 makes the game on a graded poset NP-hard, even on
-      two ranks with unit weights.  The complexity of Taxman itself is open, with
-      <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/statements.md#open-questions">the theory’s
-      other open questions</a>.</p>
-    </aside>
-    <p>Last, how hard is Taxman?  Franklín and Moniot proved a more general game NP-hard:  Taxman on any set of things
-    that sit in levels, as division puts the numbers in levels, where a move scores one thing and the taxman takes
-    everything below it.  So a fast method for that game would give fast methods for a large family of hard problems,
-    none of which has a known fast method.  Whether Taxman itself, on the numbers 1 to n, is that hard is open.</p>
-  </div>
-</section>
-
-<section class="chapter" id="data" data-toc="data" aria-labelledby="h-data">
-  <h2 id="h-data">The data, and how to check it</h2>
-  <div class="para">
-    <aside class="note tech" aria-label="A line of the file">
-      <div class="note-head"><span class="note-name">A line of the file</span></div>
-      <p>One JSON line for each game, in order of n: n, score, moves in the order of play, promotions, proof (what
-      proves the score), method, <code>in_the_bag</code>, <code>setup</code>, <code>nodes</code>,
-      <code>seconds</code>, and <code>assumes</code>, what that rests on beyond the frame model (<a
-      href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#a-results-line---out-schema-5">a
-      results line</a>; <a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#proof-kinds">the
-      proof kinds</a>).</p>
-    </aside>
-    <aside class="note tech" aria-label="What the verifiers check">
-      <div class="note-head"><span class="note-name">What the verifiers check</span></div>
-      <p>The <a class="gloss" href="glossary.html#frame-solver">frame solver</a>’s verifier also sets up the search problems of each <a class="gloss" href="glossary.html#repeat">repeat</a> and of the game it repeats, and
-      compares them.  The verifier in Python also checks each score against Franklín and Moniot’s upper bound
-      (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/verifiers.md">the verifiers</a>).</p>
-    </aside>
-    <p>One file, <a
-    href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a>, has a
-    line for each game of the <a class="gloss" href="glossary.html#chain">chain</a>: its best score, the moves that
-    reach it in the order of play, its promotions, what proves the score, and what that rests on.  Two programs
-    that share no code check every line.  Run these commands from the top folder of the
-    <a href="https://github.com/bvchess/taxman">repository</a>:</p>
-  </div>
-  <dl class="commands">
-    <dt>Print the line of game 21</dt>
-    <dd><code>gzip -dc results/optimal.jsonl.gz | sed -n 21p</code></dd>
-    <dt>Build the frame solver</dt>
-    <dd><code>cd solver/frame &amp;&amp; cargo build --release &amp;&amp; cd ../..</code></dd>
-    <dt>Check every game with the frame solver’s verifier</dt>
-    <dd><code>solver/frame/target/release/taxman verify-results results/optimal.jsonl.gz</code></dd>
-    <dt>Check every game again, with a verifier in Python that shares no code with it</dt>
-    <dd><code>python3 solver/tools/check_results.py results/optimal.jsonl.gz</code></dd>
-  </dl>
-  <p>Both verifiers replay each game: every <a class="gloss" href="glossary.html#move">move</a> legal, the largest
-  prime first, no move left at the end, and the score as recorded.  They check that each score is at most n more than
-  the score of the game before it, and they work out again what proves each score and what that rests on, so
-  that an edit to the file cannot change either.</p>
-  <p>A replay shows that the moves are legal and score what the line says, but not that no other moves score more.
-  That rests on what proves the score, which each line names: a rule, such as the ceiling, or a search.  The
-  <a class="gloss" href="glossary.html#prover">prover</a> proves the scores of games 2 to 2,531 again, on the whole
-  board, and <a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/reproducing.md">its guide</a>
-  gives the commands.</p>
-  <p>The scores alone are also in
-  <a href="https://github.com/bvchess/taxman/blob/master/results/b019312.txt">results/b019312.txt</a>, in the format of
-  the OEIS.</p>
 </section>
 
 <nav class="chapter-nav" aria-label="Pages"></nav>
