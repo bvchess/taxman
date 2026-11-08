@@ -228,7 +228,7 @@ searched game against n.
 lemma (R7); how a subtree grows with the gap (measured); what was tried and did not help (the notebook's register);
 the design (`solver/docs/DESIGN.md`, `search.md`, `gf2-bound.md`, `tactics.md`).
 
-### 6. The bound
+### 6. The parity bound
 
 **Point.**  A bound limits how high a score can go, and the sharper it is, the less a search has to explore.  Ours is
 a quick test of even and odd, on the frames of a search or on the whole board.
@@ -242,16 +242,17 @@ a quick test of even and odd, on the frames of a search or on the whole board.
   (chapter 7).
 * Odd cores: game 45's is the first; the parity bound is exact to 77 and first misses at 78, where an odd core weighs
   in (measured).
-* Comparing bounds, last because it rests on measurements: Franklín and Moniot's bound is looser, its gap about ten
-  times the parity bound's in every game to the end of the chain (measured), and a search with it explores far more
-  (the prover's searches of every game to 1,000 under each bound); a set is allowed by theirs, by the parity bound, or
-  playable when some set of factors gets at least one, an odd number, or exactly one scheme.
+* Comparing bounds, last because its second half rests on measurements: first the theory, that Franklín and Moniot's
+  bound is looser, a set being allowed by theirs, by the parity bound, or playable when some set of factors gets at
+  least one, an odd number, or exactly one scheme; then the measurements, its gap about ten times the parity bound's
+  in every game to the end of the chain, and a search with it exploring far more (the prover's searches of every game
+  to 1,000 under each bound).
 
-**Figures.**  Game 78's odd core.  Each bound's height above opt(n) in every game of the chain.  The ladder of three
-conditions, at least one, an odd number, exactly one payment scheme, on small examples, and the tables of two of them.
+**Figures.**  Game 78's odd core.  The ladder of three conditions, at least one, an odd number, exactly one payment
+scheme, on small examples, and the tables of two of them.  Each bound's height above opt(n) in every game of the chain.
 
 **Right column.**  The signed frame theorem (B1) and the frame bound (B2) over GF(2), the parity bound (W1), the first
-odd core (C3), the parity bound exact to 77 (measured), the two gaps (measured), the counting theorem (C2).
+odd core (C3), the parity bound exact to 77 (measured), the counting theorem (C2), the two gaps (measured).
 
 ### 7. Statement U
 

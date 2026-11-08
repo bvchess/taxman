@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The bound · Taxman</title>
+<title>The parity bound · Taxman</title>
 <meta name="description" content="A bound limits how high a score can go, and the sharper it is, the less a search has to explore.  Taxman's comes from a quick test of even and odd, applied to the frames of a search or to the whole board.">
 <meta name="author" content="Brian Chess">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -19,7 +19,7 @@
 
 <header class="essay-head para">
   <p class="kicker">Chapter 6</p>
-  <h1>The bound</h1>
+  <h1>The parity bound</h1>
   <p class="lede">A bound limits how high a score can go.  The sharper it is, the less a search has to explore.</p>
 </header>
 
@@ -146,45 +146,9 @@
 <section class="chapter" id="comparing" data-toc="comparing" aria-labelledby="h-comparing">
   <h2 id="h-comparing">Comparing bounds</h2>
   <div class="para">
-    <aside class="note card" aria-label="The two gaps, measured">
-      <div class="note-head"><span class="note-name">The two gaps</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md">measured<span class="sr-only">, evidence on GitHub</span></a></div>
-      <p class="plain">The parity bound's gap above opt(n) is about a tenth of Franklín and Moniot's.</p>
-      <p class="precise"><span class="run">Precisely.</span>130 points against 1,200 in games 1,000 to 1,300.  Theirs is
-      the heaviest set with a payment scheme, a maximum-weight matching
-      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#what-the-paper-proves">what
-      the paper proves</a>).</p>
-    </aside>
     <p>Franklín and Moniot's paper gives a looser bound: the heaviest set whose numbers can each have a maximal factor
-    of their own, from outside the set, to pay with.  Every set that passes the parity test passes theirs, but the
-    parity bound comes far closer to opt(n): its gap is about a tenth of theirs.</p>
-  </div>
-
-  <figure class="fig wide bounds-fig" id="bounds">
-    <div class="chart">
-      <p class="chart-title">How far each bound sits above opt(n)</p>
-      <div class="chart-box"></div>
-    </div>
-    <figcaption class="fig-caption">Every game up to <span data-bounds="lastN">5,060</span>, as a share of opt(n).  The
-    axis stops at 0.5%, and triangles mark the games where a bound goes higher: <span data-bounds="fmOver">17</span> for
-    Franklín and Moniot's bound and <span data-bounds="parityOver">4</span> for the parity bound, none past game
-    <span data-bounds="overLast">186</span>.</figcaption>
-  </figure>
-
-  <div class="para">
-    <p>The parity bound gets the first <span data-bounds="exactTo">77</span> games exactly right: in each of them it is
-    opt(n) itself.  Past game <span data-bounds="overLast">186</span> it is never more than an eighth of a percent above
-    opt(n), while Franklín and Moniot's bound is typically a quarter of a percent above.  At game
-    <span data-bounds="lastN">5,060</span> the parity bound is <span data-bounds="parityGapLast">2,557</span> points
-    above opt(n), and theirs is <span data-bounds="fmGapLast">20,219</span>.</p>
-    <p>For a search, the gap is what matters.  A branch survives as long as its bound beats the best game found, so the
-    closer the bound, the sooner a branch dies.  We ran the <a class="gloss" href="glossary.html#prover">prover</a>'s
-    search on every game up to 1,000 twice, changing nothing but the bound.  With Franklín and Moniot's bound, 294 games
-    needed a search, and the searches took 9.4 million nodes in all.  With the parity bound, 241 did, and they took
-    67,000.  The difference grows with n: below game 500 the parity bound's searches are 16 times smaller, and from game
-    900 to 1,000, 168 times smaller.</p>
-  </div>
-
-  <div class="para">
+    of their own, from outside the set, to pay with.  Every set that passes the parity test passes theirs, so their
+    bound is never below the parity bound.</p>
     <p>Each way of handing out factors is a <a class="gloss" href="glossary.html#payment-scheme">payment scheme</a>, and
     counting a set's schemes shows what each bound allows.  Group the schemes by the factors they pay with, and count
     the schemes in each group.  Franklín and Moniot's bound allows the set when some group has at least one scheme, and
@@ -239,6 +203,43 @@
     takes a 1 in every row, no two in the same column: it is one payment scheme.  Choose rows to add them up; the
     bottom row says whether each column comes out even or odd.</figcaption>
   </figure>
+
+  <div class="para">
+    <aside class="note card" aria-label="The two gaps, measured">
+      <div class="note-head"><span class="note-name">The two gaps</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md">measured<span class="sr-only">, evidence on GitHub</span></a></div>
+      <p class="plain">The parity bound's gap above opt(n) is about a tenth of Franklín and Moniot's.</p>
+      <p class="precise"><span class="run">Precisely.</span>130 points against 1,200 in games 1,000 to 1,300.  Theirs is
+      the heaviest set with a payment scheme, a maximum-weight matching
+      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#what-the-paper-proves">what
+      the paper proves</a>).</p>
+    </aside>
+    <p>How much lower is the parity bound?  Measured against opt(n), its gap is about a tenth of theirs.</p>
+  </div>
+
+  <figure class="fig wide bounds-fig" id="bounds">
+    <div class="chart">
+      <p class="chart-title">How far each bound sits above opt(n)</p>
+      <div class="chart-box"></div>
+    </div>
+    <figcaption class="fig-caption">Every game up to <span data-bounds="lastN">5,060</span>, as a share of opt(n).  The
+    axis stops at 0.5%, and triangles mark the games where a bound goes higher: <span data-bounds="fmOver">17</span> for
+    Franklín and Moniot's bound and <span data-bounds="parityOver">4</span> for the parity bound, none past game
+    <span data-bounds="overLast">186</span>.</figcaption>
+  </figure>
+
+  <div class="para">
+    <p>The parity bound gets the first <span data-bounds="exactTo">77</span> games exactly right: in each of them it is
+    opt(n) itself.  Past game <span data-bounds="overLast">186</span> it is never more than an eighth of a percent above
+    opt(n), while Franklín and Moniot's bound is typically a quarter of a percent above.  At game
+    <span data-bounds="lastN">5,060</span> the parity bound is <span data-bounds="parityGapLast">2,557</span> points
+    above opt(n), and theirs is <span data-bounds="fmGapLast">20,219</span>.</p>
+    <p>For a search, the gap is what matters.  A branch survives as long as its bound beats the best game found, so the
+    closer the bound, the sooner a branch dies.  We ran the <a class="gloss" href="glossary.html#prover">prover</a>'s
+    search on every game up to 1,000 twice, changing nothing but the bound.  With Franklín and Moniot's bound, 294 games
+    needed a search, and the searches took 9.4 million nodes in all.  With the parity bound, 241 did, and they took
+    67,000.  The difference grows with n: below game 500 the parity bound's searches are 16 times smaller, and from game
+    900 to 1,000, 168 times smaller.</p>
+  </div>
 </section>
 
 <nav class="chapter-nav" aria-label="Pages"></nav>

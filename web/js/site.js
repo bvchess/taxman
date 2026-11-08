@@ -13,7 +13,7 @@ export const STORY = [
   { n: 3, title: 'The top half', line: 'One greedy pass chooses the numbers above n/2.', href: 'top-half.html' },
   { n: 4, title: 'Frames', line: 'What remains splits into frames, and only the promotions remain to choose.', href: 'frames.html' },
   { n: 5, title: 'Search', line: 'A search tries promotion sets until it proves that none beats the best one found.', href: 'search.html' },
-  { n: 6, title: 'The bound', line: 'A bound limits how high a score can go, and the sharper it is, the less a search explores.', href: 'bound.html' },
+  { n: 6, title: 'The parity bound', line: 'A bound limits how high a score can go, and the sharper it is, the less a search explores.', href: 'bound.html' },
   { n: 7, title: 'Statement U', line: 'The one open statement the scores rest on, and the evidence for it.', href: 'statement-u.html' },
   {
     n: 8, title: 'Results', line: 'The best scores, how we proved each one, and what they show.', href: 'results.html',
