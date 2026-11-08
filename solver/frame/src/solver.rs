@@ -1668,6 +1668,11 @@ pub struct RangeSummary {
     /// included (none in the proven mode).
     pub repaired: usize,
     pub repair_time: Duration,
+    /// Lines that the unsound mode appended to its best file (none in the proven mode): those of its file offered when
+    /// the run opened it, the games and repairs it recorded, and the repairs of the best file's own lines.
+    pub best_added: usize,
+    /// Of those, the repairs of the best file's lines of the games below the run's first, which the run has no line of.
+    pub best_repaired: usize,
     /// The game whose search stopped at a limit, or at a signal; the range ends there.
     pub stopped_at: Option<u32>,
 }

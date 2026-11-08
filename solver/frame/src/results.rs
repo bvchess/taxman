@@ -948,7 +948,7 @@ impl ResultsFile {
         let (mut file, text) = open_locked(path)?;
         let contents = read_results(&text, optimal, threads).map_err(|e| format!("{}: {e}", path.display()))?;
         let kept = Kept { lines: contents.lines, valid_len: contents.valid_len, torn: contents.torn };
-        mend(&mut file, &text, kept).map_err(|e| format!("{}: {e}", path.display()))?;
+        mend(&mut file, &text, kept, 0).map_err(|e| format!("{}: {e}", path.display()))?;
         Ok(ResultsFile { path: path.to_owned(), file, contents })
     }
 
@@ -1061,11 +1061,12 @@ pub(crate) fn open_locked(path: &Path) -> Result<(File, String), String> {
     Ok((file, text))
 }
 
-/// Makes the file that [`open_locked`] opened, whose text was `text` and whose lines are kept as far as `kept` says, ready
-/// for the next line: a torn last line is cut off, and a last line kept that has no newline gets one.
-pub(crate) fn mend(file: &mut File, text: &str, kept: Kept) -> std::io::Result<()> {
+/// Makes the file that [`open_locked`] opened, whose text from the byte `start` on (0 for the whole file) was `text`
+/// and whose lines are kept as far as `kept` says, ready for the next line: a torn last line is cut off, and a last line
+/// kept that has no newline gets one.
+pub(crate) fn mend(file: &mut File, text: &str, kept: Kept, start: u64) -> std::io::Result<()> {
     if kept.torn {
-        file.set_len(kept.valid_len as u64)?;
+        file.set_len(start + kept.valid_len as u64)?;
     }
     if kept.valid_len > 0 && !text[..kept.valid_len].ends_with('\n') {
         file.write_all(b"\n")?;

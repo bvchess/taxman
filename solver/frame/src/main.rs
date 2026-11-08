@@ -13,8 +13,9 @@ use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, gate_trial, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
 use taxman::solver::unsound::{
-    DEFAULT_BACK, DEFAULT_PUSH_GROWTH, DEFAULT_STOP_GROWTH, DEFAULT_STOP_QUIET, DEFAULT_TILT, DEFAULT_UNSEEDED_EVERY,
-    DEFAULT_WIDEN, MAX_ABOVE, MAX_BACK, MAX_EFFORT, MAX_TILT, MIN_EFFORT, REPAIR_REACH, ROUND_WORK,
+    DEFAULT_BACK, DEFAULT_BEST, DEFAULT_PUSH_GROWTH, DEFAULT_STOP_GROWTH, DEFAULT_STOP_QUIET, DEFAULT_TILT,
+    DEFAULT_UNSEEDED_EVERY, DEFAULT_WIDEN, MAX_ABOVE, MAX_BACK, MAX_EFFORT, MAX_TILT, MIN_EFFORT, REPAIR_REACH,
+    ROUND_WORK,
 };
 use taxman::tactics::Tactics;
 
@@ -113,7 +114,13 @@ commands:
                                alone
       --push-growth T|off      with --unsound: play a game twice, as --unseeded-every does, if the growth of its gap
                                after its play is above T (default {push_growth})
-      --past-ceiling           with --unsound: do not end a game's rounds at the run's ceiling, n + the score of the
+      --best FILE|off          with --unsound: the best file of unproven lines, the best known of each game past the
+                               built-in table, from any run (default {default_best} in the directory of --out; off:
+                               none).  A game starts from the file's moves for the games around it when they score
+                               more than the run's own, every line of --out and every line the run records is offered
+                               to the file, and the walk of the repair goes down into its lines of the games below the
+                               range.  Runs may share a file: it is locked only to read what is new and to append
+      --past-ceiling          with --unsound: do not end a game's rounds at the run's ceiling, n + the score of the
                                moves for n-1 it starts from (which they do by default, when it has such moves)
       --no-repair              with --unsound: do not repair lines: by default, what survives of each line in each of
                                the {repair_reach} games below it replaces the line of that game if it scores more, and
@@ -170,6 +177,7 @@ fn usage() -> String {
         .replace("{stop_growth}", &DEFAULT_STOP_GROWTH.map_or("off".to_owned(), |t| t.to_string()))
         .replace("{stop_quiet}", &DEFAULT_STOP_QUIET.to_string())
         .replace("{push_growth}", &DEFAULT_PUSH_GROWTH.map_or("off".to_owned(), |t| t.to_string()))
+        .replace("{default_best}", DEFAULT_BEST)
         .replace("{widen}", &DEFAULT_WIDEN.to_string())
         .replace("{ladder}", &ladder.join(" -> "))
 }

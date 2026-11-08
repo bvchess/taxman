@@ -14,8 +14,8 @@ A game is set up as a proven run sets it up: the board and its frames.  Four met
   its level of effort.
 
 A `prime` or `repeat` game searches nothing, and keeps what the line it starts from falls short by, if it does.  The
-moves for n − 1 are the run's line, else the file's, else the built-in table's, and `--from-known` takes the table's
-always.  A [game played twice](shortfalls.md#games-played-twice) is also searched with nothing from the games below it.
+moves for n − 1 are the run's line, else the file's, or the [best file's](best.md) if that scores more, else the
+built-in table's, and `--from-known` takes the table's always.  A [game played twice](shortfalls.md#games-played-twice) is also searched with nothing from the games below it.
 
 The setup does not depend on the moves for n − 1, so a run makes each game's setup, with the dive of a searched game's
 start and the game's [bound](shortfalls.md#the-bound-and-the-gap), on a thread of its own while the game before it

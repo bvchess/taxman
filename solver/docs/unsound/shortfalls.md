@@ -15,7 +15,9 @@ a line above it is a real game of n, and when it scores more than the line of n,
   survives of the lines within 8 games above it that the walk has written, the line just recorded and those it has
   replaced, the heaviest, the nearest on a tie.  If that scores more than the game's line, it replaces it, and the walk
   goes on from it too.  The walk ends at the first game with none of its lines within 8 above.  What survives is taken
-  as `--back` takes it, so the new line is a set of promotions and the moves they make, which a repeat can play.
+  as `--back` takes it, so the new line is a set of promotions and the moves they make, which a repeat can play.  A
+  game below the run's first, which the run has no line of, is weighed on the [best file's](best.md#how-a-run-uses-it)
+  line.
 * **Primes, trivial games and the table.**  A prime's line is not weighed: it follows from the line below it, and is
   played again from it once that is replaced.  A trivial line is optimal, and the built-in table's lines are proven, so
   neither is weighed.

@@ -158,9 +158,9 @@ const SOLVE_FLAGS: [&str; 10] = [
 /// The flags of the unsound mode that take a value, besides `--out` and the solver's: the level of effort, the seed,
 /// the options that shape the rounds (the share fixed, the share tilted, the games before and above that the
 /// trajectories begin from, the widening), of which `--tilt`, `--back` and `--widen` have defaults that 0 turns off,
-/// the games played twice and the level of their unseeded play, and the stop and the push on the growth of the gap
-/// (the stop with the quiet rounds it waits for).
-const UNSOUND_FLAGS: [&str; 12] = [
+/// the games played twice and the level of their unseeded play, the stop and the push on the growth of the gap (the
+/// stop with the quiet rounds it waits for), and the best file.
+const UNSOUND_FLAGS: [&str; 13] = [
     "--effort",
     "--seed",
     "--fix",
@@ -173,6 +173,7 @@ const UNSOUND_FLAGS: [&str; 12] = [
     "--stop-growth",
     "--stop-quiet",
     "--push-growth",
+    "--best",
 ];
 
 /// The switches of the unsound mode: the mode itself, the end of the stop at the run's ceiling, the end of the repair,
@@ -253,11 +254,13 @@ fn proof_search_flags() -> impl Iterator<Item = &'static str> {
 
 /// `solve A-B --unsound --effort L --out FILE [--seed S] [--fix LO,HI] [--tilt P] [--back J] [--above J] [--widen S]
 /// [--unseeded-every K] [--unseeded-effort L] [--stop-growth T|off] [--stop-quiet K] [--push-growth T|off]
-/// [--past-ceiling] [--no-repair] [--stop-at-known] [--from-known] [--unseeded]`, with `--threads`, `--tactic` and
-/// `--show`: plays the games in the unsound mode (`solver::unsound::solve_range`), with no proof, and appends their
-/// unsound lines to FILE, and the lines that the repair replaces.  An option not given has its default
-/// ([`Plan::default`]); `--fix` turns widening off (`unsound::widening`).  It stops on SIGINT and SIGTERM between
-/// rounds, the game in play unrecorded.
+/// [--best FILE|off] [--past-ceiling] [--no-repair] [--stop-at-known] [--from-known] [--unseeded]`, with `--threads`,
+/// `--tactic` and `--show`: plays the games in the unsound mode (`solver::unsound::solve_range`), with no proof, and
+/// appends their unsound lines to FILE, and the lines that the repair replaces.  An option not given has its default
+/// ([`Plan::default`]); `--fix` turns widening off (`unsound::widening`).  The run keeps a best file, `best.jsonl`
+/// beside FILE unless `--best` says otherwise (`unsound::best_path`); the measuring options `--stop-at-known` and
+/// `--from-known`, which play the games of the built-in table, have none unless `--best` names one.  It stops on
+/// SIGINT and SIGTERM between rounds, the game in play unrecorded.
 fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     if let Some(flag) = proof_search_flags().find(|flag| args.has(flag)) {
         return Err(CliError::Usage(format!("{flag} is a flag of the proof search, which --unsound does not run")));
@@ -303,6 +306,11 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     };
     let out = args.value("--out").map(Path::new);
     let out = out.ok_or_else(|| CliError::Usage("--unsound needs --out FILE, the file of its lines".into()))?;
+    // The measuring options play the games of the built-in table, which the best file never holds.
+    let given = args.value("--best");
+    let measuring = plan.stop_at_known || plan.from_known;
+    let best = if measuring && given.is_none() { None } else { unsound::best_path(Some(out), given) };
+    let files = unsound::Files { table: Optimal::built_in(), out: Some(out), best: best.as_deref() };
     // Before any thread starts: the neighborhoods of the rounds allocate and free a searcher's memory each.
     finder::keep_freed_memory();
     if let Err(e) = engine::stop_on_signals() {
@@ -322,7 +330,7 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
         hi,
         &opts,
         &plan,
-        Some(out),
+        &files,
         |line| shown(line.summary_line(), &line.promotions, &line.moves),
         |repair| shown(repair.summary_line(), &repair.promotions, &repair.moves),
     )
@@ -333,6 +341,13 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     if plan.repair {
         let seconds = summary.repair_time.as_secs_f64();
         outln!("repaired {} lines; the repair took {seconds:.3} s", summary.repaired);
+    }
+    if let Some(best) = &best {
+        let (added, repaired) = (summary.best_added, summary.best_repaired);
+        outln!(
+            "best file {}: {added} lines added, {repaired} of them repairs of its lines of games the run has none of",
+            best.display()
+        );
     }
     if let Some(n) = summary.stopped_at {
         outln!("stopped: a signal ended the run in game n={n}, which is not recorded; run the same command to go on");

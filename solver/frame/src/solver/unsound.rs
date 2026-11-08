@@ -98,12 +98,12 @@
 //! # A range
 //!
 //! [`solve_range`] plays the games lo..=hi in order, one at a time, on all the threads given.  The moves for n − j that
-//! a game starts from, for j = 1 and the j up to `back`, are this run's line of n − j, else the file's, else the
-//! built-in table's (as a seed only, never a line).  Each line is appended to the file and synced as soon as its game
-//! ends, and a restarted run skips the games the file has.  A stop signal (SIGINT, SIGTERM) ends the run between
-//! rounds, and the game in play is not recorded.  The file holds unsound lines only: [`UnsoundFile::open`] refuses a
-//! line of a proven run, as every reader of proven lines refuses an unsound one
-//! ([`refuse_unsound`](crate::game::refuse_unsound)).
+//! a game starts from, for j = 1 and the j up to `back`, are this run's line of n − j, else the file's, or the best
+//! file's if that scores more ("The best file"), else the built-in table's (as a seed only, never a line).  Each line
+//! is appended to the file and synced as soon as its game ends, and a restarted run skips the games the file has.  A
+//! stop signal (SIGINT, SIGTERM) ends the run between rounds, and the game in play is not recorded.  The file holds
+//! unsound lines only: [`UnsoundFile::open`] refuses a line of a proven run, as every reader of proven lines refuses an
+//! unsound one ([`refuse_unsound`](crate::game::refuse_unsound)).
 //!
 //! While a game plays, a thread of its own makes the setup of the next game to play, and its start's dive
 //! ([`Boards`]): neither depends on what the game in play scores, and on many threads both would otherwise be a large
@@ -224,6 +224,33 @@
 //!   https://github.com/bvchess/taxman-notebook/blob/main/search/simulating-stop-rules-on-lines-already-made-2026-11/README.md.
 //!   The mode itself has not been measured with the 4 quiet rounds.
 //!
+//! # The best file
+//!
+//! A run keeps a *best file* ([`BestFile`]): the best line any run found of each game past the built-in table, at any
+//! level, which later runs start from and add to.  `--best FILE` names it, by default it is `best.jsonl` in the
+//! directory of `--out` ([`best_path`]), and `--best off` turns it off.  Its lines are unsound lines with a key `best`
+//! ([`BEST`]), and none is proven.  A game of the built-in table, whose table line is its best, is never in it.
+//! solver/docs/unsound/best.md is the user's guide to it.
+//!
+//! * **Seeding.**  Where a game takes the moves for the games below it and above it ([`moves_before`],
+//!   [`moves_above`]), it takes, of the run's line (its own, else its file's) and the best file's, the one that scores
+//!   more, the run's on a tie, and then the table.  The line says so: `prev.source` is `best`.  Before each game the
+//!   run reads what the other holders appended since it last read the file, so a game starts from what the others found
+//!   while it ran.
+//! * **Offering.**  Each line the run records, a game's or a repair's, is offered to the best file, and appended if it
+//!   scores more than the best file's line of its game.  A run that opens its file offers the file's last line of each
+//!   game first, so a run over the range of an old file, with a copy of the file as `--out`, plays nothing and offers
+//!   all it has.
+//! * **The repair.**  The walk down weighs the best file's lines of the games below the run's first, which the run has
+//!   no line of, against the run's lines within [`REPAIR_REACH`] above them, with the code that weighs the run's own
+//!   lines ([`Run::weigh`]), and appends a repair of one to the best file alone, as a line with `best.was` and
+//!   `repaired`.
+//! * **Sharing.**  Several runs may use one best file at once: the lock is held to read what is new and to append,
+//!   never for a run's life.  So a line depends on the moves it started from, which depend on what the other runs had
+//!   found when its game began, and its `prev` (the source and the digest of the moves) says what that was.  A run that
+//!   must not depend on the others, such as one of an experiment that compares settings, uses `--best off`, or a best
+//!   file of its own.
+//!
 //! # Measuring
 //!
 //! Two options measure the mode on the games whose opt(n) is proven, and are refused for a game the built-in table
@@ -246,12 +273,23 @@ use crate::search::finder::{self, Improvement, NEIGHBORHOODS, STAGES};
 use crate::search::{Problem, ProblemSize};
 use crate::tactics::Tactics;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
+
+mod best;
+
+pub use best::{BestFile, BEST};
+
+/// The name of the best file that a run has by default, in the directory of its `--out` file ([`best_path`]).
+pub const DEFAULT_BEST: &str = "best.jsonl";
+
+/// How many lines a run offers to the best file at a time, when it offers those of its file: the lock is held for the
+/// lines of one offer.
+const OFFER_CHUNK: usize = 32;
 
 /// The least effort a run may ask for: a budget of 2 rounds of work.  The start alone is no level, since it never
 /// repairs a shortfall.
@@ -659,6 +697,8 @@ pub enum Source {
     Results,
     /// The built-in table's moves for n − 1, which are proven.
     Table,
+    /// The best file's line of n − 1, which scored more than this run's and its file's.
+    Best,
 }
 
 impl Source {
@@ -668,6 +708,7 @@ impl Source {
             Source::Run => "run",
             Source::Results => "results",
             Source::Table => "table",
+            Source::Best => "best",
         }
     }
 }
@@ -1058,14 +1099,18 @@ pub struct Repair {
     /// The time it took: the survivors of every line it weighed, its moves and their checks, and the setup of the
     /// game's board if the run did not have it.
     pub seconds: f64,
+    /// The line replaced is the best file's, and the run has none of the game: only the best file gets the repair.
+    pub best_only: bool,
 }
 
 impl Repair {
     /// One line for a person, as [`Line::summary_line`] has for a game played: n, the new score, the method, the game
-    /// the moves came from and what it raised the score by, and the time.
+    /// the moves came from and what it raised the score by, the time, and "best file only" for a repair of the best
+    /// file's line alone.
     pub fn summary_line(&self) -> String {
+        let only = if self.best_only { "  best file only" } else { "" };
         format!(
-            "n={:<5} score={:<9} {:<7} repaired from {}, +{} {:>9.3} s  unsound",
+            "n={:<5} score={:<9} {:<7} repaired from {}, +{} {:>9.3} s  unsound{only}",
             self.n,
             self.score,
             self.method.as_str(),
@@ -1160,7 +1205,7 @@ impl UnsoundFile {
             Ok(())
         })
         .map_err(at)?;
-        mend(&mut file, &text, kept).map_err(|e| at(e.to_string()))?;
+        mend(&mut file, &text, kept, 0).map_err(|e| at(e.to_string()))?;
         Ok(UnsoundFile { file: Some((file, path.to_owned())), games, walk })
     }
 
@@ -1323,11 +1368,56 @@ fn repaired_line(old: &str, repair: &Repair, prev: Option<&Moves>) -> Result<Jso
 // ---------------------------------------------------------------------------------------------------------
 // A range
 
+/// What a run reads and writes besides its games: the table of proven games, the file it appends its lines to (`--out`)
+/// and its best file (`--best`, the module documentation, "The best file").
+#[derive(Clone, Copy)]
+pub struct Files<'a> {
+    /// The table that the run checks its lines against, takes the moves for the games below its range from, and that
+    /// says which games the best file never holds: [`Optimal::built_in`] for the command, and a table of fewer games
+    /// for a test of a game the built-in table has.
+    pub table: &'a Optimal,
+    /// The file the run appends its lines to, if it has one.
+    pub out: Option<&'a Path>,
+    /// The best file the run seeds from and offers its lines to, if it has one.
+    pub best: Option<&'a Path>,
+}
+
+impl<'a> Files<'a> {
+    /// The built-in table with the files `out` and `best`.
+    pub fn with_built_in(out: Option<&'a Path>, best: Option<&'a Path>) -> Files<'a> {
+        Files { table: Optimal::built_in(), out, best }
+    }
+}
+
+/// The best file of a run whose file is `out`, and whose `--best` is `given`: `off` has none, any other value is the
+/// path, and without one it is [`DEFAULT_BEST`] in the directory of `out` (a run with no file has none).
+pub fn best_path(out: Option<&Path>, given: Option<&str>) -> Option<PathBuf> {
+    match given {
+        Some("off") => None,
+        Some(path) => Some(PathBuf::from(path)),
+        None => out.map(|out| out.with_file_name(DEFAULT_BEST)),
+    }
+}
+
+/// Whether the paths `a` and `b` name the same file, which is the case where their directories and names are the same
+/// (the files need not be there yet).
+fn same_file(a: &Path, b: &Path) -> Result<bool, String> {
+    let resolved = |path: &Path| {
+        let dir = path.parent().filter(|dir| !dir.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+        fs::canonicalize(dir)
+            .map(|dir| dir.join(path.file_name().unwrap_or_default()))
+            .map_err(|e| format!("{}: {e}", dir.display()))
+    };
+    Ok(resolved(a)? == resolved(b)?)
+}
+
 /// Plays the games `lo..=hi` in the unsound mode with `plan` (see the module documentation), on `opts.threads` threads
-/// with `opts.tactics`, appending each line to the file `out`, if there is one, then handing it to `on_game`.  The
-/// games the file has are skipped.  With the repair, each line the run records is weighed against the lines below it,
-/// and each that it replaces is appended and handed to `on_repair` (the module documentation, "The repair"); first, a
-/// walk down that a stop cut short in the file goes on.  A stop signal ends the range with the game in play unrecorded
+/// with `opts.tactics`, appending each line to the file `files.out`, if there is one, then handing it to `on_game`.
+/// The games the file has are skipped.  With the repair, each line the run records is weighed against the lines below
+/// it, and each that it replaces is appended and handed to `on_repair` (the module documentation, "The repair"); first,
+/// a walk down that a stop cut short in the file goes on.  A run with a best file `files.best` seeds from it, offers
+/// it every line of the file and every line it records, and repairs its lines of the games below the range (the
+/// module documentation, "The best file").  A stop signal ends the range with the game in play unrecorded
 /// (`stopped_at`).
 ///
 /// # Errors
@@ -1335,14 +1425,15 @@ fn repaired_line(old: &str, repair: &Repair, prev: Option<&Moves>) -> Result<Jso
 /// A range that is empty or starts below 1; a plan that [`check_plan`] refuses (an effort outside [`MIN_EFFORT`] to
 /// [`MAX_EFFORT`], a `fix` that [`check_fix`] refuses, a `tilt` above [`MAX_TILT`], a `back` above [`MAX_BACK`], an
 /// `above` above [`MAX_ABOVE`], a `widen` of `Some(0)` or with a `fix`); `--stop-at-known` or `--from-known` for a game
-/// the built-in table lacks; a file that cannot be opened or written, or holds a line it may not
-/// ([`UnsoundFile::open`]); and a game or a repair whose moves fail a check (the module documentation, "One game").
+/// the table lacks; the same file for `out` and `best`; a file that cannot be opened or written, or holds a line it may
+/// not ([`UnsoundFile::open`], [`BestFile::open`]); and a game or a repair whose moves fail a check (the module
+/// documentation, "One game").
 pub fn solve_range(
     lo: u32,
     hi: u32,
     opts: &SolveOptions,
     plan: &Plan,
-    out: Option<&Path>,
+    files: &Files,
     mut on_game: impl FnMut(&Line),
     mut on_repair: impl FnMut(&Repair),
 ) -> Result<RangeSummary, String> {
@@ -1350,7 +1441,7 @@ pub fn solve_range(
         return Err(format!("the range {lo}..={hi} is empty or starts below 1"));
     }
     check_plan(plan)?;
-    let optimal = Optimal::built_in();
+    let optimal = files.table;
     if plan.stop_at_known || plan.from_known {
         if let Some(n) = (lo..=hi).find(|&n| optimal.score(n).is_none()) {
             return Err(format!(
@@ -1359,7 +1450,13 @@ pub fn solve_range(
             ));
         }
     }
-    let lines = out.map_or_else(|| Ok(UnsoundFile::none()), |path| UnsoundFile::open(path, optimal))?;
+    if let (Some(out), Some(best)) = (files.out, files.best) {
+        if same_file(out, best)? {
+            return Err(format!("{}: --out and --best are the same file", out.display()));
+        }
+    }
+    let lines = files.out.map_or_else(|| Ok(UnsoundFile::none()), |path| UnsoundFile::open(path, optimal))?;
+    let best = files.best.map(|path| BestFile::open(path, optimal)).transpose()?;
     // The lines of the file that set a search up, whose problems a game may repeat.
     let mut earlier = Earlier::<()>::default();
     for (&n, game) in &lines.games {
@@ -1367,10 +1464,13 @@ pub fn solve_range(
             earlier.add(n, size, digest, game.promotions.clone(), ());
         }
     }
+    let name = files.out.and_then(Path::file_name).map(|name| name.to_string_lossy().into_owned());
     let mut run = Run {
         opts,
         optimal,
         lines,
+        best,
+        name,
         earlier,
         recent: BTreeMap::new(),
         bounds: BTreeMap::new(),
@@ -1378,6 +1478,7 @@ pub fn solve_range(
         boards: Boards::new(opts),
         summary: RangeSummary::default(),
     };
+    run.offer_file()?;
     if plan.repair {
         let walk = run.lines.walk.clone();
         run.walk(walk, &mut on_repair)?;
@@ -1391,8 +1492,11 @@ pub fn solve_range(
             run.summary.stopped_at = Some(n);
             break;
         }
-        let past = moves_before(n, &run.recent, &run.lines, plan, optimal);
-        let above = moves_above(n, &run.recent, &run.lines, plan, optimal);
+        if let Some(best) = &mut run.best {
+            best.refresh()?;
+        }
+        let past = moves_before(n, &run.recent, &run.lines, run.best.as_ref(), plan, optimal);
+        let above = moves_above(n, &run.recent, &run.lines, run.best.as_ref(), plan, optimal);
         // The gap of the moves for n − 1 that the game starts from, unless it takes none.
         let gap_below = match past.first().and_then(Option::as_ref).filter(|_| !plan.unseeded) {
             Some(below) => Some(gap(below.n, run.bound_of(below.n)?, below.score)?),
@@ -1432,12 +1536,17 @@ impl KeptBoard {
     }
 }
 
-/// A run of the unsound mode as it goes: its lines, the lines a repeat may repeat, its own lines of the games a game
-/// starts from, its boards (made ahead, and kept for the repair), and what it has done.
+/// A run of the unsound mode as it goes: its lines and the best file, the lines a repeat may repeat, its own lines of
+/// the games a game starts from, its boards (made ahead, and kept for the repair), and what it has done.
 struct Run<'a> {
     opts: &'a SolveOptions,
     optimal: &'a Optimal,
     lines: UnsoundFile,
+    /// The best file, if the run has one (the module documentation, "The best file").
+    best: Option<BestFile<'a>>,
+    /// The name, with no directory, of the file the run appends to, which the lines it offers to the best file say they
+    /// came from.
+    name: Option<String>,
     earlier: Earlier<()>,
     /// This run's lines of the games before, for as many as a game may begin a trajectory from.
     recent: BTreeMap<u32, Moves>,
@@ -1456,6 +1565,7 @@ impl Run<'_> {
         let n = line.n;
         let json = line.to_json();
         self.lines.append(n, &json, stored_of(&line, &json))?;
+        self.offer(n)?;
         on_game(&line);
         self.summary.solved += 1;
         if let Some(setup) = line.setup {
@@ -1481,12 +1591,44 @@ impl Run<'_> {
         Ok(bound)
     }
 
+    /// The line of game `k` that the repair works on: the run's own, else the best file's (of a game below the run's
+    /// first, which the run has no line of).
+    fn line(&self, k: u32) -> Option<&Stored> {
+        self.lines.games.get(&k).or_else(|| self.best.as_ref()?.line(k))
+    }
+
+    /// Whether the line of game `k` is the best file's alone: the run has none of the game.
+    fn best_only(&self, k: u32) -> bool {
+        !self.lines.games.contains_key(&k)
+    }
+
+    /// Offers the run's line of game `n` to the best file, if the run has one; whether it was appended.
+    fn offer(&mut self, n: u32) -> Result<bool, String> {
+        let (Some(best), Some(line)) = (&mut self.best, self.lines.games.get(&n)) else { return Ok(false) };
+        let added = best.offer(self.name.as_deref(), [(n, line)])?;
+        self.summary.best_added += added;
+        Ok(added > 0)
+    }
+
+    /// Offers the best file, if the run has one, the last line of each game of the run's file, in order of n, a few at
+    /// a time (the module documentation, "The best file").
+    fn offer_file(&mut self) -> Result<(), String> {
+        let Some(best) = &mut self.best else { return Ok(()) };
+        let games: Vec<(u32, &Stored)> = self.lines.games.iter().map(|(&n, line)| (n, line)).collect();
+        for chunk in games.chunks(OFFER_CHUNK) {
+            self.summary.best_added += best.offer(self.name.as_deref(), chunk.iter().copied())?;
+        }
+        Ok(())
+    }
+
     /// The repair's walk down (the module documentation, "The repair") from the lines of the games `changed`: the line
     /// this run has just recorded, or where a walk was when a stop cut it short, as its file says.  Each game below
     /// them, from the highest down, is weighed against the lines of `changed` up to [`REPAIR_REACH`] above it
     /// ([`weigh`](Self::weigh)), and a game whose line is replaced joins them, with the prime above it played
-    /// again from it ([`prime_after`](Self::prime_after)).  The walk ends at the first game that none of `changed` is
-    /// that near, or at a stop signal, which leaves it to the next run that opens the file.
+    /// again from it ([`prime_after`](Self::prime_after)).  A game below the run's first, which the run has no line of,
+    /// is weighed on the best file's line, and a repair of it goes to the best file alone.  The walk ends at the first
+    /// game that none of `changed` is that near, or at a stop signal, which leaves it to the next run that opens the
+    /// file.
     fn walk(&mut self, changed: BTreeSet<u32>, on_repair: &mut impl FnMut(&Repair)) -> Result<(), String> {
         let began = Instant::now();
         let walked = self.walk_from(changed, on_repair);
@@ -1515,11 +1657,12 @@ impl Run<'_> {
     }
 
     /// Replaces the line of game `k` if what survives on its board of the line of one of the games `sources`, above
-    /// it, scores more: the heaviest, the nearest on a tie.  A game that neither the run nor its file has a line for
-    /// (the built-in table's, which are proven, stay as they are), and a prime or trivial line, are not weighed: a
-    /// prime follows from the line below it, and a trivial line is optimal.  Returns whether it replaced the line.
+    /// it, scores more: the heaviest, the nearest on a tie.  The line is the run's, or the best file's where the run
+    /// has none of the game.  A game that neither has a line for (the built-in table's, which are proven, stay as they
+    /// are), and a prime or trivial line, are not weighed: a prime follows from the line below it, and a trivial line
+    /// is optimal.  Returns whether it replaced the line.
     fn weigh(&mut self, k: u32, sources: &[u32], on_repair: &mut impl FnMut(&Repair)) -> Result<bool, String> {
-        let Some(line) = self.lines.games.get(&k) else { return Ok(false) };
+        let Some(line) = self.line(k) else { return Ok(false) };
         if matches!(line.method, Method::Prime | Method::Trivial) {
             return Ok(false);
         }
@@ -1527,26 +1670,28 @@ impl Run<'_> {
         let Some(board) = self.boards.board(k)? else { return Ok(false) };
         let mut best: Option<(u32, Vec<u32>, u64)> = None;
         for &j in sources {
-            let promotions = board.job.surviving(&self.lines.games[&j].moves);
+            let promotions = board.job.surviving(&self.line(j).expect("a game whose line changed has one").moves);
             let sum = promotions.iter().map(|&p| u64::from(p)).sum();
             if best.as_ref().is_none_or(|&(_, _, most)| sum > most) {
                 best = Some((j, promotions, sum));
             }
         }
-        let line = &self.lines.games[&k];
+        let line = self.line(k).expect("the line weighed");
         let Some((from, promotions, sum)) = best.filter(|&(_, _, sum)| board.in_the_bag + sum > line.score) else {
             return Ok(false);
         };
         let moves = board.job.moves_for(&promotions);
         let (method, was, score) = (line.method, line.score, board.in_the_bag + sum);
         let seconds = began.elapsed().as_secs_f64();
-        self.replace(Repair { n: k, from, method, was, score, moves, promotions, seconds }, None, on_repair)?;
+        let best_only = self.best_only(k);
+        let repair = Repair { n: k, from, method, was, score, moves, promotions, seconds, best_only };
+        self.replace(repair, None, on_repair)?;
         Ok(true)
     }
 
-    /// Plays the prime game k + 1 again from the line of game `k`, if the run or its file has a prime line of it and
-    /// the prime formula on the line of `k` scores more, as it does once that line is repaired; it joins `changed` if
-    /// so.
+    /// Plays the prime game k + 1 again from the line of game `k`, if the run or the best file has a prime line of it
+    /// and the prime formula on the line of `k` scores more, as it does once that line is repaired; it joins `changed`
+    /// if so.
     fn prime_after(
         &mut self,
         k: u32,
@@ -1554,32 +1699,38 @@ impl Run<'_> {
         on_repair: &mut impl FnMut(&Repair),
     ) -> Result<(), String> {
         let p = k + 1;
-        let Some(line) = self.lines.games.get(&p).filter(|line| line.method == Method::Prime) else { return Ok(()) };
+        let Some(line) = self.line(p).filter(|line| line.method == Method::Prime) else { return Ok(()) };
         let began = Instant::now();
         let SetUp::Derived(Derived::Prime { candidates }) =
             set_up(p, &Before::Run, self.opts).map_err(Failure::message)?
         else {
             return Ok(());
         };
-        let below = &self.lines.games[&k];
+        let Some(below) = self.line(k) else { return Ok(()) };
         let (moves, promotions) = prime_game(p, &candidates, &below.moves);
         let score = replay(p, &moves).map_err(|e| format!("n={p}: the prime moves from the repaired {k}: {e}"))?;
         if score <= line.score {
             return Ok(());
         }
-        let source = if self.mine.contains(&k) { Source::Run } else { Source::Results };
+        let source = match (self.mine.contains(&k), self.best_only(k)) {
+            (true, _) => Source::Run,
+            (false, false) => Source::Results,
+            (false, true) => Source::Best,
+        };
         let prev = Moves { n: k, moves: below.moves.clone(), score: below.score, source };
         let (was, seconds) = (line.score, began.elapsed().as_secs_f64());
-        let repair = Repair { n: p, from: k, method: Method::Prime, was, score, moves, promotions, seconds };
+        let best_only = self.best_only(p);
+        let repair = Repair { n: p, from: k, method: Method::Prime, was, score, moves, promotions, seconds, best_only };
         self.replace(repair, Some(&prev), on_repair)?;
         changed.insert(p);
         Ok(())
     }
 
     /// Records `repair`: checks its moves as those of a game played are checked (they replay to its score, which is no
-    /// more than the built-in table's) and that they score more than the line they replace, appends the line again with
-    /// them ([`repaired_line`], with `prev` for a prime played again), tells the repeats and the games that follow of
-    /// them, and hands the repair to `on_repair`.
+    /// more than the table's) and that they score more than the line they replace, appends the line again with them
+    /// ([`repaired_line`], with `prev` for a prime played again) to the run's file, tells the repeats and the games
+    /// that follow of them, and hands the repair to `on_repair`.  A repair of the best file's line alone, of a game
+    /// the run has no line of, goes to the best file only.  Either way the best file is offered it.
     fn replace(
         &mut self,
         repair: Repair,
@@ -1589,54 +1740,84 @@ impl Run<'_> {
         let n = repair.n;
         let fail = |e: String| format!("n={n}: the repair from {}: {e}", repair.from);
         let score = replay(n, &repair.moves).map_err(fail)?;
-        let old = &self.lines.games[&n];
+        let old = self.line(n).expect("a line to replace");
         if score != repair.score || score <= old.score {
             return Err(fail(format!("its moves score {score}, and the line it replaces {}", old.score)));
         }
         if let Some(best) = self.optimal.score(n).filter(|&best| score > best) {
-            return Err(fail(format!("its moves score {score}, above the built-in table's {best}, which is proven")));
+            return Err(fail(format!("its moves score {score}, above the table's {best}, which is proven")));
         }
         let json = repaired_line(&old.text, &repair, prev)?;
         let (method, problem) = (old.method, old.problem);
         let (moves, promotions, text) = (repair.moves.clone(), repair.promotions.clone(), json.to_string());
-        self.lines.append(n, &json, Stored { score, moves, promotions, method, problem, text })?;
+        let stored = Stored { score, moves, promotions, method, problem, text };
+        if repair.best_only {
+            let added = match &mut self.best {
+                Some(best) => best.offer(self.name.as_deref(), [(n, &stored)])?,
+                None => 0,
+            };
+            self.summary.best_added += added;
+            self.summary.best_repaired += added;
+            if added > 0 {
+                self.mine.insert(n);
+                on_repair(&repair);
+            }
+            return Ok(());
+        }
+        self.mine.insert(n);
+        self.lines.append(n, &json, stored)?;
         if let Some((size, digest)) = problem {
             self.earlier.add(n, size, digest, repair.promotions.clone(), ());
         }
         if let Some(recent) = self.recent.get_mut(&n) {
             (recent.moves, recent.score) = (repair.moves.clone(), score);
         }
-        self.mine.insert(n);
         self.summary.repaired += 1;
+        self.offer(n)?;
         on_repair(&repair);
         Ok(())
     }
 }
 
+/// The built-in table's moves for `game`, which are proven.
+fn table_moves(game: u32, optimal: &Optimal) -> Option<Moves> {
+    let (moves, score) = (optimal.moves(game)?, optimal.score(game)?);
+    Some(Moves { n: game, moves: moves.to_vec(), score, source: Source::Table })
+}
+
+/// The moves for `game` that the run has, from its own line (`run`), else its file's, or from the best file's line if
+/// that scores more (the module documentation, "The best file"): none if none of them has the game.
+fn kept_moves(game: u32, run: &BTreeMap<u32, Moves>, file: &UnsoundFile, best: Option<&BestFile>) -> Option<Moves> {
+    let own = run.get(&game).cloned().or_else(|| {
+        let (moves, score) = file.moves(game)?;
+        Some(Moves { n: game, moves: moves.to_vec(), score, source: Source::Results })
+    });
+    let better =
+        best.and_then(|best| best.moves(game)).filter(|&(_, score)| own.as_ref().is_none_or(|own| score > own.score));
+    match better {
+        Some((moves, score)) => Some(Moves { n: game, moves: moves.to_vec(), score, source: Source::Best }),
+        None => own,
+    }
+}
+
 /// The moves for the games `n − 1`, `n − 2`, ... that game `n` starts from and begins its trajectories from, as many as
 /// `plan.back` and at least the first, from game `n − 1` down: each is, with `--from-known`, the built-in table's,
-/// else this run's line of the game (`run`), else the file's line, else the table's; none for a game below 1, or that
-/// nothing has the moves for.  A game that lacks the moves for `n − 1` has a note on stderr.
+/// else this run's line of the game (`run`), else the file's line, or the best file's if that scores more, else the
+/// table's; none for a game below 1, or that nothing has the moves for.  A game that lacks the moves for `n − 1` has a
+/// note on stderr.
 fn moves_before(
     n: u32,
     run: &BTreeMap<u32, Moves>,
     file: &UnsoundFile,
+    best: Option<&BestFile>,
     plan: &Plan,
     optimal: &Optimal,
 ) -> Vec<Option<Moves>> {
     let moves_of = |game: u32| {
-        let table = || {
-            let (moves, score) = (optimal.moves(game)?, optimal.score(game)?);
-            Some(Moves { n: game, moves: moves.to_vec(), score, source: Source::Table })
-        };
         if plan.from_known {
-            return table();
+            return table_moves(game, optimal);
         }
-        let file = || {
-            let (moves, score) = file.moves(game)?;
-            Some(Moves { n: game, moves: moves.to_vec(), score, source: Source::Results })
-        };
-        run.get(&game).cloned().or_else(file).or_else(table)
+        kept_moves(game, run, file, best).or_else(|| table_moves(game, optimal))
     };
     (1..=plan.back.max(1))
         .map(|j| {
@@ -1644,8 +1825,8 @@ fn moves_before(
             if found.is_none() && j == 1 && n > 1 {
                 let _ = writeln!(
                     std::io::stderr(),
-                    "note: no moves for {} (in this run, the file or the built-in table): game {n} starts with no \
-                     seed",
+                    "note: no moves for {} (in this run, the file, the best file or the built-in table): game {n} \
+                     starts with no seed",
                     n - 1
                 );
             }
@@ -1655,20 +1836,22 @@ fn moves_before(
 }
 
 /// The moves for the games `n + 1`, ..., `n + plan.above` that game `n` begins trajectories from: each is, with
-/// `--from-known`, the built-in table's, else this run's line of the game (`run`), else the file's line; a game that
-/// none of them has gives none.  Without `--from-known` the table gives none: a run never takes the proven game above
-/// one it plays.
-fn moves_above(n: u32, run: &BTreeMap<u32, Moves>, file: &UnsoundFile, plan: &Plan, optimal: &Optimal) -> Vec<Moves> {
+/// `--from-known`, the built-in table's, else this run's line of the game (`run`), else the file's line, or the best
+/// file's if that scores more; a game that none of them has gives none.  Without `--from-known` the table gives none: a
+/// run never takes the proven game above one it plays.
+fn moves_above(
+    n: u32,
+    run: &BTreeMap<u32, Moves>,
+    file: &UnsoundFile,
+    best: Option<&BestFile>,
+    plan: &Plan,
+    optimal: &Optimal,
+) -> Vec<Moves> {
     let moves_of = |game: u32| {
         if plan.from_known {
-            let (moves, score) = (optimal.moves(game)?, optimal.score(game)?);
-            return Some(Moves { n: game, moves: moves.to_vec(), score, source: Source::Table });
+            return table_moves(game, optimal);
         }
-        let file = || {
-            let (moves, score) = file.moves(game)?;
-            Some(Moves { n: game, moves: moves.to_vec(), score, source: Source::Results })
-        };
-        run.get(&game).cloned().or_else(file)
+        kept_moves(game, run, file, best)
     };
     (1..=plan.above).filter_map(|j| n.checked_add(j).filter(|&game| game <= super::MAX_N).and_then(moves_of)).collect()
 }
@@ -1720,8 +1903,11 @@ struct Boards {
     opts: SolveOptions,
     /// The setups being made.
     making: Vec<Making>,
-    /// The boards of the run's searched and repeat games, of the last [`REPAIR_REACH`] games it played.
+    /// The boards of the run's searched and repeat games, of the last [`REPAIR_REACH`] games it played, and those that
+    /// the repair set up for a game that far below the last ([`board`](Self::board)).
     kept: BTreeMap<u32, KeptBoard>,
+    /// The last game the run played (0 before the first).
+    latest: u32,
 }
 
 /// A setup being made ahead: the game's, with moves for n − 1 if `seeded`, and the thread that makes it.
@@ -1734,7 +1920,7 @@ struct Making {
 impl Boards {
     /// No setup made ahead and no board kept yet, for a run with `opts`.
     fn new(opts: &SolveOptions) -> Boards {
-        Boards { opts: opts.clone(), making: Vec::new(), kept: BTreeMap::new() }
+        Boards { opts: opts.clone(), making: Vec::new(), kept: BTreeMap::new(), latest: 0 }
     }
 
     /// Starts making the setup of game `n`, which will have moves for n − 1 if `seeded`, else none.
@@ -1766,18 +1952,26 @@ impl Boards {
         if let Some(board) = board {
             self.kept.insert(n, board);
         }
+        self.latest = n;
         self.kept.retain(|&m, _| m + REPAIR_REACH >= n);
     }
 
     /// The board of game `k` for the repair: the one kept, else set up again; `None` for a board with no candidates.
-    fn board(&self, k: u32) -> Result<Option<KeptBoard>, String> {
+    /// One set up again for a game within [`REPAIR_REACH`] below the last the run played is kept too, as the walk after
+    /// each of the next games weighs the same line against it again (the best file's lines of the games below the
+    /// run's first are such games).
+    fn board(&mut self, k: u32) -> Result<Option<KeptBoard>, String> {
         if let Some(board) = self.kept.get(&k) {
             return Ok(Some(board.clone()));
         }
-        Ok(match set_up(k, &Before::None, &self.opts).map_err(Failure::message)? {
+        let board = match set_up(k, &Before::None, &self.opts).map_err(Failure::message)? {
             SetUp::Search(set, _) => Some(KeptBoard::of(&set)),
             SetUp::Derived(_) => None,
-        })
+        };
+        if let Some(board) = board.as_ref().filter(|_| self.latest > 0 && k + REPAIR_REACH >= self.latest) {
+            self.kept.insert(k, board.clone());
+        }
+        Ok(board)
     }
 }
 
@@ -2227,8 +2421,9 @@ mod tests {
             "in_the_bag":96,"prev":{"n":395,"score":60,"source":"results","moves_digest":"d","short_by":0},
             "ceiling":456,"at_ceiling":false,"growth":30,"rounds":3,"repaired":null,"build":{"commit":"x"}}"#;
         let (moves, promotions) = (vec![2, 4, 6], vec![4, 6]);
+        let (n, from, was, score, seconds) = (396, 398, 100, 500, 0.5);
         let repair =
-            Repair { n: 396, from: 398, method: Method::Search, was: 100, score: 500, moves, promotions, seconds: 0.5 };
+            Repair { n, from, method: Method::Search, was, score, moves, promotions, seconds, best_only: false };
         let line = repaired_line(old, &repair, None).unwrap();
         let old = Json::parse(old).unwrap();
         let keys = |json: &Json| json.as_obj().unwrap().iter().map(|(key, _)| key.clone()).collect::<Vec<_>>();
