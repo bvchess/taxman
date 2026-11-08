@@ -45,12 +45,12 @@
     <a class="gloss" href="glossary.html#frame-model">frame model</a>, in which the player plays every number of
     <a class="gloss" href="glossary.html#u-star">U*</a> and chooses only the promotions.  That score
     is the score of a real game, so it is never above <a class="gloss" href="glossary.html#opt">opt(n)</a>.  It equals
-    opt(n) exactly when some optimal game plays all of U*.</p>
-    <p>Every optimal game plays the numbers of U* with one or two prime factors
-    (<a href="top-half.html#bottom-layers">chapter 3</a>).  For those with three or more, it is open.
+    opt(n) exactly when there exists an optimal game that plays all of U*.</p>
+    <p>In <a href="top-half.html#bottom-layers">chapter 3</a> we've shown that every optimal game plays all of the
+    numbers of U* that have one or two prime factors. For those with three or more, it is open question.
     <a class="gloss" href="glossary.html#statement-u">Statement U</a> says that some optimal game plays them all.  If
-    it failed, every optimal game would give one of them up, free the factor that paid for it, and win the points back
-    below n/2.</p>
+    it failed for some value of n, every optimal game of n would give one of them up, free the factor that paid for it
+    and win the points back with moves below n/2.</p>
   </div>
 
   <figure class="fig rests-fig" id="rests-on" aria-label="What each kind of proof in the chain's records rests on, with the number of games of each kind, and what makes the frame model's best score opt(n).">
@@ -64,9 +64,7 @@
     and so does a <a class="gloss" href="glossary.html#repeat">repeat</a>, which takes the answer of an earlier game
     that posed the same search problem.  So, followed down, every score rests on the frame model of some game, and on
     statement U in that game.</p>
-    <p>Up to game 2,531 that costs nothing: the prover proves statement U in each of those games.  Past it, the
-    <span data-rests="onU">2,529</span> scores from game <span data-rests="firstU">2,532</span> to the end of the chain
-    rest on statement U.</p>
+    <p>We've verified statement U holds up to game 2,531. Past it, the rest of the chain rest on statement U.</p>
   </div>
 </section>
 
@@ -85,7 +83,7 @@
     frame model's best score.  If the two are equal, statement U holds in that game.  A second program, the
     <a class="gloss" href="glossary.html#prover">prover</a>, does this.  It searches the whole
     <a class="gloss" href="glossary.html#board">board</a>, choosing sets of moves rather than promotions, with no
-    frames, and its bound is the <a class="gloss" href="glossary.html#parity-bound">parity bound</a> of
+    frames, and using the <a class="gloss" href="glossary.html#parity-bound">parity bound</a> of
     <a href="bound.html#parity-bound">chapter 6</a>.</p>
     <p>The prover has proven every game up to 2,531.  In each one, opt(n) is the score the
     <a class="gloss" href="glossary.html#frame-solver">frame solver</a> found.  So statement U holds in those games,
