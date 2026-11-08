@@ -1,0 +1,6 @@
+# The site's HTML indents two spaces a level, and the text of a paragraph, list item, definition or caption wraps flush
+# with its opening tag.  JetBrains editors indent such text one level by default; the last line keeps it flush.
+[*.html]
+indent_style = space
+indent_size = 2
+ij_html_do_not_indent_children_of_tags = html,body,thead,tbody,tfoot,p,li,dt,dd,figcaption,summary,h1,h2,h3
