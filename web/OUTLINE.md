@@ -268,8 +268,6 @@ to 2531.
   numbers U asks about, in 2532 to 3440), and the root's heaviest set, which holds them all in every game measured.
 * Where a proof stops: the exchange that settles layer 2 fails at an odd core.
 
-**Figures.**  What rests on what: the proof kinds, and what makes the frame model's best score opt(n).
-
 **Right column.**  The corollary of statement U (X8), statement U and its evidence (`docs/theory/evidence.md`), the
 prover (its README and `proofs.md`).
 

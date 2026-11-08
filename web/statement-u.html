@@ -9,7 +9,6 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <script src="js/tone.js"></script>
 <link rel="stylesheet" href="css/site.css">
-<link rel="stylesheet" href="css/statement-u.css">
 </head>
 <body data-page="story" data-chapter="7">
 <header class="topbar"></header>
@@ -47,24 +46,24 @@
     is the score of a real game, so it is never above <a class="gloss" href="glossary.html#opt">opt(n)</a>.  It equals
     opt(n) exactly when there exists an optimal game that plays all of U*.</p>
     <p>In <a href="top-half.html#bottom-layers">chapter 3</a> we've shown that every optimal game plays all of the
-    numbers of U* that have one or two prime factors. For those with three or more, it is open question.
-    <a class="gloss" href="glossary.html#statement-u">Statement U</a> says that some optimal game plays them all.  If
-    it failed for some value of n, every optimal game of n would give one of them up, free the factor that paid for it
-    and win the points back with moves below n/2.</p>
+    numbers of U* that have one or two prime factors.  For those with three or more, it is an open question.
+    <a class="gloss" href="glossary.html#statement-u">Statement U</a> says that some optimal game plays them all.  If it
+    failed for some value of n, every optimal game of n would give one of them up, free the factor that paid for it, and
+    win the points back with moves below n/2.</p>
   </div>
-
-  <figure class="fig rests-fig" id="rests-on" aria-label="What each kind of proof in the chain's records rests on, with the number of games of each kind, and what makes the frame model's best score opt(n).">
-    <div class="rests"></div>
-  </figure>
 
   <div class="para">
     <p>A score at the <a class="gloss" href="glossary.html#ceiling">ceiling</a> or by the
     <a class="gloss" href="glossary.html#prime-formula">prime formula</a> rests on the score of the game before it.  A
     score found by a <a class="gloss" href="glossary.html#search">search</a> rests on the frame model of its own game,
     and so does a <a class="gloss" href="glossary.html#repeat">repeat</a>, which takes the answer of an earlier game
-    that posed the same search problem.  So, followed down, every score rests on the frame model of some game, and on
-    statement U in that game.</p>
-    <p>We've verified statement U holds up to game 2,531. Past it, the rest of the chain rest on statement U.</p>
+    that posed the same search problem.  A search uses the game before only as a starting point and finds the frame
+    model's best from any start, so it inherits no error from below.  So, followed down, every score rests on statement
+    U at one game: its own, if a search or a repeat settled it, or else the nearest game below it that one settled.</p>
+    <p>We've verified statement U holds up to game 2,531.  Past it, the rest of the chain rests on statement U: the
+    <span data-rests="onU">2,529</span> scores from game <span data-rests="firstU">2,532</span> on rest on it at
+    <span data-rests="foundations">1,382</span> games, and no game carries more than <span data-rests="most">8</span> of
+    them.  If statement U failed at one game, it could make at most <span data-rests="most">8</span> scores wrong.</p>
   </div>
 </section>
 
@@ -147,16 +146,16 @@
 import { initEssay } from './js/essay.js';
 import { loadGames } from './js/data.js';
 import { fmt } from './js/vocab.js';
-import { mountRestsOn } from './figures/rests-on.js';
+import { restsFacts } from './js/proof.js';
 
 initEssay();
 const games = await loadGames();
-const fill = (attr, facts) => {
-  for (const span of document.querySelectorAll(`[data-${attr}]`)) span.textContent = facts[span.dataset[attr]];
-};
-
-const rests = mountRestsOn(document.getElementById('rests-on'), { games });
-fill('rests', { onU: fmt(rests.onU), firstU: fmt(rests.firstU) });
+const rests = restsFacts(games);
+for (const span of document.querySelectorAll('[data-rests]')) {
+  const value = rests[span.dataset.rests];
+  if (value === undefined) throw new Error(`data-rests="${span.dataset.rests}" names no fact`);
+  span.textContent = fmt(value);
+}
 </script>
 </body>
 </html>

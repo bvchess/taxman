@@ -19,9 +19,8 @@ import { listWords, numberWord } from '../js/vocab.js';
 import { fitsFacts, fitsWords, primeFacts, primeWords } from '../figures/fits.js';
 import { slipFacts, slipOfRecord } from '../figures/slip.js';
 import { linkWords, linksFacts } from '../figures/links.js';
-import { GROUPS, PROVER_TO, RULES, oneSearchFacts, settled } from '../js/proof.js';
+import { GROUPS, PROVER_TO, RULES, foundationOf, oneSearchFacts, restsFacts, ruleOf, settled } from '../js/proof.js';
 import { boundFacts } from '../figures/bounds-chart.js';
-import { restsFacts } from '../figures/rests-on.js';
 import { readResults, repoRoot } from './results.mjs';
 
 // Descending greedy is checked against the results file's in_the_bag for every game up to GREEDY_ALL_UP_TO, then for
@@ -361,6 +360,22 @@ same('the groups add up to every game', sum(Object.values(sorted.groupCounts)), 
   const rests = restsFacts(games);
   same(`the first game resting on statement U is no longer ${PROVER_TO + 1}`, rests.firstU, PROVER_TO + 1);
   same('every game from the first resting on statement U on rests on it', rests.onU, games.lastN - rests.firstU + 1);
+  const c = games.columns;
+  const groupSizes = new Map();
+  c.n.forEach((n, i) => {
+    const found = foundationOf(c, i);
+    if (found > PROVER_TO) groupSizes.set(found, (groupSizes.get(found) ?? 0) + 1);
+  });
+  same('the foundations past PROVER_TO are counted', rests.foundations, groupSizes.size);
+  same('the most games on one foundation is at least 1', rests.most >= 1, true);
+  same('the groups of games on a foundation add up to every game resting on statement U',
+    sum([...groupSizes.values()]), rests.onU);
+  same('the most games on one foundation is the largest group', rests.most, Math.max(...groupSizes.values()));
+  same('every foundation past PROVER_TO is a search or a repeat that is its own foundation',
+    [...groupSizes.keys()].every((n) => {
+      const i = c.n.indexOf(n);
+      return ['search', 'repeat'].includes(ruleOf(c, i)) && foundationOf(c, i) === n;
+    }), true);
   // PROVER_TO is the reach of the prover's record: its largest n, with a line for every n from 2 to it.
   const record = readFileSync(join(repoRoot, 'solver', 'noframe', 'data', 'exact_parity_2_2531.jsonl'), 'utf8')
     .split('\n').filter((line) => line.trim() !== '').map((line) => JSON.parse(line).n);

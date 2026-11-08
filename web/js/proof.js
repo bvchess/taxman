@@ -106,6 +106,26 @@ function foundationsOf(c) {
  *  past it, it rests on statement U. */
 export const foundationOf = (c, i) => foundationsOf(c)[i];
 
+/**
+ * What rests on statement U, which chapter 7 counts.  A score rests on statement U when its foundation (foundationOf) is
+ * a game past PROVER_TO.  onU is how many games do; firstU is the first of them; foundations is how many distinct games
+ * past PROVER_TO they rest on; most is the largest number of games that rest on one of those foundations.
+ */
+export function restsFacts(games) {
+  const c = games.columns;
+  const groups = new Map();
+  let onU = 0;
+  let firstU = null;
+  c.n.forEach((n, i) => {
+    const found = foundationOf(c, i);
+    if (found <= PROVER_TO) return;
+    onU += 1;
+    firstU ??= n;
+    groups.set(found, (groups.get(found) ?? 0) + 1);
+  });
+  return { onU, firstU, foundations: groups.size, most: Math.max(...groups.values()) };
+}
+
 /** How the chain's record proves the game in row i, in words: "a repeat of game 21's search". */
 export function recordWords(c, i) {
   const n = c.n[i];
