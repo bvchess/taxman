@@ -80,12 +80,13 @@
 //!
 //! `back` is [`DEFAULT_BACK`], `tilt` [`DEFAULT_TILT`] and `widen` [`DEFAULT_WIDEN`], so that a user names a level of
 //! effort and nothing else; `--back 0`, `--tilt 0` and `--widen 0` turn each off, and `fix` is the finder's share.
-//! `stop_growth` is [`DEFAULT_STOP_GROWTH`] and `push_growth` [`DEFAULT_PUSH_GROWTH`] ("The bound and the gap", below),
-//! and `--stop-growth off` and `--push-growth off` turn each off; `unseeded_every` is [`DEFAULT_UNSEEDED_EVERY`], 0, so
-//! that no game is played twice for its n alone ("Games played twice").  The first three are the setting that two races
-//! chose on the 251 hard games of 3441-5060: `--back 8 --tilt 25 --widen 4`
-//! reaches the score that the built-in table has in 87.3, 91.2, 94.0, 95.2, 96.8 and 97.6% of them at the levels 1 to
-//! 6, against 78.1, 79.7, 81.3, 82.9, 86.1 and 89.6% with no option.  The first race is the notebook's entry
+//! `stop_growth` is [`DEFAULT_STOP_GROWTH`], `stop_quiet` [`DEFAULT_STOP_QUIET`] and `push_growth`
+//! [`DEFAULT_PUSH_GROWTH`] ("The bound and the gap", below), and `--stop-growth off` and `--push-growth off` turn each
+//! off; `unseeded_every` is [`DEFAULT_UNSEEDED_EVERY`], 0, so that no game is played twice for its n alone ("Games
+//! played twice").  The first three are the setting that two races chose on the 251 hard games of 3441-5060:
+//! `--back 8 --tilt 25 --widen 4` reaches the score that the built-in table has in 87.3, 91.2, 94.0, 95.2, 96.8 and
+//! 97.6% of them at the levels 1 to 6, against 78.1, 79.7, 81.3, 82.9, 86.1 and 89.6% with no option.  The first race
+//! is the notebook's entry
 //! https://github.com/bvchess/taxman-notebook/blob/main/search/tilted-back-and-wider-rounds-2026-11/README.md; the
 //! second, the race R1, is
 //! https://github.com/bvchess/taxman-notebook/blob/main/search/a-share-of-tilted-neighborhoods-2026-11/README.md.  The
@@ -190,13 +191,17 @@
 //! jump at the game where a streak of short games begins, while a game that a short game hands its shortfall on to
 //! carries the gap on, with a growth of about 0.  The bound and the growth depend on n and the moves for n − 1 alone.
 //!
-//! * **The stop on growth** (`stop_growth` T): a searched game's rounds end once its gap is within T of the gap below,
-//!   its growth from −T to T, asked after each round from the one that reaches the budget of level 1
-//!   ([`Plan::stop_floor`]) on.  Most games reach their score in level 1's rounds, and a gap that stayed as it was says
-//!   that they are probably done.  A gap that shrank by more than T says that the game below may be short, or that
-//!   this one has more to give, so the rounds go on.  The floor keeps the rounds of level 1 whole, so a line at level 1
-//!   is as without the stop, and a level still runs the rounds of the levels below it first: the stop is asked of the
-//!   same rounds at every level.  The line says whether it ended the rounds (`growth_stop`).
+//! * **The stop on growth** (`stop_growth` T, `stop_quiet` K): a searched game's rounds end once its gap is within T of
+//!   the gap below, its growth from −T to T, and the last K rounds raised nothing, asked after each round from the one
+//!   that reaches the budget of level 1 ([`Plan::stop_floor`]) on.  Most games reach their score in level 1's rounds,
+//!   and a gap that stayed as it was says that they are probably done.  A gap that shrank by more than T says that the
+//!   game below may be short, or that this one has more to give, so the rounds go on.  They go on too while the game
+//!   still gains, since a game that gained late went on to gain again: the stop waits until K rounds in a row have
+//!   raised nothing ([`Rounds::quiet`](finder::Rounds::quiet) counts them, the start being round 0; K = 0 asks the
+//!   band alone).  The floor keeps the rounds of level 1 whole, so a line at level 1 is as without the stop, and a
+//!   level still runs the rounds of the levels below it first: the stop is asked of the same rounds at every level,
+//!   with the same count of quiet rounds, which the rounds in their order give.  The line says whether it ended the
+//!   rounds (`growth_stop`) and with how many quiet rounds (`quiet_rounds`).
 //! * **The push on growth** (`push_growth` T): a game whose growth after its play is above T is played twice, as a
 //!   game whose n is a multiple of `unseeded_every` is ("Games played twice"), and keeps the better line (`pushed`).  A
 //!   gap that jumps says that the game is probably short, and an unseeded play is the play that a short line below
@@ -207,11 +212,16 @@
 //! * **What a line depends on.**  The bound is a function of n, and the growth of n and of the moves for n − 1, so a
 //!   line still depends on nothing but the game, its start, the moves it starts from, the level, the seed and the
 //!   options, never on the threads.  With both rules off, the lines are those of the mode without them.
-//! * **The defaults**, [`DEFAULT_STOP_GROWTH`] and [`DEFAULT_PUSH_GROWTH`], were chosen on the lines of the chains of
-//!   the datasheet of the unsound mode and measured on two chains of 200 games at level 3: solver/docs/unsound.md ("The
-//!   bound and the gap") says what they gained and cost, and the notebook's entry
+//! * **The defaults**, [`DEFAULT_STOP_GROWTH`], [`DEFAULT_STOP_QUIET`] and [`DEFAULT_PUSH_GROWTH`].  The stop's 25
+//!   was chosen on the lines of the chains of the datasheet of the unsound mode and measured with the push's 50 on two
+//!   chains of 200 games at level 3: solver/docs/unsound.md ("The bound and the gap") says what they gained and cost,
+//!   and the notebook's entry
 //!   https://github.com/bvchess/taxman-notebook/blob/main/search/stopping-and-pushing-by-the-gap-2026-11/README.md
-//!   has the measurement.
+//!   has the measurement.  The push's 25 was chosen on a chain of 1,060 games, in the notebook's entry
+//!   https://github.com/bvchess/taxman-notebook/blob/main/search/tuning-the-unsound-mode-on-a-long-chain-2026-11/README.md,
+//!   and the 4 quiet rounds by simulating stop rules on lines made with no stop, in
+//!   https://github.com/bvchess/taxman-notebook/blob/main/search/simulating-stop-rules-on-lines-already-made-2026-11/README.md.
+//!   The mode itself has not been measured with the 4 quiet rounds.
 //!
 //! # Measuring
 //!
@@ -283,9 +293,13 @@ pub const DEFAULT_UNSEEDED_EVERY: u32 = 0;
 /// of the rounds of level 1 on (the module documentation, "The bound and the gap", says how it was chosen).
 pub const DEFAULT_STOP_GROWTH: Option<u64> = Some(25);
 
-/// The default of `push_growth`: a game whose gap grew by more than 50 in its play is played twice (the module
+/// The default of `stop_quiet`: the stop on growth waits until the last 4 rounds raised nothing (the module
 /// documentation, "The bound and the gap", says how it was chosen).
-pub const DEFAULT_PUSH_GROWTH: Option<i64> = Some(50);
+pub const DEFAULT_STOP_QUIET: u64 = 4;
+
+/// The default of `push_growth`: a game whose gap grew by more than 25 in its play is played twice (the module
+/// documentation, "The bound and the gap", says how it was chosen).
+pub const DEFAULT_PUSH_GROWTH: Option<i64> = Some(25);
 
 /// The work of one round, which level L budgets 2^L times ([`Plan::budget`]): the steps of a round whose neighborhoods
 /// all take the step limit of a unit, [`finder::UNIT_STEPS`].  (The work of such a round is a little more,
@@ -341,9 +355,14 @@ pub struct Plan {
     /// [`MAX_EFFORT`]; `None` is the plan's `effort`.
     pub unseeded_effort: Option<u32>,
     /// `--stop-growth T` ([`DEFAULT_STOP_GROWTH`] by default): a searched game's rounds end once its growth is from −T
-    /// to T, asked after each round from the one that reaches the budget of level 1 on (the module documentation, "The
-    /// bound and the gap").  `None` (`--stop-growth off`) ends no rounds this way.
+    /// to T and the last `stop_quiet` rounds raised nothing, asked after each round from the one that reaches the
+    /// budget of level 1 on (the module documentation, "The bound and the gap").  `None` (`--stop-growth off`) ends no
+    /// rounds this way.
     pub stop_growth: Option<u64>,
+    /// `--stop-quiet K` ([`DEFAULT_STOP_QUIET`] by default): the stop on growth ends a game's rounds only when the last
+    /// K rounds raised nothing ([`finder::Rounds::quiet`], the start being round 0).  0 asks the band alone.  It does
+    /// nothing without `stop_growth`.
+    pub stop_quiet: u64,
     /// `--push-growth T` ([`DEFAULT_PUSH_GROWTH`] by default): a game whose growth after its play is above T is played
     /// twice, as a game whose n is a multiple of `unseeded_every` is (the module documentation, "The bound and the
     /// gap").  `None` (`--push-growth off`) plays no game twice this way.
@@ -352,8 +371,8 @@ pub struct Plan {
 
 /// The least effort, the finder's seed and share fixed, the defaults of `tilt`, `back` and `widen` ([`DEFAULT_TILT`],
 /// [`DEFAULT_BACK`], [`DEFAULT_WIDEN`]), no trajectory from above, the stop at the run's ceiling, the repair, the stop
-/// and the push on growth ([`DEFAULT_STOP_GROWTH`], [`DEFAULT_PUSH_GROWTH`]), no game played twice for its n alone
-/// ([`DEFAULT_UNSEEDED_EVERY`]), and no measuring option.
+/// and the push on growth ([`DEFAULT_STOP_GROWTH`], [`DEFAULT_STOP_QUIET`], [`DEFAULT_PUSH_GROWTH`]), no game played
+/// twice for its n alone ([`DEFAULT_UNSEEDED_EVERY`]), and no measuring option.
 impl Default for Plan {
     fn default() -> Plan {
         let finder::Options { fix, seed, .. } = finder::Options::default();
@@ -374,6 +393,7 @@ impl Default for Plan {
             unseeded_every: DEFAULT_UNSEEDED_EVERY,
             unseeded_effort: None,
             stop_growth: DEFAULT_STOP_GROWTH,
+            stop_quiet: DEFAULT_STOP_QUIET,
             push_growth: DEFAULT_PUSH_GROWTH,
         }
     }
@@ -523,6 +543,15 @@ fn widen_error(got: &str) -> String {
 pub fn parse_stop_growth(text: &str) -> Result<Option<u64>, String> {
     parse_or_off(text)
         .map_err(|_| format!("--stop-growth takes T, a whole number of points from 0 up, or off: got {text:?}"))
+}
+
+/// Reads the value of `--stop-quiet`, K: a whole number of rounds from 0 up.
+///
+/// # Errors
+///
+/// What `text` should have been.
+pub fn parse_stop_quiet(text: &str) -> Result<u64, String> {
+    text.parse().map_err(|_| format!("--stop-quiet takes K, a whole number of rounds from 0 up: got {text:?}"))
 }
 
 /// Reads the value of `--push-growth`: T, a whole number of points, which may be below 0, as `Some(T)`, or `off`,
@@ -763,6 +792,9 @@ pub struct Line {
     pub rounds: u64,
     pub steps: u64,
     pub work: u64,
+    /// The rounds since the score last rose, when a searched game's rounds ended ([`finder::Rounds::quiet`]; 0 on any
+    /// other line).  The line records it as `quiet_rounds` where the stop on growth ended the rounds.
+    pub quiet: u64,
     /// For each trajectory, the rounds it worked at each stage of the ladder of `--widen` (all at the first without).
     pub stage_rounds: Option<Vec<[u64; STAGES]>>,
     /// Each round that raised the score, in order.
@@ -789,7 +821,8 @@ pub struct Line {
     /// started from, the run's line when it played the game (or the file's, or the table's); `None` if the run had no
     /// moves for n − 1, or plays every game unseeded ([`Plan::unseeded`]).
     pub growth: Option<i64>,
-    /// A searched game's rounds ended before the budget with its growth from −T to T, T the plan's `stop_growth`.
+    /// A searched game's rounds ended before the budget with its growth from −T to T, T the plan's `stop_growth`, and
+    /// the last K rounds raised nothing, K the plan's `stop_quiet`.
     pub growth_stop: bool,
     /// The game was played twice because its growth after the seeded play was above the plan's `push_growth`.
     pub pushed: bool,
@@ -839,6 +872,7 @@ impl Line {
             rounds: 0,
             steps: 0,
             work: 0,
+            quiet: 0,
             stage_rounds: None,
             improvements: Vec::new(),
             seconds: 0.0,
@@ -924,6 +958,7 @@ impl Line {
             ("bound", Json::from(self.bound)),
             ("growth", self.growth.map_or(Json::Null, Json::from)),
             ("growth_stop", Json::Bool(self.growth_stop)),
+            ("quiet_rounds", if self.growth_stop { Json::from(self.quiet) } else { Json::Null }),
             ("pushed", Json::Bool(self.pushed)),
             ("repeats", self.repeats.map_or(Json::Null, Json::from)),
             ("setup", setup),
@@ -938,6 +973,7 @@ impl Line {
             ("unseeded_every", Json::from(self.plan.unseeded_every)),
             ("unseeded_effort", self.plan.unseeded_effort.map_or(Json::Null, Json::from)),
             ("stop_growth", self.plan.stop_growth.map_or(Json::Null, Json::from)),
+            ("stop_quiet", Json::from(self.plan.stop_quiet)),
             ("push_growth", self.plan.push_growth.map_or(Json::Null, Json::from)),
             ("unseeded", Json::Bool(self.unseeded)),
             ("start", self.start.map_or(Json::Null, Json::from)),
@@ -1051,6 +1087,8 @@ pub(super) struct Improved {
     pub(super) promotions: Vec<u32>,
     pub(super) moves: Vec<u32>,
     pub(super) rounds: u64,
+    /// The rounds since the game's set last became heavier ([`finder::Rounds::quiet`]).
+    pub(super) quiet: u64,
     pub(super) nodes: u64,
     pub(super) work: u64,
     pub(super) stage_rounds: Vec<[u64; STAGES]>,
@@ -1785,11 +1823,11 @@ fn play(
     let mut line = Line::blank(n, plan, opts, ceiling, bound);
     let known = plan.stop_at_known.then(|| optimal.score(n).expect("the range was checked against the table"));
     // The stop on growth: from the end of the rounds of the least level on, a score whose gap is within the plan's T of
-    // the gap below.
+    // the gap below, after the last K rounds that raised nothing.
     let floor = plan.stop_floor();
-    let stops = |score: u64, work: u64| {
+    let stops = |score: u64, work: u64, quiet: u64| {
         let within = |(most, below)| growth(bound, score, below).unsigned_abs() <= most;
-        work >= floor && plan.stop_growth.zip(gap_below).is_some_and(within)
+        work >= floor && quiet >= plan.stop_quiet && plan.stop_growth.zip(gap_below).is_some_and(within)
     };
     let mut board = None;
     match set {
@@ -1817,10 +1855,10 @@ fn play(
                 let bag = set.in_the_bag;
                 // The rounds end at the table's score (`--stop-at-known`), the run's ceiling or the stop on growth,
                 // whichever comes first.
-                let enough = |sum: u64, work: u64| {
+                let enough = |sum: u64, work: u64, quiet: u64| {
                     let score = bag + sum;
                     let at_ceiling = ceiling.is_some_and(|ceiling| score >= ceiling);
-                    known.is_some_and(|known| score >= known) || at_ceiling || stops(score, work)
+                    known.is_some_and(|known| score >= known) || at_ceiling || stops(score, work, quiet)
                 };
                 let seed = before.map(|before| before.moves.as_slice());
                 // The games a trajectory may begin from, from n − 1 down, then from n + 1 up.
@@ -1836,7 +1874,8 @@ fn play(
     conclude(&mut line, before, known, optimal).map_err(|e| format!("n={n}: {e}"))?;
     line.seconds = clock();
     line.growth = gap_below.map(|below| growth(bound, line.score, below));
-    line.growth_stop = line.method == Method::Search && line.work < plan.budget() && stops(line.score, line.work);
+    line.growth_stop =
+        line.method == Method::Search && line.work < plan.budget() && stops(line.score, line.work, line.quiet);
     line.pushed = line.method != Method::Trivial && plan.push_growth.zip(line.growth).is_some_and(|(most, g)| g > most);
     if !(plays_twice(n, plan) || line.pushed) || line.method == Method::Trivial {
         return Ok(Some((line, board)));
@@ -1853,7 +1892,7 @@ fn play(
     let mut unseeded = Line { unseeded: true, ..Line::blank(n, &plan.unseeded_play(), opts, None, bound) };
     (unseeded.setup, unseeded.in_the_bag) = (Some(board.setup), Some(board.in_the_bag));
     let bag = board.in_the_bag;
-    let enough = |sum: u64, _| known.is_some_and(|known| bag + sum >= known);
+    let enough = |sum: u64, _, _| known.is_some_and(|known| bag + sum >= known);
     let others: Vec<(u32, &[u32])> = above.iter().map(|m| (m.n, m.moves.as_slice())).collect();
     if !searched(&mut unseeded, &board, None, &others, &clock, &enough) {
         return Ok(None);
@@ -1905,7 +1944,7 @@ fn searched(
     seed: Option<&[u32]>,
     others: &[(u32, &[u32])],
     clock: &dyn Fn() -> f64,
-    enough: &dyn Fn(u64, u64) -> bool,
+    enough: &dyn Fn(u64, u64, u64) -> bool,
 ) -> bool {
     let bag = board.in_the_bag;
     let improved = board.job.improve(seed, others, &line.plan, line.threads, clock, enough);
@@ -1916,7 +1955,7 @@ fn searched(
     line.start_seconds = improved.start_seconds;
     line.trajectories = Some(improved.trajectories);
     line.survivor_scores = Some(improved.survivors.iter().map(|&(game, sum)| (game, bag + sum)).collect());
-    (line.rounds, line.steps, line.work) = (improved.rounds, improved.nodes, improved.work);
+    (line.rounds, line.quiet, line.steps, line.work) = (improved.rounds, improved.quiet, improved.nodes, improved.work);
     line.stage_rounds = Some(improved.stage_rounds);
     line.improvements = improved
         .improvements
@@ -2013,7 +2052,8 @@ mod tests {
         let twice = (DEFAULT_UNSEEDED_EVERY, plan.unseeded_every, plan.unseeded, plan.unseeded_effort);
         assert_eq!(twice, (0, 0, false, None), "no game is played twice for its n, and no game unseeded alone");
         let growth = (DEFAULT_STOP_GROWTH, DEFAULT_PUSH_GROWTH, plan.stop_growth, plan.push_growth);
-        assert_eq!(growth, (Some(25), Some(50), Some(25), Some(50)), "the stop and the push on growth are on");
+        assert_eq!(growth, (Some(25), Some(25), Some(25), Some(25)), "the stop and the push on growth are on");
+        assert_eq!((DEFAULT_STOP_QUIET, plan.stop_quiet), (4, 4), "the stop waits for 4 rounds that raised nothing");
         // The rounds search with the plan's seed, tilt and widening, and the finder's other options.
         let lns = plan.lns();
         let default = finder::Options::default();
@@ -2115,6 +2155,20 @@ mod tests {
             (1, 3)
         );
         assert_eq!(plan.unseeded_play(), Plan { effort: 1, ..plan });
+    }
+
+    #[test]
+    fn the_quiet_rounds_of_the_stop_are_a_whole_number_from_0_up() {
+        // 0 asks the band of the stop alone, so there is no `off`.
+        assert_eq!(["0", "4", "99"].map(parse_stop_quiet), [Ok(0), Ok(4), Ok(99)]);
+        for text in ["", "a", "1.5", "-1", "off", " 1", "99999999999999999999999"] {
+            let err = parse_stop_quiet(text).unwrap_err();
+            assert_eq!(err, format!("--stop-quiet takes K, a whole number of rounds from 0 up: got {text:?}"));
+        }
+        // Any K is a plan, and the plan of K = 0 is the stop of the band alone.
+        for stop_quiet in [0, DEFAULT_STOP_QUIET, u64::MAX] {
+            assert_eq!(check_plan(&Plan { stop_quiet, ..Plan::default() }), Ok(()));
+        }
     }
 
     #[test]

@@ -936,8 +936,9 @@ trait Job: Send + Sync {
     /// search makes ([`search::start_incumbent`]), from the promotions of `seed`, the moves for `n − 1`, if the search
     /// takes a seed, then the rounds of LNS on many threads that `plan` asks for ([`finder::Lns::rounds`]), which end
     /// once their work reaches the plan's budget ([`unsound::Plan::budget`]) or `enough` says so of the game's
-    /// promotion sum and the work of the rounds so far (the run's ceiling, the table's score and the stop on growth are
-    /// the caller's).  If the search takes a seed, the rounds follow a trajectory besides the start's from what
+    /// promotion sum, the work of the rounds so far and the quiet rounds, those since the game's set last became
+    /// heavier ([`finder::Rounds::quiet`]); the run's ceiling, the table's score and the stop on growth are the
+    /// caller's.  If the search takes a seed, the rounds follow a trajectory besides the start's from what
     /// survives of the moves in `others`, games and their moves (n − 1, n − 2, ..., then n + 1, n + 2, ...: a move
     /// above n is dropped, [`Board::seed`]), for each that is not a set an earlier trajectory began from
     /// ([`unsound::trajectories`]).  `clock` is the game's seconds so far.  The start's dive is the one
@@ -949,7 +950,7 @@ trait Job: Send + Sync {
         plan: &unsound::Plan,
         threads: usize,
         clock: &dyn Fn() -> f64,
-        enough: &dyn Fn(u64, u64) -> bool,
+        enough: &dyn Fn(u64, u64, u64) -> bool,
     ) -> unsound::Improved;
     /// Makes the dive of the unsound mode's start ([`search::start_dive`]) once, which depends on the board alone, so
     /// that a run may make it while the game before plays.
@@ -1099,7 +1100,7 @@ impl<const W: usize> Job for SearchJob<W> {
         plan: &unsound::Plan,
         threads: usize,
         clock: &dyn Fn() -> f64,
-        enough: &dyn Fn(u64, u64) -> bool,
+        enough: &dyn Fn(u64, u64, u64) -> bool,
     ) -> unsound::Improved {
         let prepared = &self.prepared;
         let seed = self.seed_of(seed.filter(|_| self.seeds));
@@ -1129,6 +1130,7 @@ impl<const W: usize> Job for SearchJob<W> {
             promotions: ran.set.to_vec(),
             moves: solution_for_promotions::<W>(&self.board.tables, ran.set),
             rounds: ran.rounds,
+            quiet: ran.quiet(),
             nodes: ran.nodes,
             work: ran.work,
             stage_rounds: ran.stage_rounds,

@@ -359,6 +359,15 @@ pub struct Rounds<const W: usize> {
     pub interrupted: bool,
 }
 
+impl<const W: usize> Rounds<W> {
+    /// The quiet rounds: how many rounds have been done since the game's set last became heavier, the start counting as
+    /// round 0 (so all the rounds so far, if none made it heavier).  The rounds in their order give it, so it does not
+    /// depend on the threads.
+    pub fn quiet(&self) -> u64 {
+        self.rounds - self.improvements.last().map_or(0, |improvement| improvement.round)
+    }
+}
+
 /// A game to search: its prepared setup, and the search space of the engine's searchers on it.
 pub struct Lns<'a, const W: usize> {
     pub p: &'a Prepared<W>,
@@ -482,7 +491,8 @@ impl<const W: usize> Lns<'_, W> {
     /// one, a trajectory each, on `threads` threads: until their work reaches `budget` (the engine's steps and
     /// [`NEIGHBORHOOD_WORK`] for each neighborhood, checked after each round, so the round that reaches it is the
     /// last, and a budget of 0 allows none), and none once `enough` says that the game's promotion sum is enough after
-    /// the work of the rounds so far (asked of the starts, with no work, and after each round).  A round's work is at
+    /// the work of the rounds so far and the rounds since the game's set last became heavier ([`Rounds::quiet`]; asked
+    /// of the starts, with no work and no quiet rounds, and after each round).  A round's work is at
     /// least [`NEIGHBORHOODS`] times [`NEIGHBORHOOD_WORK`], so the rounds end.  A trajectory's incumbent becomes the
     /// best set of its own neighborhoods if that is heavier.  With `options.widen`, a trajectory's stage moves down the
     /// ladder and back as its [`Standing`] says, from the rounds before.  The game's set is the heaviest incumbent, the
@@ -499,7 +509,7 @@ impl<const W: usize> Lns<'_, W> {
         budget: u64,
         threads: usize,
         clock: &dyn Fn() -> f64,
-        enough: &dyn Fn(u64, u64) -> bool,
+        enough: &dyn Fn(u64, u64, u64) -> bool,
     ) -> Rounds<W> {
         self.rounds_in(starts, budget, threads, clock, enough, (ahead(threads), Order::Rounds))
     }
@@ -512,7 +522,7 @@ impl<const W: usize> Lns<'_, W> {
         budget: u64,
         threads: usize,
         clock: &dyn Fn() -> f64,
-        enough: &dyn Fn(u64, u64) -> bool,
+        enough: &dyn Fn(u64, u64, u64) -> bool,
         (depth, order): (usize, Order),
     ) -> Rounds<W> {
         let mut views: Vec<View<W>> = starts.iter().map(|&base| View { base, standing: Standing::default() }).collect();
@@ -531,7 +541,7 @@ impl<const W: usize> Lns<'_, W> {
             let none = Improvement { round: 0, trajectory, stage: 0, steps: 0, work: 0, sum, seconds: clock() };
             out.improvements.push(none);
         }
-        let more = |out: &Rounds<W>| out.work < budget && !enough(out.set.sum(), out.work);
+        let more = |out: &Rounds<W>| out.work < budget && !enough(out.set.sum(), out.work, out.quiet());
         if !more(&out) {
             return out;
         }
@@ -1168,7 +1178,7 @@ mod tests {
     use crate::game::Optimal;
     use crate::numtheory::Tables;
     use crate::search::{search, search_beside, SearchTactics};
-    use std::cell::Cell;
+    use std::cell::{Cell, RefCell};
 
     const W: usize = 16;
 
@@ -1233,7 +1243,7 @@ mod tests {
     ) -> Rounds<W> {
         let space = SearchSpace::new(p);
         let lns = Lns { p, space: &space, options };
-        lns.rounds(starts, budget, threads, &|| 0.0, &|sum, _| target.is_some_and(|target| sum >= target))
+        lns.rounds(starts, budget, threads, &|| 0.0, &|sum, _, _| target.is_some_and(|target| sum >= target))
     }
 
     /// [`rounds_with`] the default options.
@@ -1283,7 +1293,7 @@ mod tests {
     ) -> Rounds<W> {
         let space = SearchSpace::new(p);
         let lns = Lns { p, space: &space, options };
-        lns.rounds_in(starts, budget, threads, &|| 0.0, &|_, _| false, flight)
+        lns.rounds_in(starts, budget, threads, &|| 0.0, &|_, _, _| false, flight)
     }
 
     /// The rounds that run ahead of their ends are the rounds one after another, which one round in flight plays: its
@@ -1370,12 +1380,45 @@ mod tests {
         // Enough once the work of the rounds reaches a count: the rounds of that budget.
         let space = SearchSpace::new(&p);
         let lns = Lns { p: &p, space: &space, options: Options::default() };
-        assert_eq!(lns.rounds(&[p.greedy], long.work, 4, &|| 0.0, &|_, work| work >= ONE_ROUND), short);
+        assert_eq!(lns.rounds(&[p.greedy], long.work, 4, &|| 0.0, &|_, work, _| work >= ONE_ROUND), short);
         // A start that is enough runs no round, and neither does no budget.
         for none in [rounds_of(&p, long.work, 4, Some(0)), rounds_of(&p, 0, 4, None)] {
             assert_eq!((none.set, none.rounds, none.nodes, none.work), (p.greedy, 0, 0, 0));
             assert!(none.improvements.is_empty());
         }
+    }
+
+    #[test]
+    fn the_quiet_rounds_are_those_since_the_games_set_last_became_heavier() {
+        let p = board(ROUNDS_GAME).prepare(SearchTactics::default()).unwrap();
+        let space = SearchSpace::new(&p);
+        let lns = Lns { p: &p, space: &space, options: Options::default() };
+        // What `enough` is asked: the promotion sum, the work and the quiet rounds.
+        let asked = RefCell::new(Vec::new());
+        let ask = |sum: u64, work: u64, quiet: u64| {
+            asked.borrow_mut().push((sum, work, quiet));
+            false
+        };
+        let budget = 5 * rounds_of(&p, ONE_ROUND, 4, None).work;
+        let ran = lns.rounds(&[p.greedy], budget, 4, &|| 0.0, &ask);
+        // It is asked of the start, with no work, and after each round but the last, which reaches the budget.
+        let (start, after): (Vec<_>, Vec<_>) = asked.into_inner().into_iter().partition(|&(_, work, _)| work == 0);
+        // The start counts as round 0: no round is quiet yet.
+        assert!(!start.is_empty() && start.iter().all(|&asked| asked == (p.greedy.sum(), 0, 0)), "{start:?}");
+        // After round r, the rounds since the last improvement of a round up to r (0 if there is none).
+        let quiet: Vec<u64> = (1..=ran.rounds)
+            .map(|round| {
+                let last = ran.improvements.iter().rev().find(|improvement| improvement.round <= round);
+                round - last.map_or(0, |improvement| improvement.round)
+            })
+            .collect();
+        let (last, before) = quiet.split_last().expect("rounds were done");
+        assert_eq!(after.iter().map(|&(_, _, quiet)| quiet).collect::<Vec<_>>(), before);
+        assert_eq!(ran.quiet(), *last);
+        // A round that improves the set leaves none, and a round that does not adds one.
+        assert!(quiet.contains(&0) && quiet.iter().any(|&q| q >= 1), "rounds of both kinds: {quiet:?}");
+        // The rounds in their order give it, so it does not depend on the threads.
+        assert_eq!(lns.rounds(&[p.greedy], budget, 1, &|| 0.0, &|_, _, _| false), ran);
     }
 
     #[test]

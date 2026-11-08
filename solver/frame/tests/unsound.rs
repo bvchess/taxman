@@ -4,8 +4,8 @@
 //! that shape the rounds (`fix`, `tilt`, `back`, `widen`) change the line, and each of them, the last three together
 //! and the defaults of the last three keep all of the above.  The repair pulls a short line up from the lines above
 //! it, an unseeded game takes nothing from the games below it, and a game played twice keeps its better play.  A
-//! line's bound is the parity bound, the stop on growth ends a level's rounds from the end of level 1's on, and the
-//! push plays twice a game whose gap grew.
+//! line's bound is the parity bound, the stop on growth ends a level's rounds from the end of level 1's on, after any
+//! quiet rounds it waits for, and the push plays twice a game whose gap grew.
 //!
 //! Most tests play the rounds with `tilt`, `back` and `widen` off (`plain`, the form of the mode before they had
 //! defaults), so that each keeps testing what it tested; the options are given by name where a test is about them, and
@@ -221,14 +221,16 @@ fn the_rounds_of_a_level_run_until_their_work_reaches_its_budget_and_the_round_t
 
 /// Games whose rounds, from a start made with the table's moves for n − 1, find different sets under the options that
 /// shape the rounds, and each starts from the table's moves, so it is the same game whatever the lines before it.  The
-/// defaults play each once: their gaps grow by 50 or less over the table's.
+/// defaults play each once but 539 at level 1: the gap of its seeded play grows by 39 over the table's, and the push
+/// (more than 25) plays it twice.
 const SHAPED: [u32; 4] = [375, 539, 544, 680];
 
-/// The games of [`SHAPED`] that the check of a lower level first plays.  The line of a game played twice is the better
-/// play's, which can be the other play at the next level, so a level runs the rounds of the levels below first in each
-/// play, not in the line: the seeded play is the game played once, and the unseeded play is the game played unseeded
-/// alone (`a_game_played_twice_has_the_line_of_the_better_play_...`).
-const PLAYED_ONCE: [u32; 2] = [375, 539];
+/// The games of [`SHAPED`] that the check of a lower level first plays, those that the defaults play once at levels 1
+/// to 3.  The line of a game played twice is the better play's, which can be the other play at the next level, so a
+/// level runs the rounds of the levels below first in each play, not in the line: the seeded play is the game played
+/// once, and the unseeded play is the game played unseeded alone
+/// (`a_game_played_twice_has_the_line_of_the_better_play_...`).
+const PLAYED_ONCE: [u32; 2] = [375, 680];
 
 /// The games of [`SHAPED`] but 544, which keeps the check of the threads inside its CPU limit.
 const ON_THREADS: [u32; 3] = [375, 539, 680];
@@ -333,7 +335,8 @@ for_each_option!(same_on_one_thread_and_on_four, check_same_on_one_thread_and_on
 fn check_lower_level_first(shape: usize) {
     let by_level: Vec<Vec<Line>> =
         (1..=3).map(|effort| shaped_lines(&PLAYED_ONCE, &options(4, true), &shaped(effort)[shape].1)).collect();
-    assert!(by_level.iter().flatten().all(|line| line.other.is_none()), "each game is played once");
+    let twice: Vec<_> = by_level.iter().flatten().filter(|line| line.other.is_some()).map(|line| line.n).collect();
+    assert!(twice.is_empty(), "each game is played once: {twice:?}");
     for (less, more) in by_level.iter().zip(&by_level[1..]) {
         for (less, more) in less.iter().zip(more) {
             let (n, raised) = (less.n, (raised_by(less), raised_by(more)));
@@ -1066,11 +1069,19 @@ fn a_games_bound_is_the_parity_bound_and_the_first_games_gap_grows_over_the_tabl
     assert_eq!(lines[0].growth, Some((lines[0].bound - lines[0].score) as i64 - gap_below as i64));
 }
 
-/// The plan of [`from_table`] at level `effort` with the stop on growth `stop_growth`.
+/// The plan of [`from_table`] at level `effort` with the stop on growth `stop_growth`, which waits for no quiet rounds:
+/// the stop of the band alone.
 fn stopping(effort: u32, stop_growth: Option<u64>) -> Plan {
-    Plan { stop_growth, ..from_table(effort) }
+    Plan { stop_growth, stop_quiet: 0, ..from_table(effort) }
 }
 
+/// The plan of [`from_table`] at level `effort` whose stop on growth has no limit on the growth, and waits for
+/// `stop_quiet` rounds in a row that raised nothing: the stop of the quiet rounds alone.
+fn waiting(effort: u32, stop_quiet: u64) -> Plan {
+    Plan { stop_quiet, ..stopping(effort, Some(u64::MAX)) }
+}
+
+/// With no quiet rounds to wait for (`stopping`), the stop is the band alone, as it was before the stop waited for any.
 #[test]
 fn the_stop_on_growth_ends_the_rounds_from_the_end_of_the_least_levels_rounds_on() {
     let opts = options(4, false);
@@ -1122,6 +1133,62 @@ fn the_stop_on_growth_ends_the_rounds_from_the_end_of_the_least_levels_rounds_on
     // Each line records the stop's T.
     assert_eq!(stopped[0].to_json().get("stop_growth"), Some(&Json::from(u64::MAX)));
     assert_eq!(three[0].to_json().get("stop_growth"), Some(&Json::Null));
+    assert_eq!(three[0].to_json().get("stop_quiet"), Some(&Json::from(4u64)), "the default");
+    assert_eq!(stopped[0].to_json().get("stop_quiet"), Some(&Json::from(0u64)));
+}
+
+/// Where the stop of [`waiting`] with `quiet` rounds to wait for ends the rounds of a game, from `one` and `three`, its
+/// lines with no stop at level 1 and at a higher level: the first round from the end of level 1's rounds on, and before
+/// the last, that follows `quiet` rounds in a row that raised nothing (the start being round 0).  That round, the score
+/// after it, and the rounds since the score last rose; `None` if there is none.
+fn quiet_stop(one: &Line, three: &Line, quiet: u64) -> Option<(u64, u64, u64)> {
+    let last = |round: u64| three.improvements.iter().rev().find(|raised| raised.round <= round);
+    let since = |round: u64| round - last(round).map_or(0, |raised| raised.round);
+    let score = |round: u64| last(round).map_or_else(|| three.start.expect("a searched game"), |raised| raised.score);
+    (one.rounds..three.rounds).find(|&round| since(round) >= quiet).map(|round| (round, score(round), since(round)))
+}
+
+#[test]
+fn the_stop_on_growth_waits_for_k_rounds_that_raised_nothing() {
+    let opts = options(4, false);
+    let (one, three) = (lines(FIRST, &opts, &from_table(1), None), lines(FIRST, &opts, &from_table(3), None));
+    // At level 3, 375 raises the score in rounds 2 and 3 and 376 in rounds 1 and 2, and the quiet rounds follow.
+    let gains: Vec<Vec<u64>> =
+        three.iter().map(|line| raised(line).iter().map(|&(round, _)| round).collect()).collect();
+    assert_eq!(gains, [[2, 3], [1, 2]]);
+    // The round at which each game's rounds end, for K from 0 to 3 (none: the game plays its level's rounds).
+    let (mut ends, mut waited) = (Vec::new(), Vec::new());
+    for quiet in 0..=3 {
+        let lines = lines(FIRST, &opts, &waiting(3, quiet), None);
+        let mut end = Vec::new();
+        for ((one, three), line) in one.iter().zip(&three).zip(&lines) {
+            let (n, json, stop) = (line.n, line.to_json(), quiet_stop(one, three, quiet));
+            assert_eq!(json.get("stop_quiet"), Some(&Json::from(quiet)), "n={n}, K={quiet}");
+            if let Some((round, score, since)) = stop {
+                // The rounds end at the round the line with no stop gives, with the quiet rounds it had.
+                let ended = (line.rounds, line.score, line.growth_stop, line.quiet);
+                assert_eq!(ended, (round, score, true, since), "n={n}, K={quiet}");
+                assert!(since >= quiet && line.work < line.plan.budget(), "n={n}, K={quiet}");
+                assert_eq!(json.get("quiet_rounds"), Some(&Json::from(since)), "n={n}, K={quiet}");
+                assert!(line.summary_line().contains(", stopped"), "{}", line.summary_line());
+            } else {
+                // Never quiet enough before the last round: the line of level 3 with no stop.
+                let (line, three) = (slice::from_ref(line), slice::from_ref(three));
+                assert_eq!(with_plan(line, from_table(3)), with_plan(three, from_table(3)), "n={n}, K={quiet}");
+                assert_eq!(json.get("quiet_rounds"), Some(&Json::Null), "n={n}, K={quiet}");
+            }
+            end.push(stop.map(|(round, ..)| round));
+        }
+        ends.push(end);
+        waited.push(lines);
+    }
+    // K = 0 asks the gap alone, so the rounds end with level 1's, round 2 in both games.  Each game then waits for K
+    // rounds after its last gain, in round 3 and round 2.  Level 3 has 5 rounds, and a game that would wait for its
+    // last round plays them all.
+    assert_eq!(ends, [[Some(2), Some(2)], [Some(4), Some(3)], [None, Some(4)], [None, None]]);
+    // The count comes from the rounds in their order, so the lines are the same on one thread.
+    let on_one = lines(FIRST, &options(1, false), &waiting(3, 1), None);
+    assert_eq!(timeless_all(&on_one), timeless_all(&waited[1]));
 }
 
 /// The plan of a run at level 1 that repairs and plays twice a game whose growth is above `push_growth`.
@@ -1196,7 +1263,7 @@ fn a_repeat_plays_the_promotions_of_a_line_that_searched_its_problem() {
 #[test]
 fn the_lines_of_a_run_that_stops_and_pushes_are_the_same_on_one_thread_and_on_four() {
     let dir = TempDir::new("unsound-growth");
-    let plan = Plan { stop_growth: Some(0), push_growth: Some(0), ..repairing(2) };
+    let plan = Plan { stop_growth: Some(0), stop_quiet: 1, push_growth: Some(0), ..repairing(2) };
     let (one, four) = (dir.join("one.jsonl"), dir.join("four.jsonl"));
     played(WALKED, &options(1, false), &plan, Some(&one));
     played(WALKED, &options(4, false), &plan, Some(&four));

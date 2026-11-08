@@ -13,8 +13,8 @@ use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, gate_trial, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
 use taxman::solver::unsound::{
-    DEFAULT_BACK, DEFAULT_PUSH_GROWTH, DEFAULT_STOP_GROWTH, DEFAULT_TILT, DEFAULT_UNSEEDED_EVERY, DEFAULT_WIDEN,
-    MAX_ABOVE, MAX_BACK, MAX_EFFORT, MAX_TILT, MIN_EFFORT, REPAIR_REACH, ROUND_WORK,
+    DEFAULT_BACK, DEFAULT_PUSH_GROWTH, DEFAULT_STOP_GROWTH, DEFAULT_STOP_QUIET, DEFAULT_TILT, DEFAULT_UNSEEDED_EVERY,
+    DEFAULT_WIDEN, MAX_ABOVE, MAX_BACK, MAX_EFFORT, MAX_TILT, MIN_EFFORT, REPAIR_REACH, ROUND_WORK,
 };
 use taxman::tactics::Tactics;
 
@@ -108,6 +108,9 @@ commands:
                                moves for n-1 it starts from (T >= 0), from the end of the rounds of level {min_effort}
                                on (default {stop_growth}).  The gap is the game's bound less its score, and its growth
                                the gap less that of the moves for n-1
+      --stop-quiet K           with --unsound: the stop of --stop-growth ends a game's rounds only when the last K
+                               rounds raised nothing (default {stop_quiet}); the start counts as round 0.  0: the gap
+                               alone
       --push-growth T|off      with --unsound: play a game twice, as --unseeded-every does, if the growth of its gap
                                after its play is above T (default {push_growth})
       --past-ceiling           with --unsound: do not end a game's rounds at the run's ceiling, n + the score of the
@@ -165,6 +168,7 @@ fn usage() -> String {
         .replace("{repair_reach}", &REPAIR_REACH.to_string())
         .replace("{unseeded_every}", &DEFAULT_UNSEEDED_EVERY.to_string())
         .replace("{stop_growth}", &DEFAULT_STOP_GROWTH.map_or("off".to_owned(), |t| t.to_string()))
+        .replace("{stop_quiet}", &DEFAULT_STOP_QUIET.to_string())
         .replace("{push_growth}", &DEFAULT_PUSH_GROWTH.map_or("off".to_owned(), |t| t.to_string()))
         .replace("{widen}", &DEFAULT_WIDEN.to_string())
         .replace("{ladder}", &ladder.join(" -> "))

@@ -158,8 +158,9 @@ const SOLVE_FLAGS: [&str; 10] = [
 /// The flags of the unsound mode that take a value, besides `--out` and the solver's: the level of effort, the seed,
 /// the options that shape the rounds (the share fixed, the share tilted, the games before and above that the
 /// trajectories begin from, the widening), of which `--tilt`, `--back` and `--widen` have defaults that 0 turns off,
-/// the games played twice and the level of their unseeded play, and the stop and the push on the growth of the gap.
-const UNSOUND_FLAGS: [&str; 11] = [
+/// the games played twice and the level of their unseeded play, and the stop and the push on the growth of the gap
+/// (the stop with the quiet rounds it waits for).
+const UNSOUND_FLAGS: [&str; 12] = [
     "--effort",
     "--seed",
     "--fix",
@@ -170,6 +171,7 @@ const UNSOUND_FLAGS: [&str; 11] = [
     "--unseeded-every",
     "--unseeded-effort",
     "--stop-growth",
+    "--stop-quiet",
     "--push-growth",
 ];
 
@@ -250,12 +252,12 @@ fn proof_search_flags() -> impl Iterator<Item = &'static str> {
 }
 
 /// `solve A-B --unsound --effort L --out FILE [--seed S] [--fix LO,HI] [--tilt P] [--back J] [--above J] [--widen S]
-/// [--unseeded-every K] [--unseeded-effort L] [--stop-growth T|off] [--push-growth T|off] [--past-ceiling]
-/// [--no-repair] [--stop-at-known] [--from-known] [--unseeded]`, with `--threads`, `--tactic` and `--show`: plays
-/// the games in the unsound mode (`solver::unsound::solve_range`), with no proof, and appends their unsound lines to
-/// FILE, and the lines that the repair replaces.  An option not given has its default ([`Plan::default`]); `--fix`
-/// turns widening off (`unsound::widening`).  It stops on SIGINT and SIGTERM between rounds, the game in play
-/// unrecorded.
+/// [--unseeded-every K] [--unseeded-effort L] [--stop-growth T|off] [--stop-quiet K] [--push-growth T|off]
+/// [--past-ceiling] [--no-repair] [--stop-at-known] [--from-known] [--unseeded]`, with `--threads`, `--tactic` and
+/// `--show`: plays the games in the unsound mode (`solver::unsound::solve_range`), with no proof, and appends their
+/// unsound lines to FILE, and the lines that the repair replaces.  An option not given has its default
+/// ([`Plan::default`]); `--fix` turns widening off (`unsound::widening`).  It stops on SIGINT and SIGTERM between
+/// rounds, the game in play unrecorded.
 fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     if let Some(flag) = proof_search_flags().find(|flag| args.has(flag)) {
         return Err(CliError::Usage(format!("{flag} is a flag of the proof search, which --unsound does not run")));
@@ -276,6 +278,7 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
         args.value("--unseeded-effort").map(unsound::parse_unseeded_effort).transpose().map_err(CliError::Usage)?;
     let stop_growth =
         args.value("--stop-growth").map(unsound::parse_stop_growth).transpose().map_err(CliError::Usage)?;
+    let stop_quiet = args.value("--stop-quiet").map(unsound::parse_stop_quiet).transpose().map_err(CliError::Usage)?;
     let push_growth =
         args.value("--push-growth").map(unsound::parse_push_growth).transpose().map_err(CliError::Usage)?;
     let plan = Plan {
@@ -294,6 +297,7 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
         unseeded_every: args.parsed("--unseeded-every")?.unwrap_or(default.unseeded_every),
         unseeded_effort,
         stop_growth: stop_growth.unwrap_or(default.stop_growth),
+        stop_quiet: stop_quiet.unwrap_or(default.stop_quiet),
         push_growth: push_growth.unwrap_or(default.push_growth),
         ..default
     };

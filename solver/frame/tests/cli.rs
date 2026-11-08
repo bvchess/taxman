@@ -45,6 +45,7 @@ fn help_lists_the_commands_and_every_tactic() {
             "--unseeded-every K",
             "--unseeded-effort L",
             "--stop-growth T|off",
+            "--stop-quiet K",
             "--push-growth T|off",
             "--past-ceiling",
             "--no-repair",
@@ -68,7 +69,8 @@ fn help_lists_the_commands_and_every_tactic() {
             "which are on unless given 0",
             "turns widening off, and is refused with --widen S of 1 or more",
             "from the end of the rounds of level 1 on (default 25)",
-            "if the growth of its gap after its play is above T (default 50)",
+            "only when the last K rounds raised nothing (default 4)",
+            "if the growth of its gap after its play is above T (default 25)",
             "keep the better line (default 0)",
         ] {
             assert!(help.contains(text), "{args:?}: no {text:?}");
@@ -493,7 +495,7 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         let message = format!("{} is a flag of the proof search, which --unsound does not run", flag[0]);
         assert_usage_error(&[&base[..], flag].concat(), &message);
     }
-    let unsound_only: [&[&str]; 16] = [
+    let unsound_only: [&[&str]; 17] = [
         &["--effort", "1"],
         &["--seed", "2"],
         &["--fix", "0.5,0.7"],
@@ -504,6 +506,7 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         &["--unseeded-every", "8"],
         &["--unseeded-effort", "1"],
         &["--stop-growth", "0"],
+        &["--stop-quiet", "0"],
         &["--push-growth", "off"],
         &["--past-ceiling"],
         &["--no-repair"],
@@ -554,11 +557,16 @@ fn the_options_that_shape_the_rounds_are_checked() {
         assert_usage_error(&[&base[..], &["--widen", widen, "--fix", fix]].concat(), message);
         assert_usage_error(&[&base[..], &["--fix", fix, "--widen", widen]].concat(), message);
     }
-    // The stop's T is a whole number of points from 0 up, the push's one that may be below 0, each or `off`, and the
-    // level of the unseeded play a level of effort.
+    // The stop's T is a whole number of points from 0 up, the push's one that may be below 0, each or `off`, the rounds
+    // the stop waits for a whole number from 0 up (0 is the stop of the band alone, so not `off`), and the level of the
+    // unseeded play a level of effort.
     for growth in ["", "a", "1.5", "Off", "-1"] {
         let message = format!("--stop-growth takes T, a whole number of points from 0 up, or off: got {growth:?}");
         assert_usage_error(&[&base[..], &["--stop-growth", growth]].concat(), &message);
+    }
+    for quiet in ["", "a", "1.5", "off", "-1"] {
+        let message = format!("--stop-quiet takes K, a whole number of rounds from 0 up: got {quiet:?}");
+        assert_usage_error(&[&base[..], &["--stop-quiet", quiet]].concat(), &message);
     }
     for growth in ["", "a", "1.5", "Off"] {
         let message =
@@ -682,7 +690,7 @@ fn unsound_lines(dir: &TempDir, tag: &str, games: &[u32], effort: u32, extra: &[
 }
 
 /// With no option, `--unsound` plays the rounds of `--back 8 --tilt 25 --widen 4 --unseeded-every 0 --stop-growth 25
-/// --push-growth 50`: the lines are the same, but for the build and the times.
+/// --stop-quiet 4 --push-growth 25`: the lines are the same, but for the build and the times.
 #[test]
 fn the_defaults_are_the_options_given_by_name() {
     let dir = TempDir::new("unsound-defaults");
@@ -699,8 +707,10 @@ fn the_defaults_are_the_options_given_by_name() {
         "0",
         "--stop-growth",
         "25",
+        "--stop-quiet",
+        "4",
         "--push-growth",
-        "50",
+        "25",
     ];
     let by_name = unsound_lines(&dir, "named", games, 1, &named);
     assert_eq!(by_default, by_name);
