@@ -264,8 +264,8 @@ to 2531.
   rest on statement U from the first game that needs a search (2532 today).
 * The prover settles statement U one game at a time: it finds opt(n) on the whole board, with no frames, bounded by
   the parity bound of chapter 6, and has proven every game up to 2531.
-* The evidence past 2531: the lower layers (F4), the sources conjecture to 100,000, the barred bounds (about 85% of the
-  numbers U asks about, in 2532 to 3440), and the root's heaviest set, which holds them all in every game measured.
+* The evidence past 2531: the lower layers (F4), the sources conjecture to 100,000, the barred bounds (about 80% of the
+  numbers U asks about pass, in 2532 to 5060), and the root's heaviest set, which holds them all in every game.
 * Where a proof stops: the exchange that settles layer 2 fails at an odd core.
 
 **Right column.**  The corollary of statement U (X8), statement U and its evidence (`docs/theory/evidence.md`), the

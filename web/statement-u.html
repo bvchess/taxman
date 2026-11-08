@@ -108,16 +108,18 @@
       <li>It holds in every game the prover reaches, up to game 2,531.</li>
       <li>For the numbers of U* with one or two prime factors, the theory proves it: every optimal game
       plays that portion of U*.</li>
-      <li>Among the <a class="gloss" href="glossary.html#source">sources</a> alone, U* is the heaviest playable in
-      every game we've examined (up to 100,000.)  In those games, giving up a number in U* never pays within the top
+      <li>Among the <a class="gloss" href="glossary.html#source">sources</a> alone, U* is the heaviest playable set in
+      every game we've examined (up to 100,000).  In those games, giving up a number in U* never pays within the top
       half.</li>
-      <li>The prover can fix layers 1 and 2 as every optimal game plays them, leave out one number of U* at a time, and
-      bound what any such game without that number could score.  For about 85% of the numbers statement U is about, in
-      the games from 2,532 to 3,440 that need a search or repeat one, that bound is at most the recorded score, so an
-      optimal game that beats the score, if there is one, plays them.  In no game does it cover all of them; if it did,
-      the prover would prove that game's score.</li>
-      <li>In every game up to 3,440 that needs a search, a heaviest set that the parity bound allows, with layers 1
-      and 2 as every optimal game plays them, holds all of them.</li>
+      <li>The prover can test the numbers statement U is about one at a time.  For each, it bounds the score of any
+      optimal game that gives that number up.  When the bound is at most the recorded score, giving the number up cannot
+      beat the record.  In the games from 2,532 to 5,060 that rest on a search, about 80% of the numbers pass, so a game
+      that beats a recorded score would have to give up one of the rest.  Fewer pass where the parity bound sits further
+      above the score, and past game 1,149 no game has every number pass.</li>
+      <li>The parity bound lets through more sets than the player can play, so the heaviest set it allows answers a
+      looser question than the game.  With layers 1 and 2 played as every optimal game plays them, that heaviest set
+      keeps every number statement U is about, in every game from 2,532 to 5,060 that rests on a search.  Even the
+      looser question never gives one of them up.</li>
     </ul>
   </div>
 </section>
