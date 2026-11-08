@@ -142,16 +142,16 @@
 
 <section class="chapter" id="peel" data-toc="peel" aria-labelledby="h-peel">
   <h2 id="h-peel">Peel</h2>
-  <p>Trying every way to pay would be laborious.  A quicker test never has to guess.  It pairs numbers with their payments
-  one at a time, using only two kinds of safe step:</p>
+  <p>Trying every way to pay would be laborious.  A quicker test never has to guess.  It pairs numbers with their
+  payments one at a time, using only two kinds of safe step:</p>
   <ul class="rules">
     <li>A number with only one <a class="gloss" href="glossary.html#maximal-factor">maximal factor</a> left pays with it.</li>
     <li>A factor that only one remaining number can use pays for that number.</li>
   </ul>
-  <p>Each step takes a pair out, and the next step looks at what remains. We call this a
-    <a class="gloss" href="glossary.html#peel"><em>peel</em></a> test. If it pairs every number, the set is
-  <a class="gloss" href="glossary.html#playable">playable</a>.  If the steps run out with numbers left over, it is not.
-  </p>
+  <p>Each step takes a pair out, and the next step looks at what remains.  We call this a
+  <a class="gloss" href="glossary.html#peel"><em>peel</em></a> test.  If it pairs every number, the set is
+  <a class="gloss" href="glossary.html#playable">playable</a>.  If the steps run out with numbers left over, it is
+  not.</p>
 
   <figure class="fig fig-panel" id="peel-fig">
     <svg role="img" aria-label="Peel, step by step, pairing each move of game 21's optimal set with the factor that pays for it."></svg>
@@ -216,7 +216,12 @@
     choose to play first, the taxman will take both of its factors, and that will leave at most k&nbsp;−&nbsp;2 factors
     for the other k&nbsp;−&nbsp;1 numbers.</p>
     <p>A loop is also the only way peel gets stuck on sets of numbers with two maximal factors to pay with.  Peel is
-    stuck when every number left still has two factors and every factor still has two numbers.</p>
+    stuck when every number left still has two factors and every factor still has two numbers.  Then every point has a
+    second line out, so a walk along the lines that never turns back must come around to a point it passed: a loop.</p>
+    <p>So for numbers with two maximal factors, whether they can all be played is something you can see: draw their
+    lines and look for a loop.  Every product of two different primes, such as 95 = 5 · 19, is such a number, and
+    <a href="top-half.html#bottom-layers">chapter 3</a> chooses among those above n/2 this way.  It takes them from the
+    largest down and keeps each one that closes no loop with those it has kept.</p>
   </div>
 </section>
 
