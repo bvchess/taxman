@@ -13,15 +13,16 @@ README](../frame/README.md) says how to build it), and the words of the search a
 * [How a game is played](#how-a-game-is-played)
 * [The repair](#the-repair)
 * [Games played twice](#games-played-twice)
+* [The bound and the gap](#the-bound-and-the-gap)
 * [An unsound line](#an-unsound-line)
 
 ## What it is and is not
 
 Each line of a run is a real game.  Its moves are legal and are replayed before they count, so its score is a lower
 bound on opt(n), the best score of game n.  The score is opt(n) if the search found the best game, and nothing in the
-run says whether it did.  A higher level of effort buys a better chance, with more time, and never scores less than a
-lower one, since it plays the rounds of the lower one first.  A score above the built-in table's, which is proven, is a
-hard error.
+run says whether it did.  A higher level of effort buys a better chance, with more time, and its seeded play never
+scores less than a lower one's, since it plays the rounds of the lower one first.  A score above the built-in table's,
+which is proven, or above the game's [bound](#the-bound-and-the-gap) is a hard error.
 
 An unsound line never mixes with proven ones.  Its key `"unsound":true` makes `solve` without `--unsound`,
 `verify-results`, `solver/tools/check_results.py` and the built-in table refuse any line that has it, and `--unsound`
@@ -31,11 +32,11 @@ proof.
 ## The command
 
 ```
-$ taxman solve 5061-5063 --unsound --effort 1 --out unsound.jsonl
-n=5061  score=8057912   search  rounds=5      improved=1      21.565 s  unsound
-n=5062  score=8062974   repeat  rounds=0      improved=0       0.427 s  unsound  at ceiling
-n=5063  score=8063376   repeat  rounds=0      improved=0       0.405 s  unsound
-repaired 0 lines; the repair took 0.027 s
+$ taxman solve 5061-5063 --unsound --effort 1 --threads 8 --out unsound.jsonl
+n=5061  score=8057912   search  rounds=5      improved=1      29.567 s  unsound  growth 516  pushed, unseeded play 8057844
+n=5062  score=8062974   repeat  rounds=0      improved=0       0.092 s  unsound  at ceiling  growth 0
+n=5063  score=8063376   repeat  rounds=0      improved=0       0.374 s  unsound  growth 0
+repaired 0 lines; the repair took 0.021 s
 ```
 
 `solve A-B --unsound --effort L --out FILE` plays the games A to B in order, one at a time on all the threads, and
@@ -46,12 +47,13 @@ so the first game of a range past the table's end starts from the moves for the 
 the games FILE has, and from where the repair was.
 
 The summary line on stdout gives n, the score, the method, the rounds, how many of them raised the score and the
-seconds, then `unsound`, what `--stop-at-known` recorded, "at ceiling" if the game stopped at the run's ceiling, and
-"n-1 short by" a number of points if this game's score proves the line of n − 1 short by at least that many, and for a
-[game played twice](#games-played-twice) what its unseeded play scored, or that it was kept.  A line that the repair
-replaces has a summary line of its own: n, the new score, the method of the line replaced, the game its
-moves came from and how much they gain, and the seconds.  The run ends with the number of lines the repair replaced and
-the seconds its walks took, those that replaced nothing included.
+seconds, then `unsound`, what `--stop-at-known` recorded, "at ceiling" if the game stopped at the run's ceiling,
+"n-1 short by" a number of points if this game's score proves the line of n − 1 short by at least that many, the
+[growth of its gap](#the-bound-and-the-gap), with "stopped" if the growth ended its rounds, and for a [game played
+twice](#games-played-twice) whether the push played it, and what its unseeded play scored, or that it was kept.  A
+line that the repair replaces has a summary line of its own: n, the new score, the method of the line replaced, the
+game its moves came from and how much they gain, and the seconds.  The run ends with the number of lines the repair
+replaced and the seconds its walks took, those that replaced nothing included.
 
 ## The flags
 
@@ -69,15 +71,18 @@ reference](REFERENCE.md#1-the-flags-of-solve)), and refuses the flags of the pro
 | `--tilt P` | P from 0 to 100, default 25: P percent of a round's neighborhoods free the small promotions more often.  0: none |
 | `--widen S` | S ≥ 1, default 4: a trajectory that has not grown heavier in S rounds moves to larger neighborhoods.  0: no widening |
 | `--fix LO,HI` | the share of the incumbent's promotions that each neighborhood keeps fixed, drawn at random from LO to HI, 0 ≤ LO ≤ HI ≤ 1 (default 0.7,0.9).  It turns widening off, and is refused with `--widen S` of 1 or more |
-| `--unseeded-every K` | K ≥ 0, default 8: a game whose n is a multiple of K is played twice, also unseeded, and keeps the better line ([games played twice](#games-played-twice)).  0: none |
+| `--unseeded-every K` | K ≥ 0, default 0: a game whose n is a multiple of K is played twice, also unseeded, and keeps the better line ([games played twice](#games-played-twice)).  0: none |
+| `--stop-growth T` | T ≥ 0 or `off`, default 25: a searched game's rounds end once its [gap](#the-bound-and-the-gap) is within T of the gap below, from the end of the rounds of level 1 on |
+| `--push-growth T` | T or `off`, default 50: a game whose gap grows by more than T in its play is [played twice](#games-played-twice) |
+| `--unseeded-effort L` | the level of effort of the unseeded play of a game played twice, from 1 to 6 (default: `--effort`'s), for measuring |
 | `--past-ceiling` | no stop at the [run's ceiling](#the-runs-ceiling) |
 | `--no-repair` | no [repair](#the-repair) of the lines below a line |
 | `--stop-at-known`, `--from-known` | to measure the mode on the games whose opt(n) the built-in table has, and refused for any other: end a game's rounds as soon as its score is the table's, and start every game from the table's moves for n − 1 |
 | `--unseeded` | to measure what a game makes of its board alone: every game is played [unseeded](#games-played-twice), and none twice |
 
 The options `--back`, `--tilt` and `--widen` shape the rounds ([the options](#the-options-that-shape-the-rounds)), and
-are on unless given 0, as `--unseeded-every` is, so that a user names a level of effort and nothing else; `--above`
-shapes them too, and is off unless given.  The three were chosen together by
+are on unless given 0, as `--stop-growth` and `--push-growth` are unless given `off`, so that a user names a level of
+effort and nothing else; `--above` shapes them too, and is off unless given.  The three were chosen together by
 two races on the hard games of 3441-5060, at equal work ([the first
 race](https://github.com/bvchess/taxman-notebook/blob/main/search/tilted-back-and-wider-rounds-2026-11/README.md), [the
 second](https://github.com/bvchess/taxman-notebook/blob/main/search/a-share-of-tilted-neighborhoods-2026-11/README.md)).
@@ -102,8 +107,8 @@ always.  A [game played twice](#games-played-twice) is also searched with nothin
 
 The setup does not depend on the moves for n − 1, so a run makes each game's setup while the game before it plays, on
 a thread of its own beside the threads of `--threads`, with the part of a searched game's start that depends on the
-board alone (its dive).  Both run on one thread, and on many threads they would otherwise be a large part of the time
-of a run at a low level of effort.
+board alone (its dive) and the game's [bound](#the-bound-and-the-gap).  They run on one thread, and on many threads
+they would otherwise be a large part of the time of a run at a low level of effort.
 
 A line depends on the game, its start, the moves it starts from, the level, the seed and the options, and not on the
 threads or the machine, but for its times and threads.
@@ -162,8 +167,9 @@ The table does not show:
   games and the games behind them, so a share has no interval.
 * **A longer chain.**  A chain of 100 games starts from a proven game.  A shortfall passes to the games after it, so a
   chain of 200 games scored lower in the datasheet.
-* **This build.**  The chains ran before the repair, which can raise the shares, and before the rounds ran ahead of
-  their ends, which gives the same lines in less time on many threads.
+* **This build.**  The chains ran before the repair and the push on growth, which can raise the shares, before the
+  rounds ran ahead of their ends, which gives the same lines in less time on many threads, and before the stop on
+  growth, which ends most games' rounds after level 1's.
 * **The games past 5060.**  The known games stand in for them, and their hardest games lie at the top of the range, so
   the share past 5060 may be lower.
 
@@ -261,25 +267,55 @@ and a searched game starts from it and stops at the ceiling it sets.  An unseede
 below, so the short line does not hold it down; once it does better, the games above start from it and the repair walks
 down from it.
 
-* **Which games.**  With `--unseeded-every K`, a game whose n is a multiple of K, unless it is trivial: with the
-  default, K = 8, games 4952, 4960, 4968 and so on.  Which games depends on n alone.
+* **Which games.**  With `--push-growth T`, on by default, a game whose [gap grows](#the-bound-and-the-gap) by more
+  than T in its play, and with `--unseeded-every K` a game whose n is a multiple of K (K = 8: games 4952, 4960 and so
+  on), unless it is trivial.  Which games depends on n and on the moves for n − 1 alone.
 * **The unseeded play.**  It is searched on the game's board, never played by the prime formula or as a repeat: its
   start has no seed, its rounds follow the start's trajectory alone (and those of `--above`, if given), and it has no
-  run's ceiling.  A prime, which has no board, sets one up for it.  `--unseeded` plays every game this way and none
-  twice, to measure what a game makes of its board alone.
+  run's ceiling and no stop on growth.  A prime, which has no board, takes the one set up for its bound.  `--unseeded`
+  plays every game this way and none twice, to measure what a game makes of its board alone.
 * **The line.**  The better play's, the seeded one on a tie, as that play alone writes it, with `other`, what the other
   play came to.  A line of the unseeded play has no `prev` and no ceiling.  Its `seconds` are those of both plays.
-* **The work.**  The unseeded play runs its rounds to the level's budget, as a searched game does that is not stopped
-  at a ceiling, so a game played twice does up to twice a level's work: each play counts against a budget of its own.
-  Each play of a level runs the rounds of the levels below first, and a line depends on nothing that it did not depend
-  on before.
+* **The work.**  The unseeded play runs its rounds to the level's budget (or `--unseeded-effort`'s), as a searched game
+  does that is not stopped at a ceiling, so a game played twice does up to twice a level's work: each play counts
+  against a budget of its own, whether the game is played twice for its n or by the push.  Each play of a level runs
+  the rounds of the levels below first, and a line depends on nothing that it did not depend on before.
 * **What it gains.**  A streak of short games ends within K games of where it starts, if the unseeded play there
-  reaches a better score: in the chain of 4861-5060 at level 3 (524,288 work), the default took the games at opt(n)
-  from 182 to 198 of 200, since the unseeded play of 4952 ended the streak that the stuck 4950 starts after 2 games,
-  not 18.  No score was lower, and on 5061-5260 no score changed.  It cost 24% more time and 33 to 38% more work on both chains ([the
+  reaches a better score: in the chain of 4861-5060 at level 3 (524,288 work), K = 8 took the games at opt(n) from 182
+  to 198 of 200, since the unseeded play of 4952 ended the streak that the stuck 4950 starts after 2 games, not 18, for
+  24% more time ([the
   measurement](https://github.com/bvchess/taxman-notebook/blob/main/search/unseeded-games-above-a-short-game-2026-11/README.md)).
-  An unseeded play alone is weaker than a seeded one, and reaches opt(n) less often; it pays only where the seeded
-  play is held down.
+  The push plays 4950 itself twice, and with it K = 8 changed no score of 4861-5060 or 5061-5260 for half again the
+  time, so the default is 0 ([the bound and the gap](#the-bound-and-the-gap)).  An unseeded play alone is weaker than
+  a seeded one, and reaches opt(n) less often; it pays only where the seeded play is held down.
+
+## The bound and the gap
+
+Two options compare how far a game falls below a bound that no play exceeds with how far the game below it fell: they
+end the rounds of a game that is probably done, and play twice a game that is probably short.
+
+* **The bound.**  A game's bound is `in_the_bag` plus the GF(2) bound of the root's node, the parity bound of n
+  ([frame-bounds.md](../../docs/theory/frame-bounds.md#the-frame-bound), the paragraph "Against the parity bound"); a
+  score above it is a hard error.  It costs about 0.02 s a game at n = 5,000 and 0.05 s at 8,000, and a prime, which
+  the prime formula plays with no board, 0.2 and 0.5 s more to set one up, on the thread that makes the next game's
+  setup.
+* **The gap and its growth.**  A line's gap is its bound less its score, and its growth the gap less the gap of the
+  moves for n − 1 it starts from.  On the proven games of 3001-5060 the gap does not grow in 81% of the games, and
+  grows by more than 50 in 5.6% and by more than 200 in 1.0%.  A short game makes it jump where a streak of short games
+  begins (by 376 at the stuck 4950), and the games that it hands its shortfall on to carry the gap on, with a growth of
+  about 0.
+* **`--stop-growth T`** ends a searched game's rounds once its gap is within T of the gap below, asked after each
+  round from the one that reaches the budget of level 1 on.  Most games reach their score in level 1's rounds; a gap
+  that shrank by more than T says that the game below may be short or that this one has more to give, so the rounds go
+  on.  Level 1 plays as without the stop, and a level still plays the rounds of the levels below first.
+* **`--push-growth T`** plays a game twice, as `--unseeded-every` does, when its gap has grown by more than T in its
+  play: the unseeded play is the one that a short line below cannot hold down.  It counts against a budget of its own,
+  the level's.  A pushed game at one level may score more than the same game at a higher level, whose seeded play
+  brought the growth to T or below and was not pushed.
+* **What they gave.**  At level 3, with no game played twice for its n, they took the chain of 4861-5060 from 198 of
+  200 games at opt(n) to 200 in 44% less time: the push played the stuck 4950 twice, and its streak never began.
+  On 5061-5260 no line changed, in 43% less time ([the
+  measurement](https://github.com/bvchess/taxman-notebook/blob/main/search/stopping-and-pushing-by-the-gap-2026-11/README.md)).
 
 ## An unsound line
 
@@ -292,10 +328,11 @@ short, the fields regrouped and comments added:
  "method":"search", "in_the_bag":102413,
  "prev":{"n":594,"score":110282,"source":"table","moves_digest":"623c70271b00b128","short_by":0},
  "ceiling":110877, "at_ceiling":false,
+ "bound":110966, "growth":4, "growth_stop":false, "pushed":false,   # its gap, 106, is 4 more than the table's 594's
  "repeats":null,                          # a repeat names the line whose promotions it plays here
  "setup":{"frames":6,"candidates":141,"max_total":33,"greedy_sum":8396,"digest":"c6fe37bd55f2b043"},
  "effort":3, "budget":524288, "seed":1, "fix":[0.7,0.9], "tilt":25, "back":8, "above":0, "widen":4,
- "unseeded_every":8, "unseeded":false,
+ "unseeded_every":0, "unseeded_effort":null, "stop_growth":25, "push_growth":50, "unseeded":false,
  "start":110839,                          # the start fell 21 short of the table's score
  "trajectories":["start",594,593,591],    # the moves for 592 and for 590 to 587 gave a set one of these began from
  "survivor_scores":[[594,110682],[593,110489],[592,110489],[591,110303],...,[587,110303]],
@@ -333,12 +370,15 @@ the same way, each from the line above it.
 | `in_the_bag` | what the game with no promotions scores (null for the prime formula, which sets no board up) |
 | `prev` | the moves for n − 1 the game started from: `n`, `score`, `source` (`run`: this run's, `results`: the file's, or `table`: the built-in table's), `moves_digest`, and `short_by`, the points by which they fall short of opt(n − 1) at least, as this game's score proves (its score less n + score(n − 1), where that is above 0); null if there were none, and on a line of an unseeded play |
 | `ceiling`, `at_ceiling` | the run's ceiling on the score (null without moves for n − 1, with `--past-ceiling`, and on a line of an unseeded play), and whether the score reached it |
+| `bound`, `growth` | the game's [bound](#the-bound-and-the-gap), and the growth of its gap over the moves for n − 1 it started from, which a line of an unseeded play takes from the run's line below (null without such moves, and with `--unseeded`) |
+| `growth_stop`, `pushed` | whether `--stop-growth` ended the rounds before the budget, and whether `--push-growth` played the game twice |
 | `repeats` | for a repeat, the n of the line whose promotions it plays; null otherwise |
 | `setup` | as in [a results line](REFERENCE.md#a-results-line---out-schema-5), without `cap`; null on a `trivial` or `prime` line |
 | `effort`, `budget`, `seed` | the level of effort, the work its rounds run until, and the seed of the rounds' random choices |
 | `fix`, `tilt` | the range of `--fix` (the lowest and the highest share of the incumbent's promotions a neighborhood keeps fixed; a game that widens takes the ladder's shares instead, and this is the default range), and `--tilt`'s P (0 without it) |
 | `back`, `above`, `widen` | `--back`'s J (0 without it), `--above`'s J (0 without it), and `--widen`'s S (null without it) |
 | `unseeded_every`, `unseeded` | `--unseeded-every`'s K (0 without it), and whether the line is of an [unseeded play](#games-played-twice) (as `--unseeded` plays every game) |
+| `unseeded_effort`, `stop_growth`, `push_growth` | the level of `--unseeded-effort`, and the T of `--stop-growth` and of `--push-growth`; null for none |
 | `start` | the score of a searched game's start; null on any other line |
 | `trajectories` | for a searched game, what each incumbent its rounds kept began from: `"start"`, then the games whose survivors it began from, such as `["start",4231,4224]`; null on any other line |
 | `survivor_scores` | for a searched game, each game whose moves a trajectory could begin from, in the order of `trajectories`, with the score of what survives of its moves here, whether or not it began one, such as `[[594,110682],[593,110489]]`; null on any other line |

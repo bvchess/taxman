@@ -3,7 +3,9 @@
 //! table's score with `--stop-at-known`; and the wall between its lines and proven ones holds both ways.  The options
 //! that shape the rounds (`fix`, `tilt`, `back`, `widen`) change the line, and each of them, the last three together
 //! and the defaults of the last three keep all of the above.  The repair pulls a short line up from the lines above
-//! it, an unseeded game takes nothing from the games below it, and a game played twice keeps its better play.
+//! it, an unseeded game takes nothing from the games below it, and a game played twice keeps its better play.  A
+//! line's bound is the parity bound, the stop on growth ends a level's rounds from the end of level 1's on, and the
+//! push plays twice a game whose gap grew.
 //!
 //! Most tests play the rounds with `tilt`, `back` and `widen` off (`plain`, the form of the mode before they had
 //! defaults), so that each keeps testing what it tested; the options are given by name where a test is about them, and
@@ -34,13 +36,14 @@ use taxman::solver::{solve_range, Method, SolveOptions};
 const WORK: u64 = 1_100;
 
 /// The plan of a run at level `effort`, with the default seed and no measuring option, and with `tilt`, `back`, `widen`,
-/// the repair and the games played twice off: the mode as it was before those options had defaults.
+/// the repair, the games played twice and the stop and the push on growth off: the mode as it was before those options
+/// had defaults.
 fn plan(effort: u32) -> Plan {
     let off = Plan { tilt: 0, back: 0, widen: None, repair: false, unseeded_every: 0, ..Plan::default() };
-    Plan { effort, round_work: WORK, ..off }
+    Plan { effort, round_work: WORK, stop_growth: None, push_growth: None, ..off }
 }
 
-/// The plan of a run at level `effort` with the defaults of `tilt`, `back` and `widen`.
+/// The plan of a run at level `effort` with the defaults.
 fn by_default(effort: u32) -> Plan {
     Plan { effort, round_work: WORK, ..Plan::default() }
 }
@@ -127,15 +130,25 @@ fn lines_replay_to_their_scores_and_never_beat_the_table() {
     let measured = Plan { stop_at_known: true, ..plan(1) };
     let lines = lines((1, 160), &options(2, true), &measured, None);
     assert_eq!(lines.len(), 160);
-    for line in &lines {
+    for (i, line) in lines.iter().enumerate() {
         let n = line.n;
         let json = line.to_json();
         assert_eq!(json.get("unsound"), Some(&Json::Bool(true)), "n={n}");
         assert!(json.get("completed").is_none() && json.get("proof").is_none(), "n={n}: it claims nothing");
         assert_eq!(json.get("budget"), Some(&Json::from(measured.budget())), "n={n}");
+        // No play scores above the game's bound, which a board with no promotion candidates is at.
+        assert!(line.score <= line.bound, "n={n}: {} is above the bound {}", line.score, line.bound);
+        assert!(line.method != Method::Trivial || Some(line.bound) == line.in_the_bag, "n={n}");
+        assert_eq!(json.get("bound"), Some(&Json::from(line.bound)), "n={n}");
         if n > 1 {
             let prev = line.prev.as_ref().expect("the moves for n - 1");
             assert_eq!((prev.n, prev.source, prev.short_by), (n - 1, Source::Run, 0), "n={n}");
+            // The growth is the game's gap less the gap of the line below.
+            let below = &lines[i - 1];
+            let growth = (line.bound - line.score) as i64 - (below.bound - below.score) as i64;
+            assert_eq!(line.growth, Some(growth), "n={n}");
+        } else {
+            assert_eq!(line.growth, None, "game 1 has no moves below it");
         }
     }
     for method in [Method::Trivial, Method::Prime, Method::Repeat, Method::Search] {
@@ -207,23 +220,23 @@ fn the_rounds_of_a_level_run_until_their_work_reaches_its_budget_and_the_round_t
 }
 
 /// Games whose rounds, from a start made with the table's moves for n − 1, find different sets under the options that
-/// shape the rounds, and each starts from the table's moves, so it is the same game whatever the lines before it.  With
-/// the defaults, 544 and 680 are played twice, and at level 3 their seeded plays are kept.
+/// shape the rounds, and each starts from the table's moves, so it is the same game whatever the lines before it.  The
+/// defaults play each once: their gaps grow by 50 or less over the table's.
 const SHAPED: [u32; 4] = [375, 539, 544, 680];
 
-/// The games of [`SHAPED`] that the defaults play once, neither a multiple of 8 ([`unsound::DEFAULT_UNSEEDED_EVERY`]).
-/// The line of a game played twice is the better play's, which can be the other play at the next level, so a level
-/// runs the rounds of the levels below first in each play, not in the line: the seeded play is the game played once,
-/// and the unseeded play is the game played unseeded alone (`a_game_played_twice_has_the_line_of_the_better_play_...`).
+/// The games of [`SHAPED`] that the check of a lower level first plays.  The line of a game played twice is the better
+/// play's, which can be the other play at the next level, so a level runs the rounds of the levels below first in each
+/// play, not in the line: the seeded play is the game played once, and the unseeded play is the game played unseeded
+/// alone (`a_game_played_twice_has_the_line_of_the_better_play_...`).
 const PLAYED_ONCE: [u32; 2] = [375, 539];
 
-/// The games of [`SHAPED`] but 544, the dearest to play twice, which keeps the check of the threads inside its CPU limit:
-/// 680 is played twice under the defaults.
+/// The games of [`SHAPED`] but 544, which keeps the check of the threads inside its CPU limit.
 const ON_THREADS: [u32; 3] = [375, 539, 680];
 
 /// The plans of the options at level `effort`, for the games [`SHAPED`] from the table's moves: a share fixed other than
 /// the default's, the tilted share, trajectories from the 8 games before, the widening after a round without growth,
-/// the last three together, half the neighborhoods tilted, and the defaults of the last three.
+/// the last three together, half the neighborhoods tilted, and the defaults, but for the stop on growth, which ends the
+/// rounds of a level above the first where the first does and has a test of its own.
 fn shaped(effort: u32) -> [(&'static str, Plan); 7] {
     let known = Plan { from_known: true, ..plan(effort) };
     [
@@ -233,7 +246,7 @@ fn shaped(effort: u32) -> [(&'static str, Plan); 7] {
         ("widen", Plan { widen: Some(1), ..known }),
         ("tilt, back and widen", Plan { tilt: 100, back: 8, widen: Some(1), ..known }),
         ("half tilt", Plan { tilt: 50, ..known }),
-        ("the defaults", Plan { from_known: true, ..by_default(effort) }),
+        ("the defaults", Plan { from_known: true, stop_growth: None, ..by_default(effort) }),
     ]
 }
 
@@ -349,7 +362,7 @@ fn check_what_the_line_records(shape: usize) {
         assert_eq!(json.get("budget"), Some(&Json::from(shape.budget())), "n={n}");
         assert_eq!(json.get("unseeded_every"), Some(&Json::from(shape.unseeded_every)), "n={n}");
         let twice = shape.unseeded_every > 0 && n.is_multiple_of(shape.unseeded_every);
-        assert_eq!(line.other.is_some(), twice, "n={n}: played twice if a multiple of K");
+        assert_eq!(line.other.is_some(), twice || line.pushed, "n={n}: played twice if a multiple of K, or pushed");
         let (origins, stages) = (line.trajectories.as_ref().unwrap(), line.stage_rounds.as_ref().unwrap());
         assert_eq!(origins[0], Origin::Start, "n={n}");
         assert_eq!(stages.len(), origins.len(), "n={n}: the rounds of each trajectory");
@@ -1024,4 +1037,168 @@ fn a_game_played_twice_has_the_line_of_the_better_play_and_the_repair_walks_down
     let one = dir.join("one.jsonl");
     played(WALKED, &options(1, false), &twice(2), Some(&one));
     assert_eq!(file_lines(&one, false), file_lines(&file, false));
+}
+
+/// The parity bound of the games 373 to 396, the prover's bound on the whole board, as the notebook's entry "The parity
+/// bound against the frame bound (2026-10)" computed it for every board from 2 to 8191 (`parity_2_8191.jsonl.gz`).
+const PARITY: [u64; 24] = [
+    43737, 44111, 44339, 44543, 44667, 45045, 45051, 45278, 45433, 45815, 45819, 46011, 46396, 46782, 47169, 47557,
+    47563, 47799, 47943, 48335, 48474, 48868, 49044, 49438,
+];
+
+/// `lines` with `plan` in place of each line's plan, and without what varies from run to run.
+fn with_plan(lines: &[Line], plan: Plan) -> Vec<Line> {
+    lines.iter().map(|line| Line { plan, ..timeless(line) }).collect()
+}
+
+#[test]
+fn a_games_bound_is_the_parity_bound_and_the_first_games_gap_grows_over_the_tables_line() {
+    let table = Optimal::built_in();
+    let lines = lines((374, 396), &options(2, true), &Plan { stop_at_known: true, ..plan(1) }, None);
+    // Searched games, repeats and the primes 379, 383 and 389, whose bound is that of the board set up for it.
+    let bounds: Vec<u64> = lines.iter().map(|line| line.bound).collect();
+    assert_eq!(bounds, PARITY[1..]);
+    assert!(
+        lines.iter().any(|line| line.method == Method::Prime) && lines.iter().any(|line| line.method == Method::Repeat)
+    );
+    // The first game starts from the table's line of 373, whose gap the run takes from the bound of 373's board.
+    let gap_below = PARITY[0] - table.score(373).unwrap();
+    assert_eq!(lines[0].growth, Some((lines[0].bound - lines[0].score) as i64 - gap_below as i64));
+}
+
+/// The plan of [`from_table`] at level `effort` with the stop on growth `stop_growth`.
+fn stopping(effort: u32, stop_growth: Option<u64>) -> Plan {
+    Plan { stop_growth, ..from_table(effort) }
+}
+
+#[test]
+fn the_stop_on_growth_ends_the_rounds_from_the_end_of_the_least_levels_rounds_on() {
+    let opts = options(4, false);
+    let (one, three) = (lines(FIRST, &opts, &from_table(1), None), lines(FIRST, &opts, &from_table(3), None));
+    let rounds = |line: &Line| (line.rounds, line.work, line.score, raised_by(line));
+    // Every gap is within the largest T of the gap below: from level 1's budget on, each game stops at once, with
+    // level 1's rounds.
+    let stopped = lines(FIRST, &opts, &stopping(3, Some(u64::MAX)), None);
+    for ((one, three), stopped) in one.iter().zip(&three).zip(&stopped) {
+        let n = one.n;
+        assert!(three.rounds > one.rounds, "n={n}: level 3 plays more rounds than level 1");
+        assert_eq!(rounds(stopped), rounds(one), "n={n}");
+        assert!(stopped.growth_stop && !one.growth_stop && !three.growth_stop, "n={n}");
+        assert!(stopped.work >= stopped.plan.stop_floor() && stopped.work < stopped.plan.budget(), "n={n}");
+        assert!(stopped.summary_line().contains(", stopped"), "{}", stopped.summary_line());
+    }
+    // Level 1 stops at its budget whatever the growth: its lines are those without the stop.
+    let at_one = lines(FIRST, &opts, &stopping(1, Some(u64::MAX)), None);
+    assert_eq!(with_plan(&at_one, from_table(1)), with_plan(&one, from_table(1)));
+    // With a smaller T, a game stops at the end of level 1's rounds if its gap is within T of the gap below there, else
+    // at the first round after them that brings it within T, else never, and its line is then level 3's.
+    let mut ways = [0; 3];
+    for most in [0, 10, 25] {
+        let lines = lines(FIRST, &opts, &stopping(3, Some(most)), None);
+        for ((one, three), line) in one.iter().zip(&three).zip(&lines) {
+            let (n, last) = (line.n, three.growth.expect("moves below"));
+            let within = |growth: i64| growth.unsigned_abs() <= most;
+            let later = three.improvements.iter().filter(|raised| raised.round > one.rounds);
+            let at = later.clone().find(|raised| within(last + (three.score - raised.score) as i64));
+            if within(one.growth.expect("moves below")) {
+                assert_eq!(rounds(line), rounds(one), "n={n}, T={most}");
+                ways[0] += 1;
+            } else if let Some(at) = at {
+                assert_eq!((line.rounds, line.score, line.growth_stop), (at.round, at.score, true), "n={n}, T={most}");
+                ways[1] += 1;
+            } else {
+                assert_eq!(
+                    with_plan(slice::from_ref(line), from_table(3)),
+                    with_plan(slice::from_ref(three), from_table(3))
+                );
+                ways[2] += 1;
+            }
+        }
+    }
+    // At the end of level 1's rounds the gap of 375 is 21 smaller than that of the table's 374, so it goes on with a T
+    // of 0 or 10, never to come within it, and stops with 25; the gap of 376 is the gap below, and it stops with any T.
+    assert_eq!(one.iter().map(|line| line.growth).collect::<Vec<_>>(), [Some(-21), Some(0)]);
+    assert_eq!(ways, [4, 0, 2]);
+    // Each line records the stop's T.
+    assert_eq!(stopped[0].to_json().get("stop_growth"), Some(&Json::from(u64::MAX)));
+    assert_eq!(three[0].to_json().get("stop_growth"), Some(&Json::Null));
+}
+
+/// The plan of a run at level 1 that repairs and plays twice a game whose growth is above `push_growth`.
+fn pushing(push_growth: Option<i64>) -> Plan {
+    Plan { push_growth, ..twice(0) }
+}
+
+#[test]
+fn the_push_plays_a_game_twice_where_its_gap_grows_by_more_than_t() {
+    let opts = options(4, false);
+    // Every growth is above the least, and a game with moves below it is played twice, as by `--unseeded-every 1`.
+    let first = (WALKED.0, WALKED.0 + 3);
+    let every = lines(first, &opts, &twice(1), None);
+    let all = lines(first, &opts, &pushing(Some(i64::MIN)), None);
+    assert!(all.iter().all(|line| line.pushed && line.other.is_some()));
+    let unpushed = |lines: &[Line]| lines.iter().map(|line| Line { pushed: false, ..line.clone() }).collect::<Vec<_>>();
+    assert_eq!(with_plan(&unpushed(&all), twice(1)), with_plan(&every, twice(1)));
+    // No growth is above the largest: the lines without the push.
+    let once = lines(WALKED, &opts, &twice(0), None);
+    assert_eq!(with_plan(&lines(WALKED, &opts, &pushing(Some(i64::MAX)), None), twice(0)), with_plan(&once, twice(0)));
+    // Played once, 390 falls 7 short of the table's score, and its gap grows by 24: the 17 of the table's 390 and the
+    // 7.  The games above carry the gap on, with a growth of 0, and 396 reaches the table's score, 7 below that gap.
+    let table = Optimal::built_in();
+    let proven_gap = |n: u32| PARITY[(n - 373) as usize] - table.score(n).unwrap();
+    assert_eq!(proven_gap(390) as i64 - proven_gap(389) as i64, 17);
+    let growths: Vec<Option<i64>> = once.iter().map(|line| line.growth).collect();
+    assert_eq!(growths, [24, 0, 0, 0, 0, 0, -7].map(Some));
+    // So a T of 20 plays 390 twice, and no other game.
+    let pushed = lines(WALKED, &opts, &pushing(Some(20)), None);
+    let twice: Vec<u32> = pushed.iter().filter(|line| line.other.is_some()).map(|line| line.n).collect();
+    assert_eq!(twice, [390]);
+    assert!(pushed[0].pushed && pushed[0].summary_line().contains("  pushed, unseeded play"));
+    assert_eq!(pushed[0].to_json().get("push_growth"), Some(&Json::from(20i64)));
+}
+
+#[test]
+fn the_unseeded_play_of_a_game_played_twice_is_at_the_level_of_unseeded_effort() {
+    let opts = options(4, false);
+    let at_one = Plan { unseeded_every: 1, unseeded_effort: Some(1), ..from_table(3) };
+    let lines = lines(FIRST, &opts, &at_one, None);
+    let alone = self::lines(FIRST, &opts, &Plan { unseeded: true, ..from_table(1) }, None);
+    let seeded = self::lines(FIRST, &opts, &from_table(3), None);
+    for ((line, alone), seeded) in lines.iter().zip(&alone).zip(&seeded) {
+        let other = line.other.expect("every game is played twice");
+        let plays = [(line.unseeded, line.score, line.work), (other.unseeded, other.score, other.work)];
+        let (unseeded, played) = if line.unseeded { (plays[0], plays[1]) } else { (plays[1], plays[0]) };
+        assert_eq!(unseeded, (true, alone.score, alone.work), "n={}: the unseeded play is at level 1", line.n);
+        assert_eq!(played, (false, seeded.score, seeded.work), "n={}: the seeded play is at level 3", line.n);
+        assert_eq!(line.plan.effort, if line.unseeded { 1 } else { 3 }, "n={}: the line's level is its play's", line.n);
+    }
+}
+
+/// A prime played twice whose line is the prime formula's sets no search up, so no game repeats its board's problem:
+/// every game of 37 to 40 played twice, 37 a prime whose unseeded play scores no more than the formula, and whose
+/// board poses the problem of 38's (a build that remembered the problem of every prime's board for the repeats failed
+/// at 38, finding no promotions to repeat).
+#[test]
+fn a_repeat_plays_the_promotions_of_a_line_that_searched_its_problem() {
+    let lines = lines((37, 40), &options(4, true), &Plan { unseeded_every: 1, ..plan(1) }, None);
+    let prime = &lines[0];
+    assert_eq!(
+        (prime.n, prime.method, prime.setup, prime.other.map(|o| o.unseeded)),
+        (37, Method::Prime, None, Some(true))
+    );
+    for line in lines.iter().filter(|line| line.method == Method::Repeat) {
+        let m = line.repeats.expect("the game it repeats");
+        let repeated = lines.iter().find(|other| other.n == m).expect("a game of the run");
+        assert!(repeated.setup.is_some(), "n={}: repeats {m}, whose line set no search up", line.n);
+    }
+}
+
+#[test]
+fn the_lines_of_a_run_that_stops_and_pushes_are_the_same_on_one_thread_and_on_four() {
+    let dir = TempDir::new("unsound-growth");
+    let plan = Plan { stop_growth: Some(0), push_growth: Some(0), ..repairing(2) };
+    let (one, four) = (dir.join("one.jsonl"), dir.join("four.jsonl"));
+    played(WALKED, &options(1, false), &plan, Some(&one));
+    played(WALKED, &options(4, false), &plan, Some(&four));
+    assert_eq!(file_lines(&one, false), file_lines(&four, false));
 }

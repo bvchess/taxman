@@ -481,15 +481,15 @@ impl<const W: usize> Lns<'_, W> {
     /// Rounds 1, 2, ... of the rounds on many threads ([`round`](Self::round)), from the incumbents `starts`, at least
     /// one, a trajectory each, on `threads` threads: until their work reaches `budget` (the engine's steps and
     /// [`NEIGHBORHOOD_WORK`] for each neighborhood, checked after each round, so the round that reaches it is the
-    /// last, and a budget of 0 allows none), and none once `enough` says that the game's promotion sum is enough (asked
-    /// of the starts, and after each round).  A round's work is at least [`NEIGHBORHOODS`] times
-    /// [`NEIGHBORHOOD_WORK`], so the rounds end.  A trajectory's incumbent becomes the best set of its own
-    /// neighborhoods if that is heavier.  With `options.widen`, a trajectory's stage moves down the ladder and back as
-    /// its [`Standing`] says, from the rounds before.  The game's set is the heaviest incumbent, the first's on a
-    /// tie, and a round that makes it heavier than it was is an [`Improvement`], whose time is the caller's `clock`.
-    /// A start that is heavier than the first one makes the game's set before any round: an improvement of round 0.
-    /// A stop signal ([`engine::stop_signal`]) ends the rounds before the next, or in the middle of one, whose units
-    /// it stops: then the rounds are `interrupted`, and the round it stopped is not counted.
+    /// last, and a budget of 0 allows none), and none once `enough` says that the game's promotion sum is enough after
+    /// the work of the rounds so far (asked of the starts, with no work, and after each round).  A round's work is at
+    /// least [`NEIGHBORHOODS`] times [`NEIGHBORHOOD_WORK`], so the rounds end.  A trajectory's incumbent becomes the
+    /// best set of its own neighborhoods if that is heavier.  With `options.widen`, a trajectory's stage moves down the
+    /// ladder and back as its [`Standing`] says, from the rounds before.  The game's set is the heaviest incumbent, the
+    /// first's on a tie, and a round that makes it heavier than it was is an [`Improvement`], whose time is the
+    /// caller's `clock`.  A start that is heavier than the first one makes the game's set before any round: an
+    /// improvement of round 0.  A stop signal ([`engine::stop_signal`]) ends the rounds before the next, or in the
+    /// middle of one, whose units it stops: then the rounds are `interrupted`, and the round it stopped is not counted.
     ///
     /// The threads run the rounds ahead of their ends (the module documentation, "Ahead of the end of a round"), and
     /// the rounds are those that [`round`](Self::round) plays one after another.
@@ -499,7 +499,7 @@ impl<const W: usize> Lns<'_, W> {
         budget: u64,
         threads: usize,
         clock: &dyn Fn() -> f64,
-        enough: &dyn Fn(u64) -> bool,
+        enough: &dyn Fn(u64, u64) -> bool,
     ) -> Rounds<W> {
         self.rounds_in(starts, budget, threads, clock, enough, (ahead(threads), Order::Rounds))
     }
@@ -512,7 +512,7 @@ impl<const W: usize> Lns<'_, W> {
         budget: u64,
         threads: usize,
         clock: &dyn Fn() -> f64,
-        enough: &dyn Fn(u64) -> bool,
+        enough: &dyn Fn(u64, u64) -> bool,
         (depth, order): (usize, Order),
     ) -> Rounds<W> {
         let mut views: Vec<View<W>> = starts.iter().map(|&base| View { base, standing: Standing::default() }).collect();
@@ -531,7 +531,7 @@ impl<const W: usize> Lns<'_, W> {
             let none = Improvement { round: 0, trajectory, stage: 0, steps: 0, work: 0, sum, seconds: clock() };
             out.improvements.push(none);
         }
-        let more = |out: &Rounds<W>| out.work < budget && !enough(out.set.sum());
+        let more = |out: &Rounds<W>| out.work < budget && !enough(out.set.sum(), out.work);
         if !more(&out) {
             return out;
         }
@@ -1233,7 +1233,7 @@ mod tests {
     ) -> Rounds<W> {
         let space = SearchSpace::new(p);
         let lns = Lns { p, space: &space, options };
-        lns.rounds(starts, budget, threads, &|| 0.0, &|sum| target.is_some_and(|target| sum >= target))
+        lns.rounds(starts, budget, threads, &|| 0.0, &|sum, _| target.is_some_and(|target| sum >= target))
     }
 
     /// [`rounds_with`] the default options.
@@ -1283,7 +1283,7 @@ mod tests {
     ) -> Rounds<W> {
         let space = SearchSpace::new(p);
         let lns = Lns { p, space: &space, options };
-        lns.rounds_in(starts, budget, threads, &|| 0.0, &|_| false, flight)
+        lns.rounds_in(starts, budget, threads, &|| 0.0, &|_, _| false, flight)
     }
 
     /// The rounds that run ahead of their ends are the rounds one after another, which one round in flight plays: its
@@ -1367,6 +1367,10 @@ mod tests {
         let first = long.improvements[0];
         let stopped = rounds_of(&p, long.work, 4, Some(first.sum));
         assert_eq!((stopped.rounds, stopped.set.sum(), stopped.improvements), (first.round, first.sum, vec![first]));
+        // Enough once the work of the rounds reaches a count: the rounds of that budget.
+        let space = SearchSpace::new(&p);
+        let lns = Lns { p: &p, space: &space, options: Options::default() };
+        assert_eq!(lns.rounds(&[p.greedy], long.work, 4, &|| 0.0, &|_, work| work >= ONE_ROUND), short);
         // A start that is enough runs no round, and neither does no budget.
         for none in [rounds_of(&p, long.work, 4, Some(0)), rounds_of(&p, 0, 4, None)] {
             assert_eq!((none.set, none.rounds, none.nodes, none.work), (p.greedy, 0, 0, 0));

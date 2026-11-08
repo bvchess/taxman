@@ -13,8 +13,8 @@ use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, gate_trial, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
 use taxman::solver::unsound::{
-    DEFAULT_BACK, DEFAULT_TILT, DEFAULT_UNSEEDED_EVERY, DEFAULT_WIDEN, MAX_ABOVE, MAX_BACK, MAX_EFFORT, MAX_TILT,
-    MIN_EFFORT, REPAIR_REACH, ROUND_WORK,
+    DEFAULT_BACK, DEFAULT_PUSH_GROWTH, DEFAULT_STOP_GROWTH, DEFAULT_TILT, DEFAULT_UNSEEDED_EVERY, DEFAULT_WIDEN,
+    MAX_ABOVE, MAX_BACK, MAX_EFFORT, MAX_TILT, MIN_EFFORT, REPAIR_REACH, ROUND_WORK,
 };
 use taxman::tactics::Tactics;
 
@@ -102,6 +102,14 @@ commands:
       --unseeded-every K       with --unsound: play each game whose n is a multiple of K twice, as any game and also
                                unseeded, as --unseeded plays it, and keep the better line (default {unseeded_every}).
                                0: no game twice
+      --unseeded-effort L      with --unsound: the level of effort of the unseeded play of a game played twice (default:
+                               --effort's)
+      --stop-growth T|off      with --unsound: end a searched game's rounds once its gap is within T of the gap of the
+                               moves for n-1 it starts from (T >= 0), from the end of the rounds of level {min_effort}
+                               on (default {stop_growth}).  The gap is the game's bound less its score, and its growth
+                               the gap less that of the moves for n-1
+      --push-growth T|off      with --unsound: play a game twice, as --unseeded-every does, if the growth of its gap
+                               after its play is above T (default {push_growth})
       --past-ceiling           with --unsound: do not end a game's rounds at the run's ceiling, n + the score of the
                                moves for n-1 it starts from (which they do by default, when it has such moves)
       --no-repair              with --unsound: do not repair lines: by default, what survives of each line in each of
@@ -156,6 +164,8 @@ fn usage() -> String {
         .replace("{max_above}", &MAX_ABOVE.to_string())
         .replace("{repair_reach}", &REPAIR_REACH.to_string())
         .replace("{unseeded_every}", &DEFAULT_UNSEEDED_EVERY.to_string())
+        .replace("{stop_growth}", &DEFAULT_STOP_GROWTH.map_or("off".to_owned(), |t| t.to_string()))
+        .replace("{push_growth}", &DEFAULT_PUSH_GROWTH.map_or("off".to_owned(), |t| t.to_string()))
         .replace("{widen}", &DEFAULT_WIDEN.to_string())
         .replace("{ladder}", &ladder.join(" -> "))
 }

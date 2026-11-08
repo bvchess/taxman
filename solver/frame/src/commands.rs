@@ -158,9 +158,20 @@ const SOLVE_FLAGS: [&str; 10] = [
 /// The flags of the unsound mode that take a value, besides `--out` and the solver's: the level of effort, the seed,
 /// the options that shape the rounds (the share fixed, the share tilted, the games before and above that the
 /// trajectories begin from, the widening), of which `--tilt`, `--back` and `--widen` have defaults that 0 turns off,
-/// and the games played twice.
-const UNSOUND_FLAGS: [&str; 8] =
-    ["--effort", "--seed", "--fix", "--tilt", "--back", "--above", "--widen", "--unseeded-every"];
+/// the games played twice and the level of their unseeded play, and the stop and the push on the growth of the gap.
+const UNSOUND_FLAGS: [&str; 11] = [
+    "--effort",
+    "--seed",
+    "--fix",
+    "--tilt",
+    "--back",
+    "--above",
+    "--widen",
+    "--unseeded-every",
+    "--unseeded-effort",
+    "--stop-growth",
+    "--push-growth",
+];
 
 /// The switches of the unsound mode: the mode itself, the end of the stop at the run's ceiling, the end of the repair,
 /// and its measuring options, of which the last plays every game unseeded.
@@ -239,8 +250,8 @@ fn proof_search_flags() -> impl Iterator<Item = &'static str> {
 }
 
 /// `solve A-B --unsound --effort L --out FILE [--seed S] [--fix LO,HI] [--tilt P] [--back J] [--above J] [--widen S]
-/// [--unseeded-every K] [--past-ceiling] [--no-repair] [--stop-at-known] [--from-known] [--unseeded]`, with
-/// `--threads`, `--tactic` and `--show`: plays
+/// [--unseeded-every K] [--unseeded-effort L] [--stop-growth T|off] [--push-growth T|off] [--past-ceiling]
+/// [--no-repair] [--stop-at-known] [--from-known] [--unseeded]`, with `--threads`, `--tactic` and `--show`: plays
 /// the games in the unsound mode (`solver::unsound::solve_range`), with no proof, and appends their unsound lines to
 /// FILE, and the lines that the repair replaces.  An option not given has its default ([`Plan::default`]); `--fix`
 /// turns widening off (`unsound::widening`).  It stops on SIGINT and SIGTERM between rounds, the game in play
@@ -261,6 +272,12 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     let above = args.value("--above").map(unsound::parse_above).transpose().map_err(CliError::Usage)?;
     let widen = args.value("--widen").map(unsound::parse_widen).transpose().map_err(CliError::Usage)?;
     let widen = unsound::widening(fix.is_some(), widen).map_err(CliError::Usage)?;
+    let unseeded_effort =
+        args.value("--unseeded-effort").map(unsound::parse_unseeded_effort).transpose().map_err(CliError::Usage)?;
+    let stop_growth =
+        args.value("--stop-growth").map(unsound::parse_stop_growth).transpose().map_err(CliError::Usage)?;
+    let push_growth =
+        args.value("--push-growth").map(unsound::parse_push_growth).transpose().map_err(CliError::Usage)?;
     let plan = Plan {
         effort,
         seed: args.parsed("--seed")?.unwrap_or(default.seed),
@@ -275,6 +292,9 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
         repair: !args.has("--no-repair"),
         unseeded: args.has("--unseeded"),
         unseeded_every: args.parsed("--unseeded-every")?.unwrap_or(default.unseeded_every),
+        unseeded_effort,
+        stop_growth: stop_growth.unwrap_or(default.stop_growth),
+        push_growth: push_growth.unwrap_or(default.push_growth),
         ..default
     };
     let out = args.value("--out").map(Path::new);

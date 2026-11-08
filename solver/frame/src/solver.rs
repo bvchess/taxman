@@ -91,14 +91,15 @@ use crate::board::{promotion_cap, search_problem, Board};
 use crate::engine::{self, Control, Counters, EngineConfig, Spent, Stats};
 use crate::frames::BoardFrames;
 use crate::game::{replay, replay_finished, Optimal};
+use crate::gf2::Gf2Graph;
 use crate::json::Json;
 use crate::numtheory::Tables;
 use crate::results::{
     assumptions_json, assumptions_of, build_json, moves_digest, Assumptions, Proof, ResultsFile, SCHEMA,
 };
 use crate::search::{
-    self, finder, gate_trial, stat, BranchSettings, Branching, NearRepeat, Prepared, Problem, ProblemSize, ProfilePlan,
-    SearchSpace, SearchTactics,
+    self, finder, gate_trial, stat, BranchSettings, Branching, NearRepeat, NodeBound, Prepared, Problem, ProblemSize,
+    ProfilePlan, SearchSpace, SearchTactics,
 };
 use crate::tactics::{on_off, Tactics};
 use crate::utc;
@@ -935,11 +936,12 @@ trait Job: Send + Sync {
     /// search makes ([`search::start_incumbent`]), from the promotions of `seed`, the moves for `n − 1`, if the search
     /// takes a seed, then the rounds of LNS on many threads that `plan` asks for ([`finder::Lns::rounds`]), which end
     /// once their work reaches the plan's budget ([`unsound::Plan::budget`]) or `enough` says so of the game's
-    /// promotion sum (the run's ceiling and the table's score are the caller's).  If the search takes a seed, the
-    /// rounds follow a trajectory besides the start's from what survives of the moves in `others`, games and their
-    /// moves (n − 1, n − 2, ..., then n + 1, n + 2, ...: a move above n is dropped, [`Board::seed`]), for each that is
-    /// not a set an earlier trajectory began from ([`unsound::trajectories`]).  `clock` is the game's seconds so far.
-    /// The start's dive is the one [`ready`](Job::ready) made, if it was called.
+    /// promotion sum and the work of the rounds so far (the run's ceiling, the table's score and the stop on growth are
+    /// the caller's).  If the search takes a seed, the rounds follow a trajectory besides the start's from what
+    /// survives of the moves in `others`, games and their moves (n − 1, n − 2, ..., then n + 1, n + 2, ...: a move
+    /// above n is dropped, [`Board::seed`]), for each that is not a set an earlier trajectory began from
+    /// ([`unsound::trajectories`]).  `clock` is the game's seconds so far.  The start's dive is the one
+    /// [`ready`](Job::ready) made, if it was called.
     fn improve(
         &self,
         seed: Option<&[u32]>,
@@ -947,11 +949,15 @@ trait Job: Send + Sync {
         plan: &unsound::Plan,
         threads: usize,
         clock: &dyn Fn() -> f64,
-        enough: &dyn Fn(u64) -> bool,
+        enough: &dyn Fn(u64, u64) -> bool,
     ) -> unsound::Improved;
     /// Makes the dive of the unsound mode's start ([`search::start_dive`]) once, which depends on the board alone, so
     /// that a run may make it while the game before plays.
     fn ready(&self);
+    /// The bound of the root's node, made once ([`NodeBound::root`]): the GF(2) bound of the board's candidates with at
+    /// most `max_total` promotions, which bounds the promotion sum of every play of the game.  The unsound mode's bound
+    /// of a game is `in_the_bag` plus this ([`unsound`], "The bound and the gap").
+    fn bound(&self) -> u64;
 }
 
 /// The [`Job`] of a board of set width `W`.
@@ -967,6 +973,8 @@ struct SearchJob<const W: usize> {
     near: OnceLock<NearRepeat<W>>,
     /// The dive of the unsound mode's start, once it is made ([`Job::ready`]).
     dived: OnceLock<Bits<W>>,
+    /// The bound of the root's node, once it is made ([`Job::bound`]).
+    root_bound: OnceLock<u64>,
 }
 
 impl<const W: usize> SearchJob<W> {
@@ -1091,7 +1099,7 @@ impl<const W: usize> Job for SearchJob<W> {
         plan: &unsound::Plan,
         threads: usize,
         clock: &dyn Fn() -> f64,
-        enough: &dyn Fn(u64) -> bool,
+        enough: &dyn Fn(u64, u64) -> bool,
     ) -> unsound::Improved {
         let prepared = &self.prepared;
         let seed = self.seed_of(seed.filter(|_| self.seeds));
@@ -1131,6 +1139,13 @@ impl<const W: usize> Job for SearchJob<W> {
 
     fn ready(&self) {
         self.dived.get_or_init(|| search::start_dive(&self.prepared));
+    }
+
+    fn bound(&self) -> u64 {
+        *self.root_bound.get_or_init(|| {
+            let p = &self.prepared;
+            NodeBound::new(p, &Gf2Graph::new(&p.model, &p.root, &p.candidates)).root()
+        })
     }
 }
 
@@ -1219,8 +1234,8 @@ fn set_up_with_width<const W: usize>(n: u32, before: &Before, opts: &SolveOption
     // The branching settings the searchers start with: the tactics' (checked above to be the game's), and the gate, which
     // is no tactic, the run's (`--gate`) if it has one, else the default.
     let branching = Arc::new(Branching::new(BranchSettings::of(&prepared.tactics).with_gate(opts.gate)));
-    let (control, near, dived) = (Control::new(), OnceLock::new(), OnceLock::new());
-    let job = Arc::new(SearchJob { board, prepared, control, resuming, seeds, branching, near, dived });
+    let (control, near, dived, root_bound) = (Control::new(), OnceLock::new(), OnceLock::new(), OnceLock::new());
+    let job = Arc::new(SearchJob { board, prepared, control, resuming, seeds, branching, near, dived, root_bound });
     Ok(SetUp::Search(SearchSetUp { job, setup, in_the_bag, frames, greedy }, problem))
 }
 

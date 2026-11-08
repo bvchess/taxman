@@ -43,6 +43,9 @@ fn help_lists_the_commands_and_every_tactic() {
             "--above J",
             "--widen S",
             "--unseeded-every K",
+            "--unseeded-effort L",
+            "--stop-growth T|off",
+            "--push-growth T|off",
             "--past-ceiling",
             "--no-repair",
             "--stop-at-known",
@@ -64,6 +67,9 @@ fn help_lists_the_commands_and_every_tactic() {
             "0: no widening",
             "which are on unless given 0",
             "turns widening off, and is refused with --widen S of 1 or more",
+            "from the end of the rounds of level 1 on (default 25)",
+            "if the growth of its gap after its play is above T (default 50)",
+            "keep the better line (default 0)",
         ] {
             assert!(help.contains(text), "{args:?}: no {text:?}");
         }
@@ -487,7 +493,7 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         let message = format!("{} is a flag of the proof search, which --unsound does not run", flag[0]);
         assert_usage_error(&[&base[..], flag].concat(), &message);
     }
-    let unsound_only: [&[&str]; 13] = [
+    let unsound_only: [&[&str]; 16] = [
         &["--effort", "1"],
         &["--seed", "2"],
         &["--fix", "0.5,0.7"],
@@ -496,6 +502,9 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         &["--above", "2"],
         &["--widen", "3"],
         &["--unseeded-every", "8"],
+        &["--unseeded-effort", "1"],
+        &["--stop-growth", "0"],
+        &["--push-growth", "off"],
         &["--past-ceiling"],
         &["--no-repair"],
         &["--stop-at-known"],
@@ -544,6 +553,22 @@ fn the_options_that_shape_the_rounds_are_checked() {
                        --fix alone, or with --widen 0, turns widening off";
         assert_usage_error(&[&base[..], &["--widen", widen, "--fix", fix]].concat(), message);
         assert_usage_error(&[&base[..], &["--fix", fix, "--widen", widen]].concat(), message);
+    }
+    // The stop's T is a whole number of points from 0 up, the push's one that may be below 0, each or `off`, and the
+    // level of the unseeded play a level of effort.
+    for growth in ["", "a", "1.5", "Off", "-1"] {
+        let message = format!("--stop-growth takes T, a whole number of points from 0 up, or off: got {growth:?}");
+        assert_usage_error(&[&base[..], &["--stop-growth", growth]].concat(), &message);
+    }
+    for growth in ["", "a", "1.5", "Off"] {
+        let message =
+            format!("--push-growth takes T, a whole number of points (it may be below 0), or off: got {growth:?}");
+        assert_usage_error(&[&base[..], &["--push-growth", growth]].concat(), &message);
+    }
+    for effort in ["0", "7", "a"] {
+        let message =
+            format!("--unseeded-effort takes L, a level of effort, a whole number from 1 to 6: got {effort:?}");
+        assert_usage_error(&[&base[..], &["--unseeded-effort", effort]].concat(), &message);
     }
     assert!(!file.exists(), "a refused run plays no game");
 }
@@ -656,14 +681,27 @@ fn unsound_lines(dir: &TempDir, tag: &str, games: &[u32], effort: u32, extra: &[
         .collect()
 }
 
-/// With no option, `--unsound` plays the rounds of `--back 8 --tilt 25 --widen 4 --unseeded-every 8`: the lines are the
-/// same, but for the build and the times.
+/// With no option, `--unsound` plays the rounds of `--back 8 --tilt 25 --widen 4 --unseeded-every 0 --stop-growth 25
+/// --push-growth 50`: the lines are the same, but for the build and the times.
 #[test]
 fn the_defaults_are_the_options_given_by_name() {
     let dir = TempDir::new("unsound-defaults");
     let games = &RAISED_BY_THE_DEFAULTS;
     let by_default = unsound_lines(&dir, "default", games, 1, &[]);
-    let named = ["--back", "8", "--tilt", "25", "--widen", "4", "--unseeded-every", "8"];
+    let named = [
+        "--back",
+        "8",
+        "--tilt",
+        "25",
+        "--widen",
+        "4",
+        "--unseeded-every",
+        "0",
+        "--stop-growth",
+        "25",
+        "--push-growth",
+        "50",
+    ];
     let by_name = unsound_lines(&dir, "named", games, 1, &named);
     assert_eq!(by_default, by_name);
     for line in &by_default {
