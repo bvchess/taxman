@@ -12,6 +12,7 @@
 
 use super::setup::Prepared;
 use super::TaxUnit;
+use crate::bits::Bits;
 use crate::bounds::max_additional;
 use crate::gf2::{Gf2Bound, Gf2Graph};
 use crate::model::Scratch;
@@ -40,6 +41,15 @@ impl<'a, const W: usize> NodeBound<'a, W> {
         self.gf2.reset(&unit.promoted, &unit.cands);
         Some(self.gf2.evaluate(max_add, None).value)
     }
+
+    /// The bound of the root's node, the unit of no promotions and every candidate
+    /// ([`completions`](Self::completions)): the GF(2) bound of the game's candidates with at most `max_total`
+    /// promotions, on the promotion sum of every promotable set.  With `in_the_bag`, it bounds the score of game n (the
+    /// frame bound (B2), docs/theory/frame-bounds.md).
+    pub fn root(&mut self) -> u64 {
+        let root = TaxUnit { promoted: Bits::EMPTY, cands: self.prepared.candidates };
+        self.completions(&root).expect("the root's unit, which promotes nothing, can be promoted")
+    }
 }
 
 #[cfg(test)]
@@ -62,6 +72,7 @@ mod tests {
         let root = gf2.evaluate(p.max_total, None).value;
         let unit = TaxUnit { promoted: Bits::EMPTY, cands: p.candidates };
         assert_eq!(NodeBound::new(&p, &graph).completions(&unit), Some(root), "n={n}");
+        assert_eq!(NodeBound::new(&p, &graph).root(), root, "n={n}");
         let opt = Optimal::built_in().score(n).expect("an entry of the table") - board.in_the_bag;
         assert!(opt <= root, "n={n}: the root's bound {root} is below P* {opt}");
     }

@@ -137,7 +137,7 @@
 //! [`lock_dir`] keeps a second process out of a checkpoint directory, so that two runs never write the same
 //! checkpoint file.  [`in_parallel`], apart from the engine's runs, computes tasks that are each a function of an
 //! index on several threads, with their values in order: the setups of a results file's checks, and the neighborhoods
-//! of a round of the unsound mode.
+//! of a round of the unsound mode's search on its own (`search::finder::Lns::round`).
 //!
 //! **Starting stopped.**  The coordinator is the only one who checks the deadline and the stop signal, and the
 //! workers run until it does, so a stop that begins while a run is under way takes effect when the coordinator

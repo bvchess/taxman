@@ -604,13 +604,34 @@ pub fn start_incumbent<const W: usize>(
     threads: usize,
     seed: Option<&Bits<W>>,
 ) -> Bits<W> {
+    start_incumbent_with(prepared, control, threads, seed, || {
+        dive(&prepared.model, &prepared.root, graph, &prepared.candidates)
+    })
+}
+
+/// The dive of [`start_incumbent`] on `prepared`: the rounding of the matching relaxation at its root.  It depends on
+/// the game's board alone, so a caller may make it before the start, while other work runs.
+pub fn start_dive<const W: usize>(prepared: &Prepared<W>) -> Bits<W> {
+    let graph = MatchGraph::new(&prepared.model, &prepared.root);
+    dive(&prepared.model, &prepared.root, &graph, &prepared.candidates)
+}
+
+/// [`start_incumbent`], with `dived` giving its dive ([`start_dive`]) where the start takes one: for a caller that made
+/// the dive before.
+pub fn start_incumbent_with<const W: usize>(
+    prepared: &Prepared<W>,
+    control: &Control,
+    threads: usize,
+    seed: Option<&Bits<W>>,
+    dived: impl FnOnce() -> Bits<W>,
+) -> Bits<W> {
     // The greedy set, or the survivors of the seed if they are heavier.
     let start = seed.map_or(prepared.greedy, |seed| heavier(prepared.greedy, surviving(prepared, seed)));
     offer_set(control, &start);
     if reaches(start.sum(), control.ceiling()) {
         return start;
     }
-    let dived = dive(&prepared.model, &prepared.root, graph, &prepared.candidates);
+    let dived = dived();
     if dived.sum() > start.sum() {
         offer_set(control, &dived);
     }

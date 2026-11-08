@@ -1059,11 +1059,11 @@ fn unsound_keys(n: u32) -> BTreeSet<String> {
     let plan = unsound::Plan { effort: 1, round_work: 1, stop_at_known: true, ..unsound::Plan::default() };
     let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
     let mut keys = BTreeSet::new();
-    unsound::solve_range(n, n, &opts, &plan, None, |line| {
+    let keys_of = |line: &unsound::Line| {
         let json = line.to_json();
         keys = json.as_obj().expect("an object").iter().map(|(key, _)| key.clone()).collect();
-    })
-    .expect("a game");
+    };
+    unsound::solve_range(n, n, &opts, &plan, None, keys_of, |_| ()).expect("a game");
     keys
 }
 

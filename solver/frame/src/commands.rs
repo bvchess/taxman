@@ -25,7 +25,7 @@ use taxman::game::Optimal;
 use taxman::numtheory::Tables;
 use taxman::results::verify_files;
 use taxman::search::{finder, gate_trial, MAX_GATE};
-use taxman::solver::unsound::{self, Plan, MAX_EFFORT};
+use taxman::solver::unsound::{self, Plan, MAX_EFFORT, MIN_EFFORT};
 use taxman::solver::{self, GameResult, Method, SolveOptions};
 
 fn failed(message: String) -> CliError {
@@ -156,13 +156,29 @@ const SOLVE_FLAGS: [&str; 10] = [
 ];
 
 /// The flags of the unsound mode that take a value, besides `--out` and the solver's: the level of effort, the seed,
-/// and the options that shape the rounds (the share fixed, the share tilted, the games the trajectories begin from, the
-/// widening), of which the last three have defaults that 0 turns off.
-const UNSOUND_FLAGS: [&str; 6] = ["--effort", "--seed", "--fix", "--tilt", "--back", "--widen"];
+/// the options that shape the rounds (the share fixed, the share tilted, the games before and above that the
+/// trajectories begin from, the widening), of which `--tilt`, `--back` and `--widen` have defaults that 0 turns off,
+/// the games played twice and the level of their unseeded play, and the stop and the push on the growth of the gap
+/// (the stop with the quiet rounds it waits for).
+const UNSOUND_FLAGS: [&str; 12] = [
+    "--effort",
+    "--seed",
+    "--fix",
+    "--tilt",
+    "--back",
+    "--above",
+    "--widen",
+    "--unseeded-every",
+    "--unseeded-effort",
+    "--stop-growth",
+    "--stop-quiet",
+    "--push-growth",
+];
 
-/// The switches of the unsound mode: the mode itself, the end of the stop at the run's ceiling, and its measuring
-/// options.
-const UNSOUND_SWITCHES: [&str; 4] = ["--unsound", "--past-ceiling", "--stop-at-known", "--from-known"];
+/// The switches of the unsound mode: the mode itself, the end of the stop at the run's ceiling, the end of the repair,
+/// and its measuring options, of which the last plays every game unseeded.
+const UNSOUND_SWITCHES: [&str; 6] =
+    ["--unsound", "--past-ceiling", "--no-repair", "--stop-at-known", "--from-known", "--unseeded"];
 
 /// `solve N|A-B [options]`: solves game N or a range, each from the one before (`solver::solve_range_each`); with
 /// `--unsound`, plays them in the unsound mode ([`solve_unsound`]).
@@ -235,58 +251,88 @@ fn proof_search_flags() -> impl Iterator<Item = &'static str> {
     solve.chain(SEARCH_FLAGS).chain(SEARCH_SWITCHES).chain(["--force-search"])
 }
 
-/// `solve A-B --unsound --effort E --out FILE [--seed S] [--fix LO,HI] [--tilt P] [--back J] [--widen S]
-/// [--past-ceiling] [--stop-at-known] [--from-known]`, with `--threads`, `--tactic` and `--show`: plays the games in
-/// the unsound mode (`solver::unsound::solve_range`), with no proof, and appends their unsound lines to FILE.  An
-/// option not given has its default ([`Plan::default`]); `--fix` turns widening off (`unsound::widening`).  It stops on
-/// SIGINT and SIGTERM between rounds, the game in play unrecorded.
+/// `solve A-B --unsound --effort L --out FILE [--seed S] [--fix LO,HI] [--tilt P] [--back J] [--above J] [--widen S]
+/// [--unseeded-every K] [--unseeded-effort L] [--stop-growth T|off] [--stop-quiet K] [--push-growth T|off]
+/// [--past-ceiling] [--no-repair] [--stop-at-known] [--from-known] [--unseeded]`, with `--threads`, `--tactic` and
+/// `--show`: plays the games in the unsound mode (`solver::unsound::solve_range`), with no proof, and appends their
+/// unsound lines to FILE, and the lines that the repair replaces.  An option not given has its default
+/// ([`Plan::default`]); `--fix` turns widening off (`unsound::widening`).  It stops on SIGINT and SIGTERM between
+/// rounds, the game in play unrecorded.
 fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     if let Some(flag) = proof_search_flags().find(|flag| args.has(flag)) {
         return Err(CliError::Usage(format!("{flag} is a flag of the proof search, which --unsound does not run")));
     }
     let opts = solver_options(args)?;
-    let levels = format!("the level of effort, from 0 to {MAX_EFFORT}");
-    let effort = args
-        .parsed::<u32>("--effort")?
-        .ok_or_else(|| CliError::Usage(format!("--unsound needs --effort E, {levels}")))?;
-    if effort > MAX_EFFORT {
-        return Err(CliError::Usage(format!("--effort {effort}: {levels}")));
-    }
+    let effort = args.value("--effort").ok_or_else(|| {
+        CliError::Usage(format!("--unsound needs --effort L, the level of effort, from {MIN_EFFORT} to {MAX_EFFORT}"))
+    })?;
+    let effort = unsound::parse_effort(effort).map_err(CliError::Usage)?;
     let default = Plan::default();
     let fix = args.value("--fix").map(unsound::parse_fix).transpose().map_err(CliError::Usage)?;
     let tilt = args.value("--tilt").map(unsound::parse_tilt).transpose().map_err(CliError::Usage)?;
     let back = args.value("--back").map(unsound::parse_back).transpose().map_err(CliError::Usage)?;
+    let above = args.value("--above").map(unsound::parse_above).transpose().map_err(CliError::Usage)?;
     let widen = args.value("--widen").map(unsound::parse_widen).transpose().map_err(CliError::Usage)?;
     let widen = unsound::widening(fix.is_some(), widen).map_err(CliError::Usage)?;
+    let unseeded_effort =
+        args.value("--unseeded-effort").map(unsound::parse_unseeded_effort).transpose().map_err(CliError::Usage)?;
+    let stop_growth =
+        args.value("--stop-growth").map(unsound::parse_stop_growth).transpose().map_err(CliError::Usage)?;
+    let stop_quiet = args.value("--stop-quiet").map(unsound::parse_stop_quiet).transpose().map_err(CliError::Usage)?;
+    let push_growth =
+        args.value("--push-growth").map(unsound::parse_push_growth).transpose().map_err(CliError::Usage)?;
     let plan = Plan {
         effort,
         seed: args.parsed("--seed")?.unwrap_or(default.seed),
         fix: fix.unwrap_or(default.fix),
         tilt: tilt.unwrap_or(default.tilt),
         back: back.unwrap_or(default.back),
+        above: above.unwrap_or(default.above),
         widen,
         stop_at_known: args.has("--stop-at-known"),
         from_known: args.has("--from-known"),
         past_ceiling: args.has("--past-ceiling"),
+        repair: !args.has("--no-repair"),
+        unseeded: args.has("--unseeded"),
+        unseeded_every: args.parsed("--unseeded-every")?.unwrap_or(default.unseeded_every),
+        unseeded_effort,
+        stop_growth: stop_growth.unwrap_or(default.stop_growth),
+        stop_quiet: stop_quiet.unwrap_or(default.stop_quiet),
+        push_growth: push_growth.unwrap_or(default.push_growth),
         ..default
     };
     let out = args.value("--out").map(Path::new);
     let out = out.ok_or_else(|| CliError::Usage("--unsound needs --out FILE, the file of its lines".into()))?;
+    // Before any thread starts: the neighborhoods of the rounds allocate and free a searcher's memory each.
+    finder::keep_freed_memory();
     if let Err(e) = engine::stop_on_signals() {
         errln!("warning: SIGINT and SIGTERM will kill the run instead of stopping it: {e}");
     }
     let show = args.has("--show");
-    let summary = unsound::solve_range(lo, hi, &opts, &plan, Some(out), |line| {
-        outln!("{}", line.summary_line());
+    let shown = |summary: String, promotions: &[u32], moves: &[u32]| {
+        outln!("{summary}");
         if show {
-            outln!("  promotions: {:?}", line.promotions);
-            outln!("  moves: {:?}", line.moves);
+            outln!("  promotions: {promotions:?}");
+            outln!("  moves: {moves:?}");
         }
         let _ = std::io::stdout().flush();
-    })
+    };
+    let summary = unsound::solve_range(
+        lo,
+        hi,
+        &opts,
+        &plan,
+        Some(out),
+        |line| shown(line.summary_line(), &line.promotions, &line.moves),
+        |repair| shown(repair.summary_line(), &repair.promotions, &repair.moves),
+    )
     .map_err(failed)?;
     if summary.skipped > 0 {
         outln!("skipped {} games already done in {}", summary.skipped, out.display());
+    }
+    if plan.repair {
+        let seconds = summary.repair_time.as_secs_f64();
+        outln!("repaired {} lines; the repair took {seconds:.3} s", summary.repaired);
     }
     if let Some(n) = summary.stopped_at {
         outln!("stopped: a signal ended the run in game n={n}, which is not recorded; run the same command to go on");

@@ -12,7 +12,10 @@ use cli::{errln, outln, CliError, CliResult};
 use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, gate_trial, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
-use taxman::solver::unsound::{DEFAULT_BACK, DEFAULT_TILT, DEFAULT_WIDEN, MAX_BACK, MAX_EFFORT, MAX_TILT, ROUND_WORK};
+use taxman::solver::unsound::{
+    DEFAULT_BACK, DEFAULT_PUSH_GROWTH, DEFAULT_STOP_GROWTH, DEFAULT_STOP_QUIET, DEFAULT_TILT, DEFAULT_UNSEEDED_EVERY,
+    DEFAULT_WIDEN, MAX_ABOVE, MAX_BACK, MAX_EFFORT, MAX_TILT, MIN_EFFORT, REPAIR_REACH, ROUND_WORK,
+};
 use taxman::tactics::Tactics;
 
 /// The usage text with its `{...}` parts to fill in by [`usage`].
@@ -75,10 +78,10 @@ commands:
                                and is marked unsound, which every reader of proven lines refuses.  It takes
                                --threads, --tactic, --show and the flags below, and refuses the others.  The rounds
                                are shaped by --tilt, --back and --widen, which are on unless given 0
-      --effort E               with --unsound: the level of effort, from 0 (the search's start alone) to {max_effort}.
-                               Level E runs rounds of {neighborhoods} neighborhoods of the finder's search until
+      --effort L               with --unsound: the level of effort, from {min_effort} to {max_effort}.
+                               Level L runs rounds of {neighborhoods} neighborhoods of the finder's search until
                                their work (their steps and {neighborhood_work} for each neighborhood) reaches
-                               2^(E-1) x {round_work}; a higher level does the rounds of a lower one first
+                               2^L x {round_work}; a higher level does the rounds of a lower one first
       --seed S                 with --unsound: the seed of the rounds' random choices (default {seed})
       --fix LO,HI              with --unsound: the share of the incumbent's promotions that each neighborhood keeps
                                fixed, drawn from LO to HI, 0 <= LO <= HI <= 1 (default {fix}); turns widening off,
@@ -90,13 +93,35 @@ commands:
                                for each of the games n-1 .. n-J (J from 0 to {max_back}, default {back}) that differs
                                from the ones before, each with its share of a round's neighborhoods.  0: the start's
                                alone
+      --above J                with --unsound: follow an incumbent from what survives of the moves for each of the
+                               games n+1 .. n+J that the run or --out has (the built-in table's with --from-known),
+                               J from 0 to {max_above}, as --back does (default 0: none)
       --widen S                with --unsound: an incumbent that has not grown heavier for S rounds (S >= 1, default
                                {widen}) moves its neighborhoods down a ladder of the shares fixed,
                                {ladder}.  0: no widening
+      --unseeded-every K       with --unsound: play each game whose n is a multiple of K twice, as any game and also
+                               unseeded, as --unseeded plays it, and keep the better line (default {unseeded_every}).
+                               0: no game twice
+      --unseeded-effort L      with --unsound: the level of effort of the unseeded play of a game played twice (default:
+                               --effort's)
+      --stop-growth T|off      with --unsound: end a searched game's rounds once its gap is within T of the gap of the
+                               moves for n-1 it starts from (T >= 0), from the end of the rounds of level {min_effort}
+                               on (default {stop_growth}).  The gap is the game's bound less its score, and its growth
+                               the gap less that of the moves for n-1
+      --stop-quiet K           with --unsound: the stop of --stop-growth ends a game's rounds only when the last K
+                               rounds raised nothing (default {stop_quiet}); the start counts as round 0.  0: the gap
+                               alone
+      --push-growth T|off      with --unsound: play a game twice, as --unseeded-every does, if the growth of its gap
+                               after its play is above T (default {push_growth})
       --past-ceiling           with --unsound: do not end a game's rounds at the run's ceiling, n + the score of the
                                moves for n-1 it starts from (which they do by default, when it has such moves)
+      --no-repair              with --unsound: do not repair lines: by default, what survives of each line in each of
+                               the {repair_reach} games below it replaces the line of that game if it scores more, and
+                               so on down, with the line appended again
       --stop-at-known          with --unsound: end a game's rounds once its score is the built-in table's
       --from-known             with --unsound: start every game from the built-in table's moves for n-1
+      --unseeded               with --unsound: take nothing from the games below: search every game, with no seed,
+                               no trajectory of --back and no run's ceiling (for measuring)
   regress [--from A] [--to N] [--threads K] [--window K] [--tactic ...]
                           solve A..N (default 1..400) in memory and check every score against the built-in table
   verify-results [--threads K] FILE...
@@ -128,6 +153,7 @@ fn usage() -> String {
         .replace("{trial_steps}", &gate_trial::STEPS.to_string())
         .replace("{trial_threads}", &gate_trial::THREADS.to_string())
         .replace("{trial_least_gap}", &gate_trial::LEAST_GAP.to_string())
+        .replace("{min_effort}", &MIN_EFFORT.to_string())
         .replace("{max_effort}", &MAX_EFFORT.to_string())
         .replace("{neighborhoods}", &finder::NEIGHBORHOODS.to_string())
         .replace("{round_work}", &ROUND_WORK.to_string())
@@ -138,6 +164,12 @@ fn usage() -> String {
         .replace("{tilt}", &DEFAULT_TILT.to_string())
         .replace("{max_back}", &MAX_BACK.to_string())
         .replace("{back}", &DEFAULT_BACK.to_string())
+        .replace("{max_above}", &MAX_ABOVE.to_string())
+        .replace("{repair_reach}", &REPAIR_REACH.to_string())
+        .replace("{unseeded_every}", &DEFAULT_UNSEEDED_EVERY.to_string())
+        .replace("{stop_growth}", &DEFAULT_STOP_GROWTH.map_or("off".to_owned(), |t| t.to_string()))
+        .replace("{stop_quiet}", &DEFAULT_STOP_QUIET.to_string())
+        .replace("{push_growth}", &DEFAULT_PUSH_GROWTH.map_or("off".to_owned(), |t| t.to_string()))
         .replace("{widen}", &DEFAULT_WIDEN.to_string())
         .replace("{ladder}", &ladder.join(" -> "))
 }
