@@ -303,8 +303,8 @@ bound which of those members every set beating the recorded score V must play.
 * The members it does not certify are *open*, with the bound's margin over V.
 
 Only the games that rest on the frame model need it: those neither at the ceiling nor given by the prime formula or the
-semiprime formula, whose lines say `"needs":1`.  The four files below were made before the semiprime formula, so their
-lines for the games it proves say `"needs":1` and `"relation":"none"`.  Certified members can be fixed in a search that leaves the open ones optional, the integrated
+semiprime formula, whose lines say `"needs":1`.  The first four files below were made before the semiprime formula, so their
+lines for the games it proves say `"needs":1` and `"relation":"none"`; the fifth knows it.  Certified members can be fixed in a search that leaves the open ones optional, the integrated
 search of the theory track ([the certificate theorem
 (E2)](../../../docs/theory/extended-problem.md#the-certificate-theorem)).  That is why the files are kept: U\* less a
 game's open members is that search's fixed set.
@@ -318,7 +318,7 @@ The tests check the certificates against every playable set that obeys F4, on bo
   can see the failure it guards against;
 * F4's roles are checked against every optimal set there and the recorded moves to 1300.
 
-Four files, each made on one thread of the laptop:
+Five files, the first four made on one thread of the laptop and the fifth on two:
 
 | file | games | needing it | time | what for |
 |---|---|---|---|---|
@@ -326,6 +326,7 @@ Four files, each made on one thread of the laptop:
 | `data/upper_1301_2175.jsonl` | the committed chain's lines for 1301–2175, 875 | 490 | 300 s | |
 | `data/upper_2176_3314.jsonl` | the copy of the cloud chain's results taken on 2026-10-15, games that the committed chain also holds, which [the gap past 2175](https://github.com/bvchess/taxman-notebook/blob/main/search/the-gap-past-2175-2026-10/README.md) measured; 1,139 | 635 | 1,272 s, 4.1 s for the slowest game | |
 | `data/upper_3315_3440.jsonl` | the rest of the committed chain as it stood then, 126 | 73, 3424, 3425 and 3440 among them | 277 s, 4.3 s for the slowest game | |
+| `data/upper_3441_5060.jsonl` | the rest of the chain, to its last game, 1,620 | 570 | 1,533 s on two threads, at nice 10, the build of commit 0a8fdf7e | |
 
 By band, the open members and the margins of each game (the share is of all members):
 
@@ -353,18 +354,23 @@ By band, the open members and the margins of each game (the share is of all memb
 | 3200-3314 | 66 | 1030 | 959-993 | 113, 150, 246 | 16.1% | 372, 1355 |
 | 3315-3440 | 73 | 1259 | 994-1035 | 172, 197, 271 | 19.9% | 531, 1467 |
 
+The band table stops at 3440; the games of 3441-5060 are in the bullets below.
+
 * **No game past 1300 is certified whole.**  Every one leaves members open: from 1 (1305) to 102 (2172) up to 2175, and
   from 15
   (2610) to 317 (2346) past it.  In all, 7.5% of the members are open to 2175 (18,596 of 247,482), 14.9% on 2176-3314
   (77,195 of 518,992), and 19.9% on 3315-3440 (14,704 of 73,968, 172 to 271 a game, the root's gap 1,103 to 1,555).
-  Past the prover's proofs, on 2531-3440, 15.2% are open (68,144 of 449,033).
-* **The open share follows the root's gap, not n.**  It grows 3.1 points per 100 of gap to 2175 and 2.0 past it (R²
+  Past it, 3441-5060 has 570 games that need it, with 734,035 members of which 152,013 are open (20.7%; 125 to 581 a
+  game, the root's gap 917 to 2,620).  Past the prover's proofs, on 2531-3440, 15.2% are open (68,144 of 449,033), and
+  on 2532-5060, 18.6% (220,157 of 1,183,068; 1,071 games).  The counts over 2532-3440 include the games of the
+  semiprime formula, which the first four files mark `"needs":1`.
+* **The open share follows the root's gap, not n.**  Fitted on the first three files (to 3314), it grows 3.1 points per 100 of gap to 2175 and 2.0 past it (R²
   0.73, 0.73 and 0.91 in the three files), and it falls back with the gap (2600-2699).  The root's gap is the one the
   frame solver's search costs by: with layers 1 and 2 fixed, it equals the solver's GF(2) gap at the root on all 400
   games past 2175 that both measured
   ([taxman-notebook/search/the-gap-past-2175-2026-10/gaps_chain.jsonl](https://github.com/bvchess/taxman-notebook/blob/main/search/the-gap-past-2175-2026-10/gaps_chain.jsonl)).
   The margins grow with it, and the largest is close to the gap.
-* **The root's heaviest set plays all of U\*_{≥3} in every one of the 1,198 games that need it**, as at every root
-  measured before; no game is flagged.
+* **The root's heaviest set plays all of U\*_{≥3} in every one of the 2,433 games of 2..5060 that need it**, as at
+  every root measured before; no game is flagged.
 * **The open members are mostly of layer 3** (52% to 2175 and 58% past it), then of layer 5 (21%, 27%) and 4 (19%, 9%),
   and the rest in layers 6 to 11.

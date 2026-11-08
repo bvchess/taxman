@@ -62,7 +62,7 @@ Before the prover, this was the state of the evidence.
   U: some optimal game plays every source of three or more prime factors that setup keeps.  The prover's proofs
   establish U at every n ≤ 2531.  Beyond, the committed lines past 2531 that rest on U, by an exhausted search or a
   repeat, have it uncertified.  The barred parity bounds certify about 85% of those sources per game on 2176–3314 and
-  80% on 3315–3440, but close no game alone ([proofs.md](proofs.md#the-upper-part-game-by-game)).  The rest needs a
+  80% on 3315–3440 and 79% on 3441–5060, but close no game alone ([proofs.md](proofs.md#the-upper-part-game-by-game)).  The rest needs a
   search that leaves the open sources optional ([the certificate theorem
   (E2)](../../../docs/theory/extended-problem.md#the-certificate-theorem)).
 * **Whether every optimal game's upper part is U\*.**  [The uniqueness theorem

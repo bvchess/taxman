@@ -55,6 +55,8 @@ tools/summarize.py check 2 2531 data/exact_parity_2_2531.jsonl
 ./target/release/upper --from 1301 --to 2175 --out data/upper_1301_2175.jsonl          # one thread, 5 minutes
 ./target/release/upper --from 2176 --to 3314 --out data/upper_2176_3314.jsonl          # 21 minutes
 ./target/release/upper --from 3315 --to 3440 --out data/upper_3315_3440.jsonl          # 5 minutes
+./target/release/upper --from 3441 --to 5060 --threads 2 --out data/upper_3441_5060.jsonl   # 1,533 s at nice 10, the build of
+                                    # commit 0a8fdf7e; sort the lines by n
 ./target/release/exact --list 1575,1584 --out B.jsonl                   # study E6: the sources of layer >= 3 free
 ./target/release/exact --list 1575,1584 --fix-upper 1 --out D.jsonl     # ... and fixed to U*
 tools/summarize.py sources B.jsonl D.jsonl          # study E6's table and criterion (its entry for the cloud run)

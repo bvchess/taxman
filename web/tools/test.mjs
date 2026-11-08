@@ -383,6 +383,25 @@ same('the groups add up to every game', sum(Object.values(sorted.groupCounts)), 
   same('the prover\'s record has a line for every n from 2 to PROVER_TO',
     [...record].sort((x, y) => x - y), Array.from({ length: PROVER_TO - 1 }, (_, k) => k + 2));
 }
+// Chapter 7 says about 80% of the numbers of U* pass the barred bound in the games resting on a search past the
+// prover's proofs: the prover's upper files (solver/noframe/data/upper_*.jsonl) hold the counts.
+{
+  const upper = ['upper_2_1300', 'upper_1301_2175', 'upper_2176_3314', 'upper_3315_3440', 'upper_3441_5060']
+    .flatMap((name) => readFileSync(join(repoRoot, 'solver', 'noframe', 'data', `${name}.jsonl`), 'utf8')
+      .split('\n').filter((line) => line.trim() !== '').map((line) => JSON.parse(line)));
+  same('the upper files have a line for every n from 2 to the last game',
+    upper.map((r) => r.n).sort((x, y) => x - y), Array.from({ length: games.lastN - 1 }, (_, k) => k + 2));
+  const needing = upper.filter((r) => r.needs === 1);
+  same('the root\'s heaviest set plays all of U* in every game that needs the barred bounds',
+    needing.filter((r) => r.root_has_upper !== 1).length, 0);
+  const past = needing.filter((r) => r.n > PROVER_TO);
+  const share = sum(past.map((r) => r.certified)) / sum(past.map((r) => r.members));
+  same('about 80% of the members certify over the games past the prover\'s proofs that need it',
+    Math.round(share * 10) * 10, 80);
+  const statementU = readFileSync(join(repoRoot, 'web', 'statement-u.html'), 'utf8').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ');
+  checks++;
+  if (!statementU.includes('about 80% of the numbers pass')) failures.push('statement-u.html does not say "about 80% of the numbers pass"');
+}
 // Chapter 6 compares the prover's search under the two bounds on games 2..1000 (solver/noframe/data/compare_*.jsonl).
 {
   const readRun = (name) => readFileSync(join(repoRoot, 'solver', 'noframe', 'data', name), 'utf8')
