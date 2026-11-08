@@ -5,9 +5,9 @@ navigation on the left, the story in the center, and the technical layer on the 
 and ES modules, and need no build step.  [OUTLINE.md](OUTLINE.md) is the plan of the pages.
 
 * `index.html` is the introduction, which explains the game.  The chapters of the story follow: `sets.html` (1),
-  `chain.html` (2), `top-half.html` (3), `frames.html` (4), `search.html` (5), `statement-u.html` (6) and `results.html` (7).
-  `glossary.html`, `notation.html` and `about.html` are the reference pages.  `style.html` shows the site's look;
-  no page links it.
+  `chain.html` (2), `top-half.html` (3), `frames.html` (4), `search.html` (5), `bound.html` (6), `statement-u.html`
+  (7), `results.html` (8) and `summary.html` (9); `js/site.js` lists them.  `glossary.html`, `notation.html` and
+  `about.html` are the reference pages.  `style.html` shows the site's look; no page links it.
 * `css/site.css` holds the look of every page; a page with styles of its own has `css/<page>.css` beside it.
 * `js/` holds the site's modules: `model.js` is the game, the frame model and playability, with names from the
   [glossary](../docs/GLOSSARY.md); `play.js` is the game the reader plays, apart from its board, which
@@ -54,9 +54,9 @@ web/tools/publish.sh --dry-run
 web/tools/publish.sh
 ```
 
-The site appears at https://vantuyl.com/taxman/.  `publish.sh` runs the test and sends the last commit's files that
-the site serves; its opening comment says which, and how to add one.  Every reference between the files is relative,
-so the site works from any folder.
+The site appears at https://vantuyl.com/taxman/.  `publish.sh` runs the test and sends everything in `web/` from the
+last commit except the working files its opening comment lists; a new working file, one the site does not serve,
+belongs on that list.  Every reference between the files is relative, so the site works from any folder.
 
 ## Add a figure
 

@@ -43,7 +43,9 @@ How-to lives in the docs listed at the end.
 * **heuristics/**: Python heuristic strategies, which play good but not provably optimal games, and the tools that
   measured them.  Finished work, not under active development.
 * **moniot/**: Robert Moniot's C++ heuristic strategies (see above).
-* **web/img/**: the pictures of README.md.
+* **web/**: the website, published at https://vantuyl.com/taxman.  Before changing it, read
+  [web/README.md](web/README.md), which says how to serve, test, extend and publish it, and
+  [web/OUTLINE.md](web/OUTLINE.md), its plan and the rules of its prose.  web/img/ holds the pictures of README.md.
 
 The original frame solver, in Java (the wiki describes it; it reached n = 1000), is not in the tree: the git tag
 `java-final` is the last commit that has it.
