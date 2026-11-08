@@ -6,10 +6,10 @@
 // taxman's numbers orange, a square up to n/2 and a circle above it, and a dashed circle a number above n/2 that the
 // game does not play.
 //
-// Nothing on the page moves when n changes.  Every number keeps its place on the board from game to game, the board
-// keeps the room of its largest game, and each line of words keeps the room of its longest form at the present width,
-// measured when the width changes, never when n does.  The caption stands above the board, so that it stays beside
-// the first rows, where a small game is drawn.
+// The explorer fills the center column: the controls, then the record, then the board under it.  Every number keeps
+// its place on the board from game to game, the board keeps the room of its largest game, and each line of words keeps
+// the room of its longest form at the present width, measured when the width changes, never when n does.  The caption
+// stands above the board.  A game past those of small.json has no board: its board area is not shown.
 //
 // URL parameters: n=N opens game N, and at=x, with a game up to 100, opens it pointing at the number x.
 
@@ -17,8 +17,8 @@ import * as M from '../js/model.js';
 import { NUMBER, duration, fmt, listWords, numberMark, setNumber } from '../js/vocab.js';
 import { PROOFS, PROVER_TO, foundationOf } from '../js/proof.js';
 
-// The games the story names, which the explorer offers to jump to, and the last game of the chain.
-const NAMED = [21, 40, 425, 833, 2873];
+// The game the explorer opens at, when the address names none.
+const FIRST_GAME = 21;
 
 const COLS = 10;
 const CELL = 40;
@@ -154,7 +154,6 @@ export function mountExplorer(host, { games, small }) {
   const last = games.lastN;
   const smallGames = new Map(small.map((g) => [g.n, g]));
   const smallLast = Math.max(...smallGames.keys());
-  const picks = [...new Set([...NAMED.filter((x) => x <= last), last])];
   const W = CELL * COLS;
   const H = CELL * ROWS_OF(smallLast);
 
@@ -167,9 +166,6 @@ export function mountExplorer(host, { games, small }) {
           <button type="button" class="btn round" data-act="up" aria-label="The next game">+</button>
         </span>
         <input class="ex-range" type="range" min="1" max="${last}" step="1" aria-label="Game n, from game 1 to game ${fmt(last)}">
-      </div>
-      <div class="ex-picks" role="group" aria-label="Jump to a game the story names">
-        <span class="ex-picks-word">Jump to game</span>${picks.map((x) => `<button type="button" class="btn ex-chip" data-n="${x}">${fmt(x)}</button>`).join('')}
       </div>
     </div>
     <div class="ex-body">
@@ -187,10 +183,7 @@ export function mountExplorer(host, { games, small }) {
       </div>
       <div class="ex-board">
         <p class="ex-caption"></p>
-        <div class="ex-stage">
-          <svg class="v-figure is-flat ex-svg" viewBox="0 0 ${W} ${H}" role="img" tabindex="0"></svg>
-          <div class="ex-far"><code class="ex-far-code"></code></div>
-        </div>
+        <svg class="v-figure is-flat ex-svg" viewBox="0 0 ${W} ${H}" role="img" tabindex="0"></svg>
       </div>
     </div>`;
 
@@ -199,7 +192,7 @@ export function mountExplorer(host, { games, small }) {
   const range = $('.ex-range');
   const svg = $('.ex-svg');
   const caption = $('.ex-caption');
-  const far = $('.ex-far');
+  const board$ = $('.ex-board');
   const field = (name) => host.querySelector(`[data-f="${name}"]`);
   const statsBox = $('.ex-stats');
   statsBox.innerHTML = stats(record(games, 1)).map(() => '<div class="ex-stat"><dt></dt><dd><span class="ex-val"></span><span class="ex-sub"></span></dd></div>').join('');
@@ -235,10 +228,6 @@ export function mountExplorer(host, { games, small }) {
     return `${x} remains when no move does, so the taxman takes it with the rest of the pot, ${plural(b.rest.length, 'number')} in all.`;
   }
 
-  function farText(r) {
-    return `The board of game ${fmt(r.n)} holds ${fmt(r.n)} numbers.  Its ${fmt(r.moves)} moves, in the order of play, are on line ${fmt(r.n)} of the results file:`;
-  }
-
   // ---- the room each line of words needs ---------------------------------------------------------------------
 
   // The longest few strings of each kind, by length, stand for all: each is set in its box and measured, and the box
@@ -257,8 +246,7 @@ export function mountExplorer(host, { games, small }) {
       share: longest(all.map(shareText)),
       settled: longest(all.map((r) => settledHTML(r.settled))),
       rests: longest(all.map((r) => r.rests)),
-      captions: longest([...captions, ...all.filter((r) => r.n > smallLast).map(farText)]),
-      code: [`gzip -dc results/optimal.jsonl.gz | sed -n ${last}p`],
+      captions: longest(captions),
       subs,
     };
   })();
@@ -279,14 +267,6 @@ export function mountExplorer(host, { games, small }) {
     fit(field('rests'), samples.rests);
     fit(caption, samples.captions);
     statCells.forEach((cell, k) => fit(cell.querySelector('.ex-sub'), samples.subs[k].filter(Boolean).length ? samples.subs[k] : ['\u00a0']));
-    // Past the board's games, the command that prints a game's line takes the board's place, and must fit its room.
-    far.style.visibility = 'hidden';
-    far.style.display = '';
-    fit(far.querySelector('.ex-far-code'), samples.code);
-    far.style.visibility = '';
-    const stage = $('.ex-stage');
-    stage.style.minHeight = '';
-    stage.style.minHeight = `${Math.ceil(Math.max(svg.getBoundingClientRect().height, far.scrollHeight))}px`;
     render(true);
     if (held) point(held);
   }
@@ -301,16 +281,10 @@ export function mountExplorer(host, { games, small }) {
     const g = smallGames.get(n);
     if (!g) {
       board = null;
-      svg.style.visibility = 'hidden';
-      svg.setAttribute('aria-hidden', 'true');
-      svg.removeAttribute('aria-label');
-      svg.tabIndex = -1;
       return;
     }
     if (g.score !== record(games, n).score) throw new Error(`game ${n}: small.json and games.json differ`);
     board = boardOf(g);
-    svg.style.visibility = '';
-    svg.removeAttribute('aria-hidden');
     svg.tabIndex = 0;
     const moves = board.turns.map((t) => t.move);
     svg.setAttribute('aria-label', `The board of game ${n}, ten numbers a row. The player takes ${listWords(moves)}, in that order, and the taxman takes the rest. Use the arrow keys to step through the moves.`);
@@ -349,7 +323,6 @@ export function mountExplorer(host, { games, small }) {
       if (document.activeElement !== input || Number(input.value) !== n) input.value = n;
       range.value = n;
       range.style.setProperty('--progress', `${(100 * (n - 1)) / Math.max(1, last - 1)}%`);
-      for (const b of host.querySelectorAll('.ex-chip')) b.setAttribute('aria-pressed', String(Number(b.dataset.n) === n));
       host.querySelector('[data-act="down"]').disabled = n <= 1;
       host.querySelector('[data-act="up"]').disabled = n >= last;
       drawBoard();
@@ -365,14 +338,8 @@ export function mountExplorer(host, { games, small }) {
       cell.querySelector('.ex-val').textContent = value;
       cell.querySelector('.ex-sub').textContent = sub;
     });
-    if (board) {
-      far.style.display = 'none';
-      point(null);
-    } else {
-      far.style.display = '';
-      far.querySelector('.ex-far-code').textContent = `gzip -dc results/optimal.jsonl.gz | sed -n ${r.n}p`;
-      caption.textContent = farText(r);
-    }
+    board$.hidden = !board;
+    if (board) point(null);
   }
 
   // The address keeps the game chosen, a little after the reader stops, so that a slider dragged across the chain
@@ -406,7 +373,6 @@ export function mountExplorer(host, { games, small }) {
   range.addEventListener('input', () => set(range.value));
   host.querySelector('[data-act="down"]').addEventListener('click', () => set(n - 1));
   host.querySelector('[data-act="up"]').addEventListener('click', () => set(n + 1));
-  for (const b of host.querySelectorAll('.ex-chip')) b.addEventListener('click', () => set(b.dataset.n));
 
   const numberAt = (e) => {
     const g = e.target.closest?.('.v-num');
@@ -437,7 +403,7 @@ export function mountExplorer(host, { games, small }) {
 
   const params = new URL(location.href).searchParams;
   const asked = Number(params.get('n'));
-  set(Number.isInteger(asked) && asked >= 1 && asked <= last ? asked : NAMED[0], { address: false });
+  set(Number.isInteger(asked) && asked >= 1 && asked <= last ? asked : FIRST_GAME, { address: false });
   const pointed = Number(params.get('at'));
   held = board && marks.has(pointed) ? pointed : null;
   if (held) point(held);
