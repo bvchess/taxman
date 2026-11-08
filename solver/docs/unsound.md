@@ -27,5 +27,5 @@ proof.
 | running the mode | [run.md](unsound/run.md) | run it: the command, what it prints, and every flag |
 | playing a game | [play.md](unsound/play.md) | choose the level of effort and the options that shape the rounds: how a game is played, what the levels gave, the run's ceiling |
 | short games | [shortfalls.md](unsound/shortfalls.md) | see how a game that falls short is pulled up or played again: the repair, games played twice, and the bound and the gap that stop or push a game |
-| the best-known file | [best-known.md](unsound/best-known.md) | keep the best-known line of each game across runs: what the file is, how a run starts from it and adds to it, and how to fold an old file in |
+| the best-known file | [best-known.md](unsound/best-known.md) | keep the best-known line of each game across runs: what the file is, how a run starts from it and adds to it, how to fold an old file in, and how to rehearse on proven games |
 | the line | [line.md](unsound/line.md) | read a line of the file: an example, and every key |

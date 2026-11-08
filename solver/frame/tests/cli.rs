@@ -48,6 +48,7 @@ fn help_lists_the_commands_and_every_tactic() {
             "--stop-quiet K",
             "--push-growth T|off",
             "--best-known FILE|off",
+            "--known-to N",
             "--past-ceiling",
             "--no-repair",
             "--stop-at-known",
@@ -497,7 +498,7 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         let message = format!("{} is a flag of the proof search, which --unsound does not run", flag[0]);
         assert_usage_error(&[&base[..], flag].concat(), &message);
     }
-    let unsound_only: [&[&str]; 18] = [
+    let unsound_only: [&[&str]; 19] = [
         &["--effort", "1"],
         &["--seed", "2"],
         &["--fix", "0.5,0.7"],
@@ -511,6 +512,7 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         &["--stop-quiet", "0"],
         &["--push-growth", "off"],
         &["--best-known", "off"],
+        &["--known-to", "5"],
         &["--past-ceiling"],
         &["--no-repair"],
         &["--stop-at-known"],
@@ -571,6 +573,44 @@ fn a_run_has_a_best_known_file_beside_its_file_unless_told_otherwise() {
     assert_eq!(unsound::best_known_path(Some(Path::new("o.jsonl")), Some("off")), None);
     assert_eq!(unsound::best_known_path(Some(Path::new("o.jsonl")), Some("x/b.jsonl")), Some("x/b.jsonl".into()));
     assert_eq!(unsound::best_known_path(None, None), None);
+}
+
+/// `--known-to N` takes the built-in table as holding the games up to N only: the games above N are as if unproven, so
+/// the run has a best-known file of them by default as any run of games past the table has, and its lines record N.  It
+/// takes a whole number, and is refused with the measuring options, which measure against the table.
+#[test]
+fn known_to_treats_the_games_above_it_as_unproven_and_is_refused_with_the_measuring_options() {
+    let dir = TempDir::new("unsound-known-to");
+    let out = dir.join("o.jsonl");
+    let base = ["solve", "11-12", "--unsound", "--effort", "1", "--threads", "1", "--out", path(&out)];
+    let run = taxman(&[&base[..], &["--known-to", "10"]].concat());
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert!(run.stdout.contains("lines added"), "{}", run.stdout);
+    for file in ["o.jsonl", "best-known.jsonl"] {
+        let text = fs::read_to_string(dir.join(file)).unwrap();
+        let lines: Vec<Json> = text.lines().map(|line| Json::parse(line).unwrap()).collect();
+        assert!(!lines.is_empty(), "{file}: no lines");
+        for line in &lines {
+            assert_eq!(line.get("known_to"), Some(&Json::from(10u32)), "{file}");
+            assert!(matches!(line.get("n").and_then(Json::as_u32), Some(11 | 12)), "{file}");
+        }
+    }
+    // A run with no flag keeps the key null, and its best-known file is the table's games alone: none.
+    let plain = dir.join("plain/o.jsonl");
+    fs::create_dir(dir.join("plain")).unwrap();
+    let base = ["solve", "11-12", "--unsound", "--effort", "1", "--threads", "1", "--out", path(&plain)];
+    let run = taxman(&base);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let text = fs::read_to_string(&plain).unwrap();
+    assert!(text.lines().all(|line| Json::parse(line).unwrap().get("known_to") == Some(&Json::Null)));
+    assert_eq!(fs::read_to_string(dir.join("plain/best-known.jsonl")).unwrap(), "");
+    // The measuring options measure against the table, and are refused with a cut of it.
+    for flag in ["--stop-at-known", "--from-known"] {
+        let run = taxman(&[&base[..], &["--known-to", "10", flag]].concat());
+        assert_eq!(run.code, Some(1), "{flag}: {}", run.stdout);
+        assert!(run.stderr.contains("--known-to cuts the built-in table"), "{flag}: {}", run.stderr);
+    }
+    assert_usage_error(&[&base[..], &["--known-to", "many"]].concat(), "--known-to: cannot read \"many\"");
 }
 
 /// `--fix LO,HI` takes two numbers with 0 <= LO <= HI <= 1, `--tilt P` a whole number from 0 to 100, `--back J` a whole

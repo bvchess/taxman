@@ -625,6 +625,16 @@ impl Optimal {
             .filter_map(|n| self.entry(n).map(|(score, moves)| (n, *score, moves.as_slice())))
     }
 
+    /// This table cut at `n`: a table of its entries for the games 1 to `n`, copied, with none above.  The unsound mode
+    /// takes the built-in table cut so, to treat the games above `n` as unproven (`--known-to`).
+    pub fn up_to(&self, n: u32) -> Optimal {
+        let mut cut = Optimal::default();
+        for (game, score, moves) in self.games().take_while(|&(game, _, _)| game <= n) {
+            cut.set(game, score, moves.to_vec());
+        }
+        cut
+    }
+
     /// The values of n that have an entry, ascending, as lazy as [`games`](Self::games).
     pub fn sizes(&self) -> impl Iterator<Item = u32> + '_ {
         self.games().map(|(n, _, _)| n)
@@ -902,6 +912,26 @@ mod tests {
         assert!(top >= SMALL_GAMES, "{top} games");
         assert_eq!((opt.score(top + 1), opt.moves(top + 1)), (None, None));
         assert!(opt.score(top).is_some() && opt.moves(top).is_some_and(|moves| !moves.is_empty()));
+    }
+
+    /// A table cut at n has the games 1 to n of the table and none above, whatever the table is made of, and a cut
+    /// at or past its end is the table.
+    #[test]
+    fn a_table_cut_at_n_has_the_games_up_to_n_and_none_above() {
+        let opt = Optimal::built_in();
+        let cut = opt.up_to(40);
+        assert_eq!(cut.max_n(), 40);
+        assert!(cut.games().eq(opt.games().take(40)));
+        assert_eq!((cut.score(41), cut.moves(41)), (None, None));
+        assert!(opt.score(41).is_some(), "the table that was cut still has the game");
+        assert_eq!(opt.up_to(0).max_n(), 0);
+        let cut_again = cut.up_to(12);
+        assert!(cut_again.sizes().eq(1..=12));
+        assert!(cut.up_to(u32::MAX).games().eq(cut.games()));
+        // A table laid over with a line past its text is cut as well.
+        let mut pushed = table_on(&[&lines(1..=3)]);
+        pushed.push(4, 40, vec![4]).unwrap();
+        assert!(pushed.up_to(3).sizes().eq(1..=3) && pushed.up_to(4).sizes().eq(1..=4));
     }
 
     /// The built-in file has one line for each game, every n from 1 to the end of the table, as the lookup of a line by

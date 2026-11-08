@@ -159,8 +159,8 @@ const SOLVE_FLAGS: [&str; 10] = [
 /// the options that shape the rounds (the share fixed, the share tilted, the games before and above that the
 /// trajectories begin from, the widening), of which `--tilt`, `--back` and `--widen` have defaults that 0 turns off,
 /// the games played twice and the level of their unseeded play, the stop and the push on the growth of the gap (the
-/// stop with the quiet rounds it waits for), and the best-known file.
-const UNSOUND_FLAGS: [&str; 13] = [
+/// stop with the quiet rounds it waits for), the best-known file, and the game the built-in table is cut at.
+const UNSOUND_FLAGS: [&str; 14] = [
     "--effort",
     "--seed",
     "--fix",
@@ -174,6 +174,7 @@ const UNSOUND_FLAGS: [&str; 13] = [
     "--stop-quiet",
     "--push-growth",
     "--best-known",
+    "--known-to",
 ];
 
 /// The switches of the unsound mode: the mode itself, the end of the stop at the run's ceiling, the end of the repair,
@@ -254,13 +255,15 @@ fn proof_search_flags() -> impl Iterator<Item = &'static str> {
 
 /// `solve A-B --unsound --effort L --out FILE [--seed S] [--fix LO,HI] [--tilt P] [--back J] [--above J] [--widen S]
 /// [--unseeded-every K] [--unseeded-effort L] [--stop-growth T|off] [--stop-quiet K] [--push-growth T|off]
-/// [--best-known FILE|off] [--past-ceiling] [--no-repair] [--stop-at-known] [--from-known] [--unseeded]`, with
-/// `--threads`, `--tactic` and `--show`: plays the games in the unsound mode (`solver::unsound::solve_range`), with no
-/// proof, and appends their unsound lines to FILE, and the lines that the repair replaces.  An option not given has its
-/// default ([`Plan::default`]); `--fix` turns widening off (`unsound::widening`).  The run keeps a best-known file,
-/// `best-known.jsonl` beside FILE unless `--best-known` says otherwise (`unsound::best_known_path`); the measuring
-/// options `--stop-at-known` and `--from-known`, which play the games of the built-in table, have none unless
-/// `--best-known` names one.  It stops on SIGINT and SIGTERM between rounds, the game in play unrecorded.
+/// [--best-known FILE|off] [--known-to N] [--past-ceiling] [--no-repair] [--stop-at-known] [--from-known]
+/// [--unseeded]`, with `--threads`, `--tactic` and `--show`: plays the games in the unsound mode
+/// (`solver::unsound::solve_range`), with no proof, and appends their unsound lines to FILE, and the lines that the
+/// repair replaces.  An option not given has its default ([`Plan::default`]); `--fix` turns widening off
+/// (`unsound::widening`).  The run keeps a best-known file, `best-known.jsonl` beside FILE unless `--best-known` says
+/// otherwise (`unsound::best_known_path`); the measuring options `--stop-at-known` and `--from-known`, which play the
+/// games of the built-in table, have none unless `--best-known` names one.  `--known-to N` has `solve_range` cut the
+/// built-in table at N, so that the games above N are as if unproven.  It stops on SIGINT and SIGTERM between rounds,
+/// the game in play unrecorded.
 fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     if let Some(flag) = proof_search_flags().find(|flag| args.has(flag)) {
         return Err(CliError::Usage(format!("{flag} is a flag of the proof search, which --unsound does not run")));
@@ -294,6 +297,7 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
         widen,
         stop_at_known: args.has("--stop-at-known"),
         from_known: args.has("--from-known"),
+        known_to: args.parsed("--known-to")?,
         past_ceiling: args.has("--past-ceiling"),
         repair: !args.has("--no-repair"),
         unseeded: args.has("--unseeded"),

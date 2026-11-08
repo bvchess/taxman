@@ -230,8 +230,9 @@
 //! best line any run found, at any level, which later runs start from and add to.  `--best-known FILE` names it, by
 //! default it is `best-known.jsonl` in the directory of `--out` ([`best_known_path`]), and `--best-known off` turns it
 //! off.  Its lines are unsound lines with a key `best_known` ([`BEST_KNOWN`]), and none is proven.  A game of the
-//! built-in table, whose table line is its best-known line, is never in it.  solver/docs/unsound/best-known.md is the
-//! user's guide to it.
+//! built-in table, whose table line is its best-known line, is never in it; with `--known-to N` the table is the one
+//! cut at N, so the file may hold the games above N and refuses those up to N, and a file made so is for runs with the
+//! same N.  solver/docs/unsound/best-known.md is the user's guide to it.
 //!
 //! * **Seeding.**  Where a game takes the moves for the games below it and above it ([`moves_before`],
 //!   [`moves_above`]), it takes, of the run's line (its own, else its file's) and the best-known file's, the one that
@@ -260,6 +261,12 @@
 //! seeds every game with the table's moves for n − 1, not with this run's line, so that the run's ceiling is the proven
 //! one.  A third, `--unseeded`, plays every game unseeded alone (above), to measure what a game makes of its board with
 //! nothing from the games below.  solver/docs/unsound/line.md has the keys of the line ("An unsound line").
+//!
+//! A fourth, `--known-to N`, is for a rehearsal on games whose opt(n) is proven: the run takes the built-in table as
+//! holding the games up to N only ([`Optimal::up_to`], once, in [`solve_range`]), so a game above N is as if unproven.
+//! No game takes the table's moves for a game above N, the best-known file may hold the games above N and refuses those
+//! up to N, and the checks against the table apply up to N.  The line records N (`known_to`).  It is refused with
+//! `--stop-at-known` and `--from-known`, which measure against the table.
 
 use super::{
     prime_game, set_up, Before, Derived, Earlier, Failure, Job, Method, RangeSummary, SearchSetUp, SearchSetup, SetUp,
@@ -379,6 +386,10 @@ pub struct Plan {
     pub stop_at_known: bool,
     /// `--from-known`: every game starts from the built-in table's moves for n − 1.
     pub from_known: bool,
+    /// `--known-to N`: the run takes the table as holding the games up to N only ([`Optimal::up_to`]), and treats the
+    /// games above N as unproven (the module documentation, "Measuring").  `None` takes the whole table.  Refused with
+    /// `stop_at_known` and `from_known`, which measure against the table.
+    pub known_to: Option<u32>,
     /// `--past-ceiling`: a game's rounds do not end at the run's ceiling, n + score(n − 1) of the moves it starts from.
     pub past_ceiling: bool,
     /// The repair, on unless `--no-repair`: a line that what survives of a line above it beats is replaced (the module
@@ -428,6 +439,7 @@ impl Default for Plan {
             round_work: ROUND_WORK,
             stop_at_known: false,
             from_known: false,
+            known_to: None,
             past_ceiling: false,
             repair: true,
             unseeded: false,
@@ -654,7 +666,8 @@ pub fn widening(fix_given: bool, widen: Option<Option<u64>>) -> Result<Option<u6
 
 /// Checks the plan's options: an effort from [`MIN_EFFORT`] to [`MAX_EFFORT`], `fix` ([`check_fix`]), `tilt` of at most
 /// [`MAX_TILT`], `back` of at most [`MAX_BACK`], `widen` (if any) of at least 1 and not with a `fix` other than the
-/// default, a work of a round above 0, and an `unseeded_effort` (if any) from [`MIN_EFFORT`] to [`MAX_EFFORT`].
+/// default, a work of a round above 0, an `unseeded_effort` (if any) from [`MIN_EFFORT`] to [`MAX_EFFORT`], and no
+/// `known_to` with `stop_at_known` or `from_known`.
 ///
 /// # Errors
 ///
@@ -686,6 +699,13 @@ pub fn check_plan(plan: &Plan) -> Result<(), String> {
     }
     if let Some(effort) = plan.unseeded_effort.filter(|effort| !(MIN_EFFORT..=MAX_EFFORT).contains(effort)) {
         return Err(unseeded_effort_error(&effort.to_string()));
+    }
+    if plan.known_to.is_some() && (plan.stop_at_known || plan.from_known) {
+        return Err(
+            "--known-to cuts the built-in table, and --stop-at-known and --from-known measure against it, so they are \
+             refused with it"
+                .to_owned(),
+        );
     }
     Ok(())
 }
@@ -1035,6 +1055,7 @@ impl Line {
             ("threads", Json::from(self.threads)),
             ("from_known", Json::Bool(self.plan.from_known)),
             ("stop_at_known", known),
+            ("known_to", self.plan.known_to.map_or(Json::Null, Json::from)),
             ("repair", Json::Bool(self.plan.repair)),
             // A line as a game is played; the repair writes it again with what replaced its moves ([`Repair`]).
             ("repaired", Json::Null),
@@ -1377,7 +1398,7 @@ fn repaired_line(old: &str, repair: &Repair, prev: Option<&Moves>) -> Result<Jso
 pub struct Files<'a> {
     /// The table that the run checks its lines against, takes the moves for the games below its range from, and that
     /// says which games the best-known file never holds: [`Optimal::built_in`] for the command, and a table of fewer
-    /// games for a test of a game the built-in table has.
+    /// games for a test of a game the built-in table has.  The plan's `known_to` cuts it ([`Optimal::up_to`]).
     pub table: &'a Optimal,
     /// The file the run appends its lines to, if it has one.
     pub out: Option<&'a Path>,
@@ -1428,10 +1449,10 @@ fn same_file(a: &Path, b: &Path) -> Result<bool, String> {
 ///
 /// A range that is empty or starts below 1; a plan that [`check_plan`] refuses (an effort outside [`MIN_EFFORT`] to
 /// [`MAX_EFFORT`], a `fix` that [`check_fix`] refuses, a `tilt` above [`MAX_TILT`], a `back` above [`MAX_BACK`], an
-/// `above` above [`MAX_ABOVE`], a `widen` of `Some(0)` or with a `fix`); `--stop-at-known` or `--from-known` for a game
-/// the table lacks; the same file for `out` and `best_known`; a file that cannot be opened or written, or holds a line
-/// it may not ([`UnsoundFile::open`], [`BestKnownFile::open`]); and a game or a repair whose moves fail a check (the
-/// module documentation, "One game").
+/// `above` above [`MAX_ABOVE`], a `widen` of `Some(0)` or with a `fix`, a `known_to` with `--stop-at-known` or
+/// `--from-known`); `--stop-at-known` or `--from-known` for a game the table lacks; the same file for `out` and
+/// `best_known`; a file that cannot be opened or written, or holds a line it may not ([`UnsoundFile::open`],
+/// [`BestKnownFile::open`]); and a game or a repair whose moves fail a check (the module documentation, "One game").
 pub fn solve_range(
     lo: u32,
     hi: u32,
@@ -1445,7 +1466,9 @@ pub fn solve_range(
         return Err(format!("the range {lo}..={hi} is empty or starts below 1"));
     }
     check_plan(plan)?;
-    let optimal = files.table;
+    // With `--known-to N` the run knows the table's games up to N only: every use of the table below is of the cut one.
+    let cut = plan.known_to.map(|n| files.table.up_to(n));
+    let optimal = cut.as_ref().unwrap_or(files.table);
     if plan.stop_at_known || plan.from_known {
         if let Some(n) = (lo..=hi).find(|&n| optimal.score(n).is_none()) {
             return Err(format!(
@@ -2257,6 +2280,7 @@ mod tests {
         assert_eq!((plan.tilt, plan.back, plan.widen, plan.round_work), (25, 8, Some(4), ROUND_WORK));
         assert!(!plan.stop_at_known && !plan.from_known && !plan.past_ceiling, "the stop at the ceiling is on");
         assert!(plan.repair && plan.above == 0, "the repair is on, and no trajectory begins from above");
+        assert_eq!(plan.known_to, None, "the whole built-in table is known");
         let twice = (DEFAULT_UNSEEDED_EVERY, plan.unseeded_every, plan.unseeded, plan.unseeded_effort);
         assert_eq!(twice, (0, 0, false, None), "no game is played twice for its n, and no game unseeded alone");
         let growth = (DEFAULT_STOP_GROWTH, DEFAULT_PUSH_GROWTH, plan.stop_growth, plan.push_growth);
@@ -2404,6 +2428,12 @@ mod tests {
         }
         let measured = Plan { unseeded_effort: Some(MAX_EFFORT), stop_growth: Some(9), push_growth: Some(-9), ..plan };
         assert_eq!(check_plan(&measured), Ok(()));
+        // A cut table is refused where the run measures against the table.
+        assert_eq!(check_plan(&Plan { known_to: Some(0), ..plan }), Ok(()));
+        for cut in [Plan { stop_at_known: true, ..plan }, Plan { from_known: true, ..plan }] {
+            assert!(refused(Plan { known_to: Some(3000), ..cut }).starts_with("--known-to cuts the built-in table"));
+            assert_eq!(check_plan(&cut), Ok(()));
+        }
     }
 
     #[test]

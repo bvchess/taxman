@@ -6,8 +6,8 @@
 //! "was": ...}`: the name of the file of the run that offered the line, and the score of the game's line in the
 //! best-known file before this one (`null` for the first).  A game's lines score more, line after line, and the last is
 //! the game's.  The first line of a game may record a repair (`repaired`), since the line it replaced is in the file of
-//! the run, not here.  A line of a game that the built-in table has is refused, and so is a score above the line's
-//! `bound`.
+//! the run, not here.  A line of a game that the built-in table has is refused (the table a run with `--known-to N`
+//! reads the file with has the games up to N only), and so is a score above the line's `bound`.
 //!
 //! Several runs share one file.  A holder takes an exclusive lock (`flock`) only to read what the others appended and
 //! to append, and lets it go at once, so that a run never waits for another's life.  A holder that stopped in the
@@ -31,7 +31,7 @@ pub const BEST_KNOWN: &str = "best_known";
 /// A best-known file as one run sees it: the last line of each game, as far as the run has read the file.
 pub struct BestKnownFile<'a> {
     path: PathBuf,
-    /// The built-in table, whose games the file never holds.
+    /// The built-in table, cut at the run's `--known-to` if it has one, whose games the file never holds.
     table: &'a Optimal,
     /// The last line of each game.
     games: BTreeMap<u32, Stored>,

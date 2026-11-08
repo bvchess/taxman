@@ -29,6 +29,7 @@ short, the fields regrouped and comments added:
  "other":null,                            # a game played twice says what its other play came to
  "seconds":0.0454, "start_seconds":0.0158, "threads":4,
  "from_known":true, "stop_at_known":{"known":110860,"round":1},   # so level 1 would have reached it
+ "known_to":null,                         # the whole built-in table was known
  "repair":true, "repaired":null,          # a line the repair wrote again says what replaced its moves
  "tactics":"default", "build":{"commit":"50db88e20150...","dirty":true}}
 ```
@@ -76,6 +77,7 @@ still, `prev.short_by` 11, since the new score proves the line of 5041 short by 
 | `threads` | the threads it ran on |
 | `from_known` | true if `--from-known` started the game from the built-in table's moves for n − 1 |
 | `stop_at_known` | with `--stop-at-known`: `known`, the built-in table's score, and `round`, the round after which the game had that score (0: the start or the start of a trajectory, or a game that runs no round), or null if it never had; null without the flag |
+| `known_to` | with `--known-to`: N, the last game of the built-in table that the run took as proven, so that a game above N was as if unproven; null without the flag |
 | `repair` | true unless `--no-repair` |
 | `repaired` | null on a line as its game was played; on a line that [the repair](shortfalls.md#the-repair) wrote again, `from`, the game whose line gave the new moves (a game above, or for a prime the game below), `was`, the score of the line it replaced, and `seconds`, the time the repair took |
 | `tactics`, `build` | as in a results line, `build` the one that wrote the line |

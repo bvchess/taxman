@@ -121,7 +121,12 @@ commands:
                                is offered to the file, and the walk of the repair goes down into its lines of the
                                games below the range.  Runs may share a file: it is locked only to read what is new
                                and to append
-      --past-ceiling          with --unsound: do not end a game's rounds at the run's ceiling, n + the score of the
+      --known-to N             with --unsound: take the built-in table as holding the games up to N only, so that a
+                               game above N is as if unproven: no game starts from the table's moves for a game above
+                               N, the best-known file may hold the games above N and refuses those up to N, and the
+                               checks against the table apply up to N.  For a rehearsal on games whose opt(n) is
+                               proven; refused with --stop-at-known and --from-known.  The line records N
+      --past-ceiling           with --unsound: do not end a game's rounds at the run's ceiling, n + the score of the
                                moves for n-1 it starts from (which they do by default, when it has such moves)
       --no-repair              with --unsound: do not repair lines: by default, what survives of each line in each of
                                the {repair_reach} games below it replaces the line of that game if it scores more, and
