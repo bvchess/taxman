@@ -111,11 +111,11 @@
       <li>Among the <a class="gloss" href="glossary.html#source">sources</a> alone, U* is the heaviest playable set in
       every game we've examined (up to 100,000).  In those games, giving up a number in U* never pays within the top
       half.</li>
-      <li>For games where we've used the frame solver, the prover has tested the numbers in U* one at a time.  For each,
-      it bounds the score of any
-      optimal game that gives that number up.  When the bound is at most the recorded score, giving the number up cannot
-      beat the record.  In the games from 2,532 to 5,060 that rest on a search, about 80% of the numbers pass this test, so a game
-      that beats a recorded score would have to give up one of numbers that doesn't pass the test.</li>
+      <li>For each game that rests on a search, the prover has tested the numbers in U* with three or more prime factors
+      one at a time.  For each, it bounds the score of any optimal game that gives that number up.  When the bound is at
+      most the recorded score, giving the number up cannot beat the record.  In the games from 2,532 to 5,060 that rest
+      on a search, about 80% of the numbers pass this test, so a game that beats a recorded score would have to give up
+      one of numbers that doesn't pass the test.</li>
       <li>The parity bound lets through more sets than the player can play, so the heaviest set it allows answers a
       looser question than the game.  With layers 1 and 2 played as every optimal game plays them, that heaviest set
       found by the parity bound keeps every number in U* in every game up to at least 5060.</li>
