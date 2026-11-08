@@ -326,7 +326,7 @@ status_host() {
     window="$(printf '%s\n' "$start" | sed -n 's/.* window \([0-9][0-9]*\);.*/\1/p')"
     window="${window:-4}"
     chain_to="$(printf '%s\n' "$start" | sed -n 's/.* chain 1-\([0-9][0-9]*\);.*/\1/p')"
-    chain_to="${chain_to:-8191}"
+    chain_to="${chain_to:-10239}"
     if [ -n "$start" ]; then
         printf '  chain 1-%s, window %s\n' "$chain_to" "$window"
     else

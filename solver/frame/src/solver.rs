@@ -112,7 +112,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-/// The largest board the set widths cover: 8191, at the widest of [`crate::bits::WIDTHS`] (128 words).
+/// The largest board the set widths cover: 10239, at the widest of [`crate::bits::WIDTHS`] (160 words).
 pub const MAX_N: u32 = 64 * crate::bits::WIDTHS[crate::bits::WIDTHS.len() - 1] as u32 - 1;
 
 // ---------------------------------------------------------------------------------------------------------

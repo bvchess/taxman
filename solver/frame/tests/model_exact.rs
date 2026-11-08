@@ -17,7 +17,7 @@
 //! * On every board up to 100 (and, in an ignored test, 101 to 120) both directions are checked on every set: the
 //!   sets L with U\* ∪ L playable, found by depth-first search, are all promotion sets and make games of the right
 //!   score, the promotion sets, found the same way, are all playable with U\*, and the two families are equal.
-//! * On larger boards (to 1300 by default, to 8191 in an ignored test) the sets are random: promotion sets made by
+//! * On larger boards (to 1300 by default, to 10239 in an ignored test) the sets are random: promotion sets made by
 //!   promoting candidates in a random order, and maximal playable extensions of U\* made by trying the numbers up to
 //!   n/2 in a random order.
 //! * The candidate filter is needed: a back claim of `unzip` hides a use of its factor as tax by a number that could be
@@ -350,12 +350,12 @@ fn theorem_m_on_random_sets_to_1300() {
     check_random_boards(&[60, 100, 200, 300, 500, 760, 1000, 1300], 100, 0x9E37_79B9_7F4A_7C15);
 }
 
-/// The exactness theorem (X7, docs/theory/exactness.md) on random sets of the boards from 2000 to 8191, 10 sets of each
-/// kind.
+/// The exactness theorem (X7, docs/theory/exactness.md) on random sets of the boards from 2000 to 10239, the largest
+/// the solver supports, 10 sets of each kind.
 #[test]
 #[ignore = "takes a while; the boards to 1300 are in the default test"]
 fn theorem_m_on_random_sets_past_1300() {
-    check_random_boards(&[2000, 3000, 4095, 6000, 8191], 10, 0xD1B5_4A32_D192_ED03);
+    check_random_boards(&[2000, 3000, 4095, 6000, 8191, 9000, 10239], 10, 0xD1B5_4A32_D192_ED03);
 }
 
 // ---------------------------------------------------------------------------------------------------------

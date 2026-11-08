@@ -644,49 +644,61 @@ fn engines_agree_across_the_wrap_of_the_stamp_counter() {
 }
 
 /// The engines of every number of block words search alike.  For boards whose frames need one or two words, the
-/// natural engine and, for each larger count up to `MAX_WORDS`, the engine of that many words run on the same graph
-/// ([`Gf2Bound::with_words`]) and on the graph padded with zero words ([`Gf2Graph::padded`], then [`Gf2Bound::new`])
-/// are driven along the same random paths (`walk_random_paths`): every bound, heaviest set, forced set, certified
-/// bound, solved bound without a candidate and weight split must be equal, and so must the work each engine did.
-/// Only the sets of 128 words have the engines of four and five words, and the boards that need them (from 4740 and
-/// 6392) are too large to walk, so this is where they run along paths, against the engines of one and two words.
+/// natural engine and, for each larger count up to the most of the set width ([`Gf2Bound::MOST`]), the engine of that
+/// many words run on the same graph ([`Gf2Bound::with_words`]) and on the graph padded with zero words
+/// ([`Gf2Graph::padded`], then [`Gf2Bound::new`]) are driven along the same random paths (`walk_random_paths`): every
+/// bound, heaviest set, forced set, certified bound, solved bound without a candidate and weight split must be equal,
+/// and so must the work each engine did.  Only the sets wider than 64 words have the engines of four and five words,
+/// and only those wider than 128 the engines of six and seven, and the boards that need them (from 4740, 6392 and
+/// past 8191) are too large to walk, so this is where they run along paths, against the engines of one and two words:
+/// at 128 words up to five, and at 160 up to seven.
 #[test]
 #[cfg_attr(
     debug_assertions,
     ignore = "long: the quick check is engines_of_every_word_count_agree_along_a_few_random_paths"
 )]
 fn engines_of_every_word_count_agree_along_random_paths() {
-    engines_of_every_word_count_agree_along(&[120, 300, 760, 1000], 5, 100);
+    let mut walked = Walked::default();
+    engines_of_every_word_count_agree_along::<128>(&[120, 300, 760, 1000], 5, &mut walked);
+    engines_of_every_word_count_agree_along::<160>(&[120, 300, 760, 1000], 5, &mut walked);
+    walked_at_least(&walked, 200);
 }
 
-/// [`engines_of_every_word_count_agree_along_random_paths`] along 2 paths of the boards 120 and 300.
+/// [`engines_of_every_word_count_agree_along_random_paths`] along 2 paths of the boards 120 and 300 at 160 words, the
+/// width that has every engine.
 #[test]
 fn engines_of_every_word_count_agree_along_a_few_random_paths() {
-    engines_of_every_word_count_agree_along(&[120, 300], 2, 5);
+    let mut walked = Walked::default();
+    engines_of_every_word_count_agree_along::<160>(&[120, 300], 2, &mut walked);
+    walked_at_least(&walked, 5);
 }
 
-/// The engines of every word count agree along `paths` random paths of each of `boards`, which reach at least
-/// `percent` percent of what [`engines_of_every_word_count_agree_along_random_paths`] asks.
-fn engines_of_every_word_count_agree_along(boards: &[u32], paths: usize, percent: u64) {
-    const W: usize = 128;
+/// The engines of every word count at width `W` agree along `paths` random paths of each of `boards`, which add to
+/// `walked`.
+fn engines_of_every_word_count_agree_along<const W: usize>(boards: &[u32], paths: usize, walked: &mut Walked) {
+    let most = Gf2Bound::<W>::MOST;
     let mut rng = Rng(0x7E57_ED64_0000_0005);
-    let mut walked = Walked::default();
     for &n in boards {
         let p = Board::<W>::for_n(n).prepare(SearchTactics::default()).unwrap();
         let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
         let natural = graph.words();
         assert!((1..=2).contains(&natural), "n={n}: {natural} words");
-        let padded: Vec<Gf2Graph> = (natural + 1..=MAX_WORDS).map(|words| graph.padded(words)).collect();
+        let padded: Vec<Gf2Graph> = (natural + 1..=most).map(|words| graph.padded(words)).collect();
         let mut engines = vec![Gf2Bound::<W>::new(&graph)];
-        for (words, padded) in (natural + 1..=MAX_WORDS).zip(&padded) {
+        for (words, padded) in (natural + 1..=most).zip(&padded) {
             assert_eq!(padded.words(), words);
             engines.push(Gf2Bound::<W>::with_words(&graph, words));
             engines.push(Gf2Bound::<W>::new(padded));
         }
-        assert_eq!(engines.len(), 1 + 2 * (MAX_WORDS - natural), "n={n}");
-        walk_random_paths(&p, &mut rng, paths, usize::MAX, true, &mut engines, &mut walked);
+        assert_eq!(engines.len(), 1 + 2 * (most - natural), "n={n}");
+        walk_random_paths(&p, &mut rng, paths, usize::MAX, true, &mut engines, walked);
     }
-    let Walked { checks, excluded_checked, splits_compared, .. } = walked;
+}
+
+/// The paths `walked` reach at least `percent` percent of what one width of
+/// [`engines_of_every_word_count_agree_along_random_paths`] asked when it walked the sets of 128 words alone.
+fn walked_at_least(walked: &Walked, percent: u64) {
+    let &Walked { checks, excluded_checked, splits_compared, .. } = walked;
     let at_least = |count: u64, most: u64| count * 100 >= most * percent;
     assert!(
         at_least(checks, 600) && at_least(excluded_checked, 100) && at_least(splits_compared, 5000),
@@ -695,7 +707,7 @@ fn engines_of_every_word_count_agree_along(boards: &[u32], paths: usize, percent
 }
 
 /// The narrow set widths (at most 64 words) have the engines of at most three words: asking one of four is refused,
-/// whatever the graph, since the engines of four and five words are compiled only for the sets wider than 64 words.
+/// whatever the graph, since the engines of four words and more are compiled only for the sets wider than 64 words.
 #[test]
 #[should_panic(expected = "not supported at a set width of 16 words")]
 fn a_narrow_width_refuses_an_engine_of_four_words() {
@@ -704,11 +716,21 @@ fn a_narrow_width_refuses_an_engine_of_four_words() {
     let _ = Gf2Bound::<16>::with_words(&graph, 4);
 }
 
-/// Even the widest sets refuse an engine of more than `MAX_WORDS` words (ranks above 320).
+/// The sets of 65 to 128 words have the engines of at most five words (ranks up to 320): one of six, which only the
+/// sets wider than 128 words have, is refused.
 #[test]
 #[should_panic(expected = "not supported at a set width of 128 words")]
-fn no_width_has_an_engine_of_six_words() {
+fn the_sets_of_128_words_refuse_an_engine_of_six_words() {
     let p = Board::<128>::for_n(300).prepare(SearchTactics::default()).unwrap();
-    let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates).padded(MAX_WORDS + 1);
+    let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates).padded(WIDE_WORDS + 1);
     let _ = Gf2Bound::<128>::new(&graph);
+}
+
+/// Even the widest sets refuse an engine of more than `MAX_WORDS` words.
+#[test]
+#[should_panic(expected = "not supported at a set width of 160 words")]
+fn no_width_has_an_engine_of_more_than_max_words() {
+    let p = Board::<160>::for_n(300).prepare(SearchTactics::default()).unwrap();
+    let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates).padded(MAX_WORDS + 1);
+    let _ = Gf2Bound::<160>::new(&graph);
 }

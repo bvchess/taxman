@@ -184,12 +184,14 @@ misses are the *odd* cores of movers with three or more factors.
   campaign at the end of the
   chain](https://github.com/bvchess/taxman-notebook/blob/main/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).
 * **Block words.**  A level's vectors are as wide as the root's largest frame rank (its freedoms) needs: one to three
-  words of 64 bits on every game to 4095 (ranks up to 169), four from 4740 and five from 6392 (ranks up to 314 at 8191;
+  words of 64 bits on every game to 4095 (ranks up to 169), four from 4740 and five from 6392 (ranks up to 314, at 8174;
   [boards past 4095](https://github.com/bvchess/taxman-notebook/blob/main/boards-past-4095-2026-10/README.md) has the
-  scan of every game).  Each word count is a copy of the bound's code (`Levels<W, R>`, R from 1 to `gf2::MAX_WORDS` = 5)
-  for every set width that has it.  Only the sets of 128 words have the copies of four and five words, so the narrower
-  widths build as before.  Tests run those copies on small games with the vectors padded with zero words
-  (`Gf2Graph::padded`), where they must search the same tree.
+  scan of every game), and six from 8440 and seven from 9690 (ranks up to 403, at 10230; the census of the boards past
+  8191, an ignored test of `src/frames/`).  Each word count is a copy of the bound's code (`Levels<W, R>`, R from 1 to
+  `gf2::MAX_WORDS` = 7) for every set width that has it (`Gf2Bound::MOST`): the sets of up to 64 words have the copies
+  of one to three words, those of 128 words up to five, and those of 160 words all seven, so each width builds the code
+  its games need and no more.  Tests run the copies of four words and more on small games with the vectors padded with
+  zero words (`Gf2Graph::padded`), where they must search the same tree.
 * **Other weights.**  `meet::Problem` takes weights that are positive and do not decrease with an element's index, as
   the root's candidates, in increasing order, have them; two of its starts rely on that: the start from the heaviest
   uncontended elements, and the greedy lower bound.  A bound that weighs the candidates otherwise (a Lagrangian over the

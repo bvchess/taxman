@@ -270,7 +270,7 @@ impl Gf2Graph {
 
     /// The same graph with block vectors of `words` words (at least [`words`](Self::words)), the words above the
     /// graph's zero: every bound, and so every search, is the same, but [`Gf2Bound::new`] runs the engine of
-    /// `words` words on it.  For tests, to run the engines of four and five words on boards that need fewer.
+    /// `words` words on it.  For tests, to run the engines of four words and more on boards that need fewer.
     pub fn padded(&self, words: usize) -> Gf2Graph {
         assert!(words >= self.words, "{words} words are fewer than the graph's {}", self.words);
         let vecs = self.vecs.each_ref().map(|vecs| {
@@ -297,13 +297,18 @@ impl Gf2Graph {
 /// root gap, 2026-10-27).
 const BOUNDED_SEARCHES_FROM: usize = 4;
 
-/// The most block words supported: ranks up to 320, which every board up to 8191 stays within (all checked in
-/// 2026-10: 314 at 8174; four words from n = 4740, five from 6392).
-pub const MAX_WORDS: usize = 5;
+/// The most block words supported, at the widest sets (160 words, the boards 8192 to 10239): ranks up to 448, which
+/// every one of those boards stays within (all checked in 2026-11 by the census of the boards past 8191, in the tests
+/// of `frames`: 403 at 10230; five words from n = 8192, six from 8440, seven from 9690 and on every board from 9752).
+pub const MAX_WORDS: usize = 7;
 
-/// The most block words at set widths of at most 64 words, the boards up to 4095 (ranks up to 169, at 4095).  Only the
-/// wider sets have the engines of four and five words ([`Gf2Bound::WIDE`]), so that the narrower widths are built as
-/// before.
+/// The most block words at set widths of 65 to 128 words, the boards 4096 to 8191: ranks up to 320, which every one of
+/// them stays within (all checked in 2026-10: 314 at 8174; four words from n = 4740, five from 6392).
+const WIDE_WORDS: usize = 5;
+
+/// The most block words at set widths of at most 64 words, the boards up to 4095 (ranks up to 169, at 4095).  Each
+/// width has the engines of one word up to the most its boards need ([`Gf2Bound::MOST`]), so that the narrower widths
+/// are built as before.
 const NARROW_WORDS: usize = 3;
 
 /// The GF(2) bound of the nodes on a search's path, level for level with the search's stack (see the module docs):
@@ -319,10 +324,13 @@ enum Engine<'g, const W: usize> {
     R3(Levels<'g, W, 3>),
     R4(Levels<'g, W, 4>),
     R5(Levels<'g, W, 5>),
+    R6(Levels<'g, W, 6>),
+    R7(Levels<'g, W, 7>),
 }
 
-/// Runs `$body` on the engine's levels `$l`.  The arms of four and five words test the constant [`Gf2Bound::WIDE`],
-/// so that the code for them is generated only for the sets wider than 64 words.
+/// Runs `$body` on the engine's levels `$l`.  The arms of four words and more test the constant [`Gf2Bound::MOST`],
+/// so that the code for them is generated only for the sets whose boards need them: four and five words for the sets
+/// wider than 64 words, six and seven for those wider than 128.
 macro_rules! dispatch {
     ($self:expr, $l:ident => $body:expr) => {
         match &mut $self.0 {
@@ -330,17 +338,31 @@ macro_rules! dispatch {
             Engine::R2($l) => $body,
             Engine::R3($l) => $body,
             Engine::R4($l) => {
-                if Self::WIDE {
+                if Self::MOST >= 4 {
                     $body
                 } else {
                     unreachable!("an engine of four words at {W} words")
                 }
             }
             Engine::R5($l) => {
-                if Self::WIDE {
+                if Self::MOST >= 5 {
                     $body
                 } else {
                     unreachable!("an engine of five words at {W} words")
+                }
+            }
+            Engine::R6($l) => {
+                if Self::MOST >= 6 {
+                    $body
+                } else {
+                    unreachable!("an engine of six words at {W} words")
+                }
+            }
+            Engine::R7($l) => {
+                if Self::MOST >= 7 {
+                    $body
+                } else {
+                    unreachable!("an engine of seven words at {W} words")
                 }
             }
         }
@@ -406,9 +428,16 @@ pub struct Gf2Stats {
 }
 
 impl<'g, const W: usize> Gf2Bound<'g, W> {
-    /// Whether the sets are wider than 64 words: only then are the engines of four and five words compiled (a branch
-    /// on this constant is dropped before code generation where it is false).
-    const WIDE: bool = W > 64;
+    /// The most block words of the engines compiled at this set width: [`NARROW_WORDS`] up to 64 words, [`WIDE_WORDS`]
+    /// up to 128 and [`MAX_WORDS`] beyond.  A branch on this constant is dropped before code generation where it is
+    /// false, so a width has the code of the engines of one word up to its most, and no more.
+    pub const MOST: usize = if W <= 64 {
+        NARROW_WORDS
+    } else if W <= 128 {
+        WIDE_WORDS
+    } else {
+        MAX_WORDS
+    };
 
     /// A solver for the states of `graph`'s search, positioned at the root with no candidates.
     pub fn new(graph: &'g Gf2Graph) -> Self {
@@ -419,9 +448,9 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
     /// with its vectors padded with zeros, which tests use to run the engines of more words than a board needs.
     pub fn with_words(graph: &'g Gf2Graph, words: usize) -> Self {
         assert!(words >= graph.words, "{words} words are fewer than the graph's {}", graph.words);
-        let most = if Self::WIDE { MAX_WORDS } else { NARROW_WORDS };
-        if words > most {
-            panic!("a frame of rank above {} ({words} words) is not supported at a set width of {W} words", 64 * most);
+        if words > Self::MOST {
+            let rank = 64 * Self::MOST;
+            panic!("a frame of rank above {rank} ({words} words) is not supported at a set width of {W} words");
         }
         Gf2Bound(match words {
             1 => Engine::R1(Levels::new(graph)),
@@ -431,9 +460,14 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
         })
     }
 
-    /// The engine of four or five words, for the sets wider than 64 words.
+    /// The engine of four words or more, for the sets wider than 64 words.
     fn wide(graph: &'g Gf2Graph, words: usize) -> Engine<'g, W> {
-        if Self::WIDE {
+        if Self::MOST >= 6 && words >= 6 {
+            match words {
+                6 => Engine::R6(Levels::new(graph)),
+                _ => Engine::R7(Levels::new(graph)),
+            }
+        } else if Self::MOST >= 4 {
             match words {
                 4 => Engine::R4(Levels::new(graph)),
                 _ => Engine::R5(Levels::new(graph)),
@@ -592,6 +626,8 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
             Engine::R3(l) => l.stats(),
             Engine::R4(l) => l.stats(),
             Engine::R5(l) => l.stats(),
+            Engine::R6(l) => l.stats(),
+            Engine::R7(l) => l.stats(),
         }
     }
 }

@@ -29,8 +29,8 @@ optimal game 3, 4: the taxman takes 1, then 2, and the player scores 7.  The val
 
 The solver's results are the moves of optimal games, each with its score.  The gzip file
 `results/optimal.jsonl.gz` holds a chain of them for every n from 1 to its end, each found from the moves for n − 1
-(section 3, "A chain from n = 1"); this page calls it the *committed chain*.  The code can attempt any n up to 8191, the
-largest board that its bitsets of game numbers can hold
+(section 3, "A chain from n = 1"); this page calls it the *committed chain*.  The code can attempt any n up to 10239,
+the largest board that its bitsets of game numbers can hold
 ([solver/docs/design/architecture.md](../docs/design/architecture.md), the paragraph "Width dispatch").
 
 [results/README.md](../../results/README.md) gives how far the chain reaches and how each game is proven: within the

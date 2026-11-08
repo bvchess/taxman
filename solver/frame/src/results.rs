@@ -1386,19 +1386,19 @@ mod tests {
         ])
     }
 
-    /// A line's n is checked against `MAX_N`, the largest board the solver supports (8191): the incomplete line of
-    /// a search stopped by a limit is read for the first board past 4095 and for the last, and is refused, naming
-    /// the range, for board 0 and for the first board past the last.
+    /// A line's n is checked against `MAX_N`, the largest board the solver supports (10239): the incomplete line of
+    /// a search stopped by a limit is read for the first boards past 4095 and past 8191 and for the last, and is
+    /// refused, naming the range, for board 0 and for the first board past the last.
     #[test]
     fn a_lines_board_size_must_be_a_board_the_solver_supports() {
-        assert_eq!(MAX_N, 8191);
-        for n in [1, 4095, 4096, 8191] {
+        assert_eq!(MAX_N, 10239);
+        for n in [1, 4095, 4096, 8191, 8192, 10239] {
             let contents = read_results(&text(&[incomplete_line(n)]), Optimal::built_in(), 1).unwrap();
             assert_eq!((contents.runs.get(&n), contents.incomplete_lines), (Some(&1), 1), "n={n}");
         }
-        for n in [0, 8192] {
+        for n in [0, 10240] {
             let err = read_results(&text(&[incomplete_line(n)]), Optimal::built_in(), 1).unwrap_err();
-            assert_eq!(err, format!("line 1: n={n} is not a game from 1 to 8191"));
+            assert_eq!(err, format!("line 1: n={n} is not a game from 1 to 10239"));
         }
     }
 

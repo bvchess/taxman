@@ -89,7 +89,7 @@ The steps again, with the functions that take them:
    |                                  from this run or FILE, and are checked (legal, over, opens with the largest prime)
    |                                  before anything uses them
    v
- solver::set_up(n) -> set_up_with_width::<W>      W = 8 to 128 words of 64 bits (bits::WIDTHS), by n
+ solver::set_up(n) -> set_up_with_width::<W>      W = 8 to 160 words of 64 bits (bits::WIDTHS), by n
    |
    |  [1] numtheory::Tables            maximal factors and maximal composites of 1..=n; the set width W
    |  [2] n prime ............ accelerate::prime_shortcut   the moves for n-1 with its first move replaced by n

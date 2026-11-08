@@ -804,7 +804,7 @@ fn worklist_pops_in_descending_order() {
     assert_eq!(popped, vec![191, 100, 64, 63, 7, 5, 0]);
 }
 
-/// At 128 words the summary has two words (words 0 to 63 of the set in the first, 64 to 127 in the second): members on
+/// At 128 words the summary uses two words (words 0 to 63 of the set in the first, 64 to 127 in the second): members on
 /// both sides of the boundary (4095 and 4096) and at both ends pop in descending order, and a worklist whose second
 /// summary word has emptied still pops from the first.
 #[test]
@@ -820,6 +820,26 @@ fn worklist_pops_across_both_summary_words() {
     assert_eq!(popped, vec![8191, 6000, 4100, 4097, 4096, 4095, 63, 5, 0]);
     w.insert(300);
     assert_eq!((w.pop(), w.pop()), (Some(300), None));
+}
+
+/// At 160 words, the widest set, the summary uses three words (words 128 to 159 of the set in the third): members on
+/// both sides of each boundary (4095 and 4096, 8191 and 8192) and at both ends pop in descending order, a worklist
+/// whose third summary word has emptied still pops from the second and the first, and one with members in the first
+/// and the third alone skips the empty second.
+#[test]
+fn worklist_pops_across_three_summary_words() {
+    let members = [0, 5, 4095, 4096, 8191, 8192, 9000, 10239];
+    let mut w = Worklist::<160>::of(&Bits::<160>::from_slice(&members));
+    w.insert(63);
+    w.insert(8193);
+    let mut popped = Vec::new();
+    while let Some(x) = w.pop() {
+        popped.push(x);
+    }
+    assert_eq!(popped, vec![10239, 9000, 8193, 8192, 8191, 4096, 4095, 63, 5, 0]);
+    w.insert(10000);
+    w.insert(300);
+    assert_eq!((w.pop(), w.pop(), w.pop()), (Some(10000), Some(300), None));
 }
 
 #[test]
