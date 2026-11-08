@@ -1,9 +1,9 @@
 #!/bin/bash
 # Copy the website to the web server, where it appears at https://vantuyl.com/taxman/.
-# The site has no build step, but web/ also holds files that are not part of it (tools/, OUTLINE.md, README.md, img/,
-# style.html and css/style-page.css, the internal style guide that no page links), so only the files named in SITE
-# below go out, taken from the last commit.  Files on the server that are no longer in the site are removed (only
-# inside the taxman folder).
+# The site has no build step.  Everything in web/ goes out, taken from the last commit, except the working files listed
+# in NOT_SITE below (the tools, the notes, the pictures of the repository's README, and the internal style guide that no
+# page links).  A new working file in web/ must be added to that list.  Files on the server that are no longer in the
+# site are removed (only inside the taxman folder).
 #
 #   web/tools/publish.sh             test, then publish the last commit
 #   web/tools/publish.sh --dry-run   test, then list what would change on the server without changing it
@@ -15,10 +15,8 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 DEST="bchess@vantuyl.com:/home/bchess/vantuyl.com/taxman/"
-# What the site serves: its pages (every page that site.js lists, and none other), and what they load.
-SITE=(web/*.html web/css web/js web/figures web/data web/fonts web/icon.svg)
-# Pages and styles that no page links.
-NOT_SITE=(web/style.html web/css/style-page.css)
+# web/'s working files, which are not part of the site.  A new working file goes here.
+NOT_SITE=(web/tools web/OUTLINE.md web/README.md web/img web/style.html web/css/style-page.css)
 
 ARGS=()
 DIRTY=0
@@ -37,8 +35,8 @@ node web/tools/test.mjs
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 # git archive takes the files of the commit, so nothing untracked or edited since can go out.
-git archive HEAD -- "${SITE[@]}" | tar -x -C "$STAGE"
-rm -f "${NOT_SITE[@]/#/$STAGE/}"
+git archive HEAD -- web | tar -x -C "$STAGE"
+rm -rf "${NOT_SITE[@]/#/$STAGE/}"
 find "$STAGE" \( -name '.DS_Store' -o -name '*~' -o -name '*.swp' \) -delete
 
 echo "Publishing commit $(git log -1 --format='%h %s' HEAD | cut -c1-100)"
