@@ -1,17 +1,18 @@
-//! The best file of the unsound mode, `taxman solve --unsound --best FILE`: the best line any run found of each game
-//! past the built-in table, at any level.  The module documentation of [`super`], "The best file", says how a run uses
-//! it.
+//! The best-known file of the unsound mode, `taxman solve --unsound --best-known FILE`: the best-known line of each
+//! game past the built-in table, the best line any run has found, at any level.  The module documentation of
+//! [`super`], "The best-known file", says how a run uses it.
 //!
-//! The file holds unsound lines, as a run's file does, and each line carries the key [`BEST`], `{"file": ..., "was":
-//! ...}`: the name of the file of the run that offered the line, and the score of the game's line in the best file
-//! before this one (`null` for the first).  A game's lines score more, line after line, and the last is the game's.
-//! The first line of a game may record a repair (`repaired`), since the line it replaced is in the file of the run, not
-//! here.  A line of a game that the built-in table has is refused, and so is a score above the line's `bound`.
+//! The file holds unsound lines, as a run's file does, and each line carries the key [`BEST_KNOWN`], `{"file": ...,
+//! "was": ...}`: the name of the file of the run that offered the line, and the score of the game's line in the
+//! best-known file before this one (`null` for the first).  A game's lines score more, line after line, and the last is
+//! the game's.  The first line of a game may record a repair (`repaired`), since the line it replaced is in the file of
+//! the run, not here.  A line of a game that the built-in table has is refused, and so is a score above the line's
+//! `bound`.
 //!
 //! Several runs share one file.  A holder takes an exclusive lock (`flock`) only to read what the others appended and
 //! to append, and lets it go at once, so that a run never waits for another's life.  A holder that stopped in the
 //! middle of a line leaves a torn last line, which the next holder cuts off.  Nothing here is proven: every reader of
-//! proven lines refuses a best file, as it refuses any file of unsound lines.
+//! proven lines refuses a best-known file, as it refuses any file of unsound lines.
 
 use super::{read_line, Stored};
 use crate::game::Optimal;
@@ -23,12 +24,12 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-/// The key that a line of the best file has besides a run's: `{"file": the name of the run's file the line came from,
-/// "was": the best file's score of the game before this line, or null}`.
-pub const BEST: &str = "best";
+/// The key that a line of the best-known file has besides a run's: `{"file": the name of the run's file the line came
+/// from, "was": the best-known file's score of the game before this line, or null}`.
+pub const BEST_KNOWN: &str = "best_known";
 
-/// A best file as one run sees it: the last line of each game, as far as the run has read the file.
-pub struct BestFile<'a> {
+/// A best-known file as one run sees it: the last line of each game, as far as the run has read the file.
+pub struct BestKnownFile<'a> {
     path: PathBuf,
     /// The built-in table, whose games the file never holds.
     table: &'a Optimal,
@@ -38,32 +39,32 @@ pub struct BestFile<'a> {
     read_to: u64,
 }
 
-impl<'a> BestFile<'a> {
+impl<'a> BestKnownFile<'a> {
     /// Opens the file at `path` (creating it if it is missing) and reads it, checking every line as a run's file is
-    /// checked ([`read_line`]) and that it is a line of the best file: it carries [`BEST`], is not a game of `table`,
-    /// does not score above its `bound`, scores more than the line of its game before it, and says that score in
-    /// `best.was`.  Holds the lock only while it reads.
+    /// checked ([`read_line`]) and that it is a line of the best-known file: it carries [`BEST_KNOWN`], is not a game
+    /// of `table`, does not score above its `bound`, scores more than the line of its game before it, and says that
+    /// score in `best_known.was`.  Holds the lock only while it reads.
     ///
     /// # Errors
     ///
     /// A file that cannot be read, or holds a line that fails a check; the message names the line.
-    pub fn open(path: &Path, table: &'a Optimal) -> Result<BestFile<'a>, String> {
-        let mut best = BestFile { path: path.to_owned(), table, games: BTreeMap::new(), read_to: 0 };
-        best.locked()?;
-        Ok(best)
+    pub fn open(path: &Path, table: &'a Optimal) -> Result<BestKnownFile<'a>, String> {
+        let mut best_known = BestKnownFile { path: path.to_owned(), table, games: BTreeMap::new(), read_to: 0 };
+        best_known.locked()?;
+        Ok(best_known)
     }
 
-    /// The moves of the game `n`'s best line and its score, as the run last read them.
+    /// The moves of the game `n`'s best-known line and its score, as the run last read them.
     pub fn moves(&self, n: u32) -> Option<(&[u32], u64)> {
         self.games.get(&n).map(|game| (game.moves.as_slice(), game.score))
     }
 
-    /// The score of the game `n`'s best line, as the run last read it.
+    /// The score of the game `n`'s best-known line, as the run last read it.
     pub fn score(&self, n: u32) -> Option<u64> {
         self.games.get(&n).map(|game| game.score)
     }
 
-    /// The game `n`'s best line, as the run last read it.
+    /// The game `n`'s best-known line, as the run last read it.
     pub(super) fn line(&self, n: u32) -> Option<&Stored> {
         self.games.get(&n)
     }
@@ -82,16 +83,16 @@ impl<'a> BestFile<'a> {
         Ok(())
     }
 
-    /// Whether a line of the game `n` that scores `score` would be added: the table lacks the game, and the best file's
-    /// line of it, as last read, scores less.
+    /// Whether a line of the game `n` that scores `score` would be added: the table lacks the game, and the
+    /// best-known file's line of it, as last read, scores less.
     fn wants(&self, n: u32, score: u64) -> bool {
-        self.table.score(n).is_none() && self.games.get(&n).is_none_or(|best| best.score < score)
+        self.table.score(n).is_none() && self.games.get(&n).is_none_or(|known| known.score < score)
     }
 
     /// Offers the lines `lines` (a game and its line each), which a run wrote to its file `file`, and appends those
-    /// that score more than the best file's line of their game, in the order given, each with `best.was` the score it
-    /// beats.  Reads what the others appended first, under the lock, and syncs the file once, after the last append.
-    /// Returns the number of lines appended.
+    /// that score more than the best-known file's line of their game, in the order given, each with `best_known.was`
+    /// the score it beats.  Reads what the others appended first, under the lock, and syncs the file once, after the
+    /// last append.  Returns the number of lines appended.
     ///
     /// # Errors
     ///
@@ -117,8 +118,8 @@ impl<'a> BestFile<'a> {
             if let Some(bound) = json.get("bound").and_then(Json::as_u64).filter(|&bound| line.score > bound) {
                 return Err(format!("n={n}: the line scores {}, above the game's bound {bound}", line.score));
             }
-            let was = self.games.get(&n).map(|best| best.score);
-            let text = with_best(json, file, was).map_err(|e| format!("n={n}: {e}"))?.to_string();
+            let was = self.games.get(&n).map(|known| known.score);
+            let text = with_best_known(json, file, was).map_err(|e| format!("n={n}: {e}"))?.to_string();
             handle.write_all(format!("{text}\n").as_bytes()).map_err(|e| at(&e))?;
             self.games.insert(n, Stored { text, ..line.clone() });
             added += 1;
@@ -163,7 +164,7 @@ impl<'a> BestFile<'a> {
             _ => format!("line {number} after byte {start}"),
         };
         let kept = each_line(&text, |number, json| {
-            let (n, stored, was) = read_best_line(json, table).map_err(|e| format!("{}: {e}", place(number)))?;
+            let (n, stored, was) = read_best_known_line(json, table).map_err(|e| format!("{}: {e}", place(number)))?;
             let before = games.get(&n).map(|game| game.score);
             if let Some(before) = before.filter(|&before| stored.score <= before) {
                 return Err(format!(
@@ -174,7 +175,7 @@ impl<'a> BestFile<'a> {
             }
             if was != before {
                 return Err(format!(
-                    "{}: (n={n}) {BEST}.was is {was:?}, not the score {before:?} of the line before it",
+                    "{}: (n={n}) {BEST_KNOWN}.was is {was:?}, not the score {before:?} of the line before it",
                     place(number)
                 ));
             }
@@ -187,35 +188,37 @@ impl<'a> BestFile<'a> {
     }
 }
 
-/// The game, line and `best.was` of a line of a best file, checked as a run's line is ([`read_line`]) and as a best
-/// file's ([`BestFile::open`]), but for the order of the lines of a game.
-fn read_best_line(json: &Json, table: &Optimal) -> Result<(u32, Stored, Option<u64>), String> {
+/// The game, line and `best_known.was` of a line of a best-known file, checked as a run's line is ([`read_line`]) and
+/// as a best-known file's ([`BestKnownFile::open`]), but for the order of the lines of a game.
+fn read_best_known_line(json: &Json, table: &Optimal) -> Result<(u32, Stored, Option<u64>), String> {
     let (n, stored, _) = read_line(json, table)?;
     let fail = |message: String| format!("(n={n}) {message}");
     if table.score(n).is_some() {
-        return Err(fail("the built-in table has this game, which a best file never holds".to_owned()));
+        return Err(fail("the built-in table has this game, which a best-known file never holds".to_owned()));
     }
     if let Some(bound) = json.get("bound").and_then(Json::as_u64).filter(|&bound| stored.score > bound) {
         return Err(fail(format!("it scores {}, above the game's bound {bound}", stored.score)));
     }
-    let best = Fields(json).get(BEST).map_err(|e| fail(format!("a best file's line needs a {BEST}: {e}")))?;
-    let (was, file) = (Fields(best).opt_u64("was"), Fields(best).get("file"));
-    let was = was.map_err(|e| fail(format!("{BEST}: {e}")))?;
+    let key = Fields(json)
+        .get(BEST_KNOWN)
+        .map_err(|e| fail(format!("a best-known file's line needs a {BEST_KNOWN}: {e}")))?;
+    let (was, file) = (Fields(key).opt_u64("was"), Fields(key).get("file"));
+    let was = was.map_err(|e| fail(format!("{BEST_KNOWN}: {e}")))?;
     if !matches!(file, Ok(Json::Null | Json::Str(_))) {
-        return Err(fail(format!("{BEST}: {}", Fields::bad("file"))));
+        return Err(fail(format!("{BEST_KNOWN}: {}", Fields::bad("file"))));
     }
     Ok((n, stored, was))
 }
 
-/// `json`, a line of a run, with the key [`BEST`] set (added at the end, or replaced where the line has it) to the name
-/// `file` of the run's file and the score `was` of the game's line in the best file before it.
-fn with_best(json: Json, file: Option<&str>, was: Option<u64>) -> Result<Json, String> {
+/// `json`, a line of a run, with the key [`BEST_KNOWN`] set (added at the end, or replaced where the line has it) to
+/// the name `file` of the run's file and the score `was` of the game's line in the best-known file before it.
+fn with_best_known(json: Json, file: Option<&str>, was: Option<u64>) -> Result<Json, String> {
     let Json::Obj(mut pairs) = json else { return Err("the line is not an object".to_owned()) };
-    let best =
+    let value =
         Json::object([("file", file.map_or(Json::Null, Json::from)), ("was", was.map_or(Json::Null, Json::from))]);
-    match pairs.iter_mut().find(|(key, _)| key == BEST) {
-        Some((_, value)) => *value = best,
-        None => pairs.push((BEST.to_owned(), best)),
+    match pairs.iter_mut().find(|(key, _)| key == BEST_KNOWN) {
+        Some((_, existing)) => *existing = value,
+        None => pairs.push((BEST_KNOWN.to_owned(), value)),
     }
     Ok(Json::Obj(pairs))
 }

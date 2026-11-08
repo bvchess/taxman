@@ -47,7 +47,7 @@ fn help_lists_the_commands_and_every_tactic() {
             "--stop-growth T|off",
             "--stop-quiet K",
             "--push-growth T|off",
-            "--best FILE|off",
+            "--best-known FILE|off",
             "--past-ceiling",
             "--no-repair",
             "--stop-at-known",
@@ -73,7 +73,7 @@ fn help_lists_the_commands_and_every_tactic() {
             "only when the last K rounds raised nothing (default 4)",
             "if the growth of its gap after its play is above T (default 25)",
             "keep the better line (default 0)",
-            "(default best.jsonl in the directory of --out; off: none)",
+            "(default best-known.jsonl in the directory of --out; off: none)",
         ] {
             assert!(help.contains(text), "{args:?}: no {text:?}");
         }
@@ -510,7 +510,7 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         &["--stop-growth", "0"],
         &["--stop-quiet", "0"],
         &["--push-growth", "off"],
-        &["--best", "off"],
+        &["--best-known", "off"],
         &["--past-ceiling"],
         &["--no-repair"],
         &["--stop-at-known"],
@@ -525,12 +525,12 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
     assert_usage_error(&[&base[..], &["--survivors"]].concat(), "unknown option --survivors");
 }
 
-/// A run keeps a best file, `best.jsonl` beside its file unless `--best FILE` names another or `--best off` has none.
-/// The measuring options play the games of the built-in table, which a best file never holds, so they have none unless
-/// `--best` names one; and the file of the run is not its best file.
+/// A run keeps a best-known file, `best-known.jsonl` beside its file unless `--best-known FILE` names another or
+/// `--best-known off` has none.  The measuring options play the games of the built-in table, which a best-known file
+/// never holds, so they have none unless `--best-known` names one; and the file of the run is not its best-known file.
 #[test]
-fn a_run_has_a_best_file_beside_its_file_unless_told_otherwise() {
-    let dir = TempDir::new("unsound-best");
+fn a_run_has_a_best_known_file_beside_its_file_unless_told_otherwise() {
+    let dir = TempDir::new("unsound-best-known");
     for sub in ["named", "off", "measuring"] {
         fs::create_dir(dir.join(sub)).unwrap();
     }
@@ -542,34 +542,35 @@ fn a_run_has_a_best_file_beside_its_file_unless_told_otherwise() {
     // Game 12 is the built-in table's: the file is made and stays empty, and the summary says so.
     let run = solve("by-default.jsonl", &[]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    assert_eq!(fs::read_to_string(dir.join("best.jsonl")).unwrap(), "");
-    let summary = format!("best file {}: 0 lines added", dir.join("best.jsonl").display());
+    assert_eq!(fs::read_to_string(dir.join("best-known.jsonl")).unwrap(), "");
+    let summary = format!("best-known file {}: 0 lines added", dir.join("best-known.jsonl").display());
     assert!(run.stdout.contains(&summary), "{}", run.stdout);
     let elsewhere = dir.join("elsewhere.jsonl");
-    let run = solve("named/o.jsonl", &["--best", path(&elsewhere)]);
+    let run = solve("named/o.jsonl", &["--best-known", path(&elsewhere)]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    assert!(elsewhere.exists() && !dir.join("named/best.jsonl").exists());
-    let run = solve("off/o.jsonl", &["--best", "off"]);
+    assert!(elsewhere.exists() && !dir.join("named/best-known.jsonl").exists());
+    let run = solve("off/o.jsonl", &["--best-known", "off"]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    assert!(!dir.join("off/best.jsonl").exists() && !run.stdout.contains("best file"), "{}", run.stdout);
+    assert!(!dir.join("off/best-known.jsonl").exists() && !run.stdout.contains("best-known file"), "{}", run.stdout);
     let run = solve("measuring/o.jsonl", &["--stop-at-known"]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    assert!(!dir.join("measuring/best.jsonl").exists(), "{}", run.stdout);
-    let run = solve("measuring/p.jsonl", &["--stop-at-known", "--best", path(&dir.join("measuring/b.jsonl"))]);
+    assert!(!dir.join("measuring/best-known.jsonl").exists(), "{}", run.stdout);
+    let run = solve("measuring/p.jsonl", &["--stop-at-known", "--best-known", path(&dir.join("measuring/b.jsonl"))]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(dir.join("measuring/b.jsonl").exists());
-    // The file of the run, however it is named, is not its best file.
+    // The file of the run, however it is named, is not its best-known file.
     let same = dir.join("same.jsonl");
-    for best in [path(&same), path(&dir.join("named/../same.jsonl"))] {
-        let run = solve("same.jsonl", &["--best", best]);
+    for best_known in [path(&same), path(&dir.join("named/../same.jsonl"))] {
+        let run = solve("same.jsonl", &["--best-known", best_known]);
         assert_eq!(run.code, Some(1), "{}", run.stdout);
-        assert!(run.stderr.contains("--out and --best are the same file"), "{}", run.stderr);
+        assert!(run.stderr.contains("--out and --best-known are the same file"), "{}", run.stderr);
     }
-    assert_eq!(unsound::best_path(Some(Path::new("runs/a/o.jsonl")), None), Some("runs/a/best.jsonl".into()));
-    assert_eq!(unsound::best_path(Some(Path::new("o.jsonl")), None), Some("best.jsonl".into()));
-    assert_eq!(unsound::best_path(Some(Path::new("o.jsonl")), Some("off")), None);
-    assert_eq!(unsound::best_path(Some(Path::new("o.jsonl")), Some("x/b.jsonl")), Some("x/b.jsonl".into()));
-    assert_eq!(unsound::best_path(None, None), None);
+    let default = |out: &str| unsound::best_known_path(Some(Path::new(out)), None);
+    assert_eq!(default("runs/a/o.jsonl"), Some("runs/a/best-known.jsonl".into()));
+    assert_eq!(default("o.jsonl"), Some("best-known.jsonl".into()));
+    assert_eq!(unsound::best_known_path(Some(Path::new("o.jsonl")), Some("off")), None);
+    assert_eq!(unsound::best_known_path(Some(Path::new("o.jsonl")), Some("x/b.jsonl")), Some("x/b.jsonl".into()));
+    assert_eq!(unsound::best_known_path(None, None), None);
 }
 
 /// `--fix LO,HI` takes two numbers with 0 <= LO <= HI <= 1, `--tilt P` a whole number from 0 to 100, `--back J` a whole

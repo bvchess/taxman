@@ -1075,9 +1075,13 @@ fn the_unsound_mode_documents_exactly_the_keys_of_an_unsound_line() {
     // A game with a search (85), and one with none (12).
     let written = unsound_keys(85);
     assert_eq!(unsound_keys(12), written, "a game with no search has the keys of one with a search");
-    // The table also has the key that only a line of the best file carries.
-    let with_best: BTreeSet<String> = written.iter().cloned().chain([unsound::BEST.to_owned()]).collect();
-    assert_eq!(first_column_words(part), with_best, "line.md's table of the keys of an unsound line, and the code's");
+    // The table also has the key that only a line of the best-known file carries.
+    let with_best_known: BTreeSet<String> = written.iter().cloned().chain([unsound::BEST_KNOWN.to_owned()]).collect();
+    assert_eq!(
+        first_column_words(part),
+        with_best_known,
+        "line.md's table of the keys of an unsound line, and the code's"
+    );
     let example = part.split("```").nth(1).expect("the example line is the first code block");
     assert_eq!(top_level_keys(example), written, "line.md's example of an unsound line, and the code's keys");
     assert!(example.contains("\"method\":\"search\""), "the example is a searched game");

@@ -53,7 +53,7 @@ still, `prev.short_by` 11, since the new score proves the line of 5041 short by 
 | `n`, `score`, `moves`, `promotions` | the game, its score, its moves, and the promoted numbers, ascending |
 | `method` | `trivial`, `prime`, `repeat` or `search` |
 | `in_the_bag` | what the game with no promotions scores (null for the prime formula, which sets no board up) |
-| `prev` | the moves for n − 1 the game started from: `n`, `score`, `source` (`run`: this run's, `results`: the file's, `best`: the [best file's](best.md), or `table`: the built-in table's), `moves_digest`, and `short_by`, the points by which they fall short of opt(n − 1) at least, as this game's score proves (its score less n + score(n − 1), where that is above 0); null if there were none, and on a line of an unseeded play |
+| `prev` | the moves for n − 1 the game started from: `n`, `score`, `source` (`run`: this run's, `results`: the file's, `best_known`: the [best-known file's](best-known.md), or `table`: the built-in table's), `moves_digest`, and `short_by`, the points by which they fall short of opt(n − 1) at least, as this game's score proves (its score less n + score(n − 1), where that is above 0); null if there were none, and on a line of an unseeded play |
 | `ceiling`, `at_ceiling` | the run's ceiling on the score (null without moves for n − 1, with `--past-ceiling`, and on a line of an unseeded play), and whether the score reached it |
 | `bound`, `growth` | the game's [bound](shortfalls.md#the-bound-and-the-gap), and the growth of its gap over the moves for n − 1 it started from, which a line of an unseeded play takes from the run's line below (null without such moves, and with `--unseeded`) |
 | `growth_stop`, `pushed` | whether `--stop-growth` ended the rounds before the budget, and whether `--push-growth` played the game twice |
@@ -79,4 +79,4 @@ still, `prev.short_by` 11, since the new score proves the line of 5041 short by 
 | `repair` | true unless `--no-repair` |
 | `repaired` | null on a line as its game was played; on a line that [the repair](shortfalls.md#the-repair) wrote again, `from`, the game whose line gave the new moves (a game above, or for a prime the game below), `was`, the score of the line it replaced, and `seconds`, the time the repair took |
 | `tactics`, `build` | as in a results line, `build` the one that wrote the line |
-| `best` | only on a line of the [best file](best.md), after the others: `file`, the name of the run's `--out` file that the line came from (null for a run with no file), and `was`, the score of the game's line in the best file before this one (null for the first) |
+| `best_known` | only on a line of the [best-known file](best-known.md), after the others: `file`, the name of the run's `--out` file that the line came from (null for a run with no file), and `was`, the score of the game's line in the best-known file before this one (null for the first) |
