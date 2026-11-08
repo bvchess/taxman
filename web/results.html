@@ -43,9 +43,9 @@
       <div class="note-head"><span class="note-name">A game’s record, precisely</span></div>
       <p>The record is the game’s line of the results file.  Its <code>in_the_bag</code> is ΣU*, the score with no
       promotions.</p>
-      <p>One run made every line, from November 1 to 6, 2026, on one machine with 88 threads, and it worked on up to
-      four games at once.  A game’s time, <code>seconds.active_all_runs</code>, counts only the time that at least one
-      thread worked on it, not the time it waited while the threads worked on other games
+      <p>The run that made every line worked on up to four games at once.  A game’s time,
+      <code>seconds.active_all_runs</code>, counts only the time that at least one thread worked on it, not the time it
+      waited while the threads worked on other games
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/REFERENCE.md#a-results-line---out-schema-5">the
       frame solver’s reference</a>; <a href="https://github.com/bvchess/taxman/blob/master/results/runs.md">the
       run</a>).</p>
@@ -54,7 +54,11 @@
     above n/2 that <a class="gloss" href="glossary.html#descending-greedy">descending greedy</a> keeps.  The promotions
     chosen by the search add the rest.  The search grows steeply with n: in game 21 it explores
     <span data-fact="nodes21">1</span> <a class="gloss" href="glossary.html#node">node</a>, and in game
-    <span data-last-n>5,060</span> it explores <span data-fact="nodesLast">1.2 billion</span>.
+    <span data-last-n>5,060</span> it explores <span data-fact="nodesLast">1.2 billion</span>.</p>
+    <p>The chain ran on an HPE ProLiant DL380 with two Intel Xeon E5-2699 v4 processors, 88 threads in all.  The
+    <a class="gloss" href="glossary.html#frame-solver">frame solver</a> played every game from 1 to 5,060 in one
+    run of roughly 5 days, from November 1 to 6, 2026, that kept all 88 threads busy, and the
+    <a class="gloss" href="glossary.html#prover">prover</a>’s proofs of the games up to 2,531 took 19 hours more.</p>
   </div>
 </section>
 
