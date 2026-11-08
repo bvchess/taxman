@@ -57,7 +57,7 @@ export function mountBoundsChart(host, { games, bounds }) {
 
   responsive(box, (width) => {
     const narrow = width < 520;
-    const m = { l: 44, r: narrow ? 12 : 20, t: 28, b: 32 };
+    const m = { l: 44, r: narrow ? 12 : 20, t: 14, b: 32 };
     const plotH = narrow ? 200 : 240;
     const height = m.t + plotH + m.b;
     const plotW = width - m.l - m.r;
@@ -80,8 +80,6 @@ export function mountBoundsChart(host, { games, bounds }) {
       const t = el('text', { x: x(nn), y: axisY + 18, 'text-anchor': 'middle', class: 'tick' }, svg);
       t.textContent = fmt(nn);
     }
-    const unit = el('text', { x: m.l, y: m.t - 14, class: 'tick' }, svg);
-    unit.textContent = 'above opt(n)';
 
     // The lines, the gray under the green; a value off the scale is held at the top edge.
     for (const s of series) {
