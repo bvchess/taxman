@@ -34,9 +34,9 @@
     <a href="https://oeis.org/A019312">A019312</a> in the OEIS.</p>
     <p>One file,
     <a href="https://github.com/bvchess/taxman/blob/master/results/optimal.jsonl.gz">results/optimal.jsonl.gz</a>, has a
-    line for each game: its best score, a sequence of moves that reaches it, and our method
-    for determining that no sequence scores more.  The explorer in <a href="results.html#explorer">chapter 8</a>
-    gives our results for any game. The following commands download the results file and extract the moves.</p>
+    line for each game: its best score, a sequence of moves that reaches it, and our method for determining that no
+    sequence scores more.  The explorer in <a href="results.html#explorer">chapter 8</a> gives our results for any game.
+    The following commands download the results file and extract the moves.</p>
   </div>
   <dl class="commands">
     <dt>Moves that reach the best score of game 21, in the order of play (change 21 to any game)</dt>
@@ -50,10 +50,11 @@
   <h2 id="h-game-21">Game 21, step by step</h2>
   <div class="para">
     <p>Game 20's best score is 124, so game 21's is above 124 and at most its
-    <a class="gloss" href="glossary.html#ceiling">ceiling</a>, 124 + 21 = 145
-    (<a href="chain.html#ceiling">chapter 2</a>).  21 does not fit and is not a prime, so game 20 does not settle
-    game 21 at once.  Rules settle most of the board, and the figure follows them one step at a time.  You can check
-    every step by hand.</p>
+    <a class="gloss" href="glossary.html#ceiling">ceiling</a>, 124 + 21 = 145 (<a href="chain.html#ceiling">chapter
+    2</a>).  21 does not fit and is not a prime, so game 20 does not settle game 21 at once.  The
+    <a class="gloss" href="glossary.html#parity-bound">parity bound</a> is sharper: game 21 scores at most 144
+    (<a href="bound.html#parity-bound">chapter 6</a>).  Rules settle most of the board, and the figure follows them one
+    step at a time.  You can check every step by hand.</p>
   </div>
 
   <figure class="fig fig21" id="fig21">
@@ -103,7 +104,7 @@
   </ol>
 
   <div class="para">
-    <p>So game 21's best score is 144, one below its ceiling.  The
+    <p>So game 21's best score is 144, one below its ceiling and equal to its parity bound.  The
     <a class="gloss" href="glossary.html#prover">prover</a> proves it on the whole board too, without statement U
     (<a href="statement-u.html#prover">chapter 7</a>).</p>
   </div>
