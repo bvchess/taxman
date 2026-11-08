@@ -7,7 +7,9 @@
 //! line's bound is the parity bound, the stop on growth ends a level's rounds from the end of level 1's on, after any
 //! quiet rounds it waits for, and the push plays twice a game whose gap grew.  The best-known file takes a line that
 //! scores more than its game's, seeds the games of the runs that share it, takes the repair down into its lines of the
-//! games below a run's first, and is offered the lines of a run's file when the run opens it.
+//! games below a run's first, and is offered the lines of a run's file when the run opens it.  With `known_to` the
+//! built-in table is cut, and the games above the cut are unproven: the best-known file takes and seeds from their
+//! lines, and refuses a run that knows them.
 //!
 //! Most tests play the rounds with `tilt`, `back` and `widen` off (`plain`, the form of the mode before they had
 //! defaults), so that each keeps testing what it tested; the options are given by name where a test is about them, and
@@ -1303,11 +1305,7 @@ fn the_lines_of_a_run_that_stops_and_pushes_are_the_same_on_one_thread_and_on_fo
 /// The built-in table's games below `lo`: a table that lacks the games a test plays, as the built-in table lacks the
 /// games past 5060, so that the best-known file may hold them.
 fn table_below(lo: u32) -> Optimal {
-    let mut table = Optimal::default();
-    for (n, score, moves) in Optimal::built_in().games().take_while(|&(n, _, _)| n < lo) {
-        table.push(n, score, moves.to_vec()).expect("the games in order");
-    }
-    table
+    Optimal::built_in().up_to(lo - 1)
 }
 
 /// The lines of the file `path` as JSON, in order.
@@ -1595,4 +1593,122 @@ fn a_best_known_file_never_holds_a_game_of_the_built_in_table_and_is_checked_as_
     // A file another process replaced by a shorter one is refused at the next read.
     fs::write(&best_known, "").unwrap();
     assert!(read.refresh().unwrap_err().contains("shorter than"));
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// A rehearsal: the built-in table cut at `known_to`
+
+/// The plan of a rehearsal at level `effort` on games the built-in table has: the table is cut at `known_to`.
+fn rehearsal(effort: u32, known_to: u32) -> Plan {
+    Plan { known_to: Some(known_to), ..plan(effort) }
+}
+
+#[test]
+fn with_known_to_the_games_above_it_are_unproven_and_the_best_known_file_takes_and_seeds_from_their_lines() {
+    let dir = TempDir::new("unsound-known-to");
+    let best_known = dir.join("best-known.jsonl");
+    let run = |name: &str, range: (u32, u32), effort: u32| {
+        let out = dir.join(name);
+        let files = Files::with_built_in(Some(&out), Some(&best_known));
+        played_in(range, &options(4, false), &rehearsal(effort, 389), &files)
+    };
+    // A run of 390 to 392 plays them as a run with a table of the games up to 389 does, but for the key `known_to`, and
+    // starts from the table's 389.
+    let (a, _, summary) = run("a.jsonl", (390, 392), 1);
+    let cut = table_below(390);
+    let (alone, ..) =
+        played_in((390, 392), &options(4, false), &plan(1), &Files { table: &cut, out: None, best_known: None });
+    let as_rehearsed: Vec<Line> =
+        timeless_all(&alone).into_iter().map(|l| Line { plan: rehearsal(1, 389), ..l }).collect();
+    assert_eq!(timeless_all(&a), as_rehearsed);
+    let prev = |line: &Line| line.prev.as_ref().map(|prev| (prev.n, prev.source));
+    assert_eq!((prev(&a[0]), prev(&a[1])), (Some((389, Source::Table)), Some((390, Source::Run))));
+    assert_eq!(a[0].to_json().get("known_to"), Some(&Json::from(389u32)));
+    assert_eq!(alone[0].to_json().get("known_to"), Some(&Json::Null));
+    // The built-in table has the three games, and the best-known file takes their lines.
+    assert!((390..=392).all(|n| Optimal::built_in().score(n).is_some()));
+    assert_eq!(summary.best_known_added, 3);
+    let lines = json_lines(&best_known);
+    assert_eq!(
+        lines.iter().map(game_and_score).collect::<Vec<_>>(),
+        a.iter().map(|l| (l.n, l.score)).collect::<Vec<_>>()
+    );
+    // A later run, on a copy of the file, starts game 391 from the best-known file's 390, not from the table's.
+    let (copy, out) = (dir.join("copy.jsonl"), dir.join("c.jsonl"));
+    fs::copy(&best_known, &copy).unwrap();
+    let files = Files::with_built_in(Some(&out), Some(&copy));
+    let (c, ..) = played_in((391, 391), &options(4, false), &rehearsal(1, 389), &files);
+    assert_eq!(prev(&c[0]), Some((390, Source::BestKnown)));
+    assert_eq!(c[0].prev.as_ref().map(|prev| prev.score), Some(a[0].score));
+    // At level 3 the three lines score more, and are added, each saying the score it beat.
+    let (b, _, summary) = run("b.jsonl", (390, 392), 3);
+    assert_eq!(summary.best_known_added, 3);
+    let last = last_lines(&best_known);
+    for (b, a) in b.iter().zip(&a) {
+        assert!(b.score > a.score, "n={}", b.n);
+        assert_eq!(best_known_of(&last[&b.n]), (Some("b.jsonl"), Some(a.score)), "n={}", b.n);
+    }
+    // The games up to 389 are the table's: the best-known file takes none of their lines.
+    let (known, _, summary) = run("d.jsonl", (388, 389), 1);
+    assert_eq!((known.len(), summary.best_known_added), (2, 0));
+    assert_eq!(known[1].to_json().get("known_to"), Some(&Json::from(389u32)));
+}
+
+#[test]
+fn a_best_known_file_made_with_known_to_is_refused_by_a_run_that_knows_a_game_it_holds() {
+    let dir = TempDir::new("unsound-known-to-refused");
+    let (best_known, out) = (dir.join("best-known.jsonl"), dir.join("a.jsonl"));
+    let files = Files::with_built_in(Some(&out), Some(&best_known));
+    played_in((390, 391), &options(4, false), &rehearsal(1, 389), &files);
+    // A run with a table cut at the game below the file's games reads it, and one that knows game 390 does not.
+    BestKnownFile::open(&best_known, &Optimal::built_in().up_to(389)).unwrap();
+    let cut = Optimal::built_in().up_to(390);
+    for table in [&cut, Optimal::built_in()] {
+        let err = BestKnownFile::open(&best_known, table).err().expect("a refusal");
+        assert!(err.contains("line 1: (n=390) the built-in table has this game"), "{err}");
+    }
+    // The run without the flag is refused before it plays a game; with the flag below the file's games, it is not.
+    let run = |known_to: Option<u32>| {
+        let (plan, other) = (Plan { known_to, ..plan(1) }, dir.join("b.jsonl"));
+        let files = Files::with_built_in(Some(&other), Some(&best_known));
+        unsound::solve_range(392, 392, &options(4, false), &plan, &files, |_| (), |_| ())
+    };
+    let err = run(None).unwrap_err();
+    assert!(err.contains("(n=390) the built-in table has this game"), "{err}");
+    assert_eq!(run(Some(389)).unwrap().solved, 1);
+}
+
+#[test]
+fn known_to_is_refused_with_the_options_that_measure_against_the_table() {
+    for measured in [Plan { stop_at_known: true, ..rehearsal(1, 389) }, Plan { from_known: true, ..rehearsal(1, 389) }]
+    {
+        let err =
+            unsound::solve_range(390, 391, &options(1, true), &measured, &built_in(None), |_| (), |_| ()).unwrap_err();
+        assert!(err.starts_with("--known-to cuts the built-in table"), "{err}");
+    }
+}
+
+#[test]
+fn a_run_with_known_to_folds_an_old_file_of_the_games_into_its_best_known_file() {
+    let dir = TempDir::new("unsound-known-to-fold");
+    // An old file of the games 390 to 392, made by a run with the whole table.
+    let old = dir.join("old.jsonl");
+    let (lines, ..) = played_in((390, 392), &options(4, false), &plan(1), &built_in(Some(&old)));
+    assert!(json_lines(&old).iter().all(|line| line.get("known_to") == Some(&Json::Null)));
+    // A run over their range with a copy of the file as `--out` plays nothing and offers every line.
+    let (copy, best_known) = (dir.join("copy.jsonl"), dir.join("best-known.jsonl"));
+    fs::copy(&old, &copy).unwrap();
+    let files = Files::with_built_in(Some(&copy), Some(&best_known));
+    let (played, repairs, summary) = played_in((390, 392), &options(4, false), &rehearsal(1, 389), &files);
+    assert_eq!((played.len(), repairs.len(), summary.skipped, summary.best_known_added), (0, 0, 3, 3));
+    let offered = json_lines(&best_known);
+    assert_eq!(
+        offered.iter().map(game_and_score).collect::<Vec<_>>(),
+        lines.iter().map(|l| (l.n, l.score)).collect::<Vec<_>>()
+    );
+    assert!(offered.iter().all(|line| best_known_of(line) == (Some("copy.jsonl"), None)));
+    // The same run again adds nothing, and the file reads back with the table cut at 389.
+    let (_, _, summary) = played_in((390, 392), &options(4, false), &rehearsal(1, 389), &files);
+    assert_eq!((summary.skipped, summary.best_known_added), (3, 0));
+    BestKnownFile::open(&best_known, &table_below(390)).unwrap();
 }

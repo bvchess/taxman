@@ -9,7 +9,8 @@ any level of effort.  A run of the unsound mode starts its games from it and add
 raise the best-known line of some n, and the file is where to look for the best-known line of n.  Its lines are
 unproven: each is a lower bound on opt(n) that a run found, and every reader of proven lines refuses the file, as it
 refuses any file of unsound lines ([what the mode is and is not](../unsound.md#what-it-is-and-is-not)).  A game of the
-built-in table is never in it, since the table's proven line is that game's best-known line.
+built-in table is never in it, since the table's proven line is that game's best-known line, except in a
+[rehearsal](#a-rehearsal-on-proven-games).
 
 `--best-known FILE` names the file.  By default it is `best-known.jsonl` in the directory of `--out`, and
 `--best-known off` gives a run none.  The file is created if it is missing.  The measuring options `--stop-at-known` and
@@ -52,6 +53,15 @@ game of the built-in table or scores above its `bound`, and that the lines of a 
 Several runs may use one file at once.  A run locks it only to read what is new and to append, never for its life, so
 none waits for another's game.  A run that stops in the middle of a line leaves a torn last line, which the next run to
 use the file cuts off.
+
+## A rehearsal on proven games
+
+A best-known file made with `--known-to N` is for runs with the same N: a rehearsal on games whose opt(n) is proven.  The
+file never holds a game of the built-in table, so a pass cannot ratchet on such games; `--known-to N` cuts the table at
+N for the run ([the flag](run.md#the-flags)), the file may hold the games above N, and the run's reader refuses only the
+games up to N.  A run without the flag, or with a larger N, refuses the file, since it holds games that run takes as
+proven.  An old file of the games above N is folded in as any old file is, by a run over their range with a copy of it
+as `--out`.
 
 ## What a line then depends on
 
