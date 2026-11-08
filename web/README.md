@@ -14,10 +14,10 @@ and ES modules, and need no build step.  [OUTLINE.md](OUTLINE.md) is the plan of
   `figures/game.js` and `figures/graph-game.js` draw, over the two trays of `trays.js`; `proof.js` is the one place that knows how each game was proven
   (its rule and its group, from `data/games.json` alone); `site.js` lists the pages, and every navigation draws from it.
 * `figures/` holds one file for each figure, `css/` and `fonts/` the look.
-* `data/` holds `games.json`, a column for every field of every game in the chain, and `small.json`, the moves and
-  promotions of games 1 to 100.
-* `tools/` holds `export.mjs`, `results.mjs`, `test.mjs` and `icon.mjs`, which writes `icon.svg`, the favicon, from
-  `js/icon.js`; run it after changing the icon.
+* `data/` holds `games.json`, a column for every field of every game in the chain, `small.json`, the moves and
+  promotions of games 1 to 100, and `bounds.json`, the two root bounds of every game, from the prover's files.
+* `tools/` holds `export.mjs`, `results.mjs`, `test.mjs`, `serve.mjs`, `publish.sh` and `icon.mjs`, which writes
+  `icon.svg`, the favicon, from `js/icon.js`; run it after changing the icon.
 * `img/` holds the pictures that the repository's README and the wiki link to.  Leave it as it is.
 
 ## Serve it
@@ -54,13 +54,9 @@ web/tools/publish.sh --dry-run
 web/tools/publish.sh
 ```
 
-The site is copied to `bchess@vantuyl.com:/home/bchess/vantuyl.com/taxman/`, where it appears at
-https://vantuyl.com/taxman/.  The script refuses to run while `web/` has uncommitted changes, runs the test, and
-sends the files of the last commit that the site serves: its pages, `css/`, `js/`, `figures/`, `data/`, `fonts/` and
-`icon.svg`.  `tools/`, `img/`, `OUTLINE.md`, `README.md` and the unlinked style guide (`style.html`,
-`css/style-page.css`) stay behind.  Every reference between the files is relative, so the site works from any folder.
-A new top-level file or folder of the site must be added to `SITE` in the script.  `--dry-run` lists what would change
-on the server without changing it; `--dirty` skips the check for uncommitted changes.
+The site appears at https://vantuyl.com/taxman/.  `publish.sh` runs the test and sends the last commit's files that
+the site serves; its opening comment says which, and how to add one.  Every reference between the files is relative,
+so the site works from any folder.
 
 ## Add a figure
 
