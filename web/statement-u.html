@@ -59,11 +59,9 @@
     and so does a <a class="gloss" href="glossary.html#repeat">repeat</a>, which takes the answer of an earlier game
     that posed the same search problem.  A search uses the game before only as a starting point and finds the frame
     model's best from any start, so it inherits no error from below.  So, followed down, every score rests on statement
-    U at one game: its own, if a search or a repeat settled it, or else the nearest game below it that one settled.</p>
-    <p>We've verified statement U holds up to game 2,531.  Past it, the rest of the chain rests on statement U: the
-    <span data-rests="onU">2,529</span> scores from game <span data-rests="firstU">2,532</span> on rest on it at
-    <span data-rests="foundations">1,382</span> games, and no game carries more than <span data-rests="most">8</span> of
-    them.  If statement U failed at one game, it could make at most <span data-rests="most">8</span> scores wrong.</p>
+    U at one game: either its own (if a search or a repeat settled it), or else the nearest game below it that was
+    settled by a search.</p>
+    <p>We've verified statement U holds up to game 2,531.  Past it, the rest of the chain rests on statement U.</p>
   </div>
 </section>
 
@@ -108,10 +106,10 @@
     <p>What supports statement U past game 2,531:</p>
     <ul class="rules">
       <li>It holds in every game the prover reaches, up to game 2,531.</li>
-      <li>For the numbers of U* with one or two prime factors, the theory proves the same statement: every optimal game
-      plays them.</li>
-      <li>Among the <a class="gloss" href="glossary.html#source">sources</a> alone, U* is the heaviest playable set,
-      in every game up to 100,000.  In those games, giving up a number of U* never pays within the top
+      <li>For the numbers of U* with one or two prime factors, the theory proves it: every optimal game
+      plays that portion of U*.</li>
+      <li>Among the <a class="gloss" href="glossary.html#source">sources</a> alone, U* is the heaviest playable in
+      every game we've examined (up to 100,000.)  In those games, giving up a number in U* never pays within the top
       half.</li>
       <li>The prover can fix layers 1 and 2 as every optimal game plays them, leave out one number of U* at a time, and
       bound what any such game without that number could score.  For about 85% of the numbers statement U is about, in
