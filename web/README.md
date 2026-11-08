@@ -47,6 +47,21 @@ Re-export when `results/optimal.jsonl.gz` changes, and commit the two JSON files
 game and checks descending greedy against the recorded `in_the_bag`.  It prints one line, takes under half a minute,
 and exits nonzero on a failure.
 
+## Publish it
+
+```
+web/tools/publish.sh --dry-run
+web/tools/publish.sh
+```
+
+The site is copied to `bchess@vantuyl.com:/home/bchess/vantuyl.com/taxman/`, where it appears at
+https://vantuyl.com/taxman/.  The script refuses to run while `web/` has uncommitted changes, runs the test, and
+sends the files of the last commit that the site serves: its pages, `css/`, `js/`, `figures/`, `data/`, `fonts/` and
+`icon.svg`.  `tools/`, `img/`, `OUTLINE.md`, `README.md` and the unlinked style guide (`style.html`,
+`css/style-page.css`) stay behind.  Every reference between the files is relative, so the site works from any folder.
+A new top-level file or folder of the site must be added to `SITE` in the script.  `--dry-run` lists what would change
+on the server without changing it; `--dirty` skips the check for uncommitted changes.
+
 ## Add a figure
 
 A figure is one file in `figures/`: facts from `../js/model.js`, marks placed by hand, drawn by `js/scene.js`, which
