@@ -11,9 +11,10 @@ cargo build --release
 ./target/release/span --from 2 --to 100000 --threads 6 --seconds 540 --out OUT.jsonl     # resumable; ~10 min
 ./target/release/span --from 101000 --to 1000000 --step 1000 --threads 6 --seconds 540 --out OUT.jsonl
 ./target/release/star --from 2 --to 20000 --threads 6 --seconds 540 --out OUT.jsonl
-../tools/cloud/prover.sh 2 2530     # the proofs of 2..2530 (data/exact_parity_2_2530.jsonl): `exact` over the range in
-                                    # resumable passes on every CPU, then the check.  It takes 1,700 thread-hours; the
-                                    # steps are in solver/docs/runbook/prover.md, "On a machine of your own"
+../tools/cloud/prover.sh 2 2530     # the proofs of 2..2530 (all of data/exact_parity_2_2531.jsonl but its last line):
+                                    # `exact` over the range in resumable passes on every CPU, then the check.  It takes
+                                    # 1,700 thread-hours; the steps are in solver/docs/runbook/prover.md, "On a machine
+                                    # of your own".  Game 2531, prime, was added by `exact --list 2531` (a second)
 ./target/release/exact --from 2 --to 1300 --threads 3 --seconds 540 --checkpoints work/fresh --out OUT.jsonl
                                     # a part of it, rerun until done: the searches start from the roles of the
                                     # bottom-layers theorem (--fix-low 0 starts from the plain root); 6 thread-minutes
@@ -31,8 +32,8 @@ bash tools/adversary_campaign.sh                                                
                                     # semiprime games (J3), derived
 ./target/release/optsets --list 798,799,800 --upper fixed --threads 1 --seconds 540 --out FIXED.jsonl
 ./target/release/moves --from 2 --to 1300 --seconds 540 --out OUT.jsonl         # one thread; ~7 minutes
-tools/summarize.py check 2 2530 data/exact_parity_2_2530.jsonl
-                                    # every n in 2..2530 proven, scores recorded, and how many proofs rest on F4
+tools/summarize.py check 2 2531 data/exact_parity_2_2531.jsonl
+                                    # every n in 2..2531 proven, scores recorded, and how many proofs rest on F4
 ./target/release/exact --from 2 --to 2530 --budget 1 --out PRE.jsonl    # no search, only the roles' checks (about a
                                     # second a game); each line's "relation" says whether the game needs a search
                                     # (none) or rests on the game before it (chain, prime, semiprime)

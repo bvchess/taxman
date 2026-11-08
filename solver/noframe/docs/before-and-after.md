@@ -48,19 +48,19 @@ Before the prover, this was the state of the evidence.
   every rejection of descending greedy on the sources' instance is a GF(2) dependency of what it kept above.  That is a
   statement about cores and closed surfaces mod 2, which the adversarial results tie to the window law with the real
   ranking of the primes.
-* **The prover's proofs reach 2530**; the chain reaches further within the frame model, and a longer range costs more.
+* **The prover's proofs reach 2531**; the chain reaches further within the frame model, and a longer range costs more.
   The cost follows the root's parity gap, which rises with n past 2100 ([proofs.md](proofs.md#the-run-of-2-to-2530)).
   What the parity bound still misses are the [odd
   cores](../../../docs/theory/parity-bound.md#what-the-parity-bound-misses).  The conflicts of its heaviest sets are
   large: 20–45 members at 990.
 * **The optimal sets of 990–1300 are not enumerated.**  The enumeration mode works with the parity bound (tested against
   brute force), so `optsets` with it would extend [uniqueness.md](uniqueness.md) at about the cost of the proofs.
-* **Statement U past 2530.**  The frame model's individual assumptions are no longer open: they are theorems given a
+* **Statement U past 2531.**  The frame model's individual assumptions are no longer open: they are theorems given a
   per-board fact that holds on every board to 8191 ([the bottom-layers theorem
   (F4)](../../../docs/theory/frame-model.md#the-bottom-layers-theorem) and [the exactness theorem
   (X7)](../../../docs/theory/exactness.md#the-exactness-theorem)).  What the model's answers rest on is one statement,
   U: some optimal game plays every source of three or more prime factors that setup keeps.  The prover's proofs
-  establish U at every n ≤ 2530.  Beyond, the committed lines past 2530 that rest on U, by an exhausted search or a
+  establish U at every n ≤ 2531.  Beyond, the committed lines past 2531 that rest on U, by an exhausted search or a
   repeat, have it uncertified.  The barred parity bounds certify about 85% of those sources per game on 2176–3314 and
   80% on 3315–3440, but close no game alone ([proofs.md](proofs.md#the-upper-part-game-by-game)).  The rest needs a
   search that leaves the open sources optional ([the certificate theorem

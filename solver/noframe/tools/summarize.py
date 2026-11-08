@@ -579,7 +579,7 @@ def exact_order(args):
 
 def exact_check(args):
     """check A B FILE...: the files prove opt(n) for every n in 2..B (`exact_proofs`: so together they must reach back
-    to 2, as data/exact_parity_2_2530.jsonl does alone), have a line for every n in A..B, and each line's score is the
+    to 2, as data/exact_parity_2_2531.jsonl does alone), have a line for every n in A..B, and each line's score is the
     recorded optimum.  The last FILE is the run's output and holds the games A..B; the files before it, the baseline,
     count for the games below A only, so that a baseline that reaches past A cannot stand in for a line the output
     lacks.  Exits 1 if any of that fails."""

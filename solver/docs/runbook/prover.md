@@ -136,17 +136,17 @@ SSH](launch.md#steps-through-ssm-or-ssh)), the first as root and the others as `
    to compare with the estimate ([What it costs](#what-it-costs)); the late games cost more.
 
 **`BASELINE`, for a range from A > 2.**  The check at the end needs every n in 2..A − 1 proven, from one file:
-`BASELINE`, whose default is the committed `solver/noframe/data/exact_parity_2_2530.jsonl`.  The check reads its games
-below A only, so the default serves any A up to 2531, the rehearsal above included.  For a range that continues a run
+`BASELINE`, whose default is the committed `solver/noframe/data/exact_parity_2_2531.jsonl`.  The check reads its games
+below A only, so the default serves any A up to 2532, the rehearsal above included.  For a range that continues a run
 of your own, join the files that cover 2..A − 1 and set `BASELINE` to the joined file before `prover.sh` in step 3 and
-before `prover.sh --verify`; for 3001..B after a run of 2531..3000:
+before `prover.sh --verify`; for 3001..B after a run of 2532..3000:
 
 ```
-cat solver/noframe/data/exact_parity_2_2530.jsonl ~/prover-work/results/exact_parity_2531_3000.jsonl \
+cat solver/noframe/data/exact_parity_2_2531.jsonl ~/prover-work/results/exact_parity_2532_3000.jsonl \
     > ~/baseline_2_3000.jsonl
 ```
 
-`prover.sh` reads `BASELINE` only in that check, so a range from past 2531 without the joined file ends in a failed
+`prover.sh` reads `BASELINE` only in that check, so a range from past 2532 without the joined file ends in a failed
 check after the whole run; with `S3_DEST` the results are saved, and `--verify` with the file runs the check again.  The
 joined file is also the first file of `summarize.py exact` ([Bring the data home, verify,
 commit](#bring-the-data-home-verify-commit)).  A range from 2 needs no `BASELINE`, and `prover.sh` refuses one: its
@@ -244,7 +244,8 @@ directory (the results, the checkpoints and the logs), on a disk that survives a
    ```
 
    Then commit the file as [Bring the data home, verify, commit](#bring-the-data-home-verify-commit) says: `cp
-   $W/results/exact_parity_2_2530.jsonl solver/noframe/data/`.
+   $W/results/exact_parity_2_2530.jsonl solver/noframe/data/exact_parity_2_2531.jsonl`, and game 2531, which is prime, was
+   added by `exact --list 2531 --out ...` and appended to it: the prime step, no search, a second.
 
 ## Watch, stop, resume
 

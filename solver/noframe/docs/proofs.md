@@ -2,7 +2,7 @@
 
 Part of [the prover's README](../README.md).
 
-The prover proves opt(n) = V(n), the recorded score, for every n ≤ 2530, in one run of one build ([the
+The prover proves opt(n) = V(n), the recorded score, for every n ≤ 2531, in one run of one build and a one-game step ([the
 run](#the-run-of-2-to-2530)).  `src/game.rs` proves upper bounds on opt(n) from proven facts only:
 
 * [the playability theorem (P2)](../../../docs/theory/playability.md#the-playability-theorem) with [the core theorem
@@ -23,26 +23,27 @@ run](#the-run-of-2-to-2530)).  `src/game.rs` proves upper bounds on opt(n) from 
 
 A search from the roles proves that no playable set that obeys them beats V(n).  That proves opt(n) ≤ V(n), because an
 optimal set beating V(n) would obey them.  Its lines say `"fix_low":1`, and the plain root's `"fix_low":0`.  All 795
-searches of `data/exact_parity_2_2530.jsonl` start from the roles, so its proofs rest on F4 besides the other theorems;
+searches of `data/exact_parity_2_2531.jsonl` start from the roles, so its proofs rest on F4 besides the other theorems;
 `data/exact_2_1231.jsonl` is from the plain root, from before the field, and does not.  `tools/summarize.py exact` and
 `check` count the proofs that rest on it.  Its game (`src/game.rs`) knows nothing of frames, greedy, `unzip` or
 promotions; U\* and descending greedy (`src/peel.rs`) enter through the roles of F4 and the checks of the conjectures.
 
 ## The run of 2 to 2530
 
-**One run of one build proved every game of 2..2530.**  `data/exact_parity_2_2530.jsonl` holds its 2,529 lines, one a
-game.  The command was `../tools/cloud/prover.sh 2 2530` ([the
+**One run of one build proved every game of 2..2530, and game 2531 followed.**  `data/exact_parity_2_2531.jsonl` holds
+the run's 2,529 lines and one for 2531, one a game.  The command was `../tools/cloud/prover.sh 2 2530` ([the
 runbook](../../docs/runbook/prover.md#on-a-machine-of-your-own)), from commit 9015f79, on the 88 threads of one machine
 (two Xeon E5-2699 v4 processors, 756 GiB) at idle priority, in passes of 3600 s.  It started on 2026-11-06 at 05:02 PST
 and ended "complete" on 2026-11-07 at 00:21 PST: 19.3 hours and 20 passes, with no interruption and no error.  It cost
 no money, only its hours.  [The notebook's
 entry](https://github.com/bvchess/taxman-notebook/blob/main/the-model-free-proofs-of-2-2530-on-one-machine-2026-11/README.md)
-has the account.
+has the account.  Game 2531 is prime, so it was added afterward by a run of `exact --list 2531` alone: the prime step,
+no search, 0.3 s, from the proven game 2530.
 
-The check, `../tools/cloud/prover.sh --verify 2 2530`, prints `OK: opt(n) is proven equal to the recorded score for
-every n in 2..2530`: every game has a line with the recorded score, and no search found a set that beats it.  Every
+The check, `tools/summarize.py check 2 2531 data/exact_parity_2_2531.jsonl`, prints `OK: opt(n) is proven equal to the
+recorded score for every n in 2..2531`: every game has a line with the recorded score, and no search found a set that beats it.  Every
 game's recorded moves obey the roles of F4, and the roles' parity bound is at least its score, which `exact` asserts
-before any search.  With `tools/summarize.py exact data/exact_parity_2_2530.jsonl`:
+before any search.  With `tools/summarize.py exact data/exact_parity_2_2531.jsonl`:
 
 | | games |
 |---|---|
@@ -50,16 +51,16 @@ before any search.  With `tools/summarize.py exact data/exact_parity_2_2530.json
 | parity bound at the root already equals V(n) | 199 |
 | proven by a search | 795 |
 | `chain`, at its ceiling V(n) = n + V(n−1), predecessor proven | 712 |
-| `prime`, by the prime formula, predecessor proven | 319 |
+| `prime`, by the prime formula, predecessor proven | 320 |
 | `semiprime`, by the semiprime formula, predecessor proven | 459 |
-| **every n in 2 .. 2530** | **2,529** |
+| **every n in 2 .. 2531** | **2,530** |
 
 The 795 searches took 1,957.8 million nodes and **1,698.5 thread-hours** (search seconds), 3.12 ms a node on average.
-The other 1,734 games took 616 seconds in all.  The machine was not otherwise idle: from about 09:00 PST on the first
+The other 1,735 games took 616 seconds in all.  The machine was not otherwise idle: from about 09:00 PST on the first
 day, experiments of the frame solver ran beside the run on up to 8 threads at nice 19, so the seconds and the
 milliseconds a node below run a little long.  The nodes of a search on one thread do not depend on that, and those of a
 search on several threads vary a little with the timing ([a game on several
-threads](#a-game-on-several-threads)).  `tools/summarize.py cost --band 100 data/exact_parity_2_2530.jsonl` gives the
+threads](#a-game-on-several-threads)).  `tools/summarize.py cost --band 100 data/exact_parity_2_2531.jsonl` gives the
 cost by band, with the dearest game of each in brackets:
 
 | n | searches | the root's parity gap (mean) | median nodes | most nodes | nodes | thread-hours | ms a node |

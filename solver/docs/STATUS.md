@@ -13,13 +13,14 @@ notebook](https://github.com/bvchess/taxman-notebook/blob/main/README.md), how f
 The Nov 1 run finished on 2026-11-06 at 05:00 PST, and its file is `results/optimal.jsonl.gz`: the games 1 to 5060, each
 proven, by one build ([results/runs.md](../../results/runs.md)).  The cleanup of the frame solver is finished; its last
 step retired the bounds store, the ledger, `--use-prev`, the readers of older line formats, `certify`, the certificates
-and the extended mode.  The prover's run of 2 to 2530 is done and committed.  The priority is the unsound mode.
+and the extended mode.  The prover's proofs of 2 to 2531 are done and committed.  The priority is the unsound mode.
 
 ## In flight
 
-* **The prover's run of 2 to 2530.**  Done: one run of commit 9015f79 on batmobile, which ended on 2026-11-07 at 00:21
-  PST, proved every game of 2 to 2530.  `prover.sh --verify 2 2530` passes on its file, which is committed as
-  `solver/noframe/data/exact_parity_2_2530.jsonl` and replaced the older `exact_parity` files ([the prover's
+* **The prover's proofs of 2 to 2531.**  Done: one run of commit 9015f79 on batmobile, which ended on 2026-11-07 at 00:21
+  PST, proved every game of 2 to 2530, and a one-game run of `exact` added game 2531 by the prime step.
+  `tools/summarize.py check 2 2531` passes on the file, which is committed as
+  `solver/noframe/data/exact_parity_2_2531.jsonl` and replaced the older `exact_parity` files ([the prover's
   proofs](../noframe/docs/proofs.md#the-run-of-2-to-2530) record the run).
 
 ## Open

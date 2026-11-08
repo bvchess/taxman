@@ -50,7 +50,7 @@ What the prover established, assumption by assumption
 |---|---|---|
 | (★): descending greedy is maximum-cardinality on every component and truncation of the sources' instance, hence U\* is the heaviest playable set of sources ([the sources conjecture (S1)](../../docs/theory/sources.md#the-sources-conjecture)) | **every game n = 2 .. 100,000** (602,777,907 greedy rejections) and **902 games to 2,000,000** (60,183,674 more): every rejection a GF(2) linear dependency, which certifies (★) for the whole game; the five components that the earlier evidence left undecided settled; no counterexample | certified per game (a bound met), open in general |
 | greedy removal of impossible sources in frames (`removeImpossible`) | at the root (where it shapes the search space) it *is* descending greedy on each component of the sources, so it is certified with (★) for every n ≤ 100,000 | certified per game |
-| the frame model as a whole: `unzip`'s mandatory moves, freedoms, closed frames inert, promotions one frame forward, greedy removal | **opt(n) proven equal to the recorded score, on the whole board, for every n = 2 .. 2530**, in one run of one build | verified (exact, on the whole board) |
+| the frame model as a whole: `unzip`'s mandatory moves, freedoms, closed frames inert, promotions one frame forward, greedy removal | **opt(n) proven equal to the recorded score, on the whole board, for every n = 2 .. 2531**, in one run of one build | verified (exact, on the whole board) |
 | uniqueness: one optimal set per game, and every optimal game's upper part U\* | **U\* is the unique heaviest playable set of sources wherever (★) holds** ([Q1](../../docs/theory/uniqueness-and-longest-games.md#the-uniqueness-theorem)), so to 100,000; every optimal set enumerated, on the whole board, in 954 of the games 2..989 (the other 34 with the sources fixed to U\*): **the optimal set is unique for every n ≤ 424, not at 425**; 30 games have two or three; every optimal set found has upper part U\* | proven (the sources, given (★)); measured (whole game) |
 | the longest games: an optimal game plays the most moves a game of the board can (the wiki's open question) | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; every other game to 1300 is a longest game, the difference never above one | refuted (on the whole board); measured to 1300 |
 
@@ -59,9 +59,9 @@ Its files, in [docs/](docs/):
 * [star.md](docs/star.md) certifies (★) by a statement of linear algebra, **(♦)**: every member
   that descending greedy rejects is a GF(2) combination of members it kept above it.  Statement (♦) is cheap to check
   exactly (game 2,000,000 takes 2.7 minutes), and it holds in every game checked.
-* [proofs.md](docs/proofs.md) proves the recorded scores to 2530 by a branch and bound over the picks, limited
+* [proofs.md](docs/proofs.md) proves the recorded scores to 2531 by a branch and bound over the picks, limited
   by the Franklín–Moniot bound and the *parity bound*, whose gap is about a tenth of the Franklín–Moniot bound's.  The
-  chain's games past 2530 are proven within the frame model alone, not by the prover.
+  chain's games past 2531 are proven within the frame model alone, not by the prover.
 * [star.md](docs/star.md#adversarial-search-what-protects-greedy) also searches Taxman-shaped synthetic instances for
   what protects greedy: the *window law*, taken with respect to the same ranking of the primes that decides which
   products fall in the window (n/2, n].

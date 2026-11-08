@@ -317,7 +317,7 @@ fn a_board_past_4095_builds_bounds_and_searches_at_w128() {
     builds_bounds_and_searches::<128>(4100, 4095);
 }
 
-/// At W = 20 the prover's proof (`solver/noframe/data/exact_parity_2_2530.jsonl`) is the only upper bound that does not
+/// At W = 20 the prover's proof (`solver/noframe/data/exact_parity_2_2531.jsonl`) is the only upper bound that does not
 /// come from the search being tested (the Java stops at 1023, and the prover shares no code with the frame solver): for
 /// game 1032, whose W = 20 search [`a_w20_search_interrupted_and_resumed_gives_the_same_answer`] resumes, its own
 /// search finished, and proved the recorded score optimal.  The file is long and its lines are in the order the games
@@ -326,7 +326,7 @@ fn a_board_past_4095_builds_bounds_and_searches_at_w128() {
 fn the_provers_proof_matches_a_w20_result() {
     let n = 1032;
     let score = stored_games()[&n].0;
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../noframe/data/exact_parity_2_2530.jsonl");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../noframe/data/exact_parity_2_2531.jsonl");
     let file = std::fs::File::open(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     let start = format!("{{\"n\":{n},");
     let line = BufReader::new(file)

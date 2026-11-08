@@ -21,9 +21,9 @@ counts on this page are a snapshot, dated 2026-11-06, which no test pins: the co
 How far each proof kind reaches:
 
 * **Every line of `optimal.jsonl.gz`** is proven within the frame model.
-* **Games 2 to 2530** are also proven on the whole board by the prover, so their scores are opt(n) without the frame
+* **Games 2 to 2531** are also proven on the whole board by the prover, so their scores are opt(n) without the frame
   model.
-* **Games 2531 on** are proven within the frame model, which is exact given statement U.  U is not proven past 2530.
+* **Games 2532 on** are proven within the frame model, which is exact given statement U.  U is not proven past 2531.
   A line of them proven by the ceiling or the prime formula is opt(n)
   wherever the game before it is.
 
@@ -213,15 +213,16 @@ What that evidence amounts to:
      and 1056–1063; the first's differ at those and at 1221–1224.
 5. **Independence from the table.**  The chain starts at n = 1, so no line of it is built from the table, which was
    only compared with; a score that differed would have been a hard error.
-6. **The prover's proofs.**  The prover proves every n up to 2530 optimal without the frame model, with no frames or
+6. **The prover's proofs.**  The prover proves every n up to 2531 optimal without the frame model, with no frames or
    promotions ([the prover's README](../solver/noframe/README.md); [the parity bound
    (W1)](../docs/theory/parity-bound.md#the-parity-bound)).  So
-   the file's scores to 2530 do not rest on the frame model either: those 2530 are opt(n) on the whole board.  The
-   games 2..2530 were proven in one run of one build, on 2026-11-06 and 07 ([the
+   the file's scores to 2531 do not rest on the frame model either: those 2531 are opt(n) on the whole board.  The
+   games 2..2530 were proven in one run of one build, on 2026-11-06 and 07, and game 2531 afterward, by the prime
+   step ([the
    notebook](https://github.com/bvchess/taxman-notebook/blob/main/the-model-free-proofs-of-2-2530-on-one-machine-2026-11/README.md)),
-   and its file, `solver/noframe/data/exact_parity_2_2530.jsonl`, is committed
+   and its file, `solver/noframe/data/exact_parity_2_2531.jsonl`, is committed
    ([the prover's proofs](../solver/noframe/docs/proofs.md#the-run-of-2-to-2530)).
-   The 2530 games of 2531–5060 are proven within the frame model, which is exact given U ([the exactness theorem
+   The 2529 games of 2532–5060 are proven within the frame model, which is exact given U ([the exactness theorem
    (X7)](../docs/theory/exactness.md#the-exactness-theorem)).
 
 The checks cannot catch a game that is legal, finished and within the chain bounds but not optimal, when the moves for n

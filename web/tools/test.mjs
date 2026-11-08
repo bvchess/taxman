@@ -340,13 +340,14 @@ same('the rules add up to every game', sum(Object.values(sorted.counts)), record
 same('the groups add up to every game', sum(Object.values(sorted.groupCounts)), records.length);
 {
   const rests = restsFacts(games);
-  const stale = 'statement-u.html: its sentence about game 2,531 is stale';
-  same(`${stale}: game ${PROVER_TO + 1} is no longer by the prime formula`, cols.proof[PROVER_TO], 'prime_formula');
-  same(`${stale}: the first game resting on statement U is no longer ${PROVER_TO + 2}`, rests.firstU, PROVER_TO + 2);
+  same(`the first game resting on statement U is no longer ${PROVER_TO + 1}`, rests.firstU, PROVER_TO + 1);
   same('every game from the first resting on statement U on rests on it', rests.onU, games.lastN - rests.firstU + 1);
-  const page = readFileSync(join(repoRoot, 'web', 'statement-u.html'), 'utf8').replace(/\s+/g, ' ');
-  const words = 'Game 2,531 follows from game 2,530 by the prime formula';
-  same(`${stale}: it no longer says "${words}"`, page.includes(words), true);
+  // PROVER_TO is the reach of the prover's record: its largest n, with a line for every n from 2 to it.
+  const record = readFileSync(join(repoRoot, 'solver', 'noframe', 'data', 'exact_parity_2_2531.jsonl'), 'utf8')
+    .split('\n').filter((line) => line.trim() !== '').map((line) => JSON.parse(line).n);
+  same('PROVER_TO is the largest n of the prover\'s record', Math.max(...record), PROVER_TO);
+  same('the prover\'s record has a line for every n from 2 to PROVER_TO',
+    [...record].sort((x, y) => x - y), Array.from({ length: PROVER_TO - 1 }, (_, k) => k + 2));
 }
 const badGroup = [];
 const badSearch = [];

@@ -16,7 +16,7 @@
 //! as the searches of `data/exact_2_1231.jsonl` ran).  Which games end up proven, given their predecessors, is worked
 //! out by `tools/summarize.py exact` from the file.
 //!
-//! The roles of F4 (`--fix-low 1`, the default, as `data/exact_parity_2_2530.jsonl` was made; `--fix-low 0` starts
+//! The roles of F4 (`--fix-low 1`, the default, as `data/exact_parity_2_2531.jsonl` was made; `--fix-low 0` starts
 //! from the plain root, as `data/exact_2_1231.jsonl` was): the search starts from the roles `upper::low_roles` writes
 //! down, "B" below, the largest prime forced and every other prime barred, the sources of layer 2 in U\* forced and the
 //! other numbers of layer 2 above n/2 barred, and, on a board whose frames of layer 2 are closed (the function decides

@@ -17,9 +17,10 @@ import { primeFactors } from './model.js';
 import { fmt } from './vocab.js';
 
 /** The last game the prover proves on the whole board, without the frame model (results/README.md, "What supports the
- *  scores"); past it, a score is the frame model's best, which is opt(n) wherever statement U holds.  The pages' text
+ *  scores"); past it, a score is the frame model's best, which is opt(n) wherever statement U holds.  The prover's
+ *  record is solver/noframe/data/exact_parity_2_2531.jsonl, which tools/test.mjs checks this against.  The pages' text
  *  says the number too, in statement-u.html, results.html, top-half.html and the others that name it. */
-export const PROVER_TO = 2530;
+export const PROVER_TO = 2531;
 
 /** The proof kinds of a results line, in plain words (docs/GLOSSARY.md, "proof"). */
 export const PROOFS = [
@@ -100,9 +101,9 @@ function foundationsOf(c) {
   return FOUNDATIONS.get(c);
 }
 
-/** The game whose frame model the score of row i rests on, followed down through the games before: game 2530 for game
- *  2531, which the prime formula gives from game 2530.  Up to PROVER_TO the prover proves the score outright; past it,
- *  it rests on statement U. */
+/** The game whose frame model the score of row i rests on, followed down through the games before: a game by the
+ *  ceiling or the prime formula rests on the game before it.  Up to PROVER_TO the prover proves the score outright;
+ *  past it, it rests on statement U. */
 export const foundationOf = (c, i) => foundationsOf(c)[i];
 
 /** How the chain's record proves the game in row i, in words: "a repeat of game 21's search". */
