@@ -104,7 +104,7 @@ chain's end, and this site explains how.
 * **Check it yourself:** the data, the programs and the theory on GitHub.
 * **Right column:** the rules precisely, opt(n) and the Taxman sequence (OEIS A019312); the heuristics' claims and how
   they were measured (`heuristics/README.md`); how to check the chain; what supports the scores (proven outright to
-  2530, given statement U past it), beside "Check it yourself" and not at the top, until chapter 7 gives it its home;
+  2531, given statement U past it), beside "Check it yourself" and not at the top, until chapter 7 gives it its home;
   how to cite the site.
 
 ## The story
@@ -173,7 +173,7 @@ greedy pass chooses them.
   48 of the 720 orders of six of them trap greedy at four, though five fit.  Taken from the largest down, they do not.
   Yet U\* is certified best among the sources in every game to 100,000.
 * Whether an optimal game of the whole board plays all of U\* is statement U, the one open statement the frame solver's
-  scores rest on past 2530.
+  scores rest on past 2531.
 
 **Figures.**  Game 21 in layers (the game-21 figure, from the pot to the sources).  The layer-2 graph of a mid-size
 game, greedy adding edges from the largest down and refusing the ones that close a loop.  A chart of the top half's
@@ -255,17 +255,16 @@ gaps (measured), the counting theorem (C2), the first odd core (C3), the parity 
 ### 7. Statement U
 
 **Point.**  One open statement stands between the frame model and the best score, and it is proven in every game up
-to 2530.
+to 2531.
 
 * The frame model's best is opt(n) exactly when statement U holds (X8); it is proved for the numbers of U* with one or
   two prime factors (F4) and open for the rest.
-* Every score rests, followed down, on the frame model of some game; up to 2530 that is proven, and past it the scores
-  rest on statement U from the first game that needs a search (2532 today; 2531 follows from 2530 by the prime
-  formula).
+* Every score rests, followed down, on the frame model of some game; up to 2531 that is proven, and past it the scores
+  rest on statement U from the first game that needs a search (2532 today).
 * The prover settles statement U one game at a time: it finds opt(n) on the whole board, with no frames, bounded by
-  the parity bound of chapter 6, and has proven every game up to 2530.
-* The evidence past 2530: the lower layers (F4), the sources conjecture to 100,000, the barred bounds (about 85% of the
-  numbers U asks about, in 2531 to 3440), and the root's heaviest set, which holds them all in every game measured.
+  the parity bound of chapter 6, and has proven every game up to 2531.
+* The evidence past 2531: the lower layers (F4), the sources conjecture to 100,000, the barred bounds (about 85% of the
+  numbers U asks about, in 2532 to 3440), and the root's heaviest set, which holds them all in every game measured.
 * Where a proof stops: the exchange that settles layer 2 fails at an odd core.
 
 **Figures.**  What rests on what: the proof kinds, and what makes the frame model's best score opt(n).

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Statement U · Taxman</title>
-<meta name="description" content="The scores of the chain of optimal Taxman games rest on one open statement, statement U: proven in every game up to 2,530 by a second program that searches the whole board, and the evidence for it past that game.">
+<meta name="description" content="The scores of the chain of optimal Taxman games rest on one open statement, statement U: proven in every game up to 2,531 by a second program that searches the whole board, and the evidence for it past that game.">
 <meta name="author" content="Brian Chess">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <script src="js/tone.js"></script>
@@ -20,8 +20,8 @@
 <header class="essay-head para">
   <p class="kicker">Chapter 7</p>
   <h1>Statement U</h1>
-  <p class="lede">The best scores past game 2,530 rest on one statement that we have not proven in general.  Up to game
-  2,530 the prover proves it, one game at a time.</p>
+  <p class="lede">The best scores past game 2,531 rest on one statement that we have not proven in general.  Up to game
+  2,531 the prover proves it, one game at a time.</p>
 </header>
 
 <section class="chapter" id="what-supports-the-scores" data-toc="what-supports-the-scores" aria-labelledby="h-supports">
@@ -34,8 +34,8 @@
       <p class="precise"><span class="run">Precisely.</span>ΣU* + P*(Π<sub>n</sub>) ≤ opt(n), with equality iff
       statement U holds at n.</p>
     </aside>
-    <aside class="note card" aria-label="Statement U, open, proved to game 2,530">
-      <div class="note-head"><span class="note-name">Statement U</span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">open, proved to game 2,530<span class="sr-only">, evidence on GitHub</span></a></div>
+    <aside class="note card" aria-label="Statement U, open, proved to game 2,531">
+      <div class="note-head"><span class="note-name">Statement U</span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">open, proved to game 2,531<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">Some optimal game plays every number of U* with three or more prime factors.</p>
       <p class="precise"><span class="run">Precisely.</span>Some optimal set of n contains U*<sub>≥3</sub>.  It holds
       at every game the prover proves
@@ -64,9 +64,9 @@
     and so does a <a class="gloss" href="glossary.html#repeat">repeat</a>, which takes the answer of an earlier game
     that posed the same search problem.  So, followed down, every score rests on the frame model of some game, and on
     statement U in that game.</p>
-    <p>Up to game 2,530 that costs nothing: the prover proves statement U in each of those games.  Past it, the
+    <p>Up to game 2,531 that costs nothing: the prover proves statement U in each of those games.  Past it, the
     <span data-rests="onU">2,529</span> scores from game <span data-rests="firstU">2,532</span> to the end of the chain
-    rest on statement U.  Game 2,531 follows from game 2,530 by the prime formula, so the prime formula proves its score too.</p>
+    rest on statement U.</p>
   </div>
 </section>
 
@@ -78,7 +78,7 @@
       <p>A branch and bound over sets of moves that uses the parity bound and takes the recorded score as its
       target.  It rests only on the theory's theorems and on elementary bounds, and we test its exact methods
       against brute force (<a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/README.md">its
-      README</a>).  Its run of games 2 to 2,530 took 19 hours on a machine with 88 threads
+      README</a>).  Proving every game up to 2,531 took it 19 hours on a machine with 88 threads
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md">the proofs</a>).</p>
     </aside>
     <p>We can prove statement U one game at a time: find opt(n) without the frame model, and compare it with the
@@ -87,14 +87,14 @@
     <a class="gloss" href="glossary.html#board">board</a>, choosing sets of moves rather than promotions, with no
     frames, and its bound is the <a class="gloss" href="glossary.html#parity-bound">parity bound</a> of
     <a href="bound.html#parity-bound">chapter 6</a>.</p>
-    <p>The prover has proven every game up to 2,530.  In each one, opt(n) is the score the
+    <p>The prover has proven every game up to 2,531.  In each one, opt(n) is the score the
     <a class="gloss" href="glossary.html#frame-solver">frame solver</a> found.  So statement U holds in those games,
     and their scores rest on no open statement.</p>
   </div>
 </section>
 
 <section class="chapter" id="evidence" data-toc="evidence" aria-labelledby="h-evidence">
-  <h2 id="h-evidence">The evidence past 2,530</h2>
+  <h2 id="h-evidence">The evidence past 2,531</h2>
   <div class="para">
     <aside class="note tech" aria-label="The evidence for statement U">
       <div class="note-head"><span class="note-name">The evidence for statement U</span></div>
@@ -108,9 +108,9 @@
       href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md#the-upper-part-game-by-game">the
       upper part, game by game</a>.</p>
     </aside>
-    <p>What supports statement U past game 2,530:</p>
+    <p>What supports statement U past game 2,531:</p>
     <ul class="rules">
-      <li>It holds in every game the prover reaches, up to game 2,530.</li>
+      <li>It holds in every game the prover reaches, up to game 2,531.</li>
       <li>For the numbers of U* with one or two prime factors, the theory proves the same statement: every optimal game
       plays them.</li>
       <li>Among the <a class="gloss" href="glossary.html#source">sources</a> alone, U* is the heaviest playable set,
@@ -118,7 +118,7 @@
       half.</li>
       <li>The prover can fix layers 1 and 2 as every optimal game plays them, leave out one number of U* at a time, and
       bound what any such game without that number could score.  For about 85% of the numbers statement U is about, in
-      the games from 2,531 to 3,440 that need a search or repeat one, that bound is at most the recorded score, so an
+      the games from 2,532 to 3,440 that need a search or repeat one, that bound is at most the recorded score, so an
       optimal game that beats the score, if there is one, plays them.  In no game does it cover all of them; if it did,
       the prover would prove that game's score.</li>
       <li>In every game up to 3,440 that needs a search, a heaviest set that the parity bound allows, with layers 1
