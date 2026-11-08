@@ -265,7 +265,7 @@ The ignored tests are for large machines and long runs:
 `--tactic NAME=VALUE`, which is repeatable; `taxman help` and
 [solver/docs/design/tactics.md](../docs/design/tactics.md) give the names, values and defaults, and switching one never
 changes the answer.  [The reference](../docs/REFERENCE.md#1-the-flags-of-solve) has every flag of `solve` but those of
-the unsound mode, which [unsound.md](../docs/unsound.md#the-flags) has.
+the unsound mode, which [run.md](../docs/unsound/run.md#the-flags) has.
 
 ### Solve one game
 

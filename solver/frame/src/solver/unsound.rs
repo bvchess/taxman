@@ -173,7 +173,8 @@
 //! * **The default**, [`DEFAULT_UNSEEDED_EVERY`], is 0.  With every eighth game played twice and no push, the chain of
 //!   4861-5060 at level 3 had 198 of 200 games at opt(n), against 182 with neither; with the push, every eighth game
 //!   played twice changed no score of 4861-5060 or 5061-5260 and took about half again the time.
-//!   solver/docs/unsound.md ("Games played twice") has the numbers, and the measurements are the notebook's entries
+//!   solver/docs/unsound/shortfalls.md ("Games played twice") has the numbers, and the measurements are the notebook's
+//!   entries
 //!   https://github.com/bvchess/taxman-notebook/blob/main/search/unseeded-games-above-a-short-game-2026-11/README.md
 //!   and https://github.com/bvchess/taxman-notebook/blob/main/search/stopping-and-pushing-by-the-gap-2026-11/README.md.
 //!
@@ -214,8 +215,8 @@
 //!   options, never on the threads.  With both rules off, the lines are those of the mode without them.
 //! * **The defaults**, [`DEFAULT_STOP_GROWTH`], [`DEFAULT_STOP_QUIET`] and [`DEFAULT_PUSH_GROWTH`].  The stop's 25
 //!   was chosen on the lines of the chains of the datasheet of the unsound mode and measured with the push's 50 on two
-//!   chains of 200 games at level 3: solver/docs/unsound.md ("The bound and the gap") says what they gained and cost,
-//!   and the notebook's entry
+//!   chains of 200 games at level 3: solver/docs/unsound/shortfalls.md ("The bound and the gap") says what they gained
+//!   and cost, and the notebook's entry
 //!   https://github.com/bvchess/taxman-notebook/blob/main/search/stopping-and-pushing-by-the-gap-2026-11/README.md
 //!   has the measurement.  The push's 25 was chosen on a chain of 1,060 games, in the notebook's entry
 //!   https://github.com/bvchess/taxman-notebook/blob/main/search/tuning-the-unsound-mode-on-a-long-chain-2026-11/README.md,
@@ -230,7 +231,7 @@
 //! that comes first), and the line records the round at which it was the table's, or that it never was.  `--from-known`
 //! seeds every game with the table's moves for n − 1, not with this run's line, so that the run's ceiling is the proven
 //! one.  A third, `--unseeded`, plays every game unseeded alone (above), to measure what a game makes of its board with
-//! nothing from the games below.  solver/docs/unsound.md has the keys of the line ("An unsound line").
+//! nothing from the games below.  solver/docs/unsound/line.md has the keys of the line ("An unsound line").
 
 use super::{
     prime_game, set_up, Before, Derived, Earlier, Failure, Job, Method, RangeSummary, SearchSetUp, SearchSetup, SetUp,
@@ -753,7 +754,7 @@ pub struct Raised {
     pub score: u64,
 }
 
-/// An unsound line: a game as the unsound mode played it (the module documentation; solver/docs/unsound.md, "An
+/// An unsound line: a game as the unsound mode played it (the module documentation; solver/docs/unsound/line.md, "An
 /// unsound line", has its keys).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Line {
