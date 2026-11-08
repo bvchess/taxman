@@ -23,17 +23,17 @@ import { scene } from '../js/scene.js';
 const W = 360;
 const H = 372;
 // The square: primes at the corners, each product on the side between its two primes.
-const CORNER = { 2: [70, 54], 5: [290, 54], 3: [290, 234], 7: [70, 234] };
+const CORNER = { 2: [70, 234], 5: [290, 234], 3: [290, 54], 7: [70, 54] };
 const PRODUCTS = [10, 15, 21, 14];
-// Layers: the products ascending down a column at the left, the primes ascending down a column at the right, level.
+// Layers: the products ascending up a column at the left, the primes ascending up a column at the right, level.
 const COLUMN = { product: 90, prime: 270 };
-const rowY = (i) => 54 + 60 * i;
+const rowY = (i) => 234 - 60 * i;
 // The places the numbers pass through between the two forms, where they pass one another.  Each number moves along the
 // smooth curve through its place; the places were found by moving them a little at a time, keeping any move that kept
 // the numbers farther apart, until, unfolding or folding, no two centers came nearer than 55 units.
 const MIDWAY = {
-  2: [158, 35], 3: [267, 154], 5: [323, 160], 7: [155, 259],
-  10: [153, 91], 14: [52, 136], 15: [193, 147], 21: [116, 193],
+  2: [158, 253], 3: [267, 134], 5: [323, 128], 7: [155, 29],
+  10: [153, 197], 14: [52, 152], 15: [193, 141], 21: [116, 95],
 };
 const TRAY = { y: 280, h: 86, w: 168, x: { player: 8, taxman: 184 } };
 const SCALE = 1.25;
@@ -122,8 +122,10 @@ export function mountLoop(host) {
         const ys = stuck.map((m) => PLACE.layers[m][1]);
         [sx, sy] = [COLUMN.prime, (Math.min(...ys) + Math.max(...ys)) / 2 + 4];
       } else if (stuck.length === 1) {
+        // A lone stuck number is labeled just above it: inside the square, or over it for the top side, never down by
+        // the trays.
         const [x, y] = PLACE.loop[stuck[0]];
-        [sx, sy] = [x, y + (y > 150 ? 38 : -32)];
+        [sx, sy] = [x, y - 32];
       }
       const gone = listWords(M.maximalFactors(stuck[0]).sort((a, b) => a - b));
       const words = stuck.length === 1 ? `stuck: ${gone} are gone` : `${listWords(stuck)} are stuck`;

@@ -27,7 +27,7 @@ const HEAD_Y = [16, 36]; // the two lines of the heads
 const rowY = (i) => 72 + 36 * i;
 // The numbers top to bottom, by hand, so that no two lines cross; each factor stands level with the number it pays
 // for, so every payment is drawn straight across.
-const MEMBER_ORDER = [19, 15, 9, 21, 14, 18, 12, 20, 16];
+const MEMBER_ORDER = [16, 20, 12, 18, 14, 21, 9, 15, 19];
 // The steps the text walks through first, each a front move: 19 with 1, 9 with 3, then 15 and 21.
 const TEXT_RUN = [19, 9, 15, 21];
 const KIND = { front: 'one way to pay', back: 'one taker' };

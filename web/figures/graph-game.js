@@ -4,12 +4,12 @@
 // js/trays.js.
 //
 // The layout is the wiki's walkthrough of game 21: one column a layer, Ω(x), the highest layer at the left and layer
-// 0, the number 1, at the right; in each column the numbers ascend from the top.  The rules, the same for every n and
-// width:
+// 0, the number 1, at the right; in each column the numbers ascend from the bottom.  The rules, the same for every n
+// and width:
 // * the columns stand evenly spaced, at the pitch that fits the deepest layer of the largest game across the width,
 //   so the spacing does not change with n, and the graph is centered;
-// * the rows are evenly spaced and top-aligned, so the small numbers, which most lines lead to, sit level along the
-//   top, and the lines mostly run level or rise to the right;
+// * the rows are evenly spaced and bottom-aligned, so the small numbers, which most lines lead to, sit level along the
+//   bottom, and the lines mostly run level or fall to the right;
 // * 1 stands level with the middle of the primes, which all lead to it;
 // * a line is straight, from a number to its maximal factor in the next column, and lies under the tokens, so that
 //   no line crosses a number;
@@ -57,17 +57,18 @@ function layout(n, width, deepest) {
   const top = half + 8;
   const columns = [];
   for (let x = 1; x <= n; x++) (columns[M.omega(x)] ??= []).push(x);
+  const rows = Math.max(...columns.map((c) => c.length));
+  const bottom = top + row * (rows - 1);
   const last = columns.length - 1;
   const left = width / 2 - (pitch * last) / 2;
   const at = new Map();
   columns.forEach((column, k) => {
-    column.forEach((x, i) => at.set(x, { x: left + pitch * (last - k), y: top + row * i }));
+    column.forEach((x, i) => at.set(x, { x: left + pitch * (last - k), y: bottom - row * i }));
   });
-  if (columns[1]) at.get(1).y = top + (row * (columns[1].length - 1)) / 2;
-  const rows = Math.max(...columns.map((c) => c.length));
-  const height = top + row * (rows - 1) + (SIZE.circle + SIZE.depth) * scale + 10;
-  // The numbers in reading order, a column at a time from the left, for the tab order.
-  const order = columns.slice().reverse().flat();
+  if (columns[1]) at.get(1).y = bottom - (row * (columns[1].length - 1)) / 2;
+  const height = bottom + (SIZE.circle + SIZE.depth) * scale + 10;
+  // The numbers in reading order, a column at a time from the left and from the top down, for the tab order.
+  const order = columns.slice().reverse().flatMap((column) => column.slice().reverse());
   return { at, scale, width, height, order };
 }
 

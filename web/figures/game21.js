@@ -44,25 +44,26 @@ const stopLabel = (name) => (name === 'layered' ? 'layers' : name);
 // The pot: the numbers in order, seven a row.
 const potAt = (m) => [CENTER_X + (((m - 1) % 7) - 3) * 58, 112 + Math.floor((m - 1) / 7) * 56];
 
-// The layers: one column a layer, layer 0 at the right and layer 4 at the left, each ascending from the top and
-// centered, so that once the columns are cut at n/2 the factors stand above the line and the sources, the top half,
+// The layers: one column a layer, layer 0 at the right and layer 4 at the left, each ascending from the bottom and
+// centered, so that once the columns are cut at n/2 the sources, the top half, stand above the line and the factors
 // below it.
 const COLUMN_X = [516, 397, 278, 159, 40];
 const MID_Y = 154; // the middle of the columns, and the line at n/2 once they are cut
 const STEP = 34;
-const SPLIT = 22; // once cut, how far the factors stand above the line and the sources below it
+const SPLIT = 22; // once cut, how far the sources stand above the line and the factors below it
 
-// The frames, side by side.  Rows are 48 apart, and each factor stands level with the factor it divides (8 with 4,
-// 4 with 2, 9 with 3, 7 with 1), so that a candidate's dotted link and its hop run straight across, between the
-// sources they pass.
+// The frames, side by side in boxes of one size, the larger numbers higher where the rule below allows.  Rows are 48
+// apart, and a factor stands level with the factor it divides in the frame in front (4 with 2, 9 with 3, 7 with 1), so
+// that a candidate's dotted link and its hop run straight across, between the sources they pass.  The closed frame of
+// 16 and 8, which no link leaves, stands at the middle of its box.
 const row = (r) => 58 + 48 * r;
 const FRAME_AT = {
-  16: [33, row(1)], 8: [97, row(1)],
-  20: [175, row(0.5)], 12: [175, row(1.5)], 18: [175, row(2.5)],
-  10: [239, row(0)], 4: [239, row(1)], 6: [239, row(2)], 9: [239, row(3)],
-  14: [317, row(1.5)], 21: [317, row(2.5)], 15: [317, row(3.5)],
-  2: [381, row(1)], 7: [381, row(2)], 3: [381, row(3)], 5: [381, row(4)],
-  11: [459, row(0.5)], 13: [459, row(1.5)], 17: [459, row(2.5)], 19: [459, row(3.5)],
+  16: [33, row(2)], 8: [97, row(2)],
+  20: [175, row(3.5)], 12: [175, row(2.5)], 18: [175, row(1.5)],
+  10: [239, row(4)], 4: [239, row(3)], 6: [239, row(2)], 9: [239, row(1)],
+  14: [317, row(2.5)], 21: [317, row(1.5)], 15: [317, row(0.5)],
+  2: [381, row(3)], 7: [381, row(2)], 3: [381, row(1)], 5: [381, row(0)],
+  11: [459, row(3.5)], 13: [459, row(2.5)], 17: [459, row(1.5)], 19: [459, row(0.5)],
   1: [523, row(2)],
 };
 const BOX_AT = {
@@ -73,7 +74,7 @@ const BOX_AT = {
 };
 // After the promotion the moves of frame 0 make room for 9, level with 3, which pays for it: a short hop
 // rightward from the factors of frame 1.
-const PROMOTED_AT = { 14: [317, row(1.2)], 21: [317, row(2.1)], 9: [317, row(3)], 15: [317, row(3.9)] };
+const PROMOTED_AT = { 14: [317, row(2.8)], 21: [317, row(1.9)], 9: [317, row(1)], 15: [317, row(0.1)] };
 const NAME_Y = 302; // the names of the layers and the frames, under them (a frame's name from the freedoms state on)
 // The lines of a frame's arithmetic, under its name: three, as two run into the next frame at a width of 390 px.
 const ARITH_LINES = 3;
@@ -159,8 +160,8 @@ const closedPayments = (f) => {
     .flatMap((fr) => fr.kept.map((m) => [m, payOf.get(m)]));
 };
 
-// Each layer's column, ascending from the top; once split at n/2, the factors stand above the line, the largest
-// nearest it, and the sources below it, the smallest nearest it.
+// Each layer's column, ascending from the bottom; once split at n/2, the sources stand above the line, the smallest
+// nearest it, and the factors below it, the largest nearest it.
 function layersAt(split) {
   const columns = [[], [], [], [], []];
   for (const x of numbers) columns[M.omega(x)].push(x);
@@ -168,13 +169,13 @@ function layersAt(split) {
   columns.forEach((column, layer) => {
     const x = COLUMN_X[layer];
     if (!split) {
-      column.forEach((n, j) => (at[n] = [x, MID_Y + (j - (column.length - 1) / 2) * STEP]));
+      column.forEach((n, j) => (at[n] = [x, MID_Y - (j - (column.length - 1) / 2) * STEP]));
       return;
     }
     const factors = column.filter((n) => !isSource(n));
     const srcs = column.filter(isSource);
-    factors.forEach((n, j) => (at[n] = [x, MID_Y - SPLIT - (factors.length - 1 - j) * STEP]));
-    srcs.forEach((n, j) => (at[n] = [x, MID_Y + SPLIT + j * STEP]));
+    factors.forEach((n, j) => (at[n] = [x, MID_Y + SPLIT + (factors.length - 1 - j) * STEP]));
+    srcs.forEach((n, j) => (at[n] = [x, MID_Y - SPLIT - j * STEP]));
   });
   return at;
 }
@@ -220,16 +221,17 @@ function buildStates(f) {
   for (let k = 0; k <= 4; k++) layers[`layer${k}`] = { x: COLUMN_X[k], y: NAME_Y, at: [0.5, 1] };
   S.layers = layers;
 
-  // Sources and factors: each column cut at n/2, the factors above the line and the sources below it.  The line is
-  // named at its left end, below it; the words for its two sides sit clear of the one line that crosses there.
+  // Sources and factors: each column cut at n/2, the sources above the line and the factors below it.  The line is
+  // named at its left end, below it, under 16; the words for its two sides sit clear of the one line that crosses
+  // there.
   const split = { _duration: 1100 };
   for (const x of numbers) split[x] = { ...pos(splitAt[x]), shape: shapeOf(x), halo: isSource(x) ? 1 : 0 };
   for (const [a, b] of allEdges) split[`e${a}-${b}`] = { faded: isSource(a) ? 0 : 0.6 };
   for (let k = 0; k <= 4; k++) split[`layer${k}`] = { x: COLUMN_X[k], y: NAME_Y };
   split.rule = {};
-  split.half = { x: 2, y: MID_Y - 6 };
-  split.sourcesName = { x: 100, y: MID_Y + 38 };
-  split.factorsName = { x: 100, y: MID_Y - 34 };
+  split.half = { x: 2, y: MID_Y + 19 };
+  split.sourcesName = { x: 100, y: MID_Y - 34 };
+  split.factorsName = { x: 100, y: MID_Y + 38 };
   S.sources = split;
 
   // Descending greedy, from 21 down, where the sources stand: each kept (gray) or rejected (hollow, dashed) in its
@@ -409,7 +411,7 @@ function captions(f) {
   return {
     pot: `The pot holds the numbers 1 to ${N}.`,
     layers: 'Each number stands in the column of its layer, its count of prime factors, with layer 1 at the right. A line runs rightward from each number to each of its maximal factors: 12 to 6 and 4.',
-    sources: `The line cuts each column at n/2. Below it are the sources, ${M.sources(N)[0]} to ${N}: they divide no other number on the board, so no move takes them as tax. Above it are the factors, 1 to ${half}.`,
+    sources: `The line cuts each column at n/2. Above it are the sources, ${M.sources(N)[0]} to ${N}: they divide no other number on the board, so no move takes them as tax. Below it are the factors, 1 to ${half}.`,
     greedy: `From ${N} down, descending greedy keeps ${listWords(f.keptDown)}, each still playable with those it kept before. It rejects ${listWords(f.rejectedDown)}: their one maximal factor, 1, already pays for ${f1.kept[0]}. U* scores ${f.inTheBag}.`,
     layered: 'Game 21 as descending greedy left it, in its layers, with a line cutting them at n/2: the sources it kept in gray, those it ' +
       'rejected dashed. The lines of each source run to factors one layer down, in the column to its right.',
