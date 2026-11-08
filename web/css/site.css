@@ -855,10 +855,13 @@ dl.glossary dt:first-child, dl.glossary dt:first-child + dd { border-top: 0; }
 dl.standings-list { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0.55rem 18px; align-items: center; margin: 1rem 0 1.4rem; }
 dl.standings-list dt, dl.standings-list dd { margin: 0; }
 
-table.symbols { border-collapse: collapse; margin: 1rem 0 1.4rem; font-size: 0.92rem; }
-table.symbols th, table.symbols td { padding: 0.4rem 1.2rem 0.4rem 0; text-align: left; vertical-align: baseline; border-bottom: 1px solid var(--hair); }
-table.symbols th { font-size: 0.74rem; font-weight: 600; color: var(--ink-3); }
-table.symbols td:first-child { font-weight: 700; white-space: nowrap; }
+/* A table in the text: the symbols of the notation page, and counts such as chapter 2's, whose numbers align right. */
+table.symbols, table.counts { border-collapse: collapse; margin: 1rem 0 1.4rem; font-size: 0.92rem; }
+:is(table.symbols, table.counts) :is(th, td) { padding: 0.4rem 1.2rem 0.4rem 0; text-align: left; vertical-align: baseline; border-bottom: 1px solid var(--hair); }
+:is(table.symbols, table.counts) th { font-size: 0.74rem; font-weight: 600; color: var(--ink-3); }
+:is(table.symbols, table.counts) td:first-child { font-weight: 700; white-space: nowrap; }
+table.counts :is(th, td) + :is(th, td) { text-align: right; padding-left: 1.2rem; }
+table.counts :is(th, td):last-child { padding-right: 0; }
 
 @media (max-width: 560px) {
   dl.glossary { grid-template-columns: minmax(0, 1fr); }

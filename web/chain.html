@@ -328,6 +328,10 @@
     <p>Each game we settle without a search of its own rests on an earlier game, most often game n − 1, so the chain has
     to find its games in order, from game 1 up: the chain reaches game 5,000 by walking there.</p>
   </div>
+  <p>The chart has vertical stripes.  A column holds the games that end in the same two digits, and the stripes are
+  most prominent when 20 divides n. In the last column, games 100, 200, 300 and on, every one of the
+  <span data-stripes="col100">50</span> games needed a search, and so did all <span data-stripes="col20">51</span> in
+  the column of game 20.  Why should the last two digits of n matter to a search?</p>
 </section>
 
 <section class="chapter" id="cofactor" data-toc="cofactor" aria-labelledby="h-cofactor">
@@ -361,6 +365,33 @@
   from game 188 on, and <span data-cof="share">86%</span> of the ones we settled with no search.  Of the
   <span data-cof="other">2,143</span> games with any other cofactor, <span data-cof="otherSearched">1,691</span> needed
   a search.</p>
+  <div class="para">
+    <aside class="note tech" aria-label="The cofactor and the layers">
+      <div class="note-head"><span class="note-name">The cofactor and the layers</span></div>
+      <p>The <a class="gloss" href="glossary.html#layer">layer</a> of n is one more than the number of prime factors of
+      its cofactor.  With a cofactor of 1 or a prime, n lies in layer 1 or 2, and from game 188 on the prime formula or
+      the layer-2 corollary settles the game with no search.  With a cofactor of three or more prime factors, n lies in
+      layer 4 or higher, among frames with <a class="gloss" href="glossary.html#freedom">freedoms</a>, where its arrival
+      can change the search problem, and usually does.  That last part is measured, not proved.</p>
+    </aside>
+    <p>Count the prime factors of the cofactor, with repeats: the more there are, the likelier a search.</p>
+    <table class="counts">
+      <thead><tr><th>prime factors of the cofactor</th><th>games from 188 on</th><th>needed a search</th></tr></thead>
+      <tbody>
+        <tr><td>0 (n is prime)</td><td data-stripes="games0">635</td><td data-stripes="searched0">none</td></tr>
+        <tr><td>1</td><td data-stripes="games1">1,316</td><td data-stripes="searched1">none</td></tr>
+        <tr><td>2</td><td data-stripes="games2">1,244</td><td data-stripes="searched2">31%</td></tr>
+        <tr><td>3</td><td data-stripes="games3">824</td><td data-stripes="searched3">63%</td></tr>
+        <tr><td>4 or more</td><td data-stripes="games4">854</td><td data-stripes="searched4">92%</td></tr>
+      </tbody>
+    </table>
+    <p>This is what draws the stripes.  The cofactor holds every prime factor of n but its largest.  Past game 20, a
+    multiple of 20 has at least four prime factors, 2, 2, 5 and one more, so its cofactor has at least three and is
+    never 1, a prime, twice a prime or 9: of the chain's <span data-stripes="twenty">253</span> multiples of 20,
+    <span data-stripes="twentySearched">248</span> needed a search, and the other
+    <span data-stripes="twentyCeiling">5</span> reached their ceiling.  Past game 100, a multiple of 100 has at least
+    five prime factors, so its cofactor has at least four.</p>
+  </div>
   <p>A game that needs a search still gets help from game n − 1: its search starts near the best, and the search can
   stop if it reaches the ceiling (<a href="search.html#head-start">chapter 5</a>).</p>
 </section>
@@ -380,7 +411,7 @@ import { mountFits, mountPrime } from './figures/fits.js';
 import { mountSlip } from './figures/slip.js';
 import { mountLinks } from './figures/links.js';
 import { mountSettled } from './figures/settled.js';
-import { mountCofactor } from './figures/cofactor.js';
+import { mountCofactor, stripeFacts } from './figures/cofactor.js';
 
 initEssay();
 const [small, games] = await Promise.all([loadSmall(), loadGames()]);
@@ -419,6 +450,18 @@ const cofFacts = {
   otherSearched: fmt(cof.otherSearched),
 };
 fill('cof', (key) => cofFacts[key]);
+
+// The stripes of the chain chart.
+const { col100, col20, twenty, byCount } = stripeFacts(games);
+const stripeText = {
+  col100: fmt(col100.games), col20: fmt(col20.games),
+  twenty: fmt(twenty.games), twentySearched: fmt(twenty.searched), twentyCeiling: fmt(twenty.ceiling),
+  ...Object.fromEntries(byCount.flatMap((g, k) => [
+    [`games${k}`, fmt(g.games)],
+    [`searched${k}`, g.searched === 0 ? 'none' : pct(g.searched / g.games, 0)],
+  ])),
+};
+fill('stripes', (key) => stripeText[key]);
 fillOneSearch(games);
 </script>
 </body>

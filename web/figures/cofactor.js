@@ -5,7 +5,7 @@
 // From 188 on, layer 2 of every board is one closed frame (the square theorem, docs/theory/frame-model.md), which is
 // the rule's hypothesis (docs/theory/arrival.md, "The cofactor rule").
 
-import { primeFactors } from '../js/model.js';
+import { omega, primeFactors } from '../js/model.js';
 import { el, fmt } from '../js/vocab.js';
 import { freshSVG, pct, responsive, tableView, tooltip } from '../js/chart.js';
 import { NO_SEARCH, RULE, RULES, isPrime, ruleOf } from '../js/proof.js';
@@ -52,6 +52,56 @@ export function cofactorCounts(games) {
     from: FROM,
     to: games.lastN,
   };
+}
+
+/** The stripes of the chain chart, counted by the chart's own rules (ruleOf), and the claims the page makes of them,
+ *  checked here: every game with n % 100 === 0 or n % 100 === 20 was searched; no game from FROM on whose cofactor has
+ *  fewer than two prime factors was searched, and the share searched rises from two to three to four or more; every
+ *  multiple of 20 that was not searched reached its ceiling; the cofactor of a multiple of 20 above 20 has at least
+ *  three prime factors, and that of a multiple of 100 above 100 at least four.  Counts are of prime factors with
+ *  multiplicity.  col100 and col20 hold the games with n % 100 === 0 and n % 100 === 20; twenty, those with
+ *  n % 20 === 0, with how many reached their ceiling.  byCount groups the games from FROM on by omega(cofactor(n)),
+ *  4 standing for four or more.  Each group holds its games and how many were searched. */
+export function stripeFacts(games) {
+  const c = games.columns;
+  const group = () => ({ games: 0, searched: 0 });
+  const col100 = group();
+  const col20 = group();
+  const twenty = { ...group(), ceiling: 0 };
+  const byCount = [0, 1, 2, 3, 4].map(group);
+  let unexplained = 0;
+  let twentyMin = Infinity;
+  let hundredMin = Infinity;
+  for (let i = 0; i < c.n.length; i++) {
+    const n = c.n[i];
+    const rule = ruleOf(c, i);
+    const searched = rule === 'search' ? 1 : 0;
+    const add = (g) => { g.games++; g.searched += searched; };
+    const count = omega(cofactor(n));
+    if (n % 100 === 0) add(col100);
+    if (n % 100 === 20) add(col20);
+    if (n % 20 === 0) {
+      add(twenty);
+      if (rule === 'ceiling') twenty.ceiling++;
+      else if (!searched) unexplained++;
+      if (n > 20) twentyMin = Math.min(twentyMin, count);
+    }
+    if (n >= FROM) add(byCount[Math.min(count, 4)]);
+    if (n % 100 === 0 && n > 100) hundredMin = Math.min(hundredMin, count);
+  }
+  const share = (k) => byCount[k].searched / byCount[k].games;
+  const claims = [
+    [col100.searched === col100.games, 'a game with n % 100 = 0 was not searched'],
+    [col20.searched === col20.games, 'a game with n % 100 = 20 was not searched'],
+    [byCount[0].searched === 0 && byCount[1].searched === 0,
+      'a game whose cofactor has fewer than two prime factors was searched'],
+    [share(2) < share(3) && share(3) < share(4), 'the share searched does not rise with the cofactor\'s prime factors'],
+    [unexplained === 0, 'a multiple of 20 was neither searched nor at its ceiling'],
+    [twentyMin >= 3, 'a multiple of 20 above 20 has a cofactor of fewer than three prime factors'],
+    [hundredMin >= 4, 'a multiple of 100 above 100 has a cofactor of fewer than four prime factors'],
+  ];
+  for (const [holds, claim] of claims) if (!holds) throw new Error(`the stripes: ${claim}`);
+  return { col100, col20, twenty, byCount };
 }
 
 export function mountCofactor(host, { games }) {
