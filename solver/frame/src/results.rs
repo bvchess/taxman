@@ -948,7 +948,7 @@ impl ResultsFile {
         let (mut file, text) = open_locked(path)?;
         let contents = read_results(&text, optimal, threads).map_err(|e| format!("{}: {e}", path.display()))?;
         let kept = Kept { lines: contents.lines, valid_len: contents.valid_len, torn: contents.torn };
-        mend(&mut file, &text, kept).map_err(|e| format!("{}: {e}", path.display()))?;
+        mend(&mut file, &text, kept, 0).map_err(|e| format!("{}: {e}", path.display()))?;
         Ok(ResultsFile { path: path.to_owned(), file, contents })
     }
 
@@ -1061,11 +1061,12 @@ pub(crate) fn open_locked(path: &Path) -> Result<(File, String), String> {
     Ok((file, text))
 }
 
-/// Makes the file that [`open_locked`] opened, whose text was `text` and whose lines are kept as far as `kept` says, ready
-/// for the next line: a torn last line is cut off, and a last line kept that has no newline gets one.
-pub(crate) fn mend(file: &mut File, text: &str, kept: Kept) -> std::io::Result<()> {
+/// Makes the file that [`open_locked`] opened, whose text from the byte `start` on (0 for the whole file) was `text`
+/// and whose lines are kept as far as `kept` says, ready for the next line: a torn last line is cut off, and a last line
+/// kept that has no newline gets one.
+pub(crate) fn mend(file: &mut File, text: &str, kept: Kept, start: u64) -> std::io::Result<()> {
     if kept.torn {
-        file.set_len(kept.valid_len as u64)?;
+        file.set_len(start + kept.valid_len as u64)?;
     }
     if kept.valid_len > 0 && !text[..kept.valid_len].ends_with('\n') {
         file.write_all(b"\n")?;
@@ -1385,19 +1386,19 @@ mod tests {
         ])
     }
 
-    /// A line's n is checked against `MAX_N`, the largest board the solver supports (8191): the incomplete line of
-    /// a search stopped by a limit is read for the first board past 4095 and for the last, and is refused, naming
-    /// the range, for board 0 and for the first board past the last.
+    /// A line's n is checked against `MAX_N`, the largest board the solver supports (10239): the incomplete line of
+    /// a search stopped by a limit is read for the first boards past 4095 and past 8191 and for the last, and is
+    /// refused, naming the range, for board 0 and for the first board past the last.
     #[test]
     fn a_lines_board_size_must_be_a_board_the_solver_supports() {
-        assert_eq!(MAX_N, 8191);
-        for n in [1, 4095, 4096, 8191] {
+        assert_eq!(MAX_N, 10239);
+        for n in [1, 4095, 4096, 8191, 8192, 10239] {
             let contents = read_results(&text(&[incomplete_line(n)]), Optimal::built_in(), 1).unwrap();
             assert_eq!((contents.runs.get(&n), contents.incomplete_lines), (Some(&1), 1), "n={n}");
         }
-        for n in [0, 8192] {
+        for n in [0, 10240] {
             let err = read_results(&text(&[incomplete_line(n)]), Optimal::built_in(), 1).unwrap_err();
-            assert_eq!(err, format!("line 1: n={n} is not a game from 1 to 8191"));
+            assert_eq!(err, format!("line 1: n={n} is not a game from 1 to 10239"));
         }
     }
 

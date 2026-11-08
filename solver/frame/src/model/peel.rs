@@ -39,22 +39,23 @@ use super::FactorProvider;
 use crate::bits::Bits;
 
 /// A set of pending numbers that pops its largest member in constant time: the words of a bitset plus summary words,
-/// bit `i % 64` of summary word `i / 64` set when word `i` is non-empty.  Two summary words, so `W <= 128`, boards up
-/// to 8191; at `W <= 64` only the first is ever used, which the compiler knows (`TOP`).
+/// bit `i % 64` of summary word `i / 64` set when word `i` is non-empty.  Three summary words, so `W <= 192`, which
+/// covers the widest set (160 words, boards up to 10239); at `W <= 64` only the first is ever used, and at `W <= 128`
+/// only the first two, which the compiler knows (`TOP`).
 pub(super) struct Worklist<const W: usize> {
     words: [u64; W],
-    summary: [u64; 2],
+    summary: [u64; 3],
 }
 
 impl<const W: usize> Worklist<W> {
-    const FITS: () = assert!(W <= 128, "a worklist summarizes at most 128 words");
+    const FITS: () = assert!(W <= 192, "a worklist summarizes at most 192 words");
     /// The last summary word in use.
     const TOP: usize = (W - 1) / 64;
 
     #[inline]
     pub(super) fn new() -> Self {
         let () = Self::FITS;
-        Worklist { words: [0; W], summary: [0; 2] }
+        Worklist { words: [0; W], summary: [0; 3] }
     }
 
     #[inline]

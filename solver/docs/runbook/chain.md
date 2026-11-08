@@ -74,7 +74,7 @@ run](https://github.com/bvchess/taxman-notebook/blob/main/scaling-to-192-threads
 
   ```
   mkdir -p ~/taxman-work/results && gzip -dc results/optimal.jsonl.gz > ~/taxman-work/results/strict.jsonl
-  solver/tools/cloud/chain.sh 8191                    # skips the games it holds and solves the next on
+  solver/tools/cloud/chain.sh 10239                   # skips the games it holds and solves the next on
   ```
 
   `chain.sh` checks the file when it opens it.  The file holds no incomplete line, and its lines keep the build that
@@ -97,10 +97,11 @@ run](https://github.com/bvchess/taxman-notebook/blob/main/scaling-to-192-threads
   run the old build.  The width of the sets is part of that: a build that gives a game another width refuses its old
   checkpoint.  Do not `git pull` in the middle of a long game without a reason.  Changing only code generation (PGO,
   `target-cpu`) is harmless.
-* **Past 4095.**  The solver supports games up to n = 8191 (`taxman::solver::MAX_N`), those from 4096 with sets of 128
-  words ([the entry on boards past
-  4095](https://github.com/bvchess/taxman-notebook/blob/main/boards-past-4095-2026-10/README.md)).  The solver refuses a
-  game past 8191 ("beyond the largest supported board"), which ends the script with an error.
+* **Past 4095.**  The solver supports games up to n = 10239 (`taxman::solver::MAX_N`), those from 4096 to 8191 with
+  sets of 128 words ([the entry on boards past
+  4095](https://github.com/bvchess/taxman-notebook/blob/main/boards-past-4095-2026-10/README.md)) and those from 8192
+  with sets of 160.  The solver refuses a game past 10239 ("beyond the largest supported board"), which ends the script
+  with an error.
 
 ## The machine's folders
 

@@ -504,7 +504,8 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     /// claim.  The sources are visited in descending order and the pass restarts after the first claim, since
     /// a claim can make a larger source eligible.  These are the orders of the claims of frame h in
     /// docs/theory/frame-model.md, so that the frames setup builds are the root problem Π_n of the theory
-    /// (`tests/canonical_root.rs`, and check I of the census `examples/structure.rs` at commit 3ca11bf).
+    /// (`tests/canonical_root.rs`, check I of the census `examples/structure.rs` at commit 3ca11bf to 8191, and the
+    /// census of the boards past 8191 in the tests of `frames`).
     ///
     /// The questions about a factor's use (`factor_can_go_forward` and `has_outside_move_using`) are about
     /// other frames and about this frame's sources and factors as they were when `unzip` began, none of which a

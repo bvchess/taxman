@@ -112,7 +112,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-/// The largest board the set widths cover: 8191, at the widest of [`crate::bits::WIDTHS`] (128 words).
+/// The largest board the set widths cover: 10239, at the widest of [`crate::bits::WIDTHS`] (160 words).
 pub const MAX_N: u32 = 64 * crate::bits::WIDTHS[crate::bits::WIDTHS.len() - 1] as u32 - 1;
 
 // ---------------------------------------------------------------------------------------------------------
@@ -1668,6 +1668,13 @@ pub struct RangeSummary {
     /// included (none in the proven mode).
     pub repaired: usize,
     pub repair_time: Duration,
+    /// Lines that the unsound mode appended to its best-known file (none in the proven mode): those of its file
+    /// offered when the run opened it, the games and repairs it recorded, and the repairs of the best-known file's own
+    /// lines.
+    pub best_known_added: usize,
+    /// Of those, the repairs of the best-known file's lines of the games below the run's first, which the run has no
+    /// line of.
+    pub best_known_repaired: usize,
     /// The game whose search stopped at a limit, or at a signal; the range ends there.
     pub stopped_at: Option<u32>,
 }

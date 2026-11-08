@@ -19,8 +19,8 @@
 //! * [`the_check_says_which_statement_fails`]: the check of the theorem accepts what it allows and fails each of its
 //!   statements in turn on small sets made to break it.
 //! * [`layer_2_greedy_is_what_setup_keeps`]: the numbers of layer 2 above n/2 in the game with no promotions
-//!   (`Board::plain`) are Kruskal's, on every board to 400 and on a sample of the boards to 8191 (an ignored test
-//!   takes every 25th).
+//!   (`Board::plain`) are Kruskal's, on every board to 400 and on a sample of the boards to 10239, the largest the
+//!   solver supports (an ignored test takes every 25th).
 //! * [`theorem_b_holds_for_every_recorded_game`]: the moves of the committed chain `results/optimal.jsonl.gz` and of
 //!   the chain 2176 to 2276 of the Graviton calibration, another run of moves for the games the committed chain has.
 //!   The frame solver's moves play numbers of layer 2 up to n/2 only on small boards, where the frames of layer 2 have
@@ -45,6 +45,7 @@ use taxman::brute;
 use taxman::game::Optimal;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
+use taxman::solver::MAX_N;
 use taxman::with_width;
 
 // ---------------------------------------------------------------------------------------------------------
@@ -270,8 +271,9 @@ fn check_setup_keeps(boards: &[u32]) {
 }
 
 /// The numbers of layer 2 above n/2 that setup keeps are Kruskal's, on every board to 400, every 25th to 2200, every
-/// 100th to 4000, every 500th to 8000, and the boards 4095, 4096 (the last at a width of 64 words and the first at 128)
-/// and 8191.  A board costs about as much as n² (0.2 s at 8000), so the boards past 2200 are thinned.
+/// 100th to 4000, every 500th to 10000, and the boards 4095, 4096 (the last at a width of 64 words and the first at
+/// 128), 8191, 8192 (the last at 128 and the first at 160) and 10239, the largest.  A board costs about as much as n²
+/// (0.2 s at 8000), so the boards past 2200 are thinned.
 #[test]
 #[cfg_attr(
     debug_assertions,
@@ -283,9 +285,9 @@ fn layer_2_greedy_is_what_setup_keeps() {
             || (n <= 2200 && n.is_multiple_of(25))
             || (n <= 4000 && n.is_multiple_of(100))
             || n.is_multiple_of(500)
-            || [4095, 4096, 8191].contains(&n)
+            || [4095, 4096, 8191, 8192, MAX_N].contains(&n)
     };
-    let boards: Vec<u32> = (2..=8191).filter(|&n| sampled(n)).collect();
+    let boards: Vec<u32> = (2..=MAX_N).filter(|&n| sampled(n)).collect();
     check_setup_keeps(&boards);
 }
 
@@ -296,11 +298,12 @@ fn layer_2_greedy_is_what_setup_keeps_on_the_boards_to_400() {
     check_setup_keeps(&boards);
 }
 
-/// The same on every board to 400 and every 25th board to 8191.
+/// The same on every board to 400, every 25th board to 10239, and the boards 8191 and 10239.
 #[test]
-#[ignore = "takes twenty seconds; a thinner choice of boards is in the default test"]
+#[ignore = "takes most of a minute; a thinner choice of boards is in the default test"]
 fn layer_2_greedy_is_what_setup_keeps_on_every_25th_board() {
-    let boards: Vec<u32> = (2..=8191u32).filter(|&n| n <= 400 || n.is_multiple_of(25) || n == 8191).collect();
+    let boards: Vec<u32> =
+        (2..=MAX_N).filter(|&n| n <= 400 || n.is_multiple_of(25) || n == 8191 || n == MAX_N).collect();
     check_setup_keeps(&boards);
 }
 

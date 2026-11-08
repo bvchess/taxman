@@ -84,7 +84,7 @@ changed"](https://github.com/bvchess/taxman-notebook/blob/main/terms-changed.md)
   results lines and a tactic call `cap`: the proof kind `cap`, the fields `reached_cap` and `setup.cap`, the tactic
   `prev_cap`.
 * **the run's ceiling**: in the unsound mode, n + score(n − 1) of the moves a game starts from, which is the ceiling if
-  those moves are optimal; a searched game stops there ([the unsound mode](../solver/docs/unsound.md#the-runs-ceiling)).
+  those moves are optimal; a searched game stops there ([the unsound mode](../solver/docs/unsound/play.md#the-runs-ceiling)).
 * **prime formula**: for a prime n, opt(n) = n + opt(n − 1) − q, with q the largest prime below n.  The optimal game
   of n is that of n − 1 with its first move, q, replaced by n.  For game 7: 7 + 15 − 5 = 17.  The tactic is
   `prime_shortcut`, the proof kind `prime_formula`, and the theory proves the formula ([the prime formula
@@ -371,14 +371,14 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **unsound line**: the line that `taxman solve --unsound` writes for a game: legal moves and their score, a lower bound
   on opt(n) that nothing proves, found by the large neighborhood search of the finder (above), with a level of
   **effort** that buys a better chance of opt(n) with more time.  Its key `"unsound"` keeps it out of every reader of
-  results lines ([the unsound mode, "An unsound line"](../solver/docs/unsound.md#an-unsound-line)).
+  results lines ([the unsound mode, "An unsound line"](../solver/docs/unsound/line.md#an-unsound-line)).
 * **repair**: in the unsound mode, the replacement of a game's line by what survives in it of a line above it, when
   that scores more and so proves the line short; the run walks down from each line it records, and appends each line it
-  replaces ([the unsound mode, "The repair"](../solver/docs/unsound.md#the-repair)).
+  replaces ([the unsound mode, "The repair"](../solver/docs/unsound/shortfalls.md#the-repair)).
 * **growth** (of the gap): in the unsound mode, a line's gap less the gap of the moves for n − 1 that the game starts
   from, a line's gap being the game's bound (`in_the_bag` plus the GF(2) bound of the root, which is the parity bound)
   less its score.  It is about 0 where a game is as close to its bound as the game below it, and jumps where a streak
-  of short games begins ([the unsound mode, "The bound and the gap"](../solver/docs/unsound.md#the-bound-and-the-gap)).
+  of short games begins ([the unsound mode, "The bound and the gap"](../solver/docs/unsound/shortfalls.md#the-bound-and-the-gap)).
 
 ## Programs, files and documents
 

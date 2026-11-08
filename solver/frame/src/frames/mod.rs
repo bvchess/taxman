@@ -69,8 +69,9 @@
 //!   its *claimed* factor leaves the frame's *remaining* sources and factors, which are what the frame shows the
 //!   search.  Every such pair is a move that any moves playing the frame's sources must make, as the frame takes
 //!   them with whatever is promoted into it (X5); a pair of the second kind needs that no promotion
-//!   candidate has the factor among its maximal factors, which the candidate filter makes so (the census
-//!   `examples/structure.rs` at commit 3ca11bf checked it on every board).  (Earlier notes call these moves "forced";
+//!   candidate has the factor among its maximal factors, which the candidate filter makes so (checked on every board
+//!   the solver supports: to 8191 by the census `examples/structure.rs` at commit 3ca11bf, and past it by the census
+//!   in this module's tests, `census_of_the_boards_past_8191`).  (Earlier notes call these moves "forced";
 //!   this code keeps that word out of the frames, since the search has forced members of its own that are unrelated.)
 //! * **remove_impossible** drops, greedily from the largest source down, every source that cannot be played
 //!   together with the sources already kept.  They are the frame's *impossible* moves, which no moves of the model
@@ -108,14 +109,14 @@
 //! frame model's exactness needs (the one-frame-forward lemma, X3).  Clean numbering is F6 of
 //! docs/theory/frame-model.md.  The Java numbered the frames breadth first from the front instead (number 0 to every
 //! frame with freedoms with no frame with freedoms directly in front of it, `k + 1` to every one directly behind a
-//! frame numbered `k` and not yet numbered); on every board up to 8191, the largest the solver supports, the two
-//! numberings are the same (the census `examples/structure.rs` at commit 3ca11bf, and this module's tests), so the
-//! frames, candidates and searches are those of the Java's numbering.  [`numbering`] exposes the numbers of the
-//! board's frames, for this module's tests.
+//! frame numbered `k` and not yet numbered); on every board the solver supports, up to 10239, the two numberings are
+//! the same (to 8191 the census `examples/structure.rs` at commit 3ca11bf, past it the census of this module's tests,
+//! `census_of_the_boards_past_8191`, checked in 2026-11), so the frames, candidates and searches are those of the
+//! Java's numbering.  [`numbering`] exposes the numbers of the board's frames, for this module's tests.
 //!
 //! Every layer between `ℓ₀` and the highest layer with freedoms has a frame with freedoms, so every number from 0 to the
-//! last has a frame: on every board to 8191, the largest the solver supports (the census `examples/structure.rs` at
-//! commit 3ca11bf), and the tests below check the boards to 400 and a sample to 8191.
+//! last has a frame: on every board the solver supports, up to 10239 (the same two censuses), and the tests below check
+//! the boards to 400 and a sample to 10239.
 //!
 //! # Why frames are merged
 //!
@@ -158,8 +159,8 @@
 //! model makes of its frames are Π_n's.  The order of every loop is part of that, since which source is declared
 //! impossible, or which pair is claimed first, can depend on the order.  [`crate::root_problem`] builds Π_n from the
 //! theory's definitions with no code of this module, and setup is compared with it on every board to 1000
-//! (`tests/canonical_root.rs`) and on every board to 8191 (check I of the census `examples/structure.rs` at commit
-//! 3ca11bf).
+//! (`tests/canonical_root.rs`) and on every other board the solver supports, up to 10239 (to 8191 check I of the
+//! census `examples/structure.rs` at commit 3ca11bf, past it the census of this module's tests).
 //!
 //! The golden tests (`tests/golden_frames.rs`) compare every field of every frame as setup forms it of the 318 boards
 //! in `testdata/golden` (up to n = 760), and the frames before and after numbering and merging of the eleven wide
@@ -183,6 +184,7 @@ pub use board_frames::{BoardFrames, ClaimKind, Frame};
 use crate::bits::Bits;
 use crate::model;
 use crate::numtheory::Tables;
+use crate::root_problem::RootProblem;
 
 /// The frames of a board as the search takes them: those with freedoms, numbered by layer and merged, and the
 /// numbers that could be promoted.
@@ -258,6 +260,22 @@ pub fn build_frames<const W: usize>(t: &Tables) -> SearchFrames<W> {
 pub fn numbering<const W: usize>(t: &Tables) -> (Numbering<W>, SearchFrames<W>) {
     let (frames, listed) = build(t, true);
     (listed.expect("a numbering was asked for"), frames)
+}
+
+/// The root problem Π_n as setup and the model build it, from what [`numbering`] returns for the board and from the
+/// root that [`crate::model::FrameGraph::build`] makes of its frames: U\* (the sources of the board's frames as
+/// [`BoardFrames::new`] forms them), the candidates, and the moves and factors of each root frame.  For comparing with
+/// [`crate::root_problem::build`], which builds Π_n from the theory's definitions with no code of this module or of the
+/// model (`tests/canonical_root.rs`, and the census of the boards past 8191 in this module's tests).
+pub fn root_problem_of_setup<const W: usize>(
+    numbered: &Numbering<W>,
+    frames: &SearchFrames<W>,
+    root: &model::FrameSet<W>,
+) -> RootProblem {
+    let mut ustar: Vec<u32> = numbered.frames.iter().flat_map(|frame| frame.sources.to_vec()).collect();
+    ustar.sort_unstable();
+    let root_frames = root.frames().iter().map(|frame| (frame.moves.to_vec(), frame.factors.to_vec())).collect();
+    RootProblem { ustar, candidates: frames.candidates.to_vec(), frames: root_frames }
 }
 
 /// The work of [`build_frames`] and [`numbering`]; the numbering is made only when `record` is set, so the solver's
@@ -609,42 +627,154 @@ mod tests {
         (0..frames.len()).map(|i| (!frames[i].is_closed()).then(|| board_frames.frames_in_front(i))).collect()
     }
 
-    /// The numbering by layer of the board `1..=t.n` gives every frame the number that the breadth-first numbering
-    /// gives it, which is clean, and no number is without a frame.
-    fn check_the_numbering_by_layer_is_the_breadth_first_one<const W: usize>(t: &Tables) {
-        let board_frames = BoardFrames::<W>::new(t, Bits::EMPTY);
-        let frames = board_frames.frames();
-        let (breadth_first, in_front) = breadth_first_numbers(&board_frames);
-        let Numbers { groups, number, .. } = numbered_frames(&board_frames);
-        assert_eq!(number, breadth_first, "n={}", t.n);
-        assert!(groups.iter().all(|group| !group.is_empty()), "n={}: a number without a frame", t.n);
-        assert_eq!(unclean(&breadth_first, &in_front, |i| frames[i].is_closed()), None, "n={}", t.n);
+    /// The frames of a board with no promotions (`board_frames`) lie in layers (the frame lemma (F1)), the numbering
+    /// by layer gives every frame the number that the breadth-first numbering gives it, which is clean, and no number
+    /// is without a frame.
+    fn check_the_numbering_by_layer_is_the_breadth_first_one<const W: usize>(board_frames: &BoardFrames<W>) {
+        let (frames, n) = (board_frames.frames(), board_frames.tables().n);
+        let (breadth_first, in_front) = breadth_first_numbers(board_frames);
+        let Numbers { groups, number, layers } = numbered_frames(board_frames);
+        assert_eq!(lemma_omega_violation(board_frames, &layers), None, "n={n}");
+        assert_eq!(number, breadth_first, "n={n}");
+        assert!(groups.iter().all(|group| !group.is_empty()), "n={n}: a number without a frame");
+        assert_eq!(unclean(&breadth_first, &in_front, |i| frames[i].is_closed()), None, "n={n}");
+    }
+
+    /// [`check_the_numbering_by_layer_is_the_breadth_first_one`] on the board `1..=n`, at the width it dispatches to.
+    fn check_the_numbering_of_the_board(n: u32) {
+        let t = Tables::new(n);
+        crate::with_width!(n, W => {
+            check_the_numbering_by_layer_is_the_breadth_first_one(&BoardFrames::<W>::new(&t, Bits::EMPTY))
+        });
     }
 
     /// On the boards `1..=n` the frames are numbered by layer as they are numbered breadth first from the front (the
     /// Java's numbering, [`breadth_first_numbers`]), frame by frame, and that numbering is clean.  Every board to 400,
-    /// and a sample of the boards to 8191 at the width each dispatches to (`tests/wide.rs` builds the frames of
-    /// those): every 199th board from 401, the boards where the count of frames steps up (512, 1024, 2048, 4096) and
-    /// the largest.
+    /// and a sample of the boards past it at the width each dispatches to (`tests/wide.rs` builds the frames of
+    /// those): every 199th board from 401 to 8191, the boards where the count of frames steps up (512, 1024, 2048,
+    /// 4096 and 8192), the last board of 128 words and the largest.  (The census of the boards past 8191 takes every
+    /// one of them.)
     #[test]
     #[cfg_attr(
         debug_assertions,
         ignore = "long: the quick check is the_numbering_by_layer_is_the_breadth_first_one_on_a_sample"
     )]
     fn the_numbering_by_layer_is_the_breadth_first_one() {
-        let sample = (401..=8191).step_by(199).chain([512, 1024, 2048, 4096, 8191]);
-        for n in (2..=400).chain(sample) {
-            crate::with_width!(n, W => check_the_numbering_by_layer_is_the_breadth_first_one::<W>(&Tables::new(n)));
-        }
+        let sample = (401..=8191).step_by(199).chain([512, 1024, 2048, 4096, 8191, 8192, crate::solver::MAX_N]);
+        (2..=400).chain(sample).for_each(check_the_numbering_of_the_board);
     }
 
     /// [`the_numbering_by_layer_is_the_breadth_first_one`] on every board to 200, every 5th to 400 and the boards where
-    /// the count of frames steps up.
+    /// the count of frames steps up, but the first of 160 words.
     #[test]
     fn the_numbering_by_layer_is_the_breadth_first_one_on_a_sample() {
-        for n in (2..=200).chain((205..=400).step_by(5)).chain([512, 1024, 2048, 4096]) {
-            crate::with_width!(n, W => check_the_numbering_by_layer_is_the_breadth_first_one::<W>(&Tables::new(n)));
+        let sample = (2..=200).chain((205..=400).step_by(5)).chain([512, 1024, 2048, 4096]);
+        sample.for_each(check_the_numbering_of_the_board);
+    }
+
+    /// What the census of the boards past 8191 measures on one board: the frames of its root, and the largest GF(2)
+    /// rank among them.
+    #[derive(Clone, Copy, Debug)]
+    struct Census {
+        frames: usize,
+        rank: usize,
+    }
+
+    /// The census of the board `1..=t.n` at width `W`: the checks of [`census_of_the_boards_past_8191`], and what it
+    /// measures.
+    fn census_of<const W: usize>(t: &Tables) -> Census {
+        let board_frames = BoardFrames::<W>::new(t, Bits::EMPTY);
+        check_the_numbering_by_layer_is_the_breadth_first_one(&board_frames);
+        let theory = crate::root_problem::build(t);
+        // The game with no promotions plays U* above n/2 (the kept-sources lemma (X1), docs/theory/exactness.md).
+        let mut plain: Vec<u32> = board_frames.solution().into_iter().filter(|&x| 2 * x > t.n).collect();
+        plain.sort_unstable();
+        assert_eq!(plain, theory.ustar, "n={}: the game with no promotions does not play U*", t.n);
+
+        let (numbered, frames) = numbering::<W>(t);
+        let count = frames.frames.len();
+        assert!(count <= model::MAX_FRAMES, "n={}: {count} frames, more than {}", t.n, model::MAX_FRAMES);
+        // No candidate has the factor of a back claim among its maximal factors (the claims lemma (X5),
+        // docs/theory/exactness.md).
+        let back: Bits<W> = frames.claims.iter().flatten().filter(|c| c.2 == ClaimKind::Back).map(|c| c.1).collect();
+        for c in frames.candidates.iter() {
+            let listed = t.max_factors[c as usize].iter().find(|&&f| back.contains(f));
+            assert_eq!(listed, None, "n={}: the candidate {c} lists the factor of a back claim", t.n);
         }
+        let (graph, root) = model::FrameGraph::build::<W>(t, &frames.columns()).expect("the model of setup's frames");
+        // Every candidate has a home frame of at least 1, the frame in front of it to be promoted into (the
+        // reduction-step lemma (X6)).
+        let homeless = frames.candidates.iter().find(|&c| graph.home(c) == 0);
+        assert_eq!(homeless, None, "n={}: a candidate whose home is frame 0", t.n);
+        assert_eq!(root_problem_of_setup(&numbered, &frames, &root), theory, "n={}: setup and Π_n differ", t.n);
+
+        let gf2 = crate::gf2::Gf2Graph::new(&graph, &root, &frames.candidates);
+        let most = crate::gf2::Gf2Bound::<W>::MOST;
+        assert!(gf2.words() <= most, "n={}: {} block words, more than the {most} of {W} words", t.n, gf2.words());
+        Census { frames: count, rank: gf2.ranks().iter().copied().max().unwrap_or(0) }
+    }
+
+    /// The census of the boards past 8191, those of the widest set (160 words): on every board from 8192 to
+    /// [`crate::solver::MAX_N`], the frames lie in layers (the frame lemma (F1), docs/theory/frame-model.md), the
+    /// numbering by layer is the breadth-first one and clean, and no number is without a frame
+    /// ([`check_the_numbering_by_layer_is_the_breadth_first_one`]); no candidate lists the factor of a back claim, and
+    /// every candidate has a home of at least 1; the game with no promotions plays the U\* of
+    /// [`crate::root_problem::build`] above n/2, and setup builds Π_n ([`root_problem_of_setup`] is that problem, as
+    /// `tests/canonical_root.rs` checks on the boards to 1000); and the root has at most [`model::MAX_FRAMES`] frames,
+    /// whose GF(2) ranks need no more block words than the engines of the width have.  It prints the boards where the
+    /// count of frames and the block words change, and the largest rank.  The boards up to 8191 had these checks (A,
+    /// C, D, F, G and I) from the census `examples/structure.rs` at commit 3ca11bf.  In 2026-11 it found 10 frames on
+    /// every board, five block words from 8192, six from 8440 and seven from 9690 (on every board from 9752), and the
+    /// largest rank 403, at 10230, in 17 minutes on 8 threads of a busy machine.  Run it in a release build, on up to 8
+    /// threads, with its progress on stderr:
+    /// `cargo test --release --lib census_of_the_boards_past_8191 -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "the census of the boards past 8191, a quarter of an hour on 8 threads in a release build"]
+    fn census_of_the_boards_past_8191() {
+        use std::cmp::Reverse;
+        use std::sync::atomic::{AtomicU32, Ordering};
+        const FIRST: u32 = 8192;
+        let last = crate::solver::MAX_N;
+        let threads = std::thread::available_parallelism().map_or(1, |p| p.get()).min(8);
+        let start = std::time::Instant::now();
+        let next = AtomicU32::new(FIRST);
+        let mut found: Vec<(u32, Census)> = std::thread::scope(|scope| {
+            let workers: Vec<_> = (0..threads)
+                .map(|_| {
+                    scope.spawn(|| {
+                        let mut found = Vec::new();
+                        loop {
+                            let n = next.fetch_add(1, Ordering::Relaxed);
+                            if n > last {
+                                return found;
+                            }
+                            found.push((n, crate::with_width!(n, W => census_of::<W>(&Tables::new(n)))));
+                            if n.is_multiple_of(128) {
+                                eprintln!("census: board {n} done at {:.0} s", start.elapsed().as_secs_f64());
+                            }
+                        }
+                    })
+                })
+                .collect();
+            workers.into_iter().flat_map(|worker| worker.join().expect("a census thread")).collect()
+        });
+        found.sort_unstable_by_key(|&(n, _)| n);
+        assert_eq!(found.len(), (last - FIRST + 1) as usize);
+
+        let steps = |key: fn(&Census) -> usize| {
+            let mut out: Vec<(u32, usize)> = Vec::new();
+            for (n, census) in &found {
+                if out.last().is_none_or(|&(_, k)| k != key(census)) {
+                    out.push((*n, key(census)));
+                }
+            }
+            out
+        };
+        let (at, most) = found.iter().map(|(n, c)| (*n, c.rank)).max_by_key(|&(n, rank)| (rank, Reverse(n))).unwrap();
+        println!("boards {FIRST} to {last}, on {threads} threads, in {:.0} s", start.elapsed().as_secs_f64());
+        println!("frames, from the board where the count changes: {:?}", steps(|c| c.frames));
+        println!("GF(2) block words, from the board where they change: {:?}", steps(|c| c.rank.div_ceil(64).max(1)));
+        println!("the largest rank: {most}, first at {at}");
     }
 
     /// The frames lie in layers (the frame lemma (F1), docs/theory/frame-model.md) on every board to 400, and on all of

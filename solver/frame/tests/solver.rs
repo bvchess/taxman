@@ -507,10 +507,10 @@ fn the_runs_gate_reaches_the_searchers() {
 }
 
 /// 1500 gets `W = 24`, 2050 `W = 36` (the first board with a number above 2047 in its frames), 3600 `W = 64` (the
-/// widest set up to board 4095, which the boards from 3584 up get) and 4100 `W = 128`, the widest, which the boards
-/// from 4096 up get; `tests/wide.rs` goes further into the second and compares the widths from 36 to 56 with 64, and
-/// the boards past 4095 with the board layer's invariants.  The setup's cost is mostly the local search for a better
-/// first incumbent.
+/// widest set up to board 4095, which the boards from 3584 up get) and 4100 `W = 128`, which the boards from 4096 to
+/// 8191 get; `tests/wide.rs` goes further into the second and compares the widths from 36 to 56 with 64, and the
+/// boards past 4095 with the board layer's invariants.  The setup's cost is mostly the local search for a better first
+/// incumbent.
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is a_big_board_gets_through_setup")]
 fn big_boards_get_through_setup() {

@@ -47,6 +47,7 @@ fn help_lists_the_commands_and_every_tactic() {
             "--stop-growth T|off",
             "--stop-quiet K",
             "--push-growth T|off",
+            "--best-known FILE|off",
             "--past-ceiling",
             "--no-repair",
             "--stop-at-known",
@@ -72,6 +73,7 @@ fn help_lists_the_commands_and_every_tactic() {
             "only when the last K rounds raised nothing (default 4)",
             "if the growth of its gap after its play is above T (default 25)",
             "keep the better line (default 0)",
+            "(default best-known.jsonl in the directory of --out; off: none)",
         ] {
             assert!(help.contains(text), "{args:?}: no {text:?}");
         }
@@ -495,7 +497,7 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         let message = format!("{} is a flag of the proof search, which --unsound does not run", flag[0]);
         assert_usage_error(&[&base[..], flag].concat(), &message);
     }
-    let unsound_only: [&[&str]; 17] = [
+    let unsound_only: [&[&str]; 18] = [
         &["--effort", "1"],
         &["--seed", "2"],
         &["--fix", "0.5,0.7"],
@@ -508,6 +510,7 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         &["--stop-growth", "0"],
         &["--stop-quiet", "0"],
         &["--push-growth", "off"],
+        &["--best-known", "off"],
         &["--past-ceiling"],
         &["--no-repair"],
         &["--stop-at-known"],
@@ -520,6 +523,54 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
     }
     // `--back 1` is what `--survivors` was, and the switch is gone.
     assert_usage_error(&[&base[..], &["--survivors"]].concat(), "unknown option --survivors");
+}
+
+/// A run keeps a best-known file, `best-known.jsonl` beside its file unless `--best-known FILE` names another or
+/// `--best-known off` has none.  The measuring options play the games of the built-in table, which a best-known file
+/// never holds, so they have none unless `--best-known` names one; and the file of the run is not its best-known file.
+#[test]
+fn a_run_has_a_best_known_file_beside_its_file_unless_told_otherwise() {
+    let dir = TempDir::new("unsound-best-known");
+    for sub in ["named", "off", "measuring"] {
+        fs::create_dir(dir.join(sub)).unwrap();
+    }
+    let solve = |name: &str, extra: &[&str]| {
+        let out = dir.join(name);
+        let base = ["solve", "12", "--unsound", "--effort", "1", "--threads", "1", "--out", path(&out)];
+        taxman(&[&base[..], extra].concat())
+    };
+    // Game 12 is the built-in table's: the file is made and stays empty, and the summary says so.
+    let run = solve("by-default.jsonl", &[]);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert_eq!(fs::read_to_string(dir.join("best-known.jsonl")).unwrap(), "");
+    let summary = format!("best-known file {}: 0 lines added", dir.join("best-known.jsonl").display());
+    assert!(run.stdout.contains(&summary), "{}", run.stdout);
+    let elsewhere = dir.join("elsewhere.jsonl");
+    let run = solve("named/o.jsonl", &["--best-known", path(&elsewhere)]);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert!(elsewhere.exists() && !dir.join("named/best-known.jsonl").exists());
+    let run = solve("off/o.jsonl", &["--best-known", "off"]);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert!(!dir.join("off/best-known.jsonl").exists() && !run.stdout.contains("best-known file"), "{}", run.stdout);
+    let run = solve("measuring/o.jsonl", &["--stop-at-known"]);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert!(!dir.join("measuring/best-known.jsonl").exists(), "{}", run.stdout);
+    let run = solve("measuring/p.jsonl", &["--stop-at-known", "--best-known", path(&dir.join("measuring/b.jsonl"))]);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert!(dir.join("measuring/b.jsonl").exists());
+    // The file of the run, however it is named, is not its best-known file.
+    let same = dir.join("same.jsonl");
+    for best_known in [path(&same), path(&dir.join("named/../same.jsonl"))] {
+        let run = solve("same.jsonl", &["--best-known", best_known]);
+        assert_eq!(run.code, Some(1), "{}", run.stdout);
+        assert!(run.stderr.contains("--out and --best-known are the same file"), "{}", run.stderr);
+    }
+    let default = |out: &str| unsound::best_known_path(Some(Path::new(out)), None);
+    assert_eq!(default("runs/a/o.jsonl"), Some("runs/a/best-known.jsonl".into()));
+    assert_eq!(default("o.jsonl"), Some("best-known.jsonl".into()));
+    assert_eq!(unsound::best_known_path(Some(Path::new("o.jsonl")), Some("off")), None);
+    assert_eq!(unsound::best_known_path(Some(Path::new("o.jsonl")), Some("x/b.jsonl")), Some("x/b.jsonl".into()));
+    assert_eq!(unsound::best_known_path(None, None), None);
 }
 
 /// `--fix LO,HI` takes two numbers with 0 <= LO <= HI <= 1, `--tilt P` a whole number from 0 to 100, `--back J` a whole
@@ -735,7 +786,8 @@ fn zero_turns_the_three_options_off() {
     for (&n, line) in games.iter().zip(&off) {
         let mut played = None;
         let line_of = |line: &unsound::Line| played = Some(without_times(&line.to_json()));
-        unsound::solve_range(n, n, &opts, &plain, None, line_of, |_| ()).expect("a run of the unsound mode");
+        let files = unsound::Files::with_built_in(None, None);
+        unsound::solve_range(n, n, &opts, &plain, &files, line_of, |_| ()).expect("a run of the unsound mode");
         assert_eq!(played.as_ref(), Some(line), "game {n}");
         assert_eq!(line.get("trajectories"), Some(&Json::array(["start"])), "game {n}: the start's alone");
     }

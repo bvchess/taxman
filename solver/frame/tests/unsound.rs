@@ -5,7 +5,9 @@
 //! and the defaults of the last three keep all of the above.  The repair pulls a short line up from the lines above
 //! it, an unseeded game takes nothing from the games below it, and a game played twice keeps its better play.  A
 //! line's bound is the parity bound, the stop on growth ends a level's rounds from the end of level 1's on, after any
-//! quiet rounds it waits for, and the push plays twice a game whose gap grew.
+//! quiet rounds it waits for, and the push plays twice a game whose gap grew.  The best-known file takes a line that
+//! scores more than its game's, seeds the games of the runs that share it, takes the repair down into its lines of the
+//! games below a run's first, and is offered the lines of a run's file when the run opens it.
 //!
 //! Most tests play the rounds with `tilt`, `back` and `widen` off (`plain`, the form of the mode before they had
 //! defaults), so that each keeps testing what it tested; the options are given by name where a test is about them, and
@@ -23,12 +25,17 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::slice;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 use taxman::game::{replay, Optimal};
 use taxman::json::Json;
 use taxman::results::{verify_files, ResultsFile};
 use taxman::search::finder::{NEIGHBORHOODS, NEIGHBORHOOD_WORK};
-use taxman::solver::unsound::{self, Line, Origin, OtherPlay, Plan, Previous, Raised, Repair, Source};
-use taxman::solver::{solve_range, Method, SolveOptions};
+use taxman::solver::unsound::{
+    self, BestKnownFile, Files, Line, Origin, OtherPlay, Plan, Previous, Raised, Repair, Source,
+};
+use taxman::solver::{solve_range, Method, RangeSummary, SolveOptions};
 
 /// The work of a round in these tests, which level L budgets 2^L times: about half the work of a round of the small
 /// games (their steps are about 80 a round, and the neighborhoods' work is 64 × 32 = 2,048), so that level 1 runs two
@@ -56,6 +63,11 @@ fn options(threads: usize, seed_incumbent: bool) -> SolveOptions {
     opts
 }
 
+/// The files of a run with the built-in table, the file `out` if there is one, and no best-known file.
+fn built_in(out: Option<&Path>) -> Files<'_> {
+    Files::with_built_in(out, None)
+}
+
 /// Games whose rounds raise the score of a start made without the moves for n − 1: 375 in its rounds 2 and 3, 376 in
 /// its rounds 1 and 2, each to the table's score.
 const FIRST: (u32, u32) = (375, 376);
@@ -66,15 +78,27 @@ const SECOND: (u32, u32) = (384, 387);
 
 /// The lines of the games `range` played with `plan` and `opts`, appended to the file `out` if there is one, and the
 /// repairs of the run; each line and each repair replays to its score, which is no more than the table's.
-fn played((lo, hi): (u32, u32), opts: &SolveOptions, plan: &Plan, out: Option<&Path>) -> (Vec<Line>, Vec<Repair>) {
+fn played(range: (u32, u32), opts: &SolveOptions, plan: &Plan, out: Option<&Path>) -> (Vec<Line>, Vec<Repair>) {
+    let (lines, repairs, _) = played_in(range, opts, plan, &built_in(out));
+    (lines, repairs)
+}
+
+/// The lines and the repairs of the games `range` played with `plan` and `opts` in `files`, checked as [`played`]
+/// checks them, and the summary of the run.
+fn played_in(
+    (lo, hi): (u32, u32),
+    opts: &SolveOptions,
+    plan: &Plan,
+    files: &Files,
+) -> (Vec<Line>, Vec<Repair>, RangeSummary) {
     let optimal = Optimal::built_in();
     let (mut lines, mut repairs) = (Vec::new(), Vec::new());
-    unsound::solve_range(
+    let summary = unsound::solve_range(
         lo,
         hi,
         opts,
         plan,
-        out,
+        files,
         |line| lines.push(line.clone()),
         |repair| repairs.push(repair.clone()),
     )
@@ -91,7 +115,7 @@ fn played((lo, hi): (u32, u32), opts: &SolveOptions, plan: &Plan, out: Option<&P
         assert_eq!(replay(n, &repair.moves), Ok(repair.score), "n={n}: the repair's moves do not replay to its score");
         assert!(repair.was < repair.score && repair.score <= optimal.score(n).unwrap(), "n={n}: {repair:?}");
     }
-    (lines, repairs)
+    (lines, repairs, summary)
 }
 
 /// The lines of the games `range` played with `plan` and `opts`, appended to the file `out` if there is one
@@ -482,8 +506,9 @@ fn a_game_has_no_trajectory_from_the_moves_nothing_has() {
 
 #[test]
 fn a_plan_with_an_option_out_of_range_is_refused() {
-    let refused =
-        |plan: Plan| unsound::solve_range(12, 12, &options(1, true), &plan, None, |_| (), |_| ()).unwrap_err();
+    let refused = |plan: Plan| {
+        unsound::solve_range(12, 12, &options(1, true), &plan, &built_in(None), |_| (), |_| ()).unwrap_err()
+    };
     for fix in [(0.9, 0.7), (-0.1, 0.5), (0.5, 1.1), (f64::NAN, 0.5), (0.5, f64::INFINITY)] {
         let err = refused(Plan { fix, ..plan(1) });
         assert!(err.starts_with("--fix takes LO,HI") && err.contains("0 <= LO <= HI <= 1"), "{fix:?}: {err}");
@@ -716,7 +741,8 @@ fn the_lines_that_stop_at_the_ceiling_are_the_same_on_one_thread_and_on_four() {
 fn the_measuring_options_take_the_tables_games_only() {
     let past = Optimal::built_in().max_n() + 1;
     for measured in [Plan { stop_at_known: true, ..plan(1) }, Plan { from_known: true, ..plan(1) }] {
-        let err = unsound::solve_range(past - 1, past, &options(1, true), &measured, None, |_| (), |_| ()).unwrap_err();
+        let opts = options(1, true);
+        let err = unsound::solve_range(past - 1, past, &opts, &measured, &built_in(None), |_| (), |_| ()).unwrap_err();
         assert!(err.contains(&format!("lacks game {past}")), "{err}");
     }
     // With --from-known every game starts from the table's moves for n − 1.
@@ -748,11 +774,11 @@ fn the_wall_between_unsound_and_proven_lines_holds_both_ways() {
     fs::write(&mixed, format!("{proven}{}\n", unsound.lines().next().unwrap())).unwrap();
     let err = verify_files(slice::from_ref(&mixed), Optimal::built_in(), 1).unwrap_err();
     assert!(err.contains("line 13: an unsound line"), "{err}");
-    let err =
-        unsound::solve_range(13, 13, &options(1, true), &plan(1), Some(&proven_file), |_| (), |_| ()).unwrap_err();
+    let (opts, plan) = (options(1, true), plan(1));
+    let err = unsound::solve_range(13, 13, &opts, &plan, &built_in(Some(&proven_file)), |_| (), |_| ()).unwrap_err();
     assert!(err.contains("line 1: not an unsound line"), "{err}");
     fs::write(&mixed, format!("{unsound}{}\n", proven.lines().next().unwrap())).unwrap();
-    let err = unsound::solve_range(13, 13, &options(1, true), &plan(1), Some(&mixed), |_| (), |_| ()).unwrap_err();
+    let err = unsound::solve_range(13, 13, &opts, &plan, &built_in(Some(&mixed)), |_| (), |_| ()).unwrap_err();
     assert!(err.contains("line 13: not an unsound line"), "{err}");
 }
 
@@ -940,7 +966,8 @@ fn a_file_holds_a_second_line_of_a_game_only_as_a_repair_that_scores_more() {
     let refused = |text: String, expected: &str| {
         let bad = dir.join("bad.jsonl");
         fs::write(&bad, text).unwrap();
-        let err = unsound::solve_range(400, 400, &options(1, true), &plan(1), Some(&bad), |_| (), |_| ()).unwrap_err();
+        let (opts, plan) = (options(1, true), plan(1));
+        let err = unsound::solve_range(400, 400, &opts, &plan, &built_in(Some(&bad)), |_| (), |_| ()).unwrap_err();
         assert!(err.contains(expected), "{err}");
     };
     refused(format!("{played_395}\n{played_395}\n"), "line 2: a second line for n=395 that is no repair");
@@ -1268,4 +1295,304 @@ fn the_lines_of_a_run_that_stops_and_pushes_are_the_same_on_one_thread_and_on_fo
     played(WALKED, &options(1, false), &plan, Some(&one));
     played(WALKED, &options(4, false), &plan, Some(&four));
     assert_eq!(file_lines(&one, false), file_lines(&four, false));
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The best-known file
+
+/// The built-in table's games below `lo`: a table that lacks the games a test plays, as the built-in table lacks the
+/// games past 5060, so that the best-known file may hold them.
+fn table_below(lo: u32) -> Optimal {
+    let mut table = Optimal::default();
+    for (n, score, moves) in Optimal::built_in().games().take_while(|&(n, _, _)| n < lo) {
+        table.push(n, score, moves.to_vec()).expect("the games in order");
+    }
+    table
+}
+
+/// The lines of the file `path` as JSON, in order.
+fn json_lines(path: &Path) -> Vec<Json> {
+    fs::read_to_string(path).unwrap().lines().map(|line| Json::parse(line).unwrap()).collect()
+}
+
+/// The game of a line, and its score.
+fn game_and_score(line: &Json) -> (u32, u64) {
+    (line.get("n").and_then(Json::as_u32).unwrap(), line.get("score").and_then(Json::as_u64).unwrap())
+}
+
+/// The key `best_known` of a line of a best-known file: the name of the file the line came from, and the score of the
+/// game's line before it.
+fn best_known_of(line: &Json) -> (Option<&str>, Option<u64>) {
+    let key = line.get("best_known").expect("a line of a best-known file has `best_known`");
+    (key.get("file").and_then(Json::as_str), key.get("was").and_then(Json::as_u64))
+}
+
+/// `line` without its key `best_known`.
+fn without_best_known(line: &Json) -> Json {
+    let Json::Obj(pairs) = line else { panic!("a line is an object") };
+    Json::Obj(pairs.iter().filter(|(key, _)| key != "best_known").cloned().collect())
+}
+
+/// The best-known file `path` holds, the last line of each game, after the checks of a best-known file: in order, each
+/// line scores more than the one before it of its game and says that score in `best_known.was`.
+fn last_lines(path: &Path) -> BTreeMap<u32, Json> {
+    let mut last: BTreeMap<u32, Json> = BTreeMap::new();
+    for line in json_lines(path) {
+        let (n, score) = game_and_score(&line);
+        let before = last.get(&n).map(|line| game_and_score(line).1);
+        assert!(before.is_none_or(|before| score > before), "n={n}: {score} is no more than the {before:?} before it");
+        assert_eq!(best_known_of(&line).1, before, "n={n}: best_known.was is the score before");
+        last.insert(n, line);
+    }
+    last
+}
+
+#[test]
+fn a_line_that_scores_more_than_the_best_known_files_is_added_with_the_score_it_beat() {
+    let (dir, table) = (TempDir::new("unsound-best-known"), table_below(390));
+    let best_known = dir.join("best-known.jsonl");
+    let run = |name: &str, effort: u32| {
+        let out = dir.join(name);
+        let files = Files { table: &table, out: Some(&out), best_known: Some(&best_known) };
+        played_in((390, 392), &options(4, false), &plan(effort), &files)
+    };
+    // At level 1, 390 falls short of the table's score and 391 and 392 keep the shortfall; the best-known file has no
+    // line yet, so it takes all three, each saying where it came from.
+    let (a, _, summary) = run("a.jsonl", 1);
+    assert_eq!(summary.best_known_added, 3);
+    let lines = json_lines(&best_known);
+    assert_eq!(lines.len(), 3);
+    for (line, played) in lines.iter().zip(&a) {
+        assert_eq!(game_and_score(line), (played.n, played.score));
+        assert_eq!(best_known_of(line), (Some("a.jsonl"), None));
+        assert_eq!(without_best_known(line), played.to_json(), "n={}: the line as the run wrote it", played.n);
+    }
+    // At level 3, a run reaches the table's score: its lines are added, each saying the score it beat.
+    let (b, _, summary) = run("b.jsonl", 3);
+    let better: Vec<(&Line, &Line)> = b.iter().zip(&a).filter(|(b, a)| b.score > a.score).collect();
+    assert_eq!(better.len(), 3, "level 3 lifts the three games above their shortfall");
+    assert_eq!(summary.best_known_added, better.len());
+    assert_eq!(json_lines(&best_known).len(), 3 + better.len());
+    let last = last_lines(&best_known);
+    for (b, a) in b.iter().zip(&a) {
+        let line = &last[&b.n];
+        assert_eq!(game_and_score(line).1, a.score.max(b.score), "n={}", b.n);
+        if b.score > a.score {
+            assert_eq!(best_known_of(line), (Some("b.jsonl"), Some(a.score)), "n={}", b.n);
+            assert_eq!(without_best_known(line), b.to_json(), "n={}", b.n);
+        }
+    }
+    // The same run again scores what the best-known file has, and not more: it adds nothing, and starts game 391 from
+    // its own line of 390, which the best-known file's ties.
+    let before = fs::read(&best_known).unwrap();
+    let (c, _, summary) = run("c.jsonl", 3);
+    assert_eq!(summary.best_known_added, 0);
+    assert_eq!(fs::read(&best_known).unwrap(), before);
+    assert_eq!(timeless_all(&c), timeless_all(&b));
+    assert_eq!(c[1].prev.as_ref().map(|prev| (prev.n, prev.source)), Some((390, Source::Run)));
+    // A run at level 1 again scores less than the best-known file's in 390, and adds nothing; it starts game 391 from
+    // the best-known file's line of 390, which scores more than its own.
+    let (d, _, summary) = run("d.jsonl", 1);
+    assert_eq!(summary.best_known_added, 0);
+    assert_eq!(fs::read(&best_known).unwrap(), before);
+    assert!(d[0].score < b[0].score);
+    let seeded = d[1].prev.as_ref().map(|prev| (prev.n, prev.score, prev.source));
+    assert_eq!(seeded, Some((390, b[0].score, Source::BestKnown)));
+    // The file reads back with the checks of a best-known file.
+    let read = BestKnownFile::open(&best_known, &table).unwrap();
+    assert!(b.iter().zip(&a).all(|(b, a)| read.score(b.n) == Some(a.score.max(b.score))));
+}
+
+#[test]
+fn a_game_starts_from_a_line_that_another_run_appended_to_the_best_known_file_while_it_ran() {
+    let (dir, table) = (TempDir::new("unsound-best-known-shared"), table_below(390));
+    let (best_known, a_out, b_out) = (dir.join("best-known.jsonl"), dir.join("a.jsonl"), dir.join("b.jsonl"));
+    let (to_b, b_waits) = mpsc::channel::<()>();
+    let (to_a, a_waits) = mpsc::channel::<()>();
+    let (table, best_known, a_out, b_out) = (&table, &best_known, &a_out, &b_out);
+    let patience = Duration::from_secs(120);
+    // Run A plays 390 to 392 at level 1; after its game 390, run B plays 390 at level 3, in a thread of its own, and A
+    // goes on once B has added its line.
+    let (a, b) = thread::scope(|scope| {
+        let a = scope.spawn(move || {
+            let files = Files { table, out: Some(a_out), best_known: Some(best_known) };
+            let mut lines = Vec::new();
+            let on_game = |line: &Line| {
+                lines.push(line.clone());
+                if line.n == 390 {
+                    to_b.send(()).unwrap();
+                    a_waits.recv_timeout(patience).expect("B added its line of 390");
+                }
+            };
+            unsound::solve_range(390, 392, &options(1, false), &plan(1), &files, on_game, |_| ()).unwrap();
+            lines
+        });
+        let b = scope.spawn(move || {
+            b_waits.recv_timeout(patience).expect("A played 390");
+            let files = Files { table, out: Some(b_out), best_known: Some(best_known) };
+            let (lines, ..) = played_in((390, 390), &options(1, false), &plan(3), &files);
+            to_a.send(()).unwrap();
+            lines
+        });
+        (a.join().unwrap(), b.join().unwrap())
+    });
+    assert!(b[0].score > a[0].score, "B's 390 at level 3 scores more than A's at level 1");
+    // A's game 391 started from the best-known file's 390, which scores more than A's own, and says so.
+    let prev = a[1].prev.as_ref().expect("the moves for 390");
+    assert_eq!((prev.n, prev.score, prev.source), (390, b[0].score, Source::BestKnown));
+    let ceiling = 391 + b[0].score;
+    assert_eq!(a[1].ceiling, Some(ceiling));
+    // The file has A's 390, then B's, then A's 391 and 392, and reads back in order.
+    let lines = json_lines(best_known);
+    assert_eq!(lines.iter().map(game_and_score).map(|(n, _)| n).collect::<Vec<_>>(), [390, 390, 391, 392]);
+    assert_eq!(best_known_of(&lines[1]), (Some("b.jsonl"), Some(a[0].score)));
+    assert_eq!(best_known_of(&lines[2]), (Some("a.jsonl"), None));
+    let read = BestKnownFile::open(best_known, table).unwrap();
+    assert_eq!((read.score(390), read.score(391)), (Some(b[0].score), Some(a[1].score)));
+}
+
+#[test]
+fn a_run_adds_its_repairs_to_the_best_known_file_and_walks_down_into_its_lines_of_the_games_below_the_range() {
+    let (dir, table) = (TempDir::new("unsound-best-known-repair"), table_below(390));
+    // A run of 390 to 396 with the repair: each repair is offered, so the best-known file's last line of a game is the
+    // run's.
+    let (best_known, out) = (dir.join("best-known.jsonl"), dir.join("a.jsonl"));
+    let files = Files { table: &table, out: Some(&out), best_known: Some(&best_known) };
+    let (lines, repairs, summary) = played_in(WALKED, &options(4, false), &repairing(1), &files);
+    assert_eq!((lines.len(), repairs.len(), summary.repaired), (7, 6, 6));
+    assert_eq!((summary.best_known_added, summary.best_known_repaired), (13, 0), "the 7 games and the 6 repairs");
+    let (ours, theirs) = (games_of(&out, false), last_lines(&best_known));
+    assert_eq!(theirs.len(), 7);
+    for (n, line) in &ours {
+        assert_eq!(timeless_json(&without_best_known(&theirs[&(*n as u32)]), false), *line, "n={n}");
+    }
+    assert_eq!(theirs[&395].get("repaired").and_then(|repaired| repaired.get("from")), Some(&Json::from(396u32)));
+
+    // The best-known file holds A's lines of 390 to 395, 7 short each; B plays 396 alone, starting from the
+    // best-known file's line of 395, and its walk goes down into the best-known file's lines of 395 to 390, which B has
+    // no line of.
+    let base = dir.join("base.jsonl");
+    played_in((390, 395), &options(4, false), &plan(1), &Files { out: None, best_known: Some(&base), ..files });
+    let b_run = |threads: usize| {
+        let sub = dir.join(format!("threads-{threads}"));
+        fs::create_dir(&sub).unwrap();
+        let (best_known, out) = (sub.join("best-known.jsonl"), sub.join("b.jsonl"));
+        fs::copy(&base, &best_known).unwrap();
+        let files = Files { table: &table, out: Some(&out), best_known: Some(&best_known) };
+        (played_in((396, 396), &options(threads, false), &repairing(1), &files), best_known, out)
+    };
+    let ((lines, repairs, summary), best_known, out) = b_run(4);
+    assert_eq!(lines.len(), 1);
+    let walked: Vec<(u32, u32, u64, bool)> =
+        repairs.iter().map(|r| (r.n, r.from, r.score - r.was, r.best_known_only)).collect();
+    let down = [(395, 396), (394, 395), (393, 394), (392, 393), (391, 392), (390, 391)];
+    assert_eq!(walked, down.map(|(n, from)| (n, from, 5, true)));
+    assert!(repairs[0].summary_line().ends_with("best-known file only"));
+    assert_eq!((summary.repaired, summary.best_known_repaired, summary.best_known_added), (0, 6, 7));
+    assert_eq!(fs::read_to_string(&out).unwrap().lines().count(), 1, "the run's file has its own game alone");
+    let last = last_lines(&best_known);
+    let before = last_lines(&base);
+    for (n, from) in down {
+        let (repaired, line) = (&last[&n], &before[&n]);
+        let (score, was) = (game_and_score(repaired).1, game_and_score(line).1);
+        assert_eq!((score, best_known_of(repaired)), (was + 5, (Some("b.jsonl"), Some(was))), "n={n}");
+        let record = repaired.get("repaired").unwrap();
+        assert_eq!((record.get("from"), record.get("was")), (Some(&Json::from(from)), Some(&Json::from(was))));
+    }
+    // The lines are the same on one thread and on four.
+    let ((one, ..), one_best_known, _) = b_run(1);
+    assert_eq!(timeless_all(&one), timeless_all(&lines));
+    assert_eq!(file_lines(&one_best_known, false), file_lines(&best_known, false));
+}
+
+#[test]
+fn a_fresh_best_known_file_changes_no_line_of_a_run() {
+    let (dir, table) = (TempDir::new("unsound-best-known-fresh"), table_below(390));
+    let run = |best_known: Option<&Path>| {
+        let out = dir.join(if best_known.is_some() { "with.jsonl" } else { "without.jsonl" });
+        played_in(WALKED, &options(4, false), &repairing(1), &Files { table: &table, out: Some(&out), best_known })
+    };
+    let (without, repairs_without, _) = run(None);
+    let (with, repairs, _) = run(Some(&dir.join("best-known.jsonl")));
+    assert_eq!(timeless_all(&with), timeless_all(&without));
+    let walked = |repairs: &[Repair]| repairs.iter().map(|r| (r.n, r.from, r.was, r.score)).collect::<Vec<_>>();
+    assert_eq!(walked(&repairs), walked(&repairs_without));
+    assert_eq!(file_lines(&dir.join("with.jsonl"), false), file_lines(&dir.join("without.jsonl"), false));
+}
+
+#[test]
+fn a_run_offers_the_last_line_of_each_game_of_its_file_to_the_best_known_file_when_it_opens_it() {
+    let (dir, table) = (TempDir::new("unsound-best-known-open"), table_below(390));
+    // A's file has repairs: the last line of 395 to 390 is one, and the line before it is in the file only.
+    let a = dir.join("a.jsonl");
+    played_in(WALKED, &options(4, false), &repairing(1), &Files { table: &table, out: Some(&a), best_known: None });
+    assert_eq!(json_lines(&a).len(), 13);
+    // A run over the same range with a copy of the file plays nothing, and offers all it has.
+    let (copy, best_known) = (dir.join("copy.jsonl"), dir.join("best-known.jsonl"));
+    fs::copy(&a, &copy).unwrap();
+    let files = Files { table: &table, out: Some(&copy), best_known: Some(&best_known) };
+    let (lines, repairs, summary) = played_in(WALKED, &options(4, false), &repairing(1), &files);
+    assert_eq!((lines.len(), repairs.len(), summary.skipped, summary.best_known_added), (0, 0, 7, 7));
+    let offered = json_lines(&best_known);
+    assert_eq!(offered.iter().map(|line| game_and_score(line).0).collect::<Vec<_>>(), (390..=396).collect::<Vec<_>>());
+    let ours = games_of(&a, false);
+    for line in &offered {
+        let n = game_and_score(line).0;
+        assert_eq!(best_known_of(line), (Some("copy.jsonl"), None), "n={n}");
+        let ours = &ours.iter().find(|(m, _)| *m == u64::from(n)).unwrap().1;
+        assert_eq!(timeless_json(&without_best_known(line), false), *ours, "n={n}: the file's last line of the game");
+    }
+    // The first line of a game in the best-known file may record a repair, since the line it replaced is in A's file,
+    // and the best-known file reads back.
+    assert!(offered[5].get("repaired").is_some_and(|repaired| !repaired.is_null()));
+    let read = BestKnownFile::open(&best_known, &table).unwrap();
+    assert!((390..=396).all(|n| read.score(n) == Some(game_and_score(&offered[(n - 390) as usize]).1)));
+    // Offered again, the lines add nothing.
+    let (_, _, summary) = played_in(WALKED, &options(4, false), &repairing(1), &files);
+    assert_eq!((summary.skipped, summary.best_known_added), (7, 0));
+}
+
+#[test]
+fn a_best_known_file_never_holds_a_game_of_the_built_in_table_and_is_checked_as_a_best_known_file() {
+    let (dir, table) = (TempDir::new("unsound-best-known-checks"), table_below(390));
+    // The built-in table has every game these runs play, so nothing is added.
+    let (best_known, out) = (dir.join("best-known.jsonl"), dir.join("built-in.jsonl"));
+    let (_, _, summary) =
+        played_in((390, 392), &options(4, true), &plan(1), &Files::with_built_in(Some(&out), Some(&best_known)));
+    assert_eq!(summary.best_known_added, 0);
+    assert_eq!(fs::read_to_string(&best_known).unwrap(), "");
+
+    // A best-known file of the games 390 to 392, A's lines at level 1 and then B's at level 3.
+    let (a_out, b_out) = (dir.join("a.jsonl"), dir.join("b.jsonl"));
+    let (a, b) = (Some(a_out.as_path()), Some(b_out.as_path()));
+    let known = Some(best_known.as_path());
+    played_in((390, 392), &options(4, false), &plan(1), &Files { table: &table, out: a, best_known: known });
+    played_in((390, 392), &options(4, false), &plan(3), &Files { table: &table, out: b, best_known: known });
+    let text = fs::read_to_string(&best_known).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    assert!(lines.len() > 3 && game_and_score(&Json::parse(lines[3]).unwrap()).0 == 390, "B's line of 390 follows A's");
+    let refused = |text: String, table: &Optimal, expected: &str| {
+        let file = dir.join("bad.jsonl");
+        fs::write(&file, text).unwrap();
+        let err = BestKnownFile::open(&file, table).err().expect("a refusal");
+        assert!(err.contains(expected), "{err}");
+    };
+    refused(text.clone(), Optimal::built_in(), "the built-in table has this game");
+    refused(format!("{}\n{}\n", lines[0], lines[0]), &table, "line 2: (n=390) it scores");
+    refused(format!("{}\n{}\n{}\n", lines[0], lines[3], lines[0]), &table, "line 3: (n=390) it scores");
+    let plain = fs::read_to_string(dir.join("a.jsonl")).unwrap();
+    refused(plain, &table, "line 1: (n=390) a best-known file's line needs a best_known");
+    let (first, second) = (game_and_score(&Json::parse(lines[0]).unwrap()).1, lines[3]);
+    let lost = second.replace(&format!("\"was\":{first}}}"), "\"was\":null}");
+    assert_ne!(lost, second, "the second line of 390 says the score it beat");
+    refused(format!("{}\n{lost}\n", lines[0]), &table, "best_known.was is None");
+    refused(format!("{}\nnot json\n{}\n", lines[0], lines[1]), &table, "line 2");
+
+    // A torn last line is cut off, and the file goes on from the line before it.
+    fs::write(&best_known, format!("{text}{{\"unsound\":tr")).unwrap();
+    let mut read = BestKnownFile::open(&best_known, &table).unwrap();
+    assert_eq!(fs::read_to_string(&best_known).unwrap(), text);
+    // A file another process replaced by a shorter one is refused at the next read.
+    fs::write(&best_known, "").unwrap();
+    assert!(read.refresh().unwrap_err().contains("shorter than"));
 }

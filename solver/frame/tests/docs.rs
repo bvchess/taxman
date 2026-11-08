@@ -20,7 +20,7 @@
 //!   dated;
 //! * the reference's (`solver/docs/REFERENCE.md`) table of the fields of a result line has the keys the code writes,
 //!   and its example line shows them, and so do the table and the example of an unsound line in the unsound mode's
-//!   document (`solver/docs/unsound.md`);
+//!   document (`solver/docs/unsound/line.md`);
 //! * the design's reading order (`solver/docs/design/architecture.md`) is the module map of `src/lib.rs`, and
 //!   `rust-version` is what the README and the cloud setup say;
 //! * the docs call `unzip`'s moves *mandatory*, never *forced* (which is the search's word);
@@ -165,9 +165,9 @@ fn reference_md() -> PathBuf {
     repo_dir().join("solver/docs/REFERENCE.md")
 }
 
-/// unsound.md, the unsound mode's document, in the docs of the solver.
-fn unsound_md() -> PathBuf {
-    repo_dir().join("solver/docs/unsound.md")
+/// line.md, the unsound mode's file on its line, in the folder `unsound/` of the docs of the solver.
+fn unsound_line_md() -> PathBuf {
+    repo_dir().join("solver/docs/unsound/line.md")
 }
 
 fn read(path: impl AsRef<Path>) -> String {
@@ -1063,20 +1063,27 @@ fn unsound_keys(n: u32) -> BTreeSet<String> {
         let json = line.to_json();
         keys = json.as_obj().expect("an object").iter().map(|(key, _)| key.clone()).collect();
     };
-    unsound::solve_range(n, n, &opts, &plan, None, keys_of, |_| ()).expect("a game");
+    let files = unsound::Files::with_built_in(None, None);
+    unsound::solve_range(n, n, &opts, &plan, &files, keys_of, |_| ()).expect("a game");
     keys
 }
 
 #[test]
 fn the_unsound_mode_documents_exactly_the_keys_of_an_unsound_line() {
-    let unsound = read(unsound_md());
+    let unsound = read(unsound_line_md());
     let part = section(&unsound, "## An unsound line");
     // A game with a search (85), and one with none (12).
     let written = unsound_keys(85);
     assert_eq!(unsound_keys(12), written, "a game with no search has the keys of one with a search");
-    assert_eq!(first_column_words(part), written, "unsound.md's table of the keys of an unsound line, and the code's");
+    // The table also has the key that only a line of the best-known file carries.
+    let with_best_known: BTreeSet<String> = written.iter().cloned().chain([unsound::BEST_KNOWN.to_owned()]).collect();
+    assert_eq!(
+        first_column_words(part),
+        with_best_known,
+        "line.md's table of the keys of an unsound line, and the code's"
+    );
     let example = part.split("```").nth(1).expect("the example line is the first code block");
-    assert_eq!(top_level_keys(example), written, "unsound.md's example of an unsound line, and the code's keys");
+    assert_eq!(top_level_keys(example), written, "line.md's example of an unsound line, and the code's keys");
     assert!(example.contains("\"method\":\"search\""), "the example is a searched game");
 }
 
@@ -1261,6 +1268,7 @@ const REWRITTEN: &[&str] = &[
     "solver/frame/testdata/golden/README.md",
     "solver/docs/REFERENCE.md",
     "solver/docs/unsound.md",
+    "solver/docs/unsound/",
     "solver/docs/verifiers.md",
     "solver/docs/DESIGN.md",
     DESIGN_DIR,
@@ -2762,6 +2770,7 @@ const INDEXES: &[&str] = &[
     "solver/noframe/README.md",
     "solver/docs/DESIGN.md",
     "solver/docs/RUNBOOK.md",
+    "solver/docs/unsound.md",
     "notebook/README.md",
 ];
 

@@ -27,7 +27,7 @@ file your task needs.
 |---|---|---|
 | [frame/README.md](frame/README.md) | guide | the frame solver: what it computes, how to build it, a first run and the common tasks |
 | [docs/REFERENCE.md](docs/REFERENCE.md) | reference | the frame solver's flags and commands, its output, and what a result records and why it can be trusted |
-| [docs/unsound.md](docs/unsound.md) | guide and reference | the unsound mode, which plays games as well as a level of effort finds and proves nothing: its command and flags, how a game is played, and its line |
+| [docs/unsound.md](docs/unsound.md) | guide and reference | the unsound mode, which plays games as well as a level of effort finds and proves nothing; the index of the files of docs/unsound/: its command and flags, how a game is played, how a short game is pulled up, and its line |
 | [../docs/GLOSSARY.md](../docs/GLOSSARY.md) | reference | the project's words, each with the one name the docs use |
 | [../results/README.md](../results/README.md) | reference | the committed results files and what supports their scores; [runs.md](../results/runs.md) records how the committed chain was made, run by run |
 | [noframe/README.md](noframe/README.md) | explanation and reference | the prover: its proofs and checks of the frame solver's results on the whole board, and its checks of the conjectures; the index of [noframe/docs/](noframe/docs/), a file a subject |

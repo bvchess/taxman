@@ -30,13 +30,13 @@ every second line of the Java fixtures), and the comment on each says what the w
   * `tests/model_exact.rs` decides playability on the whole board with an oracle that shares no code with `frames` or
     `model` (`src/playable.rs`, the peel, itself checked against the rules on every subset of the games to 20).  It
     checks both directions of X7 on every set of every game to 100 (to 120 ignored) and on random sets of games
-    to 1300 (to 8191 ignored), and the near miss that only the candidate filter keeps out (n = 98).
+    to 1300 (to 10239 ignored), and the near miss that only the candidate filter keeps out (n = 98).
   * `tests/bottom_layers.rs` checks F4 on every game of the committed chain and another run of
     its lines for 2176–2276 (`testdata/c8g.chain-2176.jsonl`), every optimal set the prover enumerated, and every
     optimal set of the games to 48.
   * The unit tests of `frames` check that `unzip`'s claims are its mandatory pairs, that `numbering` is what
     `build_frames` uses, that the frames lie in layers (F1), and that the numbering by layer is the Java's
-    breadth-first numbering on every game to 400 and a sample to 8191.
+    breadth-first numbering on every game to 400 and a sample to 10239.
   * `tests/canonical_root.rs` checks that setup builds Π_n: its U\*, its candidates and its root frames are those of
     `src/root_problem.rs`, which builds Π_n from the definitions with no code of `frames` or `model`, on every game to
     200 (to 1000 ignored).
@@ -45,6 +45,10 @@ every second line of the Java fixtures), and the comment on each says what the w
     [taxman-notebook/the-claims-of-unzip-in-the-extended-problem-2026-10](https://github.com/bvchess/taxman-notebook/tree/main/the-claims-of-unzip-in-the-extended-problem-2026-10)).
     It checked what X7's proof says of setup one game at a time, that Π⁺(∅) with the claims of `unzip` is Π_n (check H),
     and that setup builds Π_n (check I).
+  * The census of every game from 8192 to 10239, the games of the widest set, is the ignored unit test
+    `census_of_the_boards_past_8191` of `frames`, run in a release build in minutes on 8 threads.  It makes the
+    checks of the first census but H, whose code the frame solver no longer has, and measures the frame counts and
+    the GF(2) ranks there ([frame-model.md](frame-model.md#setup-in-the-code), the paragraph "The censuses").
 * **Regression**: `taxman regress --to N` solves 1..N as one range and checks every score against the built-in table.
 * **Tactic invariance**: games 1..300, forced to search, give identical scores with each tactic off or changed, and a
   checkpoint is refused when any of the search tactics differs.
@@ -215,22 +219,23 @@ every second line of the Java fixtures), and the comment on each says what the w
   chain concludes exactly those, with the scores of a chain that searches them, from n = 1 (1..300) and from a results
   file that a stopped run left; a game with a checkpoint is resumed, not repeated.  A unit test of `board` checks that
   the problem set up again from n is the one the setup posed, and the same at two set widths.
-* **Large games** (`tests/wide.rs`): the Java stopped at 1000, and the sets that hold a game are 8 to 128 words wide,
+* **Large games** (`tests/wide.rs`): the Java stopped at 1000, and the sets that hold a game are 8 to 160 words wide,
   so these tests check the widths past 1023 against each other and against the committed results.
-  * The same game at every width that holds it (128 included) has the same frames, candidates, greedy set,
+  * The same game at every width that holds it (128 and 160 included) has the same frames, candidates, greedy set,
     `max_total`, answer and tree.
   * Game 1133 (W = 20, 41 nodes by default and a few thousand at most) under every tactic against the committed chain, and a
     slice of that chain; the prover's proof of game 1032, whose W = 20 search the tests also resume
     (`solver/noframe/data/exact_parity_2_2531.jsonl`), gives the committed score.
-  * A game of 2050 built at W = 64 (it dispatches to 36) and one of 4100 at 128 go through the frames, the matching
-    bound, conflicts, the greedy set and a node-limited search; games of 2050, 2400, 2800 and 3100 at the widths they
-    dispatch to (36, 40, 48 and 56) and at 64 (2050 also at 128) have the same start and the same node-limited search,
-    and 4095 at 64 and 128 the same start.
-  * The games past 4095 (4096, 4100, 4740, 6000, 6392, 8191) at 128 words are checked against the board layer's own
-    invariants: nine frames, the plain game, the freedoms, the greedy set and subsets of it promoted and played to the
-    score their sum says, and the root's GF(2) bound between the greedy sum and the matching bound, with three, four and
-    five block words.  The GF(2) bound's copies of four and five words (only at 128) search game 1000's tree as the
-    copy of one word does.
+  * A game of 2050 built at W = 64 (it dispatches to 36), one of 4100 at 128 and one of 8200 at 160 go through the
+    frames, the matching bound, conflicts, the greedy set and a node-limited search; games of 2050, 2400, 2800 and 3100
+    at the widths they dispatch to (36, 40, 48 and 56) and at 64 (2050 also at 128) have the same start and the same
+    node-limited search, and 4095 at 64 and 128 the same start, and 8191 at 128 and 160.
+  * The games past 4095 (4096, 4100, 4740, 6000, 6392, 8191) at 128 words, and past 8191 (8192, 8440, 9690, 10239) at
+    160, are checked against the board layer's own invariants: nine frames, or ten past 8191, the plain game, the
+    freedoms, the greedy set and subsets of it promoted and played to the score their sum says, and the root's GF(2)
+    bound between the greedy sum and the matching bound, with three to seven block words.  The GF(2) bound's copies of
+    four and five words at 128, and of six and seven at 160 (the only width that has them), search game 1000's tree as
+    the copy of one word does.  The boards at the steps of the frame count, and the largest, fit in a frame set.
   * The levels of a real depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`): the matching bound from
     scratch and with a member removed against the min-cost-flow reference; and promoting one number at a time
     (with its no-peel shortcut) against the peel of every frame, in reached states of games at W = 20, 28 and 64.  The
@@ -259,10 +264,10 @@ the computations behind the statements that are not proved are in [evidence.md](
 | Q1 | A search over the states of the pot that uses no theory (`heuristics/evaluation/certify.py`) finds the heaviest set of sources unique in every game to 62. |
 | Q3 | The prover's `src/moves.rs`: ℓ(n) and the heaviest longest game against brute force to 22, and ν(n) against the matching solver on every board to 400. |
 | W1 | The heuristics' check above, to 22.  The prover's parity bound is at least opt(n) on every game to 2531 (`solver/noframe/data/exact_parity_2_2531.jsonl`), and the recorded moves are independent at both parities on every game to 2531 (`exact` asserts both before any search); the intersection agrees with brute force on 3,000 random pairs of matroids ([matroid intersection bounds](https://github.com/bvchess/taxman-notebook/blob/main/search/matroid-intersection-bounds-2026-10/README.md)). |
-| F1, F3, F6 | The census of every board 2..8191 (above): its check A, that each frame lies in one layer and the frames in front of it one layer down, and its check C, clean numbering; the unit tests of `frames` (above). |
+| F1, F3, F6 | The censuses of every board 2..8191 and 8192..10239 (above): their check A, that each frame lies in one layer and the frames in front of it one layer down, and their check C, clean numbering; the unit tests of `frames` (above). |
 | F4 | `tests/bottom_layers.rs` (above). |
-| X1 to X7 | `tests/model_exact.rs` (above), and the census's checks D to G: no candidate has a back claim's factor among its maximal factors (X5), none is a factor of a frame numbered 0 and every one has a home (X3, X6), and the sources played are the U\* of `src/root_problem.rs` (X1); check I and `tests/canonical_root.rs` (above), that setup builds Π_n. |
-| E5 | The census's check H (above): Π⁺(∅) with the claims is Π_n. |
+| X1 to X7 | `tests/model_exact.rs` (above), and the censuses' checks D to G: no candidate has a back claim's factor among its maximal factors (X5), none is a factor of a frame numbered 0 and every one has a home (X3, X6), and the sources played are the U\* of `src/root_problem.rs` (X1); check I and `tests/canonical_root.rs` (above), that setup builds Π_n. |
+| E5 | The first census's check H (above): Π⁺(∅) with the claims is Π_n, on every board to 8191. |
 | B1, B4 | The study of the multi-field bound ([its entry](https://github.com/bvchess/taxman-notebook/blob/main/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md); its programs build at commit 8753189): every promotion set of the boards with at most 22 candidates, and sampled ones of the boards 137..400, independent under the plain signing and five random signings over GF(3) of every frame, 6.4 million pairs, and 14,472 of every 25th board of 400..2175 in 4,320 signed frames; the decomposition bound never below P\* under random multipliers at 309 roots of 2..400 and at 400..2175. |
 | B2 | The GF(2) bound under bound soundness (above).  At every root of 2..1300 that is not prime the bound is at least P\*, and every promotion set of the 90 roots with at most 22 candidates is independent in every frame ([matroid intersection bounds](https://github.com/bvchess/taxman-notebook/blob/main/search/matroid-intersection-bounds-2026-10/README.md)). |
 | R2, R3, R7 | The prime exchanges and the near-repeat cut under bound soundness, the soundness harness, and the tripwires (above). |
