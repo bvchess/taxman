@@ -1,3 +1,9 @@
+root = true
+
+# Lines wrap at 120 columns, in every kind of file (solver/rustfmt.toml says the same to rustfmt).
+[*]
+max_line_length = 120
+
 # The site's HTML indents two spaces a level, and the text of a paragraph, list item, definition or caption wraps flush
 # with its opening tag.  JetBrains editors indent such text one level by default; the last line keeps it flush.
 [*.html]
