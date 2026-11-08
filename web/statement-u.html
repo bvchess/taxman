@@ -126,12 +126,13 @@
 <section class="chapter" id="why-open" data-toc="why-open" aria-labelledby="h-why-open">
   <h2 id="h-why-open">Where a proof stops</h2>
   <p>Why is statement U hard to prove?  Suppose an optimal game leaves out some numbers of U* with three or more prime
-  factors, and let d be the largest of them.  Adding d would raise the score, so, since the game is optimal, its moves
-  with d added are not playable.  A proof would find a trade: give up a smaller number the game plays, so that the game
-  can play d in its place, and the score rises, which an optimal game cannot allow.  In layer 2 such a trade always
-  exists, and that is how chapter 3 settles the numbers with two prime factors.  Above layer 2, an
-  <a class="gloss" href="glossary.html#odd-core">odd core</a> (<a href="bound.html#odd-cores">chapter 6</a>) can catch
-  d, and there the argument that works in layer 2 stops
+  factors, and let d be the largest of them.  Adding d would raise the score, so the game cannot play d as it stands: a
+  knot of numbers in d's layer, a core, keeps d from being paid for.  A proof would cut the knot with a trade that
+  raises the score.  The game could give up a smaller number of the knot and play d in its place, or give up a move
+  below n/2, whose return to the pot pays for d.  Either trade beats an optimal game, which is impossible, so a
+  counterexample must block both.  In layer 2 such a trade always exists, and that is how chapter 3 settles the numbers
+  with two prime factors.  Above layer 2, the knot can be an <a class="gloss" href="glossary.html#odd-core">odd core</a>
+  (<a href="bound.html#odd-cores">chapter 6</a>), and no one has found a trade that is sure to cut one
   (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#where-a-proof-stops">a
   sketch</a>).</p>
 </section>
