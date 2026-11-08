@@ -20,6 +20,7 @@ import { fitsFacts, fitsWords, primeFacts, primeWords } from '../figures/fits.js
 import { slipFacts, slipOfRecord } from '../figures/slip.js';
 import { linkWords, linksFacts } from '../figures/links.js';
 import { GROUPS, PROVER_TO, RULES, oneSearchFacts, settled } from '../js/proof.js';
+import { boundFacts } from '../figures/bounds-chart.js';
 import { restsFacts } from '../figures/rests-on.js';
 import { readResults, repoRoot } from './results.mjs';
 
@@ -330,6 +331,24 @@ records.forEach((r, i) => {
   if (cols.proof[i] !== r.proof || cols.score[i] !== r.score) stale.push(`game ${r.n}: proof or score differs`);
 });
 same('games.json is the export of the results file (run node web/tools/export.mjs)', stale.slice(0, 5), []);
+// data/bounds.json: both bounds for every game from 2, each at least the score, and the parity bound the closer.
+{
+  const bounds = JSON.parse(readFileSync(join(repoRoot, 'web', 'data', 'bounds.json'), 'utf8'));
+  const b = bounds.columns;
+  same('bounds.json has every n from 2 to the last game', b.n, Array.from({ length: games.lastN - 1 }, (_, k) => k + 2));
+  same('bounds.json has both bounds for every game', [b.fm.length, b.parity.length], [b.n.length, b.n.length]);
+  const misordered = b.n.filter((n, i) => !(b.fm[i] >= b.parity[i] && b.parity[i] >= cols.score[n - 1]));
+  same('Franklín and Moniot\'s bound is at least the parity bound, which is at least the score', misordered, []);
+  const EXACT_TO = 77;
+  const inexact = b.n.filter((n, i) => b.parity[i] !== cols.score[n - 1]);
+  same(`the parity bound equals the score for every n up to ${EXACT_TO}, and not at ${EXACT_TO + 1}`,
+    inexact[0], EXACT_TO + 1);
+  const facts = boundFacts(games, bounds);
+  same('the facts of the bounds chart', [facts.exactTo, facts.fmOver, facts.parityOver], [EXACT_TO, 17, 4]);
+  checks++;
+  if (!(facts.overLast < 187)) failures.push(`a bound is over 0.5% above opt(n) at game ${facts.overLast}, past game 186`);
+  same('the gaps at the last game', [facts.fmGapLast, facts.parityGapLast], [20219, 2557]);
+}
 same('every line of the results file assumes nothing',
   records.filter((r) => r.assumes.length > 0).map((r) => r.n).slice(0, 5), []);
 

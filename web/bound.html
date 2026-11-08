@@ -102,6 +102,16 @@
     <p>Franklín and Moniot's paper gives a looser bound: the heaviest set whose numbers can each have a maximal factor
     of their own, from outside the set, to pay with.  Every set that passes the parity test passes theirs, but the
     parity bound comes far closer to opt(n): its gap is about a tenth of theirs.</p>
+  </div>
+
+  <figure class="fig wide bounds-fig" id="bounds">
+    <div class="chart">
+      <div class="chart-box"></div>
+    </div>
+    <figcaption class="fig-caption"></figcaption>
+  </figure>
+
+  <div class="para">
     <p>Each way of handing out factors is a <a class="gloss" href="glossary.html#payment-scheme">payment scheme</a>, and
     counting a set's schemes shows what each bound allows.  Group the schemes by the factors they pay with, and count
     the schemes in each group.  Franklín and Moniot's bound allows the set when some group has at least one scheme, and
@@ -221,18 +231,25 @@
 
 <script type="module">
 import { initEssay, registerFigure } from './js/essay.js';
-import { loadSmall } from './js/data.js';
+import { loadBounds, loadGames, loadSmall } from './js/data.js';
 import { listWords, fmt } from './js/vocab.js';
 import { mountLadder } from './figures/ladder.js';
 import { mountParityTables } from './figures/parity-table.js';
+import { mountBoundsChart } from './figures/bounds-chart.js';
 import { mountExact78 } from './figures/exact-78.js';
 
 initEssay();
-const small = await loadSmall();
+const [small, games, bounds] = await Promise.all([loadSmall(), loadGames(), loadBounds()]);
 const fill = (attr, facts) => {
   for (const span of document.querySelectorAll(`[data-${attr}]`)) span.textContent = facts[span.dataset[attr]];
 };
 
+const boundFacts = mountBoundsChart(document.querySelector('#bounds .chart'), { games, bounds });
+for (const span of document.querySelectorAll('[data-bounds]')) {
+  const value = boundFacts[span.dataset.bounds];
+  if (value === undefined) throw new Error(`data-bounds="${span.dataset.bounds}" names no fact`);
+  span.textContent = fmt(value);
+}
 registerFigure('ladder', mountLadder(document.getElementById('ladder')));
 mountParityTables(document.getElementById('parity-table'));
 const e78 = mountExact78(document.getElementById('exact-78'), { small });

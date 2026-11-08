@@ -1,4 +1,4 @@
-// The data, loaded once a page: the chain's columns (games.json), the first games' moves (small.json), and two
+// The data, loaded once a page: the chain's columns (games.json), the first games' moves (small.json), the bounds (bounds.json), and two
 // counts that are in neither (START_5060, PROMOTION_SETS).
 
 const base = new URL('../data/', import.meta.url);
@@ -17,6 +17,10 @@ function load(name) {
 /** games.json: { source, lastN, columns: { n, score, proof, method, nodes, seconds, moves, promotions,
  *  candidates, inTheBag } }. */
 export const loadGames = () => load('games.json');
+
+/** bounds.json: { files, lastN, columns: { n, fm, parity } } for games 2 to lastN: Franklín and Moniot's bound and the
+ *  parity bound at the root of each game, from the prover's files. */
+export const loadBounds = () => load('bounds.json');
 
 /** small.json: [{ n, score, moves, promotions }] for the first games. */
 export const loadSmall = () => load('small.json');

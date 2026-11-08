@@ -37,6 +37,11 @@ tools/summarize.py check 2 2531 data/exact_parity_2_2531.jsonl
 ./target/release/exact --from 2 --to 2530 --budget 1 --out PRE.jsonl    # no search, only the roles' checks (about a
                                     # second a game); each line's "relation" says whether the game needs a search
                                     # (none) or rests on the game before it (chain, prime, semiprime)
+./target/release/exact --from 2532 --to 5060 --budget 1 --threads 2 --out data/rootbounds_2532_5060.jsonl
+                                    # the root bounds of the chain's games past 2531 (the file proves nothing): with no
+                                    # search, each line has the game's two bounds and the score replayed from the
+                                    # chain.  The build of commit d5a5b7ca took 1,245 s on two threads; sort the lines
+                                    # by n
 ./target/release/upper --from 1301 --to 2175 --out data/upper_1301_2175.jsonl          # one thread, 5 minutes
 ./target/release/upper --from 2176 --to 3314 --out data/upper_2176_3314.jsonl          # 21 minutes
 ./target/release/upper --from 3315 --to 3440 --out data/upper_3315_3440.jsonl          # 5 minutes

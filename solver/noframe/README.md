@@ -62,6 +62,9 @@ Its files, in [docs/](docs/):
 * [proofs.md](docs/proofs.md) proves the recorded scores to 2531 by a branch and bound over the picks, limited
   by the Franklín–Moniot bound and the *parity bound*, whose gap is about a tenth of the Franklín–Moniot bound's.  The
   chain's games past 2531 are proven within the frame model alone, not by the prover.
+  For those games, [data/rootbounds_2532_5060.jsonl](data/rootbounds_2532_5060.jsonl) records the two bounds at each
+  game's root and the chain's score, so that the bounds can be compared with opt(n) to the last game; it proves
+  nothing, and [reproducing.md](docs/reproducing.md) has its command.
 * [star.md](docs/star.md#adversarial-search-what-protects-greedy) also searches Taxman-shaped synthetic instances for
   what protects greedy: the *window law*, taken with respect to the same ranking of the primes that decides which
   products fall in the window (n/2, n].

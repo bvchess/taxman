@@ -25,6 +25,10 @@
 .rung.is-yes .rung-answer { font-weight: 700; color: var(--ink); }
 .rung.is-no .rung-answer { color: var(--ink-3); }
 
+/* ---- the bounds chart -------------------------------------------------------------------------------------- */
+
+.bounds-fig .chart-box { position: relative; }
+
 /* ---- game 78's odd core ----------------------------------------------------------------------------------- */
 
 .exact-78-fig { margin: 12px 0 16px; }
