@@ -20,8 +20,8 @@
 <header class="essay-head para">
   <p class="kicker">Chapter 2</p>
   <h1>Walking up the chain</h1>
-  <p class="lede">Game n is often easy if you know an optimal set of moves for game n − 1.  So we play the games in order, from
-  game 1 up, and this way most games end quickly.</p>
+  <p class="lede">Game n is often easy if you know an optimal set of moves for game n − 1.  So we play the games in
+  order, from game 1 up, and this way we solve most games quickly.</p>
 </header>
 
 <section class="chapter" id="ceiling" data-toc="ceiling" aria-label="The ceiling">
@@ -44,11 +44,11 @@
     same order, in game n, with every <a class="gloss" href="glossary.html#move">move</a> taking the same tax as before.
     So the best score cannot fall: <a class="gloss" href="glossary.html#opt">opt(n)</a> is at least opt(n − 1).</p>
     <p>In fact the best score always rises from one game to the next.  In a game of n − 1 played in game n, the player
-    can play n as a move so long as one of its <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a> is still
-    in the pot.  So play n just before the move that takes the last of them from the pot, or at the end if one remains,
-    and leave that move out if you can no longer play it.  Everything after it stays legal, and the game gains n and
-    loses at most that move, which is smaller than n.  So the moves of a game of n − 1 are never an optimal game of n,
-    and every optimal game of n plays n.</p>
+    can play n as a move so long as one of its <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a>
+    is still in the pot.  So play n just before the move that takes the last of them from the pot, or at the end if one
+    remains, and leave that move out if you can no longer play it.  Everything after it stays legal, and the game gains
+    n and loses at most that move, which is smaller than n.  So the moves of a game of n − 1 are never an optimal game
+    of n, and every optimal game of n plays n.</p>
     <p>Consider n = 12.  Game 11's best score is <span data-opt="11">44</span>, and its optimal game, played in game 12,
     takes the same tax with every move and leaves 12 in the pot.  The maximal factors of
     <span class="n" data-n="12">12</span> are <span class="n" data-n="4">4</span> and
