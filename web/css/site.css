@@ -862,6 +862,7 @@ table.symbols, table.counts { border-collapse: collapse; margin: 1rem 0 1.4rem; 
 :is(table.symbols, table.counts) td:first-child { font-weight: 700; white-space: nowrap; }
 table.counts :is(th, td) + :is(th, td) { text-align: right; padding-left: 1.2rem; }
 table.counts :is(th, td):last-child { padding-right: 0; }
+table.counts th { vertical-align: bottom; }
 
 @media (max-width: 560px) {
   dl.glossary { grid-template-columns: minmax(0, 1fr); }

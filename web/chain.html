@@ -308,7 +308,7 @@
   </div>
 
   <figure class="fig chart" id="settled">
-    <p class="chart-sub">Every game of the chain, a cell each, a hundred to a row from game 1 at the top left, with a
+    <p class="chart-sub">Every game of the chain, a cell each, 120 to a row from game 1 at the top left, with a
     color for how we proved it.  The dark green cells are the searches.</p>
     <div class="chart-key rule-legend"></div>
     <div class="chart-box"></div>
@@ -328,10 +328,12 @@
     <p>Each game we settle without a search of its own rests on an earlier game, most often game n − 1, so the chain has
     to find its games in order, from game 1 up: the chain reaches game 5,000 by walking there.</p>
   </div>
-  <p>The chart has vertical stripes.  A column holds the games that end in the same two digits, and the stripes are
-  most prominent when 20 divides n. In the last column, games 100, 200, 300 and on, every one of the
-  <span data-stripes="col100">50</span> games needed a search, and so did all <span data-stripes="col20">51</span> in
-  the column of game 20.  Why should the last two digits of n matter to a search?</p>
+  <p>The chart has vertical stripes.  A row holds 120 games, so the games in a column leave the same remainder when n
+  is divided by 120, and that remainder decides whether 2, 3, 4, 5 and 8 divide n.  The dark stripes are where 8, 12,
+  20 or 30 divides n: every game in the columns of games <span data-stripes="darkColumns">56, 80 and 100</span>
+  needed a search.  The light stripes are where n is twice a number with no factor 2, 3 or 5: every game in the
+  columns of games <span data-stripes="lightColumns">22, 26, 34, 38, 58 and 82</span> reached its ceiling.  Why
+  should this remainder matter so much?</p>
 </section>
 
 <section class="chapter" id="cofactor" data-toc="cofactor" aria-labelledby="h-cofactor">
@@ -376,7 +378,7 @@
     </aside>
     <p>Count the prime factors of the cofactor, with repeats: the more there are, the likelier a search.</p>
     <table class="counts">
-      <thead><tr><th>prime factors of the cofactor</th><th>games from 188 on</th><th>needed a search</th></tr></thead>
+      <thead><tr><th>number of prime factors<br>of the cofactor</th><th>games from 188 on</th><th>needed a search</th></tr></thead>
       <tbody>
         <tr><td>0 (n is prime)</td><td data-stripes="games0">635</td><td data-stripes="searched0">none</td></tr>
         <tr><td>1</td><td data-stripes="games1">1,316</td><td data-stripes="searched1">none</td></tr>
@@ -385,12 +387,14 @@
         <tr><td>4 or more</td><td data-stripes="games4">854</td><td data-stripes="searched4">92%</td></tr>
       </tbody>
     </table>
-    <p>This is what draws the stripes.  The cofactor holds every prime factor of n but its largest.  Past game 20, a
-    multiple of 20 has at least four prime factors, 2, 2, 5 and one more, so its cofactor has at least three and is
-    never 1, a prime, twice a prime or 9: of the chain's <span data-stripes="twenty">253</span> multiples of 20,
-    <span data-stripes="twentySearched">248</span> needed a search, and the other
-    <span data-stripes="twentyCeiling">5</span> reached their ceiling.  Past game 100, a multiple of 100 has at least
-    five prime factors, so its cofactor has at least four.</p>
+    <p>This is what draws the stripes.  The cofactor holds every prime factor of n but its largest.  Past 8, 12, 20 and
+    30 themselves, a number that one of them divides has at least four prime factors, so its cofactor has at least
+    three and is never 1, a prime, twice a prime or 9: of the chain's <span data-stripes="dark">1,012</span> such
+    games, <span data-stripes="darkSearched">951</span> needed a search, and the other
+    <span data-stripes="darkCeiling">61</span> reached their ceiling.  Twice a number with no factor 2, 3 or 5 is the
+    other way round: its cofactor is a prime or twice a prime in <span data-stripes="lightNamed">639</span> of the
+    chain's <span data-stripes="light">674</span> such games, and only <span data-stripes="lightSearched">13</span> of
+    them needed a search.</p>
   </div>
   <p>A game that needs a search still gets help from game n − 1: its search starts near the best, and the search can
   stop if it reaches the ceiling (<a href="search.html#head-start">chapter 5</a>).</p>
@@ -404,7 +408,7 @@
 <script type="module">
 import { initEssay, registerFigure } from './js/essay.js';
 import { loadGames, loadSmall } from './js/data.js';
-import { fmt } from './js/vocab.js';
+import { fmt, listWords } from './js/vocab.js';
 import { pct } from './js/chart.js';
 import { fillOneSearch } from './js/proof.js';
 import { mountFits, mountPrime } from './figures/fits.js';
@@ -452,10 +456,11 @@ const cofFacts = {
 fill('cof', (key) => cofFacts[key]);
 
 // The stripes of the chain chart.
-const { col100, col20, twenty, byCount } = stripeFacts(games);
+const { byCount, darkColumns, lightColumns, dark, light } = stripeFacts(games);
 const stripeText = {
-  col100: fmt(col100.games), col20: fmt(col20.games),
-  twenty: fmt(twenty.games), twentySearched: fmt(twenty.searched), twentyCeiling: fmt(twenty.ceiling),
+  darkColumns: listWords(darkColumns.map(fmt)), lightColumns: listWords(lightColumns.map(fmt)),
+  dark: fmt(dark.games), darkSearched: fmt(dark.searched), darkCeiling: fmt(dark.ceiling),
+  light: fmt(light.games), lightNamed: fmt(light.named), lightSearched: fmt(light.searched),
   ...Object.fromEntries(byCount.flatMap((g, k) => [
     [`games${k}`, fmt(g.games)],
     [`searched${k}`, g.searched === 0 ? 'none' : pct(g.searched / g.games, 0)],

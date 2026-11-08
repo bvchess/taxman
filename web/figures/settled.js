@@ -1,4 +1,4 @@
-// How every game of the chain was settled, in the terms of chapter 2: a cell for each game, a hundred to a row, game 1
+// How every game of the chain was settled, in the terms of chapter 2: a cell for each game, 120 to a row, game 1
 // at the top left, so that the grid grows downward as the chain does.  Each cell is
 // shaded by the rule of its game (js/proof.js), from data/games.json alone:
 //
@@ -33,6 +33,9 @@ export function ruleCell(parent, key, x, y, w, h = w) {
   return el('rect', { x, y, width: w, height: h, rx: Math.min(2, w / 4, h / 4), class: `rule-cell is-${key}` }, parent);
 }
 
+/** Games to a row: a column then fixes whether 2, 3, 4, 5 and 8 divide n. */
+export const COLS = 120;
+
 export function mountSettled(host, { games }) {
   const c = games.columns;
   const facts = settled(games);
@@ -46,30 +49,31 @@ export function mountSettled(host, { games }) {
 
   responsive(box, (width) => {
     const labelW = 46;
-    const cols = 100;
-    const pitch = (width - labelW - 2) / cols;
-    const gap = pitch >= 7 ? 2 : 1;
+    const pitch = (width - labelW - 2) / COLS;
+    // The gap narrows with the cells, so that on a phone the colors are not lost between them.
+    const gap = pitch >= 7 ? 2 : pitch >= 4 ? 1 : 0.5;
     const size = pitch - gap;
-    const rows = Math.ceil(total / cols);
+    const rows = Math.ceil(total / COLS);
     const top = 6;
     const height = top + rows * pitch + 8;
     const svg = freshSVG(box, width, height, `Every game of the chain from game 1 to game ${fmt(last)}, a cell each, `
-      + `${cols} to a row from game 1 at the top left, each color showing how we settled the game. `
+      + `${COLS} to a row from game 1 at the top left, each color showing how we settled the game. `
       + 'The counts are in the legend and in the table below.');
     const at = (i) => {
-      const r = Math.floor(i / cols);
-      return { x: labelW + (i % cols) * pitch, y: top + r * pitch };
+      const r = Math.floor(i / COLS);
+      return { x: labelW + (i % COLS) * pitch, y: top + r * pitch };
     };
     const g = el('g', {}, svg);
     rules.forEach((key, i) => {
       const p = at(i);
       ruleCell(g, key, p.x, p.y, size);
     });
-    // The first game of every thousandth row at its left, and the last game after its cell.
+    // The first game of every tenth row at its left, and the last game after its cell.
     const every = 10;
     for (let r = 0; r < rows; r += every) {
-      const t = el('text', { x: labelW - 8, y: at(r * cols).y + size / 2 + 4, 'text-anchor': 'end', class: 'tick' }, svg);
-      t.textContent = fmt(r * cols + 1);
+      const y = at(r * COLS).y + size / 2 + 4;
+      const t = el('text', { x: labelW - 8, y, 'text-anchor': 'end', class: 'tick' }, svg);
+      t.textContent = fmt(r * COLS + 1);
     }
     const lastAt = at(total - 1);
     const lastLabel = el('text', { x: lastAt.x + size + 6, y: lastAt.y + size / 2 + 4, class: 'tick' }, svg);
@@ -78,7 +82,7 @@ export function mountSettled(host, { games }) {
     // The hover layer: the cell under the pointer, and its game in the tooltip.
     const ring = el('rect', { width: size + 3, height: size + 3, rx: 2, class: 'rule-ring', opacity: 0 }, svg);
     const hit = el('rect', {
-      x: labelW, y: top, width: cols * pitch, height: rows * pitch, fill: 'transparent', class: 'hit',
+      x: labelW, y: top, width: COLS * pitch, height: rows * pitch, fill: 'transparent', class: 'hit',
       'aria-label': 'Explore the games with the arrow keys',
     }, svg);
     const show = (i) => {
@@ -100,8 +104,8 @@ export function mountSettled(host, { games }) {
       const r = svg.getBoundingClientRect();
       const col = Math.floor((e.clientX - r.left - labelW) / pitch);
       const row = Math.floor((e.clientY - r.top - top) / pitch);
-      const i = row * cols + col;
-      if (col < 0 || col >= cols || row < 0 || i >= total) hide();
+      const i = row * COLS + col;
+      if (col < 0 || col >= COLS || row < 0 || i >= total) hide();
       else show(i);
     });
     hit.addEventListener('pointerleave', hide);

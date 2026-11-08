@@ -9,7 +9,7 @@ import { omega, primeFactors } from '../js/model.js';
 import { el, fmt } from '../js/vocab.js';
 import { freshSVG, pct, responsive, tableView, tooltip } from '../js/chart.js';
 import { NO_SEARCH, RULE, RULES, isPrime, ruleOf } from '../js/proof.js';
-import { legendHTML, ruleCell } from './settled.js';
+import { COLS, legendHTML, ruleCell } from './settled.js';
 
 export const FROM = 188;
 
@@ -54,54 +54,82 @@ export function cofactorCounts(games) {
   };
 }
 
-/** The stripes of the chain chart, counted by the chart's own rules (ruleOf), and the claims the page makes of them,
- *  checked here: every game with n % 100 === 0 or n % 100 === 20 was searched; no game from FROM on whose cofactor has
- *  fewer than two prime factors was searched, and the share searched rises from two to three to four or more; every
- *  multiple of 20 that was not searched reached its ceiling; the cofactor of a multiple of 20 above 20 has at least
- *  three prime factors, and that of a multiple of 100 above 100 at least four.  Counts are of prime factors with
- *  multiplicity.  col100 and col20 hold the games with n % 100 === 0 and n % 100 === 20; twenty, those with
- *  n % 20 === 0, with how many reached their ceiling.  byCount groups the games from FROM on by omega(cofactor(n)),
- *  4 standing for four or more.  Each group holds its games and how many were searched. */
+/** The stripes of the chain chart (COLS games to a row), counted by the chart's own rules (ruleOf), and the claims the
+ *  page makes of them, checked here.  A column is named by its first game r, 1 to COLS, and holds the games with
+ *  (n - 1) % COLS + 1 === r.  darkColumns are the r whose games were all searched, lightColumns the r whose games
+ *  include no search.  dark counts the games whose n is divisible by 8, 12, 20 or 30, with how many were searched and
+ *  how many reached their ceiling; light, those whose n is twice a number with no factor 2, 3 or 5, with how many were
+ *  searched and how many have a cofactor that is a prime or twice a prime (named).  byCount groups the games from FROM
+ *  on by omega(cofactor(n)), the count of prime factors with multiplicity, 4 standing for four or more; each group
+ *  holds its games and how many were searched.
+ *
+ *  Claims: both lists of columns are non-empty; every dark column's r is divisible by 8, 12, 20 or 30; every light
+ *  column's r is twice a number with no factor 2, 3 or 5, and all its games reached their ceiling; every dark game was
+ *  searched or at its ceiling; every dark n other than 8, 12, 20 and 30 has a cofactor of at least three prime factors
+ *  that is never 1, a prime, twice a prime or 9; no game from FROM on whose cofactor has fewer than two prime factors
+ *  was searched, and the share searched rises from two to three to four or more. */
 export function stripeFacts(games) {
   const c = games.columns;
   const group = () => ({ games: 0, searched: 0 });
-  const col100 = group();
-  const col20 = group();
-  const twenty = { ...group(), ceiling: 0 };
+  const isDark = (n) => n % 8 === 0 || n % 12 === 0 || n % 20 === 0 || n % 30 === 0;
+  const isLight = (n) => n % 2 === 0 && n % 4 !== 0 && n % 3 !== 0 && n % 5 !== 0;
+  const columns = Array.from({ length: COLS + 1 }, () => ({ games: 0, searched: 0, ceiling: 0 }));
+  const dark = { ...group(), ceiling: 0 };
+  const light = { ...group(), named: 0 };
   const byCount = [0, 1, 2, 3, 4].map(group);
-  let unexplained = 0;
-  let twentyMin = Infinity;
-  let hundredMin = Infinity;
+  const namedKinds = KINDS.slice(0, 4);
+  const claims = [];
+  const claim = (holds, text) => { if (!holds) claims.push(text); };
   for (let i = 0; i < c.n.length; i++) {
     const n = c.n[i];
     const rule = ruleOf(c, i);
     const searched = rule === 'search' ? 1 : 0;
     const add = (g) => { g.games++; g.searched += searched; };
-    const count = omega(cofactor(n));
-    if (n % 100 === 0) add(col100);
-    if (n % 100 === 20) add(col20);
-    if (n % 20 === 0) {
-      add(twenty);
-      if (rule === 'ceiling') twenty.ceiling++;
-      else if (!searched) unexplained++;
-      if (n > 20) twentyMin = Math.min(twentyMin, count);
+    const col = columns[((n - 1) % COLS) + 1];
+    add(col);
+    if (rule === 'ceiling') col.ceiling++;
+    const k = cofactor(n);
+    const count = omega(k);
+    if (isDark(n)) {
+      add(dark);
+      if (rule === 'ceiling') dark.ceiling++;
+      claim(searched || rule === 'ceiling',
+        `game ${n}, divisible by 8, 12, 20 or 30, was neither searched nor at its ceiling`);
+      if (![8, 12, 20, 30].includes(n)) {
+        claim(count >= 3, `game ${n}, divisible by 8, 12, 20 or 30, has a cofactor of fewer than three prime factors`);
+        claim(!namedKinds.some((g) => g.test(k)),
+          `game ${n}, divisible by 8, 12, 20 or 30, has a cofactor the rule names`);
+      }
+    }
+    if (isLight(n)) {
+      add(light);
+      if (namedKinds.slice(1, 3).some((g) => g.test(k))) light.named++;
     }
     if (n >= FROM) add(byCount[Math.min(count, 4)]);
-    if (n % 100 === 0 && n > 100) hundredMin = Math.min(hundredMin, count);
+  }
+  const darkColumns = [];
+  const lightColumns = [];
+  for (let r = 1; r <= COLS; r++) {
+    const col = columns[r];
+    if (col.games && col.searched === col.games) darkColumns.push(r);
+    if (col.games && col.searched === 0) lightColumns.push(r);
+  }
+  claim(darkColumns.length > 0, 'no column was searched in every game');
+  claim(lightColumns.length > 0, 'no column was searched in no game');
+  for (const r of darkColumns) {
+    claim([8, 12, 20, 30].some((d) => r % d === 0), `dark column ${r} is not divisible by 8, 12, 20 or 30`);
+  }
+  for (const r of lightColumns) {
+    claim(isLight(r), `light column ${r} is not twice a number with no factor 2, 3 or 5`);
+    claim(columns[r].ceiling === columns[r].games, `a game in light column ${r} is not at its ceiling`);
   }
   const share = (k) => byCount[k].searched / byCount[k].games;
-  const claims = [
-    [col100.searched === col100.games, 'a game with n % 100 = 0 was not searched'],
-    [col20.searched === col20.games, 'a game with n % 100 = 20 was not searched'],
-    [byCount[0].searched === 0 && byCount[1].searched === 0,
-      'a game whose cofactor has fewer than two prime factors was searched'],
-    [share(2) < share(3) && share(3) < share(4), 'the share searched does not rise with the cofactor\'s prime factors'],
-    [unexplained === 0, 'a multiple of 20 was neither searched nor at its ceiling'],
-    [twentyMin >= 3, 'a multiple of 20 above 20 has a cofactor of fewer than three prime factors'],
-    [hundredMin >= 4, 'a multiple of 100 above 100 has a cofactor of fewer than four prime factors'],
-  ];
-  for (const [holds, claim] of claims) if (!holds) throw new Error(`the stripes: ${claim}`);
-  return { col100, col20, twenty, byCount };
+  claim(byCount[0].searched === 0 && byCount[1].searched === 0,
+    'a game whose cofactor has fewer than two prime factors was searched');
+  claim(share(2) < share(3) && share(3) < share(4),
+    'the share searched does not rise with the cofactor\'s prime factors');
+  if (claims.length) throw new Error(`the stripes: ${claims[0]}`);
+  return { byCount, darkColumns, lightColumns, dark, light };
 }
 
 export function mountCofactor(host, { games }) {

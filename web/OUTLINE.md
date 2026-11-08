@@ -141,19 +141,19 @@ points:* in game 833 every optimal game makes 362 moves, but a game can make 363
 * Often game n poses exactly the search problem of the game before it, and that game's answer carries over: a repeat.
   The solver looks for one once the problem is set up, before it searches (chapter 5).
 * Together these settle about 65% of the games with no search.  That is why the result is a chain: game 5000 is reached
-  by walking there.  The chart of the whole chain has stripes: the columns of 100 and of 20 are all searches, which
-  leads to the next section.
+  by walking there.  The chart of the whole chain, 120 to a row, has stripes, dark where 8, 12, 20 or 30 divides n
+  and light where n is twice a number with no factor 2, 3 or 5, which leads to the next section.
 * Which games need a search can usually be told from n alone, from its cofactor: n over its largest prime factor
   (measured).  The more prime factors the cofactor has, the likelier a search (a table), which draws the stripes: past
-  game 20, the cofactor of a multiple of 20 has at least three.  Those still get a start and a ceiling from game n − 1
-  (chapter 5).
+  8, 12, 20 and 30, the cofactor of a number one of them divides has at least three.  Those still get a start and a
+  ceiling from game n − 1 (chapter 5).
 
 **Examples.**  Games 9 to 13, small enough to follow by hand: game 12 from game 11 in the opening, 10 fits, 12 does not,
 and 13 is a prime.  The repeat is game 39, which the semiprime formula also settles.
 
 **Figures.**  Game 12 built from game 11's optimal game, animated.  The chain of bounds, games 1 to 16.  Game n − 1's
 optimal game over game n's, where n fits (10) and where it does not (12), each after its paragraph.  The prime swap
-(13), in the same rows.  The whole chain, a cell for each game, shaded by how it was proven.
+(13), in the same rows.  The whole chain, a cell for each game, 120 to a row, shaded by how it was proven.
 
 **Right column.**  The prime lemma (N1), monotonicity (N3), the ceiling lemma (N4), the prime formula (N5), the step
 theorem (N6), the half lemma (N7), the semiprime formula (J3), the repeat lemma (R6, its last part given statement U).
