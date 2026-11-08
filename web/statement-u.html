@@ -48,8 +48,8 @@
     <p>In <a href="top-half.html#bottom-layers">chapter 3</a> we've shown that every optimal game plays all of the
     numbers of U* that have one or two prime factors.  For those with three or more, it is an open question.
     <a class="gloss" href="glossary.html#statement-u">Statement U</a> says that some optimal game plays them all.  If it
-    failed for some value of n, every optimal game of n would give one of them up, free the factor that paid for it, and
-    win the points back with moves below n/2.</p>
+    failed for some value of n, every optimal game of n would give one of them up and win the points back elsewhere:
+    with other sources, or with moves below n/2.</p>
   </div>
 
   <div class="para">
@@ -125,17 +125,34 @@
 
 <section class="chapter" id="why-open" data-toc="why-open" aria-labelledby="h-why-open">
   <h2 id="h-why-open">Where a proof stops</h2>
-  <p>Why is statement U hard to prove?  Suppose an optimal game leaves out some numbers of U* with three or more prime
-  factors, and let d be the largest of them.  Adding d would raise the score, so the game cannot play d as it stands: a
-  knot of numbers in d's layer, a core, keeps d from being paid for.  A proof would cut the knot with a trade that
-  raises the score.  The game could give up a smaller number of the knot and play d in its place, or give up a move
-  below n/2, whose return to the pot pays for d.  Either trade beats an optimal game, which is impossible, so a
-  counterexample to statement U would have to block both.  In layer 2 such a trade always exists, and that is how
-  chapter 3 settles the numbers with two prime factors.  But above layer 2, the knot can be an
-  <a class="gloss" href="glossary.html#odd-core">odd core</a> (<a href="bound.html#odd-cores">chapter 6</a>), and no one
-  has found a trade that is sure to cut one
+  <p>Why is statement U hard to prove?  Here's what a proof would need to do.  It would be a proof by contradiction:
+  assume that statement U fails, and show that the assumption leads to something impossible, a game that scores more
+  than an optimal game.</p>
+  <ol class="rules">
+    <li><b>Assume it fails.</b>  Suppose statement U fails in game n.  Then every optimal game of n leaves out some
+    numbers of U* with three or more prime factors.  Take one such game, and let d be the largest number of U* it leaves
+    out.</li>
+    <li><b>Find what blocks d.</b>  Adding d would raise the score, so the game cannot add d and still pay for every
+    move: with d added, some group of numbers in d's layer cannot all be paid for.  Such a group, with no smaller one
+    inside it, is a <em>core</em>.  The game without d is playable, so d is in every core.</li>
+    <li><b>Trade to break the cores.</b>  The game could give up a smaller number that is in every core and play d in
+    its place, or give up a move below n/2, whose return to the pot pays for d.  Either trade swaps a number for the
+    larger d, so it raises the score.</li>
+    <li><b>Reach the contradiction.</b>  No game scores more than an optimal game, so the assumption was false, and
+    statement U holds.</li>
+  </ol>
+  <p>Step 3 is where the proof stops today.  Each trade gives up one number, and one is not always enough: if d lies in
+  two cores that share no smaller number, breaking both takes two, and together they can outweigh d.  In layer 2, d lies
+  in just one core, a single trade always breaks it, and that is how <a href="top-half.html#bottom-layers">chapter 3</a>
+  settles the numbers with two prime factors.  Above layer 2, d can lie in several cores, all but at most one of them
+  <a class="gloss" href="glossary.html#odd-core">odd cores</a> (<a href="bound.html#odd-cores">chapter 6</a>), and even
+  a lone core can block both trades.  No one has found a trade that is sure to work there
   (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#where-a-proof-stops">a
   sketch</a>).</p>
+  <p>A general proof of the sources conjecture (<a href="top-half.html#above-layer-two">chapter 3</a>), that no set of
+  sources outweighs U*, would not be enough.  An optimal game could still give up a number of U* and win the points back
+  with moves below n/2.  And a direct proof of the conjecture stops at the same place: among the sources alone, d can
+  lie in two cores that share no smaller number.</p>
 </section>
 
 <nav class="chapter-nav" aria-label="Pages"></nav>

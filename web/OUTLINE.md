@@ -267,7 +267,9 @@ to 2531.
   the parity bound of chapter 6, and has proven every game up to 2531.
 * The evidence past 2531: the lower layers (F4), the sources conjecture to 100,000, the barred bounds (about 80% of the
   numbers U asks about pass, in 2532 to 5060), and the root's heaviest set, which holds them all in every game.
-* Where a proof stops: the exchange that settles layer 2 fails at an odd core.
+* Where a proof stops: a proof by contradiction, in four steps, would beat any optimal game that leaves out a number
+  of U*; the trade that settles layer 2 fails at an odd core, and a proof of the sources conjecture would not be
+  enough.
 
 **Right column.**  The corollary of statement U (X8), statement U and its evidence (`docs/theory/evidence.md`), the
 prover (its README and `proofs.md`).
