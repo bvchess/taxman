@@ -79,10 +79,13 @@ better line.
 * **The cost.**  A game played again is a game's play at the run's level.  It takes the board it was played on if the
   run kept it, as it keeps those of its last 8 games, and the setup of the next game of the window is made while it
   plays; the repair's walk after it may set boards up again, a few seconds each at n ≈ 5,000.
-* **What it gains.**  On the 8 games below each of the 22 gains of a pass at level 3, 184 games, playing them again with
-  trajectories from the 8 games above raised 49 games in 10 streaks by 4,432 points.  The same work on 184 games in
-  random windows raised 6 games in 1 streak by 18 points.  In 8 of the 10 streaks the gain came from a trajectory that
-  began from a line above.  The pass was scripted, with seed 3, on 2026-11-08.
+* **What it gains.**  On the 8 games below the first game of each of the 23 streaks that a pass at level 3 raised
+  (22 windows, 184 games), playing them again with trajectories from the 8 games above raised 49 games in 10 streaks by
+  4,432 points.  The same work on 184 games in random windows raised 6 games in 1 streak by 18 points.  In 8 of the 10
+  streaks the first game's line came from a line above: in 7 from a trajectory that began from it, in 1 from the
+  repair's walk down from such a line.  Going on below each new gain, a script raised 211 games in 27 streaks in 102
+  thread-hours ([the
+  measurement](https://github.com/bvchess/taxman-notebook/blob/main/search/the-push-down-below-each-gain-2026-11/README.md)).
 
 ## Games played twice
 
