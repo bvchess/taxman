@@ -56,7 +56,8 @@ web/tools/publish.sh
 
 The site appears at https://vantuyl.com/taxman/.  `publish.sh` runs the test and sends everything in `web/` from the
 last commit except the working files its opening comment lists; a new working file, one the site does not serve,
-belongs on that list.  Every reference between the files is relative, so the site works from any folder.
+belongs on that list.  Every reference between the files is relative, so the site works from any folder.  `.htaccess`
+makes a browser check every file with the server on each visit, so that a publish reaches every reader at once.
 
 ## Add a figure
 

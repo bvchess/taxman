@@ -1,0 +1,10 @@
+# Every file of the site is checked with the server on each visit.  The host keeps scripts and styles for 30 days and
+# pages for 10 minutes, so after a publish a browser could pair a new page with an old script and break it.  With
+# no-cache a browser keeps its copy but asks whether it changed, and an unchanged file costs a short "not modified".
+<IfModule mod_expires.c>
+  ExpiresActive Off
+</IfModule>
+<IfModule mod_headers.c>
+  Header unset Expires
+  Header set Cache-Control "no-cache"
+</IfModule>
