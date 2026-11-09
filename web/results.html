@@ -39,8 +39,8 @@
   <figure class="fig explorer" id="explorer-fig" aria-label="The explorer: choose a game of the chain to see its record and, up to game 100, its optimal game."></figure>
 
   <div class="para">
-    <aside class="note tech" aria-label="A game's record, precisely">
-      <div class="note-head"><span class="note-name">A game’s record, precisely</span></div>
+    <aside class="note tech" aria-label="The fields of a game's record">
+      <div class="note-head"><span class="note-name">The fields of a game’s record</span></div>
       <p>The record is the game’s line of the results file.  Its <code>in_the_bag</code> is ΣU*, the score with no
       promotions.</p>
       <p>The run that made every line worked on up to four games at once.  A game’s time,
@@ -50,9 +50,9 @@
       frame solver’s reference</a>; <a href="https://github.com/bvchess/taxman/blob/master/results/runs.md">the
       run</a>).</p>
     </aside>
-    <p>Most of each score comes from the top half: <a class="gloss" href="glossary.html#u-star">U*</a>, the numbers
-    above n/2 that <a class="gloss" href="glossary.html#descending-greedy">descending greedy</a> keeps.  The promotions
-    chosen by the search add the rest.  The search grows steeply with n: in game 21 it explores
+    <p>Most of each score comes from <a class="gloss" href="glossary.html#u-star">U*</a>, the numbers in the top
+    half that <a class="gloss" href="glossary.html#descending-greedy">descending greedy</a> keeps.  The promotions
+    chosen by the search add the rest.  The search grows steeply with n.  In game 21 it explores
     <span data-fact="nodes21">1</span> <a class="gloss" href="glossary.html#node">node</a>, and in game
     <span data-last-n>5,060</span> it explores <span data-fact="nodesLast">1.2 billion</span>.</p>
     <p>The chain ran on an HPE ProLiant DL380 with two Intel Xeon E5-2699 v4 processors, 88 threads in all.  The
@@ -67,28 +67,29 @@
   <div class="para">
     <aside class="note card" aria-label="Hensley's theorem, proved">
       <div class="note-head"><span class="note-name">Hensley’s theorem<span class="note-label">Hensley, 1988</span></span><a class="standing is-proved" href="https://www.fq.math.ca/Scanned/26-3/hensley.pdf">proved<span class="sr-only">, the paper</span></a></div>
-      <p class="plain">As n grows, the player’s share tends to a limit: more than 50%, and at most 35/48, about
-      73%.</p>
-      <p class="precise"><span class="run">Precisely.</span>The limit C of opt(n) / (n²/2) exists, and 1/2 &lt; C ≤ 35/48:
+      <p class="plain">As n grows, the player’s share tends to a limit that is more than 50% and at most
+      35/48, about 73%.</p>
+      <p class="precise">The limit C of opt(n) / (n²/2) exists, and 1/2 &lt; C ≤ 35/48:
       D. Hensley, “A winning strategy at Taxman”, <i>The Fibonacci Quarterly</i> 26 (1988) 262–270.  The share has
       the same limit, since 1 + 2 + ⋯ + n = n(n + 1)/2 and (n + 1)/n tends to 1.</p>
     </aside>
     <aside class="note card" aria-label="Franklín and Moniot's Theorem 5, proved">
       <div class="note-head"><span class="note-name">The player can win all but two<span class="note-label">Franklín and Moniot, Theorem 5</span></span><a class="standing is-proved" href="https://arxiv.org/abs/2211.00461">proved<span class="sr-only">, the paper</span></a></div>
       <p class="plain">The player can beat the taxman in all but games 1 and 3.</p>
-      <p class="precise"><span class="run">Precisely.</span>Their born-free matching wins every game n ∉ {1, 3} but
+      <p class="precise">Their born-free matching wins every game n ∉ {1, 3} but
       games 7 and 13, which they win by hand: A. F. Franklín and R. K. Moniot, <i>Discrete Applied Mathematics</i> 339
       (2023) 166–171
       (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#what-the-paper-proves">what
       the paper proves</a>).</p>
     </aside>
     <p>An <a class="gloss" href="glossary.html#optimal-game">optimal game</a> wins a share of the
-    <a class="gloss" href="glossary.html#board">board</a>: its score, <a class="gloss" href="glossary.html#opt">opt(n)</a>,
-    divided by 1 + 2 + ⋯ + n, the total of the board.  The player beats the taxman when the share is above one half.
-    In every game of the <a class="gloss" href="glossary.html#chain">chain</a> except games <span data-fact="notWon">1
-    and 3</span>, it is.</p>
-    <p>In 1988 Douglas Hensley proved that as n grows, the share tends to a limit: more than 50%, and at most 35/48,
-    about 73%.  So in the long run the taxman keeps more than a quarter of the board.  The theorem does not say
+    <a class="gloss" href="glossary.html#board">board</a>, which is its score,
+    <a class="gloss" href="glossary.html#opt">opt(n)</a>, divided by 1 + 2 + ⋯ + n, the total of the board.  The player
+    beats the taxman when the share is above one half.  In every game of the
+    <a class="gloss" href="glossary.html#chain">chain</a> except games <span data-fact="notWon">1 and 3</span>, it
+    is.</p>
+    <p>In 1988 Douglas Hensley proved that as n grows, the share tends to a limit that is more than 50% and at most
+    35/48, about 73%.  So in the long run the taxman keeps more than a quarter of the board.  The theorem does not say
     what the limit is.</p>
   </div>
 
@@ -103,12 +104,12 @@
       <div class="note-head"><span class="note-name">The share near 63%</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/results/README.md#optimaljsonlgz">measured<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">From game 4,000 on, the share stays between <span data-fact="settledLo">62.8%</span> and
       <span data-fact="settledHi">63.0%</span>.</p>
-      <p class="precise"><span class="run">Precisely.</span>The share opt(n) / (n(n + 1)/2) stays in that range in every
+      <p class="precise">The share opt(n) / (n(n + 1)/2) stays in that range in every
       game from game 4,000 to game <span data-last-n>5060</span>, by the scores of results/optimal.jsonl.gz.  It
       measures finitely many games, and proves nothing about C.</p>
     </aside>
-    <p>The chain’s games put the limit near 63%.  The share swings widely in the first games and settles as n grows:
-    from game 4,000 on it stays between <span data-fact="settledLo">62.8%</span> and
+    <p>The chain’s games put the limit near 63%.  The share swings widely in the first games and settles as n grows.
+    From game 4,000 on it stays between <span data-fact="settledLo">62.8%</span> and
     <span data-fact="settledHi">63.0%</span>, and game <span data-last-n>5060</span> wins
     <span data-fact="endShare">62.9%</span>.  That is a measurement across a finite number of games, not a proof about
     the limit.</p>
@@ -120,16 +121,16 @@
   <div class="para">
     <aside class="note card" aria-label="One optimal set, to game 424, measured">
       <div class="note-head"><span class="note-name">One optimal set, to game 424</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-relaxation-proposition">measured<span class="sr-only">, evidence on GitHub</span></a></div>
-      <p class="plain">Every game up to 424 has exactly one optimal set; game 425 has two.</p>
-      <p class="precise"><span class="run">Precisely.</span>The <a class="gloss" href="glossary.html#prover">prover</a>
-      lists every optimal set of 954 of the games 2 to 989, every game to 797 among them: one in every game up to 424,
-      and two or three in 30 games from game 425 to game 779
+      <p class="plain">Every game up to 424 has a single optimal set; game 425 has two.</p>
+      <p class="precise">The <a class="gloss" href="glossary.html#prover">prover</a> lists every optimal set of 954 of
+      the games 2 to 989, every game to 797 among them.  It finds one in every game up to 424, and two or three in 30
+      games from game 425 to game 779
       (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#observations">the
       evidence</a>).</p>
     </aside>
     <p>A game usually has just one <a class="gloss" href="glossary.html#optimal-set">optimal set</a>.  The prover has
-    listed every optimal set of 954 of the games 2 to 989, and all but 30 of those have exactly one.  Game 425 is the
-    first with two.  The two differ by an exchange: one plays 110, 132 and 168, the other 98, 150 and 162, and both
+    listed every optimal set of 954 of the games 2 to 989, and all but 30 of those have only one.  Game 425 is the
+    first with two.  The two differ by an exchange.  One plays 110, 132 and 168, the other 98, 150 and 162, and both
     trios sum to 410 (<a href="frames.html#game-425">chapter 4</a>).</p>
     <p>So a game’s best score can be reached by more than one set of moves.  Where a game has several optimal sets, the
     chain keeps the one its search found
@@ -142,7 +143,7 @@
       <div class="note-head"><span class="note-name">How far an optimal game falls short</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-length-proposition">measured<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">Up to game 4,949, every recorded optimal game makes the most moves its board allows, except in
       games 833, 834 and 835, where it makes one fewer.</p>
-      <p class="precise"><span class="run">Precisely.</span>The prover settles ℓ(n), the most moves of a game of n, in
+      <p class="precise">The prover settles ℓ(n), the most moves of a game of n, in
       games 2 to 4,949.  Whether the shortfall is bounded is open.</p>
     </aside>
     <p>Nor does an <a class="gloss" href="glossary.html#optimal-game">optimal game</a> always make as many

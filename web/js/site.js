@@ -14,7 +14,7 @@ export const STORY = [
   { n: 4, title: 'Frames', line: 'What remains splits into frames, and only the promotions remain to choose.', href: 'frames.html' },
   { n: 5, title: 'Search', line: 'A search tries promotion sets until it proves that none beats the best one found.', href: 'search.html' },
   { n: 6, title: 'The parity bound', line: 'A bound limits how high a score can go, and the sharper it is, the less a search explores.', href: 'bound.html' },
-  { n: 7, title: 'Statement U', line: 'The one open statement the scores rest on, and the evidence for it.', href: 'statement-u.html' },
+  { n: 7, title: 'Statement U', line: 'The one open statement the scores depend on, and the evidence for it.', href: 'statement-u.html' },
   {
     n: 8, title: 'Results', line: 'The best scores, how we proved each one, and what they show.', href: 'results.html',
   },
@@ -39,7 +39,7 @@ export const ALONG = [
   },
   {
     title: 'One search, eight games', where: 'games 2,512 to 2,519', id: 'one-search', at: 2, href: 'chain.html#one-search',
-    line: `A game often poses exactly the search problem of an earlier game and so needs no search of its own.  Game
+    line: `A game often poses the same search problem as an earlier game and so needs no search of its own.  Game
       2,512 poses a new one, and games 2,513 to 2,519 all pose it again: one search serves eight games, more than any
       other in the chain.`,
   },

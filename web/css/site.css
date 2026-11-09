@@ -297,7 +297,7 @@ p.hurry { font-size: 0.92rem; color: var(--ink-3); margin: -0.4em 0 0; }
    statements. */
 .card { padding-top: 0.55rem; border-top: 1.5px solid var(--ink); }
 .card .plain { color: var(--ink); }
-.card .precise .run { font-weight: 700; color: var(--ink); margin-right: 0.3em; }
+.card .precise { padding-top: 0.45rem; border-top: 1px solid var(--hair); }
 .card .sub { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem; margin: 0.8rem 0 0.35rem; padding-top: 0.5rem; border-top: 1px solid var(--hair); color: var(--ink); font-weight: 700; }
 
 /* A technical note: notation, an exact definition, the mathematical version of a passage. */

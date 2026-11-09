@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Statement U · Taxman</title>
-<meta name="description" content="The scores of the chain of optimal Taxman games rest on one open statement, statement U: proven in every game up to 2,531 by a second program that searches the whole board, and the evidence for it past that game.">
+<meta name="description" content="The scores of the chain of optimal Taxman games depend on one open statement, statement U: proven in every game up to 2,531 by a second program that searches the whole board, and the evidence for it past that game.">
 <meta name="author" content="Brian Chess">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <script src="js/tone.js"></script>
@@ -19,24 +19,24 @@
 <header class="essay-head para">
   <p class="kicker">Chapter 7</p>
   <h1>Statement U</h1>
-  <p class="lede">The best scores past game 2,531 rest on one statement that we have not proven in general.  Up to game
-  2,531 the prover proves it, one game at a time.</p>
+  <p class="lede">The best scores past game 2,531 depend on one statement that we have not proven in general.  Up to
+  game 2,531 the prover proves it, one game at a time.</p>
 </header>
 
 <section class="chapter" id="what-supports-the-scores" data-toc="what-supports-the-scores" aria-labelledby="h-supports">
-  <h2 id="h-supports">What the scores rest on</h2>
+  <h2 id="h-supports">What the scores depend on</h2>
   <div class="para">
     <aside class="note card" aria-label="The corollary of statement U, proved">
       <div class="note-head"><span class="note-name">The corollary of statement U<span class="note-label">Corollary X8</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#statement-u">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">The frame model's best score is never above opt(n), and equals it exactly when statement U
       holds.</p>
-      <p class="precise"><span class="run">Precisely.</span>ΣU* + P*(Π<sub>n</sub>) ≤ opt(n), with equality iff
+      <p class="precise">ΣU* + P*(Π<sub>n</sub>) ≤ opt(n), with equality iff
       statement U holds at n.</p>
     </aside>
     <aside class="note card" aria-label="Statement U, open, proved to game 2,531">
       <div class="note-head"><span class="note-name">Statement U</span><a class="standing is-certified" href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">open, proved to game 2,531<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">Some optimal game plays every number of U* with three or more prime factors.</p>
-      <p class="precise"><span class="run">Precisely.</span>Some optimal set of n contains U*<sub>≥3</sub>.  It holds
+      <p class="precise">Some optimal set of n contains U*<sub>≥3</sub>.  It holds
       at every game the prover proves
       (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#statement-u">the evidence</a>).</p>
     </aside>
@@ -48,20 +48,20 @@
     <p>In <a href="top-half.html#bottom-layers">chapter 3</a> we've shown that every optimal game plays all of the
     numbers of U* that have one or two prime factors.  For those with three or more, it is an open question.
     <a class="gloss" href="glossary.html#statement-u">Statement U</a> says that some optimal game plays them all.  If it
-    failed for some value of n, every optimal game of n would give one of them up and win the points back elsewhere:
-    with other sources, or with moves below n/2.</p>
+    failed for some value of n, every optimal game of n would give one of them up and win the points back elsewhere,
+    with other sources or with moves below n/2.</p>
   </div>
 
   <div class="para">
     <p>A score at the <a class="gloss" href="glossary.html#ceiling">ceiling</a> or by the
-    <a class="gloss" href="glossary.html#prime-formula">prime formula</a> rests on the score of the game before it.  A
-    score found by a <a class="gloss" href="glossary.html#search">search</a> rests on the frame model of its own game,
-    and so does a <a class="gloss" href="glossary.html#repeat">repeat</a>, which takes the answer of an earlier game
-    that posed the same search problem.  A search uses the game before only as a starting point and finds the frame
-    model's best from any start, so it inherits no error from below.  So, followed down, every score rests on statement
-    U at one game: either its own (if a search or a repeat settled it), or else the nearest game below it that was
-    settled by a search.</p>
-    <p>We've verified statement U holds up to game 2,531.  Past it, the rest of the chain rests on statement U.</p>
+    <a class="gloss" href="glossary.html#prime-formula">prime formula</a> follows from the score of the game before it.
+    A score found by a <a class="gloss" href="glossary.html#search">search</a> depends on the frame model of its own
+    game, and so does a <a class="gloss" href="glossary.html#repeat">repeat</a>, which takes the answer of an earlier
+    game that posed the same search problem.  A search uses the game before only as a starting point and finds the frame
+    model's best from any start, so it inherits no error from below.  So every score comes down to statement U at one
+    game, either its own (if a search or a repeat settled it) or else the nearest game below it that a search
+    settled.</p>
+    <p>We've verified statement U holds up to game 2,531.  Past it, the rest of the chain assumes statement U.</p>
   </div>
 </section>
 
@@ -71,20 +71,20 @@
     <aside class="note tech" aria-label="The prover">
       <div class="note-head"><span class="note-name">The prover</span></div>
       <p>A branch and bound over sets of moves that uses the parity bound and takes the recorded score as its
-      target.  It rests only on the theory's theorems and on elementary bounds, and we test its exact methods
+      target.  It uses only the theory's theorems and elementary bounds, and we test its exact methods
       against brute force (<a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/README.md">its
       README</a>).  Proving every game up to 2,531 took it 19 hours on a machine with 88 threads
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md">the proofs</a>).</p>
     </aside>
-    <p>We can prove statement U one game at a time: find opt(n) without the frame model, and compare it with the
-    frame model's best score.  If the two are equal, statement U holds in that game.  A second program, the
+    <p>We can prove statement U one game at a time, by finding opt(n) without the frame model and comparing it
+    with the frame model's best score.  If the two are equal, statement U holds in that game.  A second program, the
     <a class="gloss" href="glossary.html#prover">prover</a>, does this.  It searches the whole
     <a class="gloss" href="glossary.html#board">board</a>, choosing sets of moves rather than promotions, with no
     frames, and using the <a class="gloss" href="glossary.html#parity-bound">parity bound</a> of
     <a href="bound.html#parity-bound">chapter 6</a>.</p>
     <p>The prover has proven every game up to 2,531.  In each one, opt(n) is the score the
     <a class="gloss" href="glossary.html#frame-solver">frame solver</a> found.  So statement U holds in those games,
-    and their scores rest on no open statement.</p>
+    and their scores assume no open statement.</p>
   </div>
 </section>
 
@@ -93,7 +93,7 @@
   <div class="para">
     <aside class="note tech" aria-label="The evidence for statement U">
       <div class="note-head"><span class="note-name">The evidence for statement U</span></div>
-      <p>The lower layers: every optimal set holds U*<sub>1</sub> and U*<sub>2</sub>, by
+      <p>The lower layers: every optimal set contains U*<sub>1</sub> and U*<sub>2</sub>, by
       <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-bottom-layers-theorem">the
       bottom-layers theorem (F4)</a>.  The sources: <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#the-sources-conjecture">the
       sources conjecture (S1)</a>, which we have proven in every game up to 100,000.  The bounds that leave out one
@@ -106,42 +106,43 @@
     <p>What supports statement U past game 2,531:</p>
     <ul class="rules">
       <li>It holds in every game the prover reaches, up to game 2,531.</li>
-      <li>For the numbers of U* with one or two prime factors, the theory proves it: every optimal game
-      plays that portion of U*.</li>
+      <li>For the numbers of U* with one or two prime factors, the theory proves that every optimal
+      game plays that portion of U*.</li>
       <li>Among the <a class="gloss" href="glossary.html#source">sources</a> alone, U* is the heaviest playable set in
       every game we've examined (up to 100,000).  In those games, giving up a number in U* never pays within the top
       half.</li>
-      <li>For each game that rests on a search, the prover has tested the numbers in U* with three or more prime factors
-      one at a time.  For each, it bounds the score of any optimal game that gives that number up.  When the bound is at
-      most the recorded score, giving the number up cannot beat the record.  In the games from 2,532 to 5,060 that rest
-      on a search, about 80% of the numbers pass this test, so a game that beats a recorded score would have to give up
-      one of the numbers that doesn't pass the test.</li>
+      <li>For each game whose score comes from a search, the prover has tested the numbers in U* with three or more
+      prime factors one at a time.  For each, it bounds the score of any optimal game that gives that number up.  When
+      the bound is at most the recorded score, giving the number up cannot beat the record.  In those games from 2,532
+      to 5,060, about 80% of the numbers pass this test, so a game that beats a recorded score would have to give up one
+      of the numbers that doesn't pass the test.</li>
       <li>The parity bound lets through more sets than the player can play, so the heaviest set it allows answers a
       looser question than the game.  With layers 1 and 2 played as every optimal game plays them, that heaviest set
-      found by the parity bound keeps every number in U* in every game of the chain that rests on a search.</li>
+      found by the parity bound keeps every number in U* in every game of the chain whose score comes from a
+      search.</li>
     </ul>
   </div>
 </section>
 
 <section class="chapter" id="why-open" data-toc="why-open" aria-labelledby="h-why-open">
   <h2 id="h-why-open">Where a proof stops</h2>
-  <p>Why is statement U hard to prove?  Here's what a proof would need to do.  It would be a proof by contradiction:
-  assume that statement U fails, and show that the assumption leads to something impossible, a game that scores more
-  than an optimal game.</p>
+  <p>Why is statement U hard to prove?  Here's what a proof would need to do.  It would be a proof by contradiction.  It
+  would assume that statement U fails and show that the assumption leads to something impossible, a game that scores
+  more than an optimal game.</p>
   <ol class="rules">
     <li><b>Assume it fails.</b>  Suppose statement U fails in game n.  Then every optimal game of n leaves out some
     numbers of U* with three or more prime factors.  Take one such game, and let d be the largest number of U* it leaves
     out.</li>
     <li><b>Find what blocks d.</b>  Adding d would raise the score, so the game cannot add d and still pay for every
-    move: with d added, some group of numbers in d's layer cannot all be paid for.  Such a group, with no smaller one
-    inside it, is a <em>core</em>.  The game without d is playable, so d is in every core.</li>
+    move.  With d added, some group of numbers in d's layer runs out of factors to pay with.  Such a group, with no
+    smaller one inside it, is a <em>core</em>.  The game without d is playable, so d is in every core.</li>
     <li><b>Trade to break the cores.</b>  The game could give up a smaller number that is in every core and play d in
     its place, or give up a move below n/2, whose return to the pot pays for d.  Either trade swaps a number for the
     larger d, so it raises the score.</li>
     <li><b>Reach the contradiction.</b>  No game scores more than an optimal game, so the assumption was false, and
     statement U holds.</li>
   </ol>
-  <p>Step 3 is where the proof stops today.  Each trade gives up one number, and one is not always enough: if d lies in
+  <p>Step 3 is where the proof stops today.  Each trade gives up one number, and one is not always enough.  If d lies in
   two cores that share no smaller number, breaking both takes two, and together they can outweigh d.  In layer 2, d lies
   in just one core, a single trade always breaks it, and that is how <a href="top-half.html#bottom-layers">chapter 3</a>
   settles the numbers with two prime factors.  Above layer 2, d can lie in several cores, all but at most one of them
@@ -151,8 +152,8 @@
   sketch</a>).</p>
   <p>A general proof of the sources conjecture (<a href="top-half.html#above-layer-two">chapter 3</a>), that no set of
   sources outweighs U*, would not be enough.  An optimal game could still give up a number of U* and win the points back
-  with moves below n/2.  And a direct proof of the conjecture stops at the same place: among the sources alone, d can
-  lie in two cores that share no smaller number.</p>
+  with moves below n/2.  And a direct proof of the conjecture stops at the same place, because among the sources alone,
+  d can lie in two cores that share no smaller number.</p>
 </section>
 
 <nav class="chapter-nav" aria-label="Pages"></nav>

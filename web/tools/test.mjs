@@ -430,7 +430,7 @@ same('the groups add up to every game', sum(Object.values(sorted.groupCounts)), 
   };
   states(`With Franklín and Moniot's bound, ${searched(fmRun, 2, 1000).length} games needed a search, and the searches took ${million} million nodes in all`);
   states(`With the parity bound, ${searched(parityRun, 2, 1000).length} did, and they took ${thousand},000`);
-  states(`below game 500 the parity bound's searches are ${ratio(2, 499)} times smaller, and from game 900 to 1,000, ${ratio(900, 1000)} times smaller`);
+  states(`Below game 500 the parity bound's searches are ${ratio(2, 499)} times smaller, and from game 900 to 1,000 they are ${ratio(900, 1000)} times smaller`);
 }
 const badGroup = [];
 const badSearch = [];

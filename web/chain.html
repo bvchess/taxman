@@ -28,9 +28,9 @@
   <div class="para">
     <aside class="note card" aria-label="Monotonicity, proved">
       <div class="note-head"><span class="note-name">Monotonicity<span class="note-label">Lemma N3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#monotonicity">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">The moves of any game of n − 1 are also a legal way to play game n, though never an optimal one:
-      the best score always rises.</p>
-      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  The moves of a legal game of n − 1, in their
+      <p class="plain">The moves of any game of n − 1 are also a legal way to play game n, though never an optimal one,
+      because the best score always rises.</p>
+      <p class="precise">Let n ≥ 2.  The moves of a legal game of n − 1, in their
       order, are a legal game of n, with the same taxes, and the moves of a game of n that does not play n are a legal
       game of n − 1.  Playing n in a game of n − 1, at its end if a maximal factor of n is still in the pot then, and
       otherwise just before the move after which none remains, and leaving that move out if the player can no longer
@@ -42,7 +42,7 @@
     <a class="gloss" href="glossary.html#board">board</a>, so it is never
     <a class="gloss" href="glossary.html#tax">tax</a>. You can therefore play the moves of any game of n − 1, in the
     same order, in game n, with every <a class="gloss" href="glossary.html#move">move</a> taking the same tax as before.
-    So the best score cannot fall: <a class="gloss" href="glossary.html#opt">opt(n)</a> is at least opt(n − 1).</p>
+    So <a class="gloss" href="glossary.html#opt">opt(n)</a> is at least opt(n − 1), and the best score never falls.</p>
     <p>In fact the best score always rises from one game to the next.  In a game of n − 1 played in game n, the player
     can play n as a move so long as one of its <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a>
     is still in the pot.  So play n just before the move that takes the last of them from the pot, or at the end if one
@@ -69,9 +69,9 @@
       <div class="note-head"><span class="note-name">The ceiling lemma<span class="note-label">Lemma N4</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-ceiling-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Leave the move n out of a game of n, and the moves left are a legal game of n − 1, so the best
       score rises by at most n.</p>
-      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  The moves of a game of n other than n, in
-      their order, are a legal game of n − 1.  So opt(n) ≤ opt(n − 1) + n, the ceiling of game n, and if S is playable in
-      game n, then S without n is playable in game n − 1.</p>
+      <p class="precise">Let n ≥ 2.  The moves of a game of n other than n, in their order, are a legal game of n − 1.
+      So opt(n) ≤ opt(n − 1) + n, the ceiling of game n, and if S is playable in game n, then S without n is playable in
+      game n − 1.</p>
     </aside>
     <p>An optimal game of n − 1 thus gives game n a lower bound, the score of the game we build from it.  It gives an
     upper bound too, since the best score never rises by more than n.  Take an optimal game of n and leave out its move
@@ -114,8 +114,8 @@
     <aside class="note card" aria-label="The step theorem, proved">
       <div class="note-head"><span class="note-name">The step theorem<span class="note-label">Theorem N6</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-step-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Game n is at its ceiling exactly when some optimal set of n − 1 is still playable once you add n,
-      and its optimal sets are then exactly those sets with n.</p>
-      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2.  Game n is at its ceiling iff some optimal set T
+      and then its optimal sets are those sets with n added.</p>
+      <p class="precise">Let n ≥ 2.  Game n is at its ceiling iff some optimal set T
       of game n − 1 has T ∪ {n} playable in game n, and the optimal sets of game n are then exactly these sets
       T ∪ {n}.</p>
     </aside>
@@ -126,8 +126,8 @@
     <p>Game 9's optimal set scores <span data-opt="9">30</span>, and <span class="n" data-n="10">10</span> fits into it.
     The <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a> of 10 are 2 and 5, and its half,
     <span class="n" data-n="5">5</span>, divides nothing else up to 9, so no move takes it as tax, and game 9's optimal
-    set does not hold it.  So an optimal game of 9 leaves 5 in the <a class="gloss" href="glossary.html#pot">pot</a> at
-    the end, and 10 can follow it, with 5 paying for it.  Game 10's best score is <span data-opt="9">30</span> + 10 =
+    set does not contain it.  So an optimal game of 9 leaves 5 in the <a class="gloss" href="glossary.html#pot">pot</a>
+    at the end, and 10 can follow it, with 5 paying for it.  Game 10's best score is <span data-opt="9">30</span> + 10 =
     <span data-opt="10">40</span>, its ceiling.</p>
   </div>
 
@@ -141,7 +141,7 @@
     <aside class="note card" aria-label="The half lemma, proved">
       <div class="note-head"><span class="note-name">The half lemma<span class="note-label">Lemma N7</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-half-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">At an even n, if an optimal game of n − 1 leaves n/2 alone, game n is at its ceiling.</p>
-      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 4 be even.  The number n/2 divides no number of
+      <p class="precise">Let n ≥ 4 be even.  The number n/2 divides no number of
       the board of n − 1 but itself, so if some optimal game of n − 1 does not play n/2, it is still in the pot at the
       end, n can follow, and opt(n) = opt(n − 1) + n.  For n twice a prime, an optimal game of n − 1 plays only its
       largest prime, which exceeds n/2 by Bertrand's postulate, so game n is always at its ceiling.</p>
@@ -162,7 +162,8 @@
       leaves p alone, and since it divides nothing else up to n − 1, it is still in the pot at the end.  Then n can
       follow, with p paying for it.</p>
       <p>Game 14 is one.  An optimal game of 13 opens with 13 and leaves 7 in the pot, and 14 follows, with 7 paying for
-      it: game 14’s best score is <span data-opt="13">52</span> + 14 = <span data-opt="14">66</span>, its ceiling.</p>
+      it.  So game 14’s best score is <span data-opt="13">52</span> + 14 = <span data-opt="14">66</span>, its
+      ceiling.</p>
       <p>That a prime always lies between m and 2m, for every m from 2 up, is Bertrand's postulate.  Joseph Bertrand
       guessed it in 1845 and checked it for every m below three million, and Pafnuty Chebyshev proved it a few years
       later.  In 1932 Paul Erdős, still a student, published a much simpler proof, his first paper.</p>
@@ -177,11 +178,11 @@
       in these games one test decides whether n fits.</p>
     </aside>
     <p>Game 11 has only one optimal set, and <span class="n" data-n="12">12</span> does not fit into it.  With 12 added,
-    the set holds <span class="n" data-n="8">8</span> and 12, and only <span class="n" data-n="4">4</span> can pay for
-    either: 12's other maximal factor, <span class="n" data-n="6">6</span>, is in the set, and 4 is the only maximal
-    factor of 8.  Each number of a <a class="gloss" href="glossary.html#playable">playable</a> set has a maximal factor
-    of its own to pay for it, so this set is not playable, and game 12 falls short of its ceiling.  An optimal game of
-    12 gives up 6, which then pays for 12, and scores <span data-opt="11">44</span> + 12 − 6 =
+    the set contains <span class="n" data-n="8">8</span> and 12, and only <span class="n" data-n="4">4</span> can pay
+    for either, since 12's other maximal factor, <span class="n" data-n="6">6</span>, is in the set, and 4 is the only
+    maximal factor of 8.  Each number of a <a class="gloss" href="glossary.html#playable">playable</a> set has a maximal
+    factor of its own to pay for it, so this set is not playable, and game 12 falls short of its ceiling.  An optimal
+    game of 12 gives up 6, which then pays for 12, and scores <span data-opt="11">44</span> + 12 − 6 =
     <span data-opt="12">50</span>.</p>
   </div>
 
@@ -196,17 +197,17 @@
     <aside class="note card" aria-label="The prime lemma, proved">
       <div class="note-head"><span class="note-name">The prime lemma<span class="note-label">Lemma N1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-prime-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Every optimal game opens with the largest prime of its board, and plays no other prime.</p>
-      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 2, and q(n) the largest prime up to n.  Every
-      optimal game of n plays q(n), as its first move, and no other prime: a game without it can take q(n) in place of
-      its first move, or in front of it, and score more.</p>
+      <p class="precise">Let n ≥ 2, and q(n) the largest prime up to n.  Every optimal game of n plays q(n), as its
+      first move, and no other prime, since a game without it can take q(n) in place of its first move, or in front of
+      it, and score more.</p>
     </aside>
-    <p>Past game 2, when n is a prime, it never fits, but an optimal game of n is still easy to find: take an optimal
+    <p>Past game 2, when n is a prime, it never fits, but an optimal game of n is still easy to find.  Take an optimal
     game of n − 1 and let n take the place of its first move, the largest prime below n.</p>
     <p>A prime's only maximal factor is 1, and the first move of every game takes 1 as
     <a class="gloss" href="glossary.html#tax">tax</a>, so the player can play a prime only as the first move.  Every
-    <a class="gloss" href="glossary.html#optimal-game">optimal game</a> opens with the largest prime of its board: a
-    game that does not can always play that prime in place of its first move, or in front of it, and score more.  So an
-    optimal set of n − 1 already holds a prime, and n, a second one, does not fit.</p>
+    <a class="gloss" href="glossary.html#optimal-game">optimal game</a> opens with the largest prime of its board,
+    because a game that does not can always play that prime in place of its first move, or in front of it, and score
+    more.  So an optimal set of n − 1 already contains a prime, and n, a second one, does not fit.</p>
   </div>
 
   <div class="para">
@@ -214,14 +215,14 @@
       <div class="note-head"><span class="note-name">The prime formula<span class="note-label">Lemma N5</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-prime-formula">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">At a prime p, the largest prime below p gives way to p, and the score rises by their
       difference.</p>
-      <p class="precise"><span class="run">Precisely.</span>Let p ≥ 3 be prime.  Exchanging the opening move
+      <p class="precise">Let p ≥ 3 be prime.  Exchanging the opening move
       q(p − 1) for p turns a finished game of p − 1 into a finished game of p, and back, so
       opt(p) = opt(p − 1) + p − q(p − 1).  The exchange maps the optimal sets of p − 1 one to one onto those of p
       (the step theorem).</p>
     </aside>
-    <p>The swap works because neither prime divides any other number on the board: the rest of the game cannot tell
-    them apart, and every other move stays legal.  The score rises by the gap between the two primes.  Run backward, the same exchange turns an optimal
-    game of n into a game of n − 1, so no game of n can beat the swap.  This is the
+    <p>The swap works because neither prime divides any other number on the board, so the rest of the game cannot tell
+    them apart, and every other move stays legal.  The score rises by the gap between the two primes.  Run backward, the
+    same exchange turns an optimal game of n into a game of n − 1, so no game of n can beat the swap.  This is the
     <a class="gloss" href="glossary.html#prime-formula">prime formula</a>.</p>
     <p>An optimal game of 12 opens with <span class="n" data-n="11">11</span>.  In game 13,
     <span class="n" data-n="13">13</span> takes its place, and the best score is <span data-opt="12">50</span> + 13 − 11
@@ -240,7 +241,7 @@
       <div class="note-head"><span class="note-name">The repeat lemma<span class="note-label">Lemma R6</span></span><a class="standing is-given-u" href="https://github.com/bvchess/taxman/blob/master/docs/theory/search-rules.md#the-repeat-lemma">conditional<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">If game n poses the search problem of an earlier game, the earlier game's answer gives an optimal
       game of n.</p>
-      <p class="precise"><span class="run">Precisely.</span>Let Π_n = Π_m, root problems of games n and m.  Every
+      <p class="precise">Let Π_n = Π_m, root problems of games n and m.  Every
       promotion set L makes a game of n worth Σ<a class="gloss" href="glossary.html#u-star">U*</a>(n) + ΣL, and, given
       <a class="gloss" href="glossary.html#statement-u">statement U</a> at n, a promotion set that makes an optimal game
       of m makes an optimal game of n.  The first part does not need statement U.  The prover also proves the score of
@@ -249,10 +250,10 @@
     <p>About a third of the games in which n neither fits nor is prime still need no search.  Before the
     <a class="gloss" href="glossary.html#frame-solver">frame solver</a> searches a game, rules settle most of it
     (<a href="top-half.html">chapter 3</a> and <a href="frames.html">chapter 4</a>), and what remains is the game's
-    search problem: which few numbers up to n/2 to play as moves as well.  Often n does not change that problem at all.
-    Then game n is a <a class="gloss" href="glossary.html#repeat"><em>repeat</em></a>, and the earlier game's answer to
-    the problem is game n's answer too.  The solver looks for one as soon as it sets the problem up, before it searches
-    (<a href="search.html#repeat-check">chapter 5</a>).</p>
+    search problem, the choice of which few numbers up to n/2 to play as moves as well.  Often n does not change that
+    problem at all.  Then game n is a <a class="gloss" href="glossary.html#repeat"><em>repeat</em></a>, and the earlier
+    game's answer to the problem is game n's answer too.  The solver looks for one as soon as it sets the problem up,
+    before it searches (<a href="search.html#repeat-check">chapter 5</a>).</p>
   </div>
 
   <div class="para">
@@ -260,15 +261,15 @@
       <div class="note-head"><span class="note-name">The semiprime formula<span class="note-label">Theorem J3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/arrival.md#the-semiprime-formula">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">At an odd n with two prime factors that closes a loop with the moves of an optimal game of
       n − 1, as every one from game 189 on does, n takes the place of one move with two prime factors, and the best
-      score rises by the difference: no search, and no statement U.</p>
-      <p class="precise"><span class="run">Precisely.</span>Let n be odd with two prime factors, closing a cycle with
+      score rises by the difference, with no search and no statement U.</p>
+      <p class="precise">Let n be odd with two prime factors, closing a cycle with
       U*₂(n − 1), as every such n ≥ 189 does, and x the smallest other member of the cycle.  Then
       opt(n) = opt(n − 1) + n − x, and exchanging x for n maps the optimal sets of n − 1 onto those of n.  In game 39,
       x = 22.</p>
     </aside>
     <p>Game 39 is one.  It poses the search problem of game 38, and an optimal game of 39 is an optimal game of 38 with
-    one exchange:  39 takes the place of 22.  Game 39's best score is <span data-opt="38">486</span> + 39 − 22 =
-    <span data-opt="39">503</span>, <span data-gap="39">22</span> below its ceiling.  A repeat's answer rests on
+    one exchange, in which 39 takes the place of 22.  Game 39's best score is <span data-opt="38">486</span> + 39 − 22 =
+    <span data-opt="39">503</span>, <span data-gap="39">22</span> below its ceiling.  A repeat's answer assumes
     statement U (<a href="statement-u.html">chapter 7</a>), but here a theorem, the semiprime formula, proves the same
     exchange outright.  It needs an odd n with two prime factors, as 39 = 3 · 13 is, and from game 189 on it covers
     every such n.</p>
@@ -284,8 +285,8 @@
       <p>Games <span data-run="longestFirst">2,512</span> to <span data-run="longestLast">2,519</span> pose one and
       the same search problem.  The search of game <span data-run="longestFirst">2,512</span> explored
       <span data-run="longestNodes">8.7 million</span> nodes, and the next <span data-run="longestOthers">7</span> games
-      needed no search of their own: each is a <a class="gloss" href="glossary.html#repeat">repeat</a>.  No other
-      search in the chain carries as many games.</p>
+      needed no search of their own, because each is a <a class="gloss" href="glossary.html#repeat">repeat</a>.  No
+      other search in the chain carries as many games.</p>
     </div>
   </details>
 </section>
@@ -296,15 +297,15 @@
     <aside class="note tech" aria-label="How the chart counts">
       <div class="note-head"><span class="note-name">How the chart counts</span></div>
       <p>A game counts under the first rule that applies, in the order prime, ceiling, repeat, search.  So the ceiling
-      holds <span data-settled="recordRepeatAtCeiling">1,136</span> games the chain records as repeats, since the
-      ceiling proves them from game n − 1 alone.  The searches include <span data-settled="searchNothing">5</span>
+      counts <span data-settled="recordRepeatAtCeiling">1,136</span> games the chain records as repeats, since the
+      ceiling proves them from game n − 1.  The searches include <span data-settled="searchNothing">5</span>
       small games with nothing to choose.</p>
     </aside>
-    <aside class="note tech" aria-label="What each rule rests on">
-      <div class="note-head"><span class="note-name">What each rule rests on</span></div>
-      <p>The ceiling and the prime formula prove the chain's game of n optimal wherever its game of n − 1 is.  A repeat
-      rests on <a class="gloss" href="glossary.html#statement-u">statement U</a> at n too, and a search on the
-      <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is exact where statement U holds.  The
+    <aside class="note tech" aria-label="What each rule needs">
+      <div class="note-head"><span class="note-name">What each rule needs</span></div>
+      <p>The ceiling and the prime formula prove the chain's game of n optimal if its game of n − 1 is.  A repeat
+      also needs <a class="gloss" href="glossary.html#statement-u">statement U</a> at n, and a search uses the
+      <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is exact when statement U holds.  The
       <a class="gloss" href="glossary.html#prover">prover</a> also proves the score of every game up to 2,531, on the
       whole board, without statement U
       (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports
@@ -325,10 +326,10 @@
     <div class="chart-key rule-legend"></div>
     <div class="chart-box"></div>
   </figure>
-  <p>The chart has vertical stripes.  A row holds 120 games, so the games in a column leave the same remainder when n
+  <p>The chart has vertical stripes.  A row has 120 games, so the games in a column leave the same remainder when n
   is divided by 120, and that remainder decides whether 2, 3, 4, 5 and 8 divide n.  The dark stripes are where 8, 12,
-  20 or 30 divides n: every game in the columns of games <span data-stripes="darkColumns">56, 80 and 100</span>
-  needed a search.  The light stripes are where n is twice a number with no factor 2, 3 or 5: every game in the
+  20 or 30 divides n, and every game in the columns of games <span data-stripes="darkColumns">56, 80 and 100</span>
+  needed a search.  The light stripes are where n is twice a number with no factor 2, 3 or 5, and every game in the
   columns of games <span data-stripes="lightColumns">22, 26, 34, 38, 58 and 82</span> reached its ceiling.  Why
   should this remainder matter so much?</p>
 </section>
@@ -339,16 +340,16 @@
     <aside class="note card" aria-label="The cofactor rule, measured">
       <div class="note-head"><span class="note-name">The cofactor rule</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/arrival.md#the-cofactor-rule">measured<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">The number n and its largest prime factor usually tell whether a game needs a search.</p>
-      <p class="precise"><span class="run">Precisely.</span>Let n ≥ 28, and m be n − 1, or n − 2 when n − 1 is prime. If
+      <p class="precise">Let n ≥ 28, and m be n − 1, or n − 2 when n − 1 is prime. If
       no <a class="gloss" href="glossary.html#frame">frame</a> of <a class="gloss" href="glossary.html#layer">layer</a>
       2 has a <a class="gloss" href="glossary.html#freedom">freedom</a> in game n or in game m, as for every n ≥ 188,
       then game n has the root problem of game m if its cofactor is a prime or twice a prime, and is at its ceiling if
       its cofactor is 9.  The layer-2 corollary (J2) proves the first case.  We checked the second on every board from
       188 to 8,191, and the third in every game from 188 to the end of the chain.</p>
     </aside>
-    <p>The number n alone usually tells, before any work, whether a game needs a
+    <p>The number n usually tells, before any work, whether a game needs a
     <a class="gloss" href="glossary.html#search">search</a>.  Write n as its largest prime factor times what remains,
-    the <em>cofactor</em> of n: in game 3,002, n = 38 · 79 has the cofactor 38, and a prime has the cofactor 1.  From
+    the <em>cofactor</em> of n.  In game 3,002, n = 38 · 79 has the cofactor 38, and a prime has the cofactor 1.  From
     game 188 to the end of the chain, no game whose cofactor is 1, a prime, twice a prime or 9 needed a search.  Why it
     works for twice a prime and for 9 is still a mystery.</p>
   </div>
@@ -373,7 +374,7 @@
       layer 4 or higher, among frames with <a class="gloss" href="glossary.html#freedom">freedoms</a>, where its arrival
       can change the search problem, and usually does.  That last part is measured, not proved.</p>
     </aside>
-    <p>Count the prime factors of the cofactor, with repeats: the more there are, the likelier a search.</p>
+    <p>Count the prime factors of the cofactor, with repeats.  The more there are, the likelier a search.</p>
     <table class="counts">
       <thead><tr><th>number of prime factors<br>of the cofactor</th><th>games from 188 on</th><th>needed a search</th></tr></thead>
       <tbody>
@@ -384,17 +385,17 @@
         <tr><td>4 or more</td><td data-stripes="games4">854</td><td data-stripes="searched4">92%</td></tr>
       </tbody>
     </table>
-    <p>This is what draws the stripes.  The cofactor holds every prime factor of n but its largest.  Past 8, 12, 20 and
+    <p>This is what draws the stripes.  The cofactor keeps every prime factor of n but its largest.  Past 8, 12, 20 and
     30 themselves, a number that one of them divides has at least four prime factors, so its cofactor has at least
-    three and is never 1, a prime, twice a prime or 9: of the chain's <span data-stripes="dark">1,012</span> such
+    three and is never 1, a prime, twice a prime or 9.  Of the chain's <span data-stripes="dark">1,012</span> such
     games, <span data-stripes="darkSearched">951</span> needed a search, and the other
     <span data-stripes="darkCeiling">61</span> reached their ceiling.  Twice a number with no factor 2, 3 or 5 is the
-    other way round: its cofactor is a prime or twice a prime in <span data-stripes="lightNamed">639</span> of the
+    other way round.  Its cofactor is a prime or twice a prime in <span data-stripes="lightNamed">639</span> of the
     chain's <span data-stripes="light">674</span> such games, and only <span data-stripes="lightSearched">13</span> of
     them needed a search.</p>
   </div>
-  <p>A game that needs a search still gets help from game n − 1: its search starts near the best, and the search can
-  stop if it reaches the ceiling (<a href="search.html#head-start">chapter 5</a>).</p>
+  <p>A game that needs a search still gets help from game n − 1.  Its search starts near the best, and it can stop
+  if it reaches the ceiling (<a href="search.html#head-start">chapter 5</a>).</p>
 </section>
 
 <nav class="chapter-nav" aria-label="Pages"></nav>

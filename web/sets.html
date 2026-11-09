@@ -25,8 +25,8 @@
 
 <section class="chapter" id="orders-section" data-toc="orders-section" aria-label="The order follows from the set">
   <p>Your score is the sum of the numbers you take, so it does not depend on the order you take them in.  The order
-  matters only to keep every <a class="gloss" href="glossary.html#move">move</a> legal: each number you take must still have a divisor in the
-  <a class="gloss" href="glossary.html#pot">pot</a>.</p>
+  matters only to keep every <a class="gloss" href="glossary.html#move">move</a> legal, since each number you take must
+  still have a divisor in the <a class="gloss" href="glossary.html#pot">pot</a>.</p>
   <p>Here are the nine moves required for optimal play in game 21.  You
   can play them in <span data-orders-21>several</span> orders, and in every one of them each move takes the same
   <a class="gloss" href="glossary.html#tax">tax</a>.  Step through them.</p>
@@ -46,8 +46,8 @@
       <div class="note-head"><span class="note-name">Sets of moves</span></div>
       <p>A set S ⊆ {2, …, n} is <em>playable</em> when some order of it is the moves of a legal game of n.  Its
       <a class="gloss" href="glossary.html#weight">weight</a> is ΣS, the sum of its members.  An <em>optimal set</em>,
-      which we write S*(n), is the set of moves of an optimal game: a heaviest playable set.  Some games can have more
-      than one (game 425 is the first), so we say <em>an</em> optimal set
+      which we write S*(n), is the set of moves of an optimal game, which makes it a heaviest playable set.  Some games
+      can have more than one (game 425 is the first), so we say <em>an</em> optimal set
       (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/statements.md#notation">the theory's
       notation</a>).</p>
     </aside>
@@ -64,12 +64,12 @@
     <aside class="note card" aria-label="The lifting lemma, proved">
       <div class="note-head"><span class="note-name">The lifting lemma<span class="note-label">Lemma P1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-lifting-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">You can play a number if and only if one of its maximal factors is still in the pot.</p>
-      <p class="precise"><span class="run">Precisely.</span>The maximal factors of x are x/p, for each prime p that
-      divides x.  At any point of a game, if a <a class="gloss" href="glossary.html#proper-divisor">proper divisor</a> d of x is in the pot, so is a maximal factor f of x with
-      d | f.</p>
+      <p class="precise">The maximal factors of x are x/p, for each prime p that divides x.  At any point of a game, if
+      a <a class="gloss" href="glossary.html#proper-divisor">proper divisor</a> d of x is in the pot, so is a maximal
+      factor f of x with d | f.</p>
     </aside>
     <p>A <a class="gloss" href="glossary.html#move">move</a> is legal when one of its divisors is still in the
-    <a class="gloss" href="glossary.html#pot">pot</a>, and only some divisors matter: a number's
+    <a class="gloss" href="glossary.html#pot">pot</a>, and only some divisors matter.  They are a number's
     <a class="gloss" href="glossary.html#maximal-factor"><em>maximal factors</em></a>, what you get when you divide the
     number by one of its primes.  <span class="n" data-n="10">10</span> has the maximal factors 5 and 2,
     <span class="n" data-n="8">8</span> has only 4, though 2 divides it too, and a prime has only 1.  If any
@@ -77,8 +77,8 @@
     factor of it is still in the pot.</p>
     <p>Think of that factor as what <a class="gloss" href="glossary.html#pays-for"><em>pays for</em></a> the move.  Two
     moves cannot share a payment, because whichever you take first sends the factor to the taxman.  So the player can
-    play a set only if each of its numbers has a maximal factor of its own, from outside the set: a number you take as a
-    move cannot also pay for another.</p>
+    play a set only if each of its numbers has a maximal factor of its own, from outside the set, because a number you
+    take as a move cannot also pay for another.</p>
   </div>
 
   <div class="para">
@@ -86,19 +86,19 @@
       <div class="note-head"><span class="note-name">The graph</span></div>
       <p>The maximal-factor graph of game n is a directed graph, with an edge from each number x to each of its
       maximal factors.  Every edge leads to a smaller number, so the figures draw the edges as lines without
-      arrowheads; in the board below, every edge runs one column to the right.  The divisors of x are exactly the
+      arrowheads; in the board below, every edge runs one column to the right.  The divisors of x are the
       numbers that x reaches along its edges.  The columns are the numbers'
       <a class="gloss" href="glossary.html#layer">layers</a>.</p>
       <p>As the game goes on, each number the player takes leaves the graph with its edges, so the board shows the graph
       of the numbers still in the pot.  By the lifting lemma, x still reaches each of its divisors left in the pot
       through numbers left in the pot.  So the tax of a move is everything it reaches on the board, and a move is legal
-      exactly when it still has an outgoing edge.</p>
-      <p>The graph is the <em>Hasse diagram</em> of divisibility on {1, …, n}: d is directly below x exactly when x/d
-      is prime.</p>
+      as long as it still has an outgoing edge.</p>
+      <p>The graph is the <em>Hasse diagram</em> of divisibility on {1, …, n}, in which d is directly below x exactly
+      when x/d is prime.</p>
     </aside>
     <p>Draw every number joined to its maximal factors, and the game becomes much easier to play.  The board below is
     that <a class="gloss" href="glossary.html#maximal-factor-graph"><em>maximal-factor graph</em></a>.  Its columns
-    count prime factors: the primes stand in the column at the right, 1 beyond them, and each number sits one column to
+    count prime factors.  The primes stand in the column at the right, 1 beyond them, and each number sits one column to
     the left of its maximal factors, so every line runs to the right.  Taking a number sends the taxman everything it
     reaches by following its lines to the right, and every number the player takes leaves the graph with its lines.  A
     number is a legal move, and stands up, as long as it still has a line to its right.</p>
@@ -114,10 +114,11 @@
     <aside class="note card" aria-label="The playability theorem, proved">
       <div class="note-head"><span class="note-name">The playability theorem<span class="note-label">Theorem P2</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-playability-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">A set is playable exactly when each member has a maximal factor of its own to pay for it, from
-      outside the set, with no circle in what must come first.</p>
-      <p class="precise"><span class="run">Precisely.</span>S ⊆ {2, …, n} is <a class="gloss" href="glossary.html#playable">playable</a> iff it has a <a class="gloss" href="glossary.html#payment-scheme">payment scheme</a>, a
-      one-to-one choice of a maximal factor outside S for each member, whose precedence is acyclic.  Then every
-      topological order of the precedence is a legal game.</p>
+      outside the set, with no circle in what must come first.</p>  <p class="precise">S ⊆ {2, …, n} is
+      <a class="gloss" href="glossary.html#playable">playable</a> iff it has a
+      <a class="gloss" href="glossary.html#payment-scheme">payment scheme</a>, a one-to-one choice of a maximal factor
+      outside S for each member, whose precedence is acyclic.  Then every topological order of the precedence is a legal
+      game.</p>
     </aside>
     <aside class="note tech" aria-label="Franklín and Moniot's Theorem 1">
       <div class="note-head"><span class="note-name">Franklín and Moniot</span></div>
@@ -127,16 +128,16 @@
       <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#what-the-paper-proves">how
       the theory relates to it</a>).</p>
     </aside>
-    <p>Designating a payment for each number is not quite enough, because the order can still tie itself in a knot.  A move takes
-    all of its divisors in the pot, not only the one that pays for it, so it can take a factor that another move was
-    counting on.  In game 10, 3 pays for <span class="n" data-n="9">9</span>, and <span class="n" data-n="6">6</span>
-    would take 3 as <a class="gloss" href="glossary.html#tax">tax</a>, so 9 must come before 6.  Then 2 pays for 6, but
-    <span class="n" data-n="8">8</span> and <span class="n" data-n="10">10</span> would take 2, so 6 must come before
-    them.  A move must also come before any move it divides: <span class="n" data-n="5">5</span> before 10, if a
-    player wanted to take both, or 10 would take 5.</p>
+    <p>Designating a payment for each number is not quite enough, because the order can still tie itself in a knot.  A
+    move takes all of its divisors in the pot, not only the one that pays for it, so it can take a factor that another
+    move was counting on.  In game 10, 3 pays for <span class="n" data-n="9">9</span>, and
+    <span class="n" data-n="6">6</span> would take 3 as <a class="gloss" href="glossary.html#tax">tax</a>, so 9 must
+    come before 6.  Then 2 pays for 6, but <span class="n" data-n="8">8</span> and <span class="n" data-n="10">10</span>
+    would take 2, so 6 must come before them.  A move must also come before any move it divides.  A player who wants
+    both <span class="n" data-n="5">5</span> and 10 must take 5 first, or 10 would take 5.</p>
     <p>Rules like these say which moves must come before which.  A set of moves is playable exactly when you can give
-    each move a maximal factor of its own to pay with, in a way whose rules never run in a circle: each move before the
-    next, and the last before the first.  Then any order that keeps the rules is a legal game.</p>
+    each move a maximal factor of its own to pay with, in a way whose rules never run in a circle (each move before the
+    next, and the last before the first).  Then any order that keeps the rules is a legal game.</p>
   </div>
 </section>
 
@@ -163,8 +164,8 @@
     <aside class="note card" aria-label="The peel theorem, proved">
       <div class="note-head"><span class="note-name">The peel theorem<span class="note-label">Theorem P4</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-peel-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Peel decides whether a set is playable, whichever safe steps it takes in whichever order.</p>
-      <p class="precise"><span class="run">Precisely.</span>A front move pairs a number that has one factor left to
-      pay with; a back move pairs a factor that one number alone can still use.  Each leaves a playable set playable and
+      <p class="precise">A front move pairs a number that has one factor left to
+      pay with; a back move pairs a factor that only one number can still use.  Each leaves a playable set playable and
       an unplayable set unplayable.  A set is playable iff a run of peel pairs every number, and the pairs then form an
       acyclic <a class="gloss" href="glossary.html#payment-scheme">payment scheme</a>.</p>
     </aside>
@@ -176,21 +177,22 @@
     <p>In game 21, peel pairs <span class="n" data-n="19">19</span> with 1, the only factor it has, and
     <span class="n" data-n="9">9</span> with 3 for the same reason.  Once 3 is gone, 15 has only 5 left and 21 only 7,
     and the rest follow.  The game can use the pairs it finds as its payments.</p>
-    <p>A run of peel that pairs every number also reveals a legal order of play: play each number before any move that
-    would take it, or its payment, as tax.  So peel quickly turns a playable set into an ordered list of moves.</p>
+    <p>A run of peel that pairs every number also reveals a legal order of play, in which each number comes before any
+    move that would take it, or its payment, as tax.  So peel quickly turns a playable set into an ordered list of
+    moves.</p>
   </div>
 </section>
 
 <section class="chapter" id="loop-section" data-toc="loop-section" aria-labelledby="h-loop">
   <h2 id="h-loop">Loop trouble</h2>
-  <p>When <a class="gloss" href="glossary.html#peel">peel</a> gets stuck on numbers with two maximal factors, a <a class="gloss" href="glossary.html#loop">loop</a> is to blame.  Take the numbers
-  <span class="n" data-n="10">10</span>, <span class="n" data-n="14">14</span>,
-  <span class="n" data-n="15">15</span> and <span class="n" data-n="21">21</span>, with only the primes 2, 3, 5 and 7
-  left to pay with.  Each of the four is the product of two primes, which are its maximal factors, so in the
-  maximal-factor graph it has a line to each of two primes.  Unfold the graph, putting each number between its two
-  primes, and the loop appears: the four make a square, 10 = 2 · 5, 15 = 5 · 3, 21 = 3 · 7 and 14 = 7 · 2.  Every
-  number has two ways to pay, and every prime can pay for two numbers, so peel has no safe step.  Try to play all
-  four.</p>
+  <p>When <a class="gloss" href="glossary.html#peel">peel</a> gets stuck on numbers with two maximal factors, a
+  <a class="gloss" href="glossary.html#loop">loop</a> is to blame.  Take the numbers
+  <span class="n" data-n="10">10</span>, <span class="n" data-n="14">14</span>, <span class="n" data-n="15">15</span>
+  and <span class="n" data-n="21">21</span>, with only the primes 2, 3, 5 and 7 left to pay with.  Each of the four is
+  the product of two primes, which are its maximal factors, so in the maximal-factor graph it has a line to each of two
+  primes.  Unfold the graph, putting each number between its two primes, and the loop appears.  The four make a square,
+  10 = 2 · 5, 15 = 5 · 3, 21 = 3 · 7 and 14 = 7 · 2.  Every number has two ways to pay, and every prime can pay for two
+  numbers, so peel has no safe step.  Try to play all four.</p>
 
   <figure class="fig fig-panel" id="loop" data-fig="loop">
     <svg role="img" aria-label="The numbers 10, 14, 15 and 21 in a column, each joined by lines to its two prime factors among 2, 3, 5 and 7 in a column beside it. A button unfolds them into a square with the primes at the corners and the numbers on its sides, 10 between 2 and 5, 15 between 5 and 3, 21 between 3 and 7, 14 between 7 and 2. Take the numbers one at a time; the primes go to the taxman."></svg>
@@ -203,7 +205,7 @@
       <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Numbers that each have two maximal factors outside their set make a playable set exactly when
       they and those factors make no loop.</p>
-      <p class="precise"><span class="run">Precisely.</span>An instance whose members each list two factors is
+      <p class="precise">An instance whose members each list two factors is
       <a class="gloss" href="glossary.html#playable">playable</a> iff its lists are linearly independent over GF(2), iff
       its graph, which joins each member to the two factors it lists, is a forest.  With members that list one factor,
       the same holds when the graph also joins each of them to one more vertex, the ground.  A member that lists none
@@ -217,17 +219,18 @@
     for the other k&nbsp;−&nbsp;1 numbers.</p>
     <p>A loop is also the only way peel gets stuck on sets of numbers with two maximal factors to pay with.  Peel is
     stuck when every number left still has two factors and every factor still has two numbers.  Then every point has a
-    second line out, so a walk along the lines that never turns back must come around to a point it passed: a loop.</p>
-    <p>So for numbers with two maximal factors, whether they can all be played is something you can see: draw their
-    lines and look for a loop.  Above n/2 that picture settles one part of an important choice: which numbers with two
-    prime factors every optimal game must play (<a href="top-half.html#bottom-layers">chapter 3</a>).</p>
+    second line out, so a walk along the lines that never turns back must come around to a point it passed, closing a
+    loop.</p>
+    <p>So for numbers with two maximal factors, whether they can all be played is something you can see.  Draw their
+    lines and look for a loop.  Above n/2 that picture helps settle which numbers with two prime factors
+    every optimal game must play (<a href="top-half.html#bottom-layers">chapter 3</a>).</p>
   </div>
 </section>
 
 <section class="chapter" id="along" data-toc="along" aria-label="Along the way">
   <div class="para">
-    <aside class="note tech of-aside" aria-label="Three factors, precisely">
-      <div class="note-head"><span class="note-name">Three factors, precisely</span></div>
+    <aside class="note tech of-aside" aria-label="The three factors of 30">
+      <div class="note-head"><span class="note-name">The three factors of 30</span></div>
       <p>30 has the <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a> 15, 10 and 6.  Once 1, 2, 3
       and 5 are gone, those three are all of its divisors in the pot.  The game in the figure is legal and scores
       <a class="gloss" href="glossary.html#opt">opt(40)</a>, which the
@@ -243,8 +246,8 @@
         <p>A <a class="gloss" href="glossary.html#move">move</a> usually takes one or two numbers as <a class="gloss" href="glossary.html#tax">tax</a>.  In game 40, one
         <a class="gloss" href="glossary.html#optimal-game">optimal game</a> takes 30 when 6, 10 and 15 are all still in the <a class="gloss" href="glossary.html#pot">pot</a>, so the taxman gets three numbers for one move.</p>
         <figure class="fig fig-strip" id="game-40-fig"></figure>
-        <p>It scores <span data-g40-score>opt(40)</span>, the best possible.  The same happens in larger games: in
-        game 1,250, the <a class="gloss" href="glossary.html#chain">chain</a>'s optimal game plays 748, which takes 44, 68
+        <p>It scores <span data-g40-score>opt(40)</span>, the best possible.  The same happens in larger games.  In game
+        1,250, the <a class="gloss" href="glossary.html#chain">chain</a>'s optimal game plays 748, which takes 44, 68
         and 374.</p>
       </div>
     </details>
@@ -255,7 +258,7 @@
       <div class="note-head"><span class="note-name">The length proposition<span class="note-label">Proposition Q4</span></span><a class="standing is-computed" href="https://github.com/bvchess/taxman/blob/master/docs/theory/uniqueness-and-longest-games.md#the-length-proposition">proved by computation<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">In game 833 every optimal game has <span data-833="moves">362</span> moves, and the longest games
       have <span data-833="longestMoves">363</span>.</p>
-      <p class="precise"><span class="run">Precisely.</span>In game 833 = 7² · 17 a heaviest game of
+      <p class="precise">In game 833 = 7² · 17 a heaviest game of
       <span data-833="longestMoves">363</span> moves scores <span data-833="longest">218,197</span>, which is
       <span data-833="gap">29</span> less than <a class="gloss" href="glossary.html#opt">opt(833)</a> = <span data-833="score">218,226</span>.  The <a class="gloss" href="glossary.html#prover">prover</a> and a
       maximum matching compute it.</p>
@@ -267,10 +270,10 @@
         <span class="open-mark"><span class="closed-word">Open</span><span class="open-word">Close</span></span>
       </summary>
       <div class="aside-body">
-        <p>Taking more numbers does not always score more.  In game 833, every <a class="gloss" href="glossary.html#optimal-game">optimal game</a> makes
-        <span data-833="moves">362</span> moves, yet some games make one more.  The best of those still scores
-        less, and one of them shows why: it plays five smaller numbers where the optimal game plays four larger
-        ones.</p>
+        <p>Taking more numbers does not always score more.  In game 833, every
+        <a class="gloss" href="glossary.html#optimal-game">optimal game</a> makes <span data-833="moves">362</span>
+        moves, yet some games make one more.  The best of those still scores less, and one of them shows why.  It plays
+        five smaller numbers where the optimal game plays four larger ones.</p>
         <div id="exchange-833"></div>
         <p>The trade happens below n/2.  Each of the nine numbers is a
         <a class="gloss" href="glossary.html#maximal-factor">maximal factor</a> of a number the optimal game plays, and

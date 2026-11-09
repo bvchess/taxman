@@ -26,7 +26,7 @@ entries are meant to be moved, merged and cut.
 The rules the owner's reviews have set, on top of [docs/WRITING.md](../docs/WRITING.md):
 
 * **Lead with what the reader came for.**  The game, the play and the result come first; qualifications such as what
-  a score rests on go lower, or to the right, never in a page's first lines.
+  a score depends on go lower, or to the right, never in a page's first lines.
 * **Say less.**  A sentence that does not move the story goes: history, a statistic the paragraph does not need, a
   pointer to another page.
 * **Do not explain the site to its reader.**  No note on what a column is for, no "defined in the glossary", no link to
@@ -64,6 +64,12 @@ The rules the owner's reviews have set, on top of [docs/WRITING.md](../docs/WRIT
   takes a figure's examples in turn, the figure's heads say who decides, and its caption says what its marks are.
 * **Active voice.**  Say who does what: "descending greedy keeps the source", not "the source is kept".  The passive
   voice is unwelcome.
+* **A colon introduces, it does not join.**  A colon may open a list, a formula, a citation or a label such as "Along
+  the way: game 40", and in the glossary an example after a definition.  It never hangs an explanation, a reason or an
+  example on a sentence: write two sentences, or join them with "because", "since" or "so".
+* **No pet words.**  A word a page reaches for again and again becomes a tic, as "rests on", "Precisely." and "exactly"
+  did.  Say what the dependence is ("assumes", "depends on", "follows from", "uses"), and keep "exactly when" for the
+  statement of a result.
 * **Titles say what a part is for.**  "Comparing bounds", not "Counting payment schemes".  A chapter's subhead is
   general enough to stand on its own, and a chapter goes from technique to results without turning back.
 
@@ -102,7 +108,7 @@ chain's end, and this site explains how.
 * **Along the way:** the findings as cards, each linked to the chapter that explains it: three factors of tax (40),
   one search for eight games (2512 to 2519), more moves and fewer points (833) and two optimal sets (425).
 * **Check it yourself:** the data, the programs and the theory on GitHub.
-* **Right column:** the rules precisely, opt(n) and the Taxman sequence (OEIS A019312); the heuristics' claims and how
+* **Right column:** the exact rules, opt(n) and the Taxman sequence (OEIS A019312); the heuristics' claims and how
   they were measured (`heuristics/README.md`); how to check the chain; what supports the scores (proven outright to
   2531, given statement U past it), beside "Check it yourself" and not at the top, until chapter 7 gives it its home;
   how to cite the site.
@@ -159,7 +165,7 @@ optimal game over game n's, where n fits (10) and where it does not (12), each a
 theorem (N6), the half lemma (N7), the semiprime formula (J3), the repeat lemma (R6, its last part given statement U).
 
 **Asides.**  *When n is twice a prime:* n always fits, since Bertrand's postulate puts a prime between n/2 and n;
-game 14.  *One search, eight games:* games 2512 to 2519 all rest on one search, the longest such run.
+game 14.  *One search, eight games:* games 2512 to 2519 all depend on one search, the longest such run.
 
 ### 3. The top half
 
@@ -176,7 +182,7 @@ greedy pass chooses them.
   48 of the 720 orders of six of them trap greedy at four, though five fit.  Taken from the largest down, they do not.
   Yet U\* is certified best among the sources in every game to 100,000.
 * Whether an optimal game of the whole board plays all of U\* is statement U, the one open statement the frame solver's
-  scores rest on past 2531.
+  scores depend on past 2531.
 
 **Figures.**  Game 21 in layers (the game-21 figure, from the pot to the sources).  The layer-2 graph of a mid-size
 game, greedy adding edges from the largest down and refusing the ones that close a loop.  A chart of the top half's
@@ -245,7 +251,7 @@ a quick test of even and odd, on the frames of a search or on the whole board.
   (chapter 7).
 * Odd cores: game 45's is the first; the parity bound is exact to 77 and first misses at 78, where an odd core weighs
   in (measured).
-* Comparing bounds, last because its second half rests on measurements: first the theory, that Franklín and Moniot's
+* Comparing bounds, last because its second half depends on measurements: first the theory, that Franklín and Moniot's
   bound is looser, a set being allowed by theirs, by the parity bound, or playable when some set of factors gets at
   least one, an odd number, or exactly one scheme; then the measurements, its gap about ten times the parity bound's
   in every game to the end of the chain, and a search with it exploring far more (the prover's searches of every game
@@ -265,7 +271,7 @@ to 2531.
 * The frame model's best is opt(n) exactly when statement U holds (X8); it is proved for the numbers of U* with one or
   two prime factors (F4) and open for the rest.
 * Every score rests, followed down, on the frame model of some game; up to 2531 that is proven, and past it the scores
-  rest on statement U from the first game that needs a search (2532 today).
+  depend on statement U from the first game that needs a search (2532 today).
 * The prover settles statement U one game at a time: it finds opt(n) on the whole board, with no frames, bounded by
   the parity bound of chapter 6, and has proven every game up to 2531.
 * The evidence past 2531: the lower layers (F4), the sources conjecture to 100,000, the barred bounds (about 80% of the
@@ -293,7 +299,7 @@ documents them.
 
 **Figures.**  The explorer.  The player's share against n, with Hensley's bounds.
 
-**Right column.**  A game's record, precisely; Hensley (1988); Franklín and Moniot's Theorem 5; the share near 63%
+**Right column.**  The fields of a game’s record; Hensley (1988); Franklín and Moniot's Theorem 5; the share near 63%
 (measured); one optimal set to game 424 (measured); how far an optimal game falls short (measured).
 
 ### 9. Summary
@@ -301,7 +307,7 @@ documents them.
 **Point.**  The optimal games in brief, for a reader who wants them now; the chapters before it never need it.  The
 introduction offers it at its top: "In a hurry? Go straight to the summary."
 
-* The optimal games: how far they reach and what the proofs rest on, the Taxman sequence (OEIS A019312), the file
+* The optimal games: how far they reach and what the proofs depend on, the Taxman sequence (OEIS A019312), the file
   results/optimal.jsonl.gz, and commands that download it and take out the moves.
 * Game 21, step by step: the bounds from game 20 and the parity bound, then the eight steps of the game 21 figure,
   each linked to the chapter that explains it, ending at 144.

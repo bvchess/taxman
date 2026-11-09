@@ -30,26 +30,29 @@
 <section class="chapter front-play" id="the-game" data-toc="the-game" aria-labelledby="h-game">
   <h2 id="h-game">The game</h2>
   <div class="para">
-    <aside class="note tech" aria-label="The rules, precisely">
-      <div class="note-head"><span class="note-name">The rules, precisely</span></div>
-      <p>Each move the player makes takes a number that still has a <a class="gloss" href="glossary.html#proper-divisor">proper divisor</a> in the pot,
-      then the taxman takes all of its divisors still in the pot.  When no move remains, the taxman takes the
-      rest.  The best player score possible for game n is opt(n), and opt(1), opt(2), opt(3), … is the
-      <a class="gloss" href="glossary.html#taxman-sequence">Taxman sequence</a>, <a href="https://oeis.org/A019312">A019312</a> in
-      the OEIS.</p>
+    <aside class="note tech" aria-label="The rules and opt(n)">
+      <div class="note-head"><span class="note-name">The rules and opt(n)</span></div>
+      <p>Each move the player makes takes a number that still has a
+      <a class="gloss" href="glossary.html#proper-divisor">proper divisor</a> in the pot, then the taxman takes all of
+      its divisors still in the pot.  When no move remains, the taxman takes the rest.  The best player score possible
+      for game n is opt(n), and opt(1), opt(2), opt(3), … is the
+      <a class="gloss" href="glossary.html#taxman-sequence">Taxman sequence</a>,
+      <a href="https://oeis.org/A019312">A019312</a> in the OEIS.</p>
     </aside>
     <p>You play Taxman with the numbers 1 to n, which start in the
     <a class="gloss" href="glossary.html#pot"><em>pot</em></a>.</p>
   </div>
   <ul class="rules">
-    <li>Take a number from the pot and score it.  That number is your <a class="gloss" href="glossary.html#move"><em>move</em></a>.</li>
-    <li>The taxman then takes every divisor of your move still in the pot: its <a class="gloss" href="glossary.html#tax"><em>tax</em></a>.</li>
+    <li>Take a number from the pot and score it.  That number is your
+    <a class="gloss" href="glossary.html#move"><em>move</em></a>.</li>
+    <li>The taxman then takes, as <a class="gloss" href="glossary.html#tax"><em>tax</em></a>, every divisor of your move
+    still in the pot.</li>
     <li>You may take only a number that has a divisor left in the pot, so the taxman always gets something.</li>
     <li>When no number you could take remains, the taxman takes the rest.</li>
     <li>You beat the taxman when your total is higher than the total he collects.</li>
   </ul>
   <p>We write the best total you can reach in game n as <a class="gloss" href="glossary.html#opt">opt(n)</a>, and a game
-  that reaches it is an <a class="gloss" href="glossary.html#optimal-game"><em>optimal game</em></a>.  Try game 10: its
+  that reaches it is an <a class="gloss" href="glossary.html#optimal-game"><em>optimal game</em></a>.  Try game 10.  Its
   best score is 40, and you can find it by hand.</p>
 
   <div class="game-host" id="game"></div>
@@ -58,14 +61,14 @@
     <aside class="note tech" aria-label="Heuristic strategies">
       <div class="note-head"><span class="note-name">Heuristic strategies</span></div>
       <p>A heuristic strategy plays a good game quickly, by rules such as taking the largest number you can still take,
-      or the one that costs the least tax.  To judge one, you need the best score to measure it against: one reason to
-      know opt(n).  The repository holds
+      or the one that costs the least tax.  To judge one, you need the best score to measure it against, which is one
+      reason to know opt(n).  The repository has
       <a href="https://github.com/bvchess/taxman/blob/master/heuristics/README.md">our strategies and how we measured
       them</a>, and <a href="https://github.com/bvchess/taxman/tree/master/moniot">Robert Moniot's seven</a>.</p>
     </aside>
-    <p>The blue button plays an optimal game, the best you can do.  Playing well is easy: in every game we tested it on,
-    the first thousand, a simple strategy with no search comes within a fraction of a percent of the best score.  But
-    knowing that a game is optimal means showing that no game does better, and that is more challenging.</p>
+    <p>The blue button plays an optimal game, the best you can do.  Playing well is easy.  In every game we tested it
+    on, the first thousand, a simple strategy with no search comes within a fraction of a percent of the best score.
+    But knowing that a game is optimal means showing that no game does better, and that is more challenging.</p>
   </div>
 </section>
 
@@ -78,8 +81,8 @@
       <a class="gloss" href="glossary.html#board">board</a>, 2<sup>⌊n/2⌋</sup> subsets of the numbers up to n/2, and
       2<sup>c</sup> subsets of the c <a class="gloss" href="glossary.html#candidate">candidates</a>.  The last row is
       the <a class="gloss" href="glossary.html#node">nodes</a> that the game's recorded search explored.  The row before
-      it is no count: it says how far below the best score the search starts when it starts from the game before, as we
-      measured it (<a href="search.html#head-start">chapter 5</a>).</p>
+      it is not a count.  It says how far below the best score the search starts when it starts from the game before, as
+      we measured it (<a href="search.html#head-start">chapter 5</a>).</p>
     </aside>
     <p>You can put game <span data-last-n>n</span>'s numbers in about 10<sup data-orders-exp>…</sup> orders.  No
     computer could try them all.  Each chapter of the story takes away part of the problem, until what remains is small
@@ -98,8 +101,8 @@
       <ul>
         <li><b>Follows from game n&nbsp;−&nbsp;1.</b>  n is prime, and the
         <a class="gloss" href="glossary.html#prime-formula">prime formula</a> gives its score from game
-        n&nbsp;−&nbsp;1’s.  Or it is at its <a class="gloss" href="glossary.html#ceiling">ceiling</a>: its score is
-        n&nbsp;+&nbsp;opt(n&nbsp;−&nbsp;1), the most it can be.</li>
+        n&nbsp;−&nbsp;1’s.  Or it is at its <a class="gloss" href="glossary.html#ceiling">ceiling</a>, where its score
+        is n&nbsp;+&nbsp;opt(n&nbsp;−&nbsp;1), the most it can be.</li>
         <li><b>Repeats an earlier search.</b>  The game poses the same search problem as an earlier game, and that
         game’s answer is its answer too.</li>
         <li><b>Search.</b>  Every other game.  A search proved its score.</li>
@@ -109,8 +112,8 @@
     </aside>
     <aside class="note tech" aria-label="The time of a search">
       <div class="note-head"><span class="note-name">The time of a search</span></div>
-      <p>The line passes through the median time of a search in each stretch of 100 games: half the stretch’s
-      searches took less time, and half took more.  All <span data-proof="chainSearches">…</span> searches ran on one
+      <p>The line passes through the median time of a search in each stretch of 100 games, so half the stretch’s
+      searches took less time and half took more.  All <span data-proof="chainSearches">…</span> searches ran on one
       machine with 88 threads.</p>
     </aside>
     <aside class="note tech" aria-label="The player's share">
@@ -142,8 +145,8 @@
   <div class="para">
     <p>Our results file has a line for every game: its best score, moves that reach it, and how we know there's no way
     to score more.  Up to game 2,531 we use a second program to verify we've found opt(n).  From game 2,532 on, each
-    score rests on one open statement, statement U (<a href="statement-u.html">chapter 7</a>).  The code, the theory and
-    the record of what we tried are on GitHub.</p>
+    score depends on one open statement, statement U (<a href="statement-u.html">chapter 7</a>).  The code, the theory
+    and the record of what we tried are on GitHub.</p>
   </div>
   <ul class="source-list">
     <li><a href="https://github.com/bvchess/taxman">The repository</a><span>the frame solver, the prover, the theory
@@ -152,7 +155,7 @@
     line for each game, and <a href="https://github.com/bvchess/taxman/blob/master/results/README.md">what supports each
     score</a></span></li>
     <li><a href="https://github.com/bvchess/taxman/blob/master/docs/THEORY.md">The theory</a><span>every result the
-    programs rest on, with its proof and its standing</span></li>
+    programs use, with its proof and its standing</span></li>
     <li><a href="https://github.com/bvchess/taxman/blob/master/solver/frame/README.md">The frame solver</a><span>how
     to build it and run it</span></li>
     <li><a href="https://github.com/bvchess/taxman/blob/master/solver/noframe/README.md">The prover</a><span>the second

@@ -128,7 +128,7 @@ function mountContents() {
 
 // ---- the technical layer: each note gets the line it folds into on a narrow window -------------------------------
 
-const KIND = [['card', 'Precisely'], ['tech', 'Technical note'], ['links', 'Further reading']];
+const KIND = [['card', 'Result'], ['tech', 'Technical note'], ['links', 'Further reading']];
 
 /** Give each note of the right column the button that opens it when the margin folds into the text. */
 export function mountNotes(root = document) {

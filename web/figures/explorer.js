@@ -80,7 +80,7 @@ function settled(r) {
       return [lead, `Since ${fmt(n)} is prime, its score is opt(${fmt(n - 1)}) + ${fmt(n)} − ${fmt(q)} = ${fmt(score)}, where ${fmt(q)} is the largest prime below ${fmt(n)}.`];
     }
     case 'same_search':
-      return [lead, `Game ${fmt(n)} poses exactly the search problem of an earlier game, whose promotions carry over with no search.`];
+      return [lead, `Game ${fmt(n)} poses the same search problem as an earlier game, whose promotions carry over with no search.`];
     case 'trivial':
       return [lead, n === 1
         ? 'Game 1 has no move: the taxman takes the 1.'
@@ -90,7 +90,7 @@ function settled(r) {
   }
 }
 
-// What the score rests on.
+// What the score depends on.
 function restsOn({ n }, f) {
   if (n === 1) return 'Nothing: game 1 has no move to choose.';
   if (n <= PROVER_TO) return `The prover proves it too, on the whole board, so it is opt(${fmt(n)}) without the frame model.`;
@@ -98,9 +98,9 @@ function restsOn({ n }, f) {
     return `It follows from game ${fmt(f)}’s score, which the prover proves on the whole board, so it is opt(${fmt(n)}) without the frame model.`;
   }
   if (f < n) {
-    return `It follows from game ${fmt(f)}’s score, the frame model’s best, which is opt(${fmt(f)}) wherever statement U holds, and U is open past game ${fmt(PROVER_TO)}.`;
+    return `It follows from game ${fmt(f)}’s score, the frame model’s best, which is opt(${fmt(f)}) when statement U holds, and U is open past game ${fmt(PROVER_TO)}.`;
   }
-  return `It is the frame model’s best score, which is opt(${fmt(n)}) wherever statement U holds, and U is open past game ${fmt(PROVER_TO)}.`;
+  return `It is the frame model’s best score, which is opt(${fmt(n)}) when statement U holds, and U is open past game ${fmt(PROVER_TO)}.`;
 }
 
 // The six numbers under the words: each a label, a value and a line under it.
@@ -176,7 +176,7 @@ export function mountExplorer(host, { games, small }) {
         <p class="ex-share" data-f="share" aria-live="polite"></p>
         <dl class="ex-words">
           <dt>How the chain settled it</dt><dd data-f="settled"></dd>
-          <dt>What it rests on</dt><dd data-f="rests"></dd>
+          <dt>What it depends on</dt><dd data-f="rests"></dd>
         </dl>
         <dl class="ex-stats"></dl>
       </div>

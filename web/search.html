@@ -48,15 +48,15 @@
     <aside class="note card" aria-label="The state lemma, proved">
       <div class="note-head"><span class="note-name">The state lemma<span class="note-label">Lemma R1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/search-rules.md#the-state-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">What a node can still promote depends only on the frames its promotions leave.</p>
-      <p class="precise"><span class="run">Precisely.</span>P ∪ X is a promotion set exactly when each member of X is a
+      <p class="precise">P ∪ X is a promotion set exactly when each member of X is a
       factor of its home in state(P), and every frame of state(P) stays winnable when the player applies X.</p>
     </aside>
     <p>A <a class="gloss" href="glossary.html#search">search</a> tries the sets one candidate at a time.  At each step
-    it takes one candidate and splits the search tree: one branch promotes it, the other goes on without it.  Each point
-    the search reaches is a <a class="gloss" href="glossary.html#node">node</a>.  All the while the search keeps the
-    best game it has found, and each node has a <a class="gloss" href="glossary.html#bound">bound</a>: a limit on the
-    sum of the promotions of any game in that branch, counting those already made.  Every game in the search plays
-    <a class="gloss" href="glossary.html#u-star">U*</a>, so its promotions decide its score.  A branch whose bound
+    it takes one candidate and splits the search tree in two.  One branch promotes it, and the other goes on without it.
+    Each point the search reaches is a <a class="gloss" href="glossary.html#node">node</a>.  All the while the search
+    keeps the best game it has found, and each node has a <a class="gloss" href="glossary.html#bound">bound</a>, a limit
+    on the sum of the promotions of any game in that branch, counting those already made.  Every game in the search
+    plays <a class="gloss" href="glossary.html#u-star">U*</a>, so its promotions decide its score.  A branch whose bound
     cannot beat the best game found is a dead end, so the search stops exploring that path.  We call this way of
     searching branch and bound.</p>
   </div>
@@ -73,10 +73,10 @@
   <div class="para">
     <aside class="note tech" aria-label="The figure's bound">
       <div class="note-head"><span class="note-name">The figure's bound</span></div>
-      <p>The figure prunes with a simpler bound than the solver's: the sum of every candidate that the player could
-      still promote alone with the node's promotions.  In its search, the player can promote candidates together
-      exactly when <a class="gloss" href="glossary.html#u-star">U*</a> with them is <a class="gloss"
-      href="glossary.html#playable">playable</a> (Theorem X7).</p>
+      <p>The figure prunes with a simpler bound than the solver's, the sum of every candidate that the player could
+      still add, one at a time, to the node's promotions.  In its search, the player can promote candidates together
+      exactly when <a class="gloss" href="glossary.html#u-star">U*</a> with them is
+      <a class="gloss" href="glossary.html#playable">playable</a> (Theorem X7).</p>
     </aside>
     <p>The figure’s search of game 45 takes <span data-tree="nodes">13</span> nodes, and its bound drops
     <span data-tree="dropped">6</span> branches without looking inside them.  When no branch remains, no set of
@@ -86,14 +86,14 @@
 
 <section class="chapter" id="the-bound" data-toc="the-bound" aria-labelledby="h-bound">
   <h2 id="h-bound">The bound</h2>
-  <p>The figure's <a class="gloss" href="glossary.html#bound">bound</a> adds up every <a class="gloss"
-  href="glossary.html#candidate">candidate</a> that the player could still promote alone along with the promotions the
-  branch has already selected. Every set the player can promote passes this test, but so do many sets that cannot, so
-  the bound is loose: at game 45's root the bound is <span data-tree="rootBound">107</span>, but eventually we learn the
-  best set of promotions can only contribute <span data-tree="best">39</span>.</p>
-  <p>The <a class="gloss" href="glossary.html#frame-solver">frame solver</a>'s bound is of the same kind: the heaviest
-  set of candidates that passes a test, one that every set of legal promotions passes.  Its test is far sharper, and
-  <a href="bound.html">chapter 6</a> explains it.</p>
+  <p>The figure's <a class="gloss" href="glossary.html#bound">bound</a> adds up every
+  <a class="gloss" href="glossary.html#candidate">candidate</a> that the player could still add, one at a time, to the
+  promotions the branch has already selected. Every set the player can promote passes this test, but so do many sets
+  that cannot, so the bound is loose.  At game 45's root the bound is <span data-tree="rootBound">107</span>, but
+  eventually we learn the best set of promotions can only contribute <span data-tree="best">39</span>.</p>
+  <p>The <a class="gloss" href="glossary.html#frame-solver">frame solver</a>'s bound is of the same kind.  It is the
+  heaviest set of candidates that passes a test, one that every set of legal promotions passes.  Its test is far
+  sharper, and <a href="bound.html">chapter 6</a> explains it.</p>
 </section>
 
 <section class="chapter" id="dead-ends" data-toc="dead-ends" aria-labelledby="h-dead-ends">
@@ -110,9 +110,9 @@
     <p>At each <a class="gloss" href="glossary.html#node">node</a>, the solver checks whether the player can really
     promote the heaviest set that passes the bound's test.  If it can, nothing in the branch does better, and the branch
     is done.  If it cannot, the solver finds the few <a class="gloss" href="glossary.html#candidate">candidates</a> in
-    it that cause the trouble, often only one or two: the player cannot promote all of them together.  Any set the
-    player can promote leaves at least one of them out, so the search splits on one of them: one branch promotes it, and
-    the other goes on without it.</p>
+    it that cause the trouble, often only one or two, which the player cannot promote all together.  Any set the player
+    can promote leaves at least one of them out, so the search splits on one of them.  One branch promotes it, and the
+    other goes on without it.</p>
     <p>The solver remembers each dead end it finds.  A set of candidates that the player cannot promote together at the
     root stays that way everywhere in the tree, so once the solver finds such a set, no other branch tries it again.</p>
   </div>
@@ -122,7 +122,7 @@
       <div class="note-head"><span class="note-name">The prime-exchange theorem<span class="note-label">Theorem R2</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/search-rules.md#the-prime-exchange-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Where two primes play the same part, the player can promote both a set of promotions and its
       mirror image, or neither, and we know the heavier in advance.</p>
-      <p class="precise"><span class="run">Precisely.</span>If exchanging the primes p &lt; q maps the root onto itself,
+      <p class="precise">If exchanging the primes p &lt; q maps the root onto itself,
       and no candidate is divisible by pq, p² or q², every heaviest promotion set has c<sub>p</sub> ≤ c<sub>q</sub>,
       where c<sub>r</sub> sums x/r over its multiples of r.  At game 1,300, 41 and 43 are such a pair
       (<a href="https://github.com/bvchess/taxman/blob/master/solver/docs/design/gf2-bound.md#prime-exchanges">prime
@@ -131,7 +131,7 @@
     <p>Some pairs of primes play the same part in a game.  In game 1,300, 41 and 43 are such a pair.  Its
     <a class="gloss" href="glossary.html#candidate">candidates</a> include 41 times 4, 6, 8, 9, 10, 12, 14 and 15, and
     43 times the same eight numbers, and swapping 41 and 43 in every number leaves the
-    <a class="gloss" href="glossary.html#frame">frames</a>, all together, exactly as they were.  So every set of
+    <a class="gloss" href="glossary.html#frame">frames</a>, all together, as they were.  So every set of
     promotions has a twin, made by the same swap, and the player can promote the twin exactly when the player can
     promote the set.  A set that promotes 164 = 4 × 41, and no other of the sixteen, has a twin that promotes 172 = 4 ×
     43 in its place, and the twin weighs 8 more.  Each swap trades a multiple of 41 for the same multiple of 43, or
@@ -144,13 +144,13 @@
   <div class="para">
     <aside class="note tech" aria-label="The two starts of game 5,060">
       <div class="note-head"><span class="note-name">The two starts of game 5,060</span></div>
-      <p>As sums of promotions, the part of the score a search chooses: the best is <span
-      data-start="best">570,330</span>, and the search starts at <span data-start="seeded">570,285</span> from game
-      5,059’s optimal set and at <span data-start="own">569,735</span> on its own.  The frame solver measured both,
-      stopping each search after its first thousand nodes (<a
-      href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-start-of-game-5060-with-and-without-the-game-before-2026-11/README.md">the
-      start of game 5,060</a>).  We measured what a start below the best costs a search at game 3,020 (<a
-      href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-dear-games-the-problem-or-the-chains-path-2026-10/README.md#4-what-a-start-below-optn-costs">a
+      <p>In sums of promotions, the part of the score a search chooses, the best is
+      <span data-start="best">570,330</span>, and the search starts at <span data-start="seeded">570,285</span> from
+      game 5,059’s optimal set and at <span data-start="own">569,735</span> on its own.  The frame solver measured both,
+      stopping each search after its first thousand nodes
+      (<a href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-start-of-game-5060-with-and-without-the-game-before-2026-11/README.md">the
+      start of game 5,060</a>).  We measured what a start below the best costs a search at game 3,020
+      (<a href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-dear-games-the-problem-or-the-chains-path-2026-10/README.md#4-what-a-start-below-optn-costs">a
       start below opt(n)</a>).</p>
     </aside>
     <p>A search does not start from nothing.  The search of game n starts from the optimal set of game n − 1, which it
@@ -165,13 +165,13 @@
       <div class="note-head"><span class="note-name">The near-repeat lemma<span class="note-label">Lemma R7</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/search-rules.md#the-near-repeat-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">A branch that poses part of an earlier game's problem adds no more than that game's best, so
       once the best game found reaches that much, the search may drop it.</p>
-      <p class="precise"><span class="run">Precisely.</span>Under three conditions against a game m, every completion
+      <p class="precise">Under three conditions against a game m, every completion
       of a node is a promotion set of m's root problem, worth at most a bound Z of its best.</p>
     </aside>
     <p>Game n − 1 helps another way too.  Where a branch of game n poses only part of the problem that game n − 1 posed,
     it can add no more than game n − 1's best, so once the search's best game reaches that, it drops the branch, by the
-    near-repeat lemma.  It is a <a class="gloss" href="glossary.html#repeat">repeat</a> in part: game n − 1’s search has
-    already shown how much that part can add.</p>
+    near-repeat lemma.  It is a <a class="gloss" href="glossary.html#repeat">repeat</a> in part, since game n − 1’s
+    search has already shown how much that part can add.</p>
   </div>
 </section>
 
@@ -182,15 +182,15 @@
       <div class="note-head"><span class="note-name">The dual-bound lemma<span class="note-label">Lemma R4</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/search-rules.md#the-dual-bound-lemma">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">A search that drops only branches that cannot do better ends with the best set of
       promotions.</p>
-      <p class="precise"><span class="run">Precisely.</span>In an <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/search-rules.md#exact-searches">exact
+      <p class="precise">In an <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/search-rules.md#exact-searches">exact
       search</a>, every promotion set heavier than the best found, and true to every mirror, lies in an open branch.
       So a search with no branch left proves P*, the heaviest promotion set's sum, equal to its best.</p>
     </aside>
     <p>When the <a class="gloss" href="glossary.html#search">search</a> has explored all branches, it has proved that no
-    set of promotions beats its best one: it either tried each set or dropped it for a reason that shows it cannot do
+    set of promotions beats its best one.  It either tried each set or dropped it for a reason that shows it cannot do
     better: a bound, a dead end, or a heavier mirror image.  So its best game is the best of the
     <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is an
-    <a class="gloss" href="glossary.html#optimal-game">optimal game</a> wherever
+    <a class="gloss" href="glossary.html#optimal-game">optimal game</a> when
     <a class="gloss" href="glossary.html#statement-u">statement U</a> holds.  This is how the search proved the scores
     of <span data-proof="exhausted">1,612</span> games of the <a class="gloss" href="glossary.html#chain">chain</a>.</p>
     <p>A search can also stop early.  No game of n scores more than the best score of game n − 1 plus n, the <a
@@ -206,7 +206,7 @@
   <p>The chart shows the number of <a class="gloss" href="glossary.html#node">nodes</a> of every game of the
   <a class="gloss" href="glossary.html#chain">chain</a> whose <a class="gloss" href="glossary.html#search">search</a>
   explored a node, <span data-cost="count">1,749</span> games in total.  They climb from a single node in the small
-  games to billions by the end: game <span data-cost="endN">5,060</span> took <span data-cost="endNodes">1.2
+  games to billions by the end, where game <span data-cost="endN">5,060</span> took <span data-cost="endNodes">1.2
   billion</span>.</p>
 
   <figure class="chart fig" id="cost-chart">
@@ -218,13 +218,13 @@
     <aside class="note card" aria-label="How a subtree grows, measured">
       <div class="note-head"><span class="note-name">How a subtree grows</span><a class="standing is-measured" href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-23-game-4949-the-first-chain-game-profiled-whole">measured<span class="sr-only">, evidence on GitHub</span></a></div>
       <p class="plain">A subtree grows about 2.6 times for every 100 points of its gap.</p>
-      <p class="precise"><span class="run">Precisely.</span>In the profile of game 4,949, a subtree's steps rose 0.42
+      <p class="precise">In the profile of game 4,949, a subtree's steps rose 0.42
       decades per 100 points of its gap, with a rank correlation of 0.88 to 0.96.  Game 4,950's nodes sit 200 to 230
       points higher, and its subtrees are 5 to 8 times larger
       (<a href="https://github.com/bvchess/taxman-notebook/blob/main/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-23-where-the-hard-games-spend-their-steps-q1">the
       hard games</a>).</p>
     </aside>
-    <p>What decides the cost is the <a class="gloss" href="glossary.html#gap">gap</a> at each node: how far its <a
+    <p>What decides the cost is the <a class="gloss" href="glossary.html#gap">gap</a> at each node, how far its <a
     class="gloss" href="glossary.html#bound">bound</a> is above the best game found.  The search cannot drop a branch
     with a large gap, and the branch splits again and again before its bound comes down.  In game 4,949, near the end of
     the chain, a subtree grew about 2.6 times for every 100 points of its gap.</p>
@@ -243,7 +243,7 @@
         <li><a href="https://github.com/bvchess/taxman/blob/master/solver/docs/design/tactics.md">The
         tactics</a><span>what proves each one, or makes it sound</span></li>
         <li><a href="https://github.com/bvchess/taxman-notebook/blob/main/README.md#register-of-everything-tried">What
-        we tried</a><span>the notebook's register: every experiment on the search, kept or not</span></li>
+        we tried</a><span>the notebook's register of every experiment on the search, kept or not</span></li>
       </ul>
     </aside>
     <p>From game <span data-cost="lateFrom">4,500</span> on, half the searched games took more than
