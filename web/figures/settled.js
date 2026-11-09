@@ -68,16 +68,13 @@ export function mountSettled(host, { games }) {
       const p = at(i);
       ruleCell(g, key, p.x, p.y, size);
     });
-    // The first game of every tenth row at its left, and the last game after its cell.
+    // The first game of every tenth row at its left.
     const every = 10;
     for (let r = 0; r < rows; r += every) {
       const y = at(r * COLS).y + size / 2 + 4;
       const t = el('text', { x: labelW - 8, y, 'text-anchor': 'end', class: 'tick' }, svg);
       t.textContent = fmt(r * COLS + 1);
     }
-    const lastAt = at(total - 1);
-    const lastLabel = el('text', { x: lastAt.x + size + 6, y: lastAt.y + size / 2 + 4, class: 'tick' }, svg);
-    lastLabel.textContent = fmt(last);
 
     // The hover layer: the cell under the pointer, and its game in the tooltip.
     const ring = el('rect', { width: size + 3, height: size + 3, rx: 2, class: 'rule-ring', opacity: 0 }, svg);

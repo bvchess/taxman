@@ -140,8 +140,8 @@ points:* in game 833 every optimal game makes 362 moves, but a game can make 363
 * At a prime n, swap the old largest prime for n: the prime formula.
 * Often game n poses exactly the search problem of the game before it, and that game's answer carries over: a repeat.
   The solver looks for one once the problem is set up, before it searches (chapter 5).
-* Together these settle about 65% of the games with no search.  That is why the result is a chain: game 5000 is reached
-  by walking there.  The chart of the whole chain, 120 to a row, has stripes, dark where 8, 12, 20 or 30 divides n
+* Together these settle about 65% of the games with no search.  That is why the result is a chain: the games are settled in
+  order, from game 1 up.  The chart of the whole chain, 120 to a row, has stripes, dark where 8, 12, 20 or 30 divides n
   and light where n is twice a number with no factor 2, 3 or 5, which leads to the next section.
 * Which games need a search can usually be told from n alone, from its cofactor: n over its largest prime factor
   (measured).  The more prime factors the cofactor has, the likelier a search (a table), which draws the stripes: past

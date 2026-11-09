@@ -300,21 +300,6 @@
       ceiling proves them from game n − 1 alone.  The searches include <span data-settled="searchNothing">5</span>
       small games with nothing to choose.</p>
     </aside>
-    <p>The same rules carry the <a class="gloss" href="glossary.html#chain">chain</a> to its end.  Of its
-    <span data-settled="total">5,060</span> games, <span data-settled="share">65.4%</span> needed no search of their
-    own: <span data-settled="ceilingShare">32.4%</span> at the ceiling, <span data-settled="primeShare">13.4%</span> by
-    the prime formula and <span data-settled="repeatShare">19.7%</span> as repeats.  The other
-    <span data-settled="searchShare">34.6%</span> needed a search.</p>
-  </div>
-
-  <figure class="fig chart" id="settled">
-    <p class="chart-sub">Every game of the chain, a cell each, 120 to a row from game 1 at the top left, with a
-    color for how we proved it.  The dark green cells are the searches.</p>
-    <div class="chart-key rule-legend"></div>
-    <div class="chart-box"></div>
-  </figure>
-
-  <div class="para">
     <aside class="note tech" aria-label="What each rule rests on">
       <div class="note-head"><span class="note-name">What each rule rests on</span></div>
       <p>The ceiling and the prime formula prove the chain's game of n optimal wherever its game of n − 1 is.  A repeat
@@ -325,9 +310,21 @@
       (<a href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports
       the scores</a>).</p>
     </aside>
-    <p>Each game we settle without a search of its own rests on an earlier game, most often game n − 1, so the chain has
-    to find its games in order, from game 1 up: the chain reaches game 5,000 by walking there.</p>
+    <p>The same rules carry the <a class="gloss" href="glossary.html#chain">chain</a> to its end.  Of its
+    <span data-settled="total">5,060</span> games, <span data-settled="share">65.4%</span> needed no search of their
+    own: <span data-settled="ceilingShare">32.4%</span> at the ceiling, <span data-settled="primeShare">13.4%</span> by
+    the prime formula and <span data-settled="repeatShare">19.7%</span> as repeats.  The other
+    <span data-settled="searchShare">34.6%</span> needed a search.</p>
+    <p>Each game we settle without a search of its own makes use of an earlier game, most often game n − 1, so we
+    have to settle the games in order, from game 1 up.</p>
   </div>
+
+  <figure class="fig chart" id="settled">
+    <p class="chart-sub">Every game of the chain, a cell each, 120 to a row from game 1 at the top left, with a
+    color for how we proved it.  The dark green cells are the searches.</p>
+    <div class="chart-key rule-legend"></div>
+    <div class="chart-box"></div>
+  </figure>
   <p>The chart has vertical stripes.  A row holds 120 games, so the games in a column leave the same remainder when n
   is divided by 120, and that remainder decides whether 2, 3, 4, 5 and 8 divide n.  The dark stripes are where 8, 12,
   20 or 30 divides n: every game in the columns of games <span data-stripes="darkColumns">56, 80 and 100</span>
