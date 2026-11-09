@@ -150,9 +150,9 @@ points:* in game 833 every optimal game makes 362 moves, but a game can make 363
   order, from game 1 up.  The chart of the whole chain, 120 to a row, has stripes, dark where 8, 12, 20 or 30 divides n
   and light where n is twice a number with no factor 2, 3 or 5, which leads to the next section.
 * Which games need a search can usually be told from n alone, from its cofactor: n over its largest prime factor
-  (measured).  The more prime factors the cofactor has, the likelier a search (a table), which draws the stripes: past
-  8, 12, 20 and 30, the cofactor of a number one of them divides has at least three.  Those still get a start and a
-  ceiling from game n − 1 (chapter 5).
+  (measured).  The higher the layer of n, the likelier a search (a table), which draws the stripes: past 8, 12, 20 and
+  30, a number one of them divides lies in layer 4 or higher, so its cofactor is never one the rule names.  Those still
+  get a start and a ceiling from game n − 1 (chapter 5).
 
 **Examples.**  Games 9 to 13, small enough to follow by hand: game 12 from game 11 in the opening, 10 fits, 12 does not,
 and 13 is a prime.  The repeat is game 39, which the semiprime formula also settles.

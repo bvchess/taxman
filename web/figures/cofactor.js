@@ -59,15 +59,14 @@ export function cofactorCounts(games) {
  *  (n - 1) % COLS + 1 === r.  darkColumns are the r whose games were all searched, lightColumns the r whose games
  *  include no search.  dark counts the games whose n is divisible by 8, 12, 20 or 30, with how many were searched and
  *  how many reached their ceiling; light, those whose n is twice a number with no factor 2, 3 or 5, with how many were
- *  searched and how many have a cofactor that is a prime or twice a prime (named).  byCount groups the games from FROM
- *  on by omega(cofactor(n)), the count of prime factors with multiplicity, 4 standing for four or more; each group
- *  holds its games and how many were searched.
+ *  searched and how many have a cofactor that is a prime or twice a prime (named).  byLayer groups the games from FROM
+ *  on by their layer, omega(n), the count of prime factors with multiplicity, 5 standing for five or more; each group
+ *  holds its layer, its games and how many were searched.
  *
  *  Claims: both lists of columns are non-empty; every dark column's r is divisible by 8, 12, 20 or 30; every light
  *  column's r is twice a number with no factor 2, 3 or 5, and all its games reached their ceiling; every dark game was
- *  searched or at its ceiling; every dark n other than 8, 12, 20 and 30 has a cofactor of at least three prime factors
- *  that is never 1, a prime, twice a prime or 9; no game from FROM on whose cofactor has fewer than two prime factors
- *  was searched, and the share searched rises from two to three to four or more. */
+ *  searched or at its ceiling; every dark n other than 8, 12, 20 and 30 lies in layer 4 or above; no game from FROM on
+ *  in layer 1 or 2 was searched, and the share searched rises from layer 3 to layer 4 to layer 5 or more. */
 export function stripeFacts(games) {
   const c = games.columns;
   const group = () => ({ games: 0, searched: 0 });
@@ -76,7 +75,7 @@ export function stripeFacts(games) {
   const columns = Array.from({ length: COLS + 1 }, () => ({ games: 0, searched: 0, ceiling: 0 }));
   const dark = { ...group(), ceiling: 0 };
   const light = { ...group(), named: 0 };
-  const byCount = [0, 1, 2, 3, 4].map(group);
+  const byLayer = [1, 2, 3, 4, 5].map((layer) => ({ layer, ...group() }));
   const namedKinds = KINDS.slice(0, 4);
   const claims = [];
   const claim = (holds, text) => { if (!holds) claims.push(text); };
@@ -89,23 +88,20 @@ export function stripeFacts(games) {
     add(col);
     if (rule === 'ceiling') col.ceiling++;
     const k = cofactor(n);
-    const count = omega(k);
     if (isDark(n)) {
       add(dark);
       if (rule === 'ceiling') dark.ceiling++;
       claim(searched || rule === 'ceiling',
         `game ${n}, divisible by 8, 12, 20 or 30, was neither searched nor at its ceiling`);
       if (![8, 12, 20, 30].includes(n)) {
-        claim(count >= 3, `game ${n}, divisible by 8, 12, 20 or 30, has a cofactor of fewer than three prime factors`);
-        claim(!namedKinds.some((g) => g.test(k)),
-          `game ${n}, divisible by 8, 12, 20 or 30, has a cofactor the rule names`);
+        claim(omega(n) >= 4, `game ${n}, divisible by 8, 12, 20 or 30, lies below layer 4`);
       }
     }
     if (isLight(n)) {
       add(light);
       if (namedKinds.slice(1, 3).some((g) => g.test(k))) light.named++;
     }
-    if (n >= FROM) add(byCount[Math.min(count, 4)]);
+    if (n >= FROM) add(byLayer[Math.min(omega(n), 5) - 1]);
   }
   const darkColumns = [];
   const lightColumns = [];
@@ -123,13 +119,12 @@ export function stripeFacts(games) {
     claim(isLight(r), `light column ${r} is not twice a number with no factor 2, 3 or 5`);
     claim(columns[r].ceiling === columns[r].games, `a game in light column ${r} is not at its ceiling`);
   }
-  const share = (k) => byCount[k].searched / byCount[k].games;
-  claim(byCount[0].searched === 0 && byCount[1].searched === 0,
-    'a game whose cofactor has fewer than two prime factors was searched');
-  claim(share(2) < share(3) && share(3) < share(4),
-    'the share searched does not rise with the cofactor\'s prime factors');
+  const share = (g) => g.searched / g.games;
+  claim(byLayer[0].searched === 0 && byLayer[1].searched === 0, 'a game in layer 1 or 2 was searched');
+  claim(share(byLayer[2]) < share(byLayer[3]) && share(byLayer[3]) < share(byLayer[4]),
+    'the share searched does not rise with the layer');
   if (claims.length) throw new Error(`the stripes: ${claims[0]}`);
-  return { byCount, darkColumns, lightColumns, dark, light };
+  return { byLayer, darkColumns, lightColumns, dark, light };
 }
 
 export function mountCofactor(host, { games }) {

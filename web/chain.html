@@ -328,10 +328,11 @@
   </figure>
   <p>The chart has vertical stripes.  A row has 120 games, so the games in a column leave the same remainder when n
   is divided by 120, and that remainder decides whether 2, 3, 4, 5 and 8 divide n.  The dark stripes are where 8, 12,
-  20 or 30 divides n, and every game in the columns of games <span data-stripes="darkColumns">56, 80 and 100</span>
-  needed a search.  The light stripes are where n is twice a number with no factor 2, 3 or 5, and every game in the
-  columns of games <span data-stripes="lightColumns">22, 26, 34, 38, 58 and 82</span> reached its ceiling.  Why
-  should this remainder matter so much?</p>
+  20 or 30 divides n.  Every game in the columns of games <span data-stripes="darkColumns">56, 80 and 100</span>
+  needed a search, so those columns are dark green from top to bottom.  The light stripes are where n is twice a
+  number with no factor 2, 3 or 5.  Every game in the columns of games
+  <span data-stripes="lightColumns">22, 26, 34, 38, 58 and 82</span> reached its ceiling, so those columns are light
+  gray from top to bottom.  Why should this remainder matter so much?</p>
 </section>
 
 <section class="chapter" id="cofactor" data-toc="cofactor" aria-labelledby="h-cofactor">
@@ -366,33 +367,32 @@
   <span data-cof="other">2,143</span> games with any other cofactor, <span data-cof="otherSearched">1,691</span> needed
   a search.</p>
   <div class="para">
-    <aside class="note tech" aria-label="The cofactor and the layers">
-      <div class="note-head"><span class="note-name">The cofactor and the layers</span></div>
-      <p>The <a class="gloss" href="glossary.html#layer">layer</a> of n is one more than the number of prime factors of
-      its cofactor.  With a cofactor of 1 or a prime, n lies in layer 1 or 2, and from game 188 on the prime formula or
-      the layer-2 corollary settles the game with no search.  With a cofactor of three or more prime factors, n lies in
-      layer 4 or higher, among frames with <a class="gloss" href="glossary.html#freedom">freedoms</a>, where its arrival
-      can change the search problem, and usually does.  That last part is measured, not proved.</p>
+    <aside class="note tech" aria-label="Why the layer matters">
+      <div class="note-head"><span class="note-name">Why the layer matters</span></div>
+      <p>From game 188 on, the prime formula or the layer-2 corollary settles every game in layer 1 or 2 with no
+      search.  In layer 4 or higher, n lies among frames with
+      <a class="gloss" href="glossary.html#freedom">freedoms</a>, where its arrival can change the search problem, and
+      usually does.  That last part is measured, not proved.</p>
     </aside>
-    <p>Count the prime factors of the cofactor, with repeats.  The more there are, the likelier a search.</p>
+    <p>Group the games by the <a class="gloss" href="glossary.html#layer">layer</a> of n (its number of prime factors
+    counted with repeats.)  The higher the layer, the likelier a search.</p>
     <table class="counts">
-      <thead><tr><th>number of prime factors<br>of the cofactor</th><th>games from 188 on</th><th>needed a search</th></tr></thead>
+      <thead><tr><th>layer of n</th><th>games from 188 on</th><th>needed a search</th></tr></thead>
       <tbody>
-        <tr><td>0 (n is prime)</td><td data-stripes="games0">635</td><td data-stripes="searched0">none</td></tr>
-        <tr><td>1</td><td data-stripes="games1">1,316</td><td data-stripes="searched1">none</td></tr>
-        <tr><td>2</td><td data-stripes="games2">1,244</td><td data-stripes="searched2">31%</td></tr>
-        <tr><td>3</td><td data-stripes="games3">824</td><td data-stripes="searched3">63%</td></tr>
-        <tr><td>4 or more</td><td data-stripes="games4">854</td><td data-stripes="searched4">92%</td></tr>
+        <tr><td>1 (n is prime)</td><td data-stripes="games1">635</td><td data-stripes="searched1">none</td></tr>
+        <tr><td>2</td><td data-stripes="games2">1,316</td><td data-stripes="searched2">none</td></tr>
+        <tr><td>3</td><td data-stripes="games3">1,244</td><td data-stripes="searched3">31%</td></tr>
+        <tr><td>4</td><td data-stripes="games4">824</td><td data-stripes="searched4">63%</td></tr>
+        <tr><td>5 or more</td><td data-stripes="games5">854</td><td data-stripes="searched5">92%</td></tr>
       </tbody>
     </table>
-    <p>This is what draws the stripes.  The cofactor keeps every prime factor of n but its largest.  Past 8, 12, 20 and
-    30 themselves, a number that one of them divides has at least four prime factors, so its cofactor has at least
-    three and is never 1, a prime, twice a prime or 9.  Of the chain's <span data-stripes="dark">1,012</span> such
-    games, <span data-stripes="darkSearched">951</span> needed a search, and the other
-    <span data-stripes="darkCeiling">61</span> reached their ceiling.  Twice a number with no factor 2, 3 or 5 is the
-    other way round.  Its cofactor is a prime or twice a prime in <span data-stripes="lightNamed">639</span> of the
-    chain's <span data-stripes="light">674</span> such games, and only <span data-stripes="lightSearched">13</span> of
-    them needed a search.</p>
+    <p>The layers draw the dark stripes.  Past 8, 12, 20 and 30 themselves, a number that one of them divides lies in
+    layer 4 or higher.  Of the chain's <span data-stripes="dark">1,012</span> such games,
+    <span data-stripes="darkSearched">951</span> needed a search, and the other
+    <span data-stripes="darkCeiling">61</span> reached their ceiling.  The cofactor rule draws the light stripes.  When
+    n is twice a number with no factor 2, 3 or 5, its cofactor is a prime or twice a prime in
+    <span data-stripes="lightNamed">639</span> of the chain's <span data-stripes="light">674</span> such games, and
+    only <span data-stripes="lightSearched">13</span> of them needed a search.</p>
   </div>
   <p>A game that needs a search still gets help from game n − 1.  Its search starts near the best, and it can stop
   if it reaches the ceiling (<a href="search.html#head-start">chapter 5</a>).</p>
@@ -454,14 +454,14 @@ const cofFacts = {
 fill('cof', (key) => cofFacts[key]);
 
 // The stripes of the chain chart.
-const { byCount, darkColumns, lightColumns, dark, light } = stripeFacts(games);
+const { byLayer, darkColumns, lightColumns, dark, light } = stripeFacts(games);
 const stripeText = {
   darkColumns: listWords(darkColumns.map(fmt)), lightColumns: listWords(lightColumns.map(fmt)),
   dark: fmt(dark.games), darkSearched: fmt(dark.searched), darkCeiling: fmt(dark.ceiling),
   light: fmt(light.games), lightNamed: fmt(light.named), lightSearched: fmt(light.searched),
-  ...Object.fromEntries(byCount.flatMap((g, k) => [
-    [`games${k}`, fmt(g.games)],
-    [`searched${k}`, g.searched === 0 ? 'none' : pct(g.searched / g.games, 0)],
+  ...Object.fromEntries(byLayer.flatMap((g) => [
+    [`games${g.layer}`, fmt(g.games)],
+    [`searched${g.layer}`, g.searched === 0 ? 'none' : pct(g.searched / g.games, 0)],
   ])),
 };
 fill('stripes', (key) => stripeText[key]);
