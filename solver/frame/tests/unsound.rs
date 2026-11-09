@@ -7,7 +7,9 @@
 //! for.  The best-known file takes a line that scores more than its game's, seeds the games of the runs that share it,
 //! takes the repair down into its lines of the games below a run's first, and is offered the lines of a run's file when
 //! the run opens it.  With `known_to` the built-in table is cut, and the games above the cut are unproven: the
-//! best-known file takes and seeds from their lines, and refuses a run that knows them.
+//! best-known file takes and seeds from their lines, and refuses a run that knows them.  A game whose line beats the
+//! best-known line it began with has the games below it played again from its line, which scores no less, and a run
+//! cut short goes on with that descent.
 //!
 //! A level of effort budgets 2^L × `round_work` work of rounds.  The tests lower `round_work` from the 65,536 of a
 //! round of full neighborhoods to about half the work of a round of the small games they play, so that a level is a
@@ -25,11 +27,12 @@ use std::thread;
 use std::time::Duration;
 use taxman::game::{replay, Optimal};
 use taxman::json::Json;
+use taxman::numtheory::Tables;
 use taxman::results::{verify_files, ResultsFile};
 use taxman::search::finder::{NEIGHBORHOODS, NEIGHBORHOOD_WORK};
 use taxman::solver::unsound::{
-    self, BestKnownFile, Files, Line, Origin, OtherPlay, Plan, Previous, Raised, Repair, Source, BACK, PUSH_GROWTH,
-    STOP_QUIET,
+    self, BestKnownFile, Descent, Files, Line, Origin, OtherPlay, Plan, Previous, Raised, Repair, Source, BACK,
+    PUSH_GROWTH, STOP_QUIET,
 };
 use taxman::solver::{solve_range, Method, RangeSummary, SolveOptions};
 
@@ -407,9 +410,6 @@ fn a_plan_with_an_option_out_of_range_is_refused() {
     for effort in [0, unsound::MAX_EFFORT + 1] {
         let err = refused(Plan { effort, ..plan(1) });
         assert_eq!(err, format!("--effort takes L, the level of effort, a whole number from 1 to 6: got \"{effort}\""));
-    }
-    for above in [9, 100] {
-        assert!(refused(Plan { above, ..plan(1) }).starts_with("--above takes J, a whole number from 0 to 8"));
     }
     assert!(refused(Plan { round_work: 0, ..plan(1) }).contains("is 0"));
     // The least and the most effort are accepted: the most budgets 2^22 work.
@@ -1040,12 +1040,15 @@ fn a_line_that_scores_more_than_the_best_known_files_is_added_with_the_score_it_
         }
     }
     // The same run again scores what the best-known file has, and not more: it adds nothing, and starts game 391 from
-    // its own line of 390, which the best-known file's ties.
+    // its own line of 390, which the best-known file's ties.  Its games began from B's lines, its known scores, on
+    // which it gains nothing.
     let before = fs::read(&best_known).unwrap();
     let (c, _, summary) = run("c.jsonl", 3);
-    assert_eq!(summary.best_known_added, 0);
+    assert_eq!((summary.best_known_added, summary.descents), (0, 0));
     assert_eq!(fs::read(&best_known).unwrap(), before);
-    assert_eq!(timeless_all(&c), timeless_all(&b));
+    let unknown = |lines: &[Line]| lines.iter().map(|line| Line { known: None, ..timeless(line) }).collect::<Vec<_>>();
+    assert_eq!(unknown(&c), unknown(&b));
+    assert!(c.iter().zip(&b).all(|(c, b)| c.known == Some(b.score)), "B's lines are the best-known ones");
     assert_eq!(c[1].prev.as_ref().map(|prev| (prev.n, prev.source)), Some((390, Source::Run)));
     // A run at level 1 again scores less than the best-known file's in 390, and adds nothing; it starts game 391 from
     // the best-known file's line of 390, which scores more than its own.
@@ -1169,9 +1172,12 @@ fn a_fresh_best_known_file_changes_no_line_of_a_run() {
         let out = dir.join(if best_known.is_some() { "with.jsonl" } else { "without.jsonl" });
         played_in(WALKED, &options(4, false), &walking(1), &Files { table: &table, out: Some(&out), best_known })
     };
-    let (without, repairs_without, _) = run(None);
+    let (without, repairs_without, summary) = run(None);
     let (with, repairs, _) = run(Some(&dir.join("best-known.jsonl")));
     assert_eq!(timeless_all(&with), timeless_all(&without));
+    // With no best-known line, or no best-known file, no game has a known score, and the run never descends.
+    assert!(with.iter().chain(&without).all(|line| line.known.is_none() && line.descent.is_none()));
+    assert_eq!((summary.descents, summary.played_again), (0, 0));
     let walked = |repairs: &[Repair]| repairs.iter().map(|r| (r.n, r.from, r.was, r.score)).collect::<Vec<_>>();
     assert_eq!(walked(&repairs), walked(&repairs_without));
     assert_eq!(file_lines(&dir.join("with.jsonl")), file_lines(&dir.join("without.jsonl")));
@@ -1360,4 +1366,213 @@ fn a_run_with_known_to_folds_an_old_file_of_the_games_into_its_best_known_file()
     let (_, _, summary) = played_in((390, 392), &options(4, false), &rehearsal(1, 389), &files);
     assert_eq!((summary.skipped, summary.best_known_added), (3, 0));
     BestKnownFile::open(&best_known, &table_below(390)).unwrap();
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The descent
+
+/// The last of the games from 390 on whose best-known lines, in most of the descent's tests, are the built-in table's,
+/// which are optimal, so that no line of a run gains on them.  The best-known line of each game above it is weak
+/// ([`weak_above`]), so the game above it is a root.
+const OPTIMAL_TO: u32 = 393;
+
+/// The games below a game whose table line is its weak best-known line in the descent's tests ([`weak_above`]).
+const WEAK_BY: u32 = 8;
+
+/// The games of the descent's runs: 390 to 395, from the root 394 ([`OPTIMAL_TO`]) on.
+const DESCENT_RANGE: (u32, u32) = (390, 395);
+
+/// Whether `n` is prime.
+fn is_prime(n: u32) -> bool {
+    Tables::new(n).is_prime(n)
+}
+
+/// A line of a best-known file for game `n` with the moves `moves`, which scores what they do: no promotions, no setup,
+/// no moves for n − 1 and no bound, from no run's file.  The line of a prime is marked as the prime formula's, as a run
+/// marks it, which the repair would play again from the line below it.
+fn best_known_line(n: u32, moves: &[u32]) -> String {
+    Json::object([
+        ("unsound", Json::Bool(true)),
+        ("n", Json::from(n)),
+        ("score", Json::from(replay(n, moves).unwrap())),
+        ("moves", Json::array(moves.iter().copied())),
+        ("promotions", Json::Arr(Vec::new())),
+        ("method", Json::from(if is_prime(n) { "prime" } else { "search" })),
+        ("in_the_bag", Json::Null),
+        ("prev", Json::Null),
+        ("ceiling", Json::Null),
+        ("setup", Json::Null),
+        ("repaired", Json::Null),
+        ("best_known", Json::object([("file", Json::Null), ("was", Json::Null)])),
+    ])
+    .to_string()
+}
+
+/// The game whose table line is game `n`'s best-known line in the descent's tests: `n` up to `optimal_to`, and the
+/// game [`WEAK_BY`] below above it.
+fn best_known_game(n: u32, optimal_to: u32) -> u32 {
+    if n <= optimal_to {
+        n
+    } else {
+        n - WEAK_BY
+    }
+}
+
+/// A best-known file of the games 390 to 406 in `dir`, for a run with the built-in table cut at 389: the table's line
+/// of each game up to `optimal_to`, and above it the table's line of a lower game ([`best_known_game`]), which is a
+/// legal game of n that scores what it does (monotonicity, N3 of docs/theory/neighbors.md) and falls far short.
+fn weak_above(dir: &TempDir, optimal_to: u32) -> PathBuf {
+    let table = Optimal::built_in();
+    let lines: Vec<String> =
+        (390..=406).map(|n| best_known_line(n, table.moves(best_known_game(n, optimal_to)).unwrap())).collect();
+    let path = dir.join("weak.jsonl");
+    fs::write(&path, lines.join("\n") + "\n").unwrap();
+    path
+}
+
+/// A run of the games `range` at level 1 with the table cut at 389, into the file `out`, from a copy `name` of the
+/// best-known file `start` in `dir`: its lines, repairs and summary.
+fn descending(
+    dir: &TempDir,
+    start: &Path,
+    name: &str,
+    out: &Path,
+    range: (u32, u32),
+) -> (Vec<Line>, Vec<Repair>, RangeSummary) {
+    let best_known = dir.join(name);
+    fs::copy(start, &best_known).unwrap();
+    let plan = Plan { known_to: Some(389), ..plan(1) };
+    played_in(range, &options(4, true), &plan, &Files::with_built_in(Some(out), Some(&best_known)))
+}
+
+/// The games of `lines` in the order they were played, and for a game the descent played again, its root.
+fn played_order(lines: &[Line]) -> Vec<(u32, Option<u32>)> {
+    lines.iter().map(|line| (line.n, line.descent.map(|descent| descent.root))).collect()
+}
+
+/// The order of the descent's tests: 390 to 394, the first game whose line beats its best-known one, while the game
+/// below it does not; the window of 394, 390 to 393, played again; then 395.
+const DESCENT_ORDER: [(u32, Option<u32>); 10] = [
+    (390, None),
+    (391, None),
+    (392, None),
+    (393, None),
+    (394, None),
+    (390, Some(394)),
+    (391, Some(394)),
+    (392, Some(394)),
+    (393, Some(394)),
+    (395, None),
+];
+
+#[test]
+fn a_game_that_gains_on_its_best_known_line_has_the_games_below_it_played_again_from_its_line() {
+    let (dir, table) = (TempDir::new("unsound-descent"), Optimal::built_in());
+    let (start, out) = (weak_above(&dir, OPTIMAL_TO), dir.join("run.jsonl"));
+    let (lines, _, summary) = descending(&dir, &start, "best-known.jsonl", &out, DESCENT_RANGE);
+    assert_eq!(played_order(&lines), DESCENT_ORDER);
+    assert_eq!((summary.solved, summary.descents, summary.played_again), (6, 1, 4));
+    // A game's known score is its best-known line's when the run began it; the run gains on the weak ones, from 394 on.
+    for line in &lines {
+        let n = line.n;
+        assert_eq!(line.known, table.score(best_known_game(n, OPTIMAL_TO)), "n={n}");
+        assert_eq!(line.score > line.known.unwrap(), n > OPTIMAL_TO, "n={n}");
+        assert_eq!(line.to_json().get("known_before"), Some(&Json::from(line.known.unwrap())), "n={n}");
+    }
+    // A game played again scores no less than its line before, from which its first trajectory after the start's
+    // begins, and says so.
+    let mut before: BTreeMap<u32, u64> = BTreeMap::new();
+    for line in &lines {
+        if let Some(descent) = line.descent {
+            assert_eq!(descent, Descent { root: 394, was: before[&line.n] }, "n={}", line.n);
+            assert!(line.score >= descent.was, "n={}", line.n);
+            if let Some(survivors) = &line.survivor_scores {
+                assert_eq!(survivors.first(), Some(&(line.n, descent.was)), "n={}: its own line first", line.n);
+            }
+            let summary = line.summary_line();
+            assert!(summary.contains(&format!("  descent from 394, +{}", line.score - descent.was)), "{summary}");
+        }
+        before.insert(line.n, line.score);
+    }
+    assert_eq!(summary.gained_again, lines.iter().filter(|l| l.descent.is_some_and(|d| l.score > d.was)).count());
+    // In the file, no game's line is below the one before it, and each descent's line says the score it played again
+    // from.
+    let file = json_lines(&out);
+    let mut last: BTreeMap<u32, u64> = BTreeMap::new();
+    for line in &file {
+        let (n, score) = game_and_score(line);
+        assert!(last.get(&n).is_none_or(|&was| score >= was), "n={n}: {score} after {:?}", last.get(&n));
+        let descent = line.get("descent").filter(|descent| !descent.is_null());
+        if let Some(descent) = descent.filter(|_| line.get("repaired") == Some(&Json::Null)) {
+            assert_eq!(descent.get("root"), Some(&Json::from(394u32)), "n={n}");
+            assert_eq!(descent.get("was"), Some(&Json::from(last[&n])), "n={n}");
+        }
+        last.insert(n, score);
+    }
+    // A file with the descent's line of a game and no line before it, or one that names another score before it, is
+    // refused.
+    let mut lines_of_390 = file.iter().filter(|line| game_and_score(line).0 == 390);
+    let (first, again) = (lines_of_390.next().unwrap(), lines_of_390.next().unwrap());
+    let refused = |text: String, expected: &str| {
+        let bad = dir.join("bad.jsonl");
+        fs::write(&bad, text).unwrap();
+        let err = unsound::solve_range(400, 400, &options(1, true), &plan(1), &built_in(Some(&bad)), |_| (), |_| ())
+            .unwrap_err();
+        assert!(err.contains(expected), "{err}");
+    };
+    refused(format!("{again}\n"), "line 1: the descent's line of n=390, which has no line before it");
+    let Json::Obj(pairs) = again.clone() else { panic!("an object") };
+    let other = Json::object([("root", Json::from(394u32)), ("was", Json::from(1u64))]);
+    let other_root = |(key, value): (String, Json)| if key == "descent" { (key, other.clone()) } else { (key, value) };
+    let wrong = Json::Obj(pairs.into_iter().map(other_root).collect());
+    refused(format!("{first}\n{wrong}\n"), "line 2: the descent's line of a line of n=390 that scored 1, not");
+}
+
+#[test]
+fn a_run_cut_short_after_a_root_descends_first_and_ends_with_the_lines_of_one_that_was_not() {
+    let dir = TempDir::new("unsound-descent-resume");
+    let (start, whole) = (weak_above(&dir, OPTIMAL_TO), dir.join("whole.jsonl"));
+    descending(&dir, &start, "best-known-whole.jsonl", &whole, DESCENT_RANGE);
+    // The file cut right after the line of the root, 394: before the walk after it and the descent.
+    let text = fs::read_to_string(&whole).unwrap();
+    let root = text.lines().position(|line| game_and_score(&Json::parse(line).unwrap()).0 == 394).unwrap();
+    let cut = dir.join("cut.jsonl");
+    fs::write(&cut, text.lines().take(root + 1).collect::<Vec<_>>().join("\n") + "\n").unwrap();
+    // From a copy of the same best-known file, which the run offers the file's lines when it opens it.
+    let (lines, _, summary) = descending(&dir, &start, "best-known-cut.jsonl", &cut, DESCENT_RANGE);
+    assert_eq!(played_order(&lines), DESCENT_ORDER[5..]);
+    assert_eq!((summary.skipped, summary.descents, summary.played_again), (5, 1, 4));
+    let one_run = |path: &Path| file_lines(path).into_iter().map(as_one_run).collect::<Vec<_>>();
+    assert_eq!(one_run(&cut), one_run(&whole), "line for line, the file of a run in one go");
+}
+
+/// The root of the test of a root directly below a prime: 396, the first game whose best-known line is weak when the
+/// lines up to 395 are the table's, below the prime 397.
+const ROOT_BELOW_A_PRIME: u32 = 396;
+
+#[test]
+fn a_prime_above_a_root_is_played_from_the_roots_line_and_gains_so_the_game_above_it_is_no_root() {
+    let dir = TempDir::new("unsound-descent-prime");
+    let (root, prime) = (ROOT_BELOW_A_PRIME, ROOT_BELOW_A_PRIME + 1);
+    assert!(is_prime(prime));
+    let (start, out) = (weak_above(&dir, root - 1), dir.join("run.jsonl"));
+    let (lines, repairs, summary) = descending(&dir, &start, "best-known.jsonl", &out, (390, prime + 1));
+    // The run descends once, from the root, and plays its window, 390 to 395, again.
+    let roots: Vec<u32> = lines.iter().filter_map(|line| line.descent.map(|descent| descent.root)).collect();
+    assert_eq!(roots, [root; 6]);
+    assert_eq!((summary.descents, summary.played_again), (1, 6));
+    // The repair writes no line of the prime, which the run had not played, not even in the best-known file alone: its
+    // known score stays the best-known file's from before.  The run plays it from the root's line, and it gains.
+    assert!(repairs.iter().all(|repair| repair.n != prime), "{repairs:?}");
+    assert_eq!(summary.best_known_repaired, 0);
+    let of = |n: u32| lines.iter().find(|line| line.n == n && line.descent.is_none()).expect("a line played in order");
+    let played = of(prime);
+    assert_eq!(played.method, Method::Prime);
+    assert_eq!(played.prev.as_ref().map(|prev| (prev.n, prev.score)), Some((root, of(root).score)));
+    assert_eq!(played.known, Optimal::built_in().score(best_known_game(prime, root - 1)));
+    assert!(played.score > played.known.unwrap(), "the prime gains");
+    // So the game above it, which gains too, is no root, and the run ends with it.
+    let above = of(prime + 1);
+    assert!(above.score > above.known.unwrap(), "the game above the prime gains");
+    assert_eq!(played_order(&lines).last(), Some(&(prime + 1, None)));
 }

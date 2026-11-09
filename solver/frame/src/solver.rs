@@ -938,14 +938,18 @@ trait Job: Send + Sync {
     /// once their work reaches the plan's budget ([`unsound::Plan::budget`]) or `enough` says so of the game's
     /// promotion sum, the work of the rounds so far and the quiet rounds, those since the game's set last became
     /// heavier ([`finder::Rounds::quiet`]); the run's ceiling, the table's score and the stop on growth are the
-    /// caller's.  If the search takes a seed, the rounds follow a trajectory besides the start's from what
+    /// caller's.  The rounds follow a trajectory besides the start's from what survives of `own`, the game's own moves,
+    /// if given, whether or not the search takes a seed, since they are no seed from another game (the unsound mode's
+    /// descent plays a game again from its line so).  If the search takes a seed, they also follow one from what
     /// survives of the moves in `others`, games and their moves (n − 1, n − 2, ..., then n + 1, n + 2, ...: a move
-    /// above n is dropped, [`Board::seed`]), for each that is not a set an earlier trajectory began from
+    /// above n is dropped, [`Board::seed`]).  Each begins only from a set that no earlier trajectory began from
     /// ([`unsound::trajectories`]).  `clock` is the game's seconds so far.  The start's dive is the one
     /// [`ready`](Job::ready) made, if it was called.
+    #[allow(clippy::too_many_arguments)]
     fn improve(
         &self,
         seed: Option<&[u32]>,
+        own: Option<&[u32]>,
         others: &[(u32, &[u32])],
         plan: &unsound::Plan,
         threads: usize,
@@ -1096,6 +1100,7 @@ impl<const W: usize> Job for SearchJob<W> {
     fn improve(
         &self,
         seed: Option<&[u32]>,
+        own: Option<&[u32]>,
         others: &[(u32, &[u32])],
         plan: &unsound::Plan,
         threads: usize,
@@ -1108,14 +1113,16 @@ impl<const W: usize> Job for SearchJob<W> {
         let dived = || *self.dived.get_or_init(|| search::start_dive(prepared));
         let start = search::start_incumbent_with(prepared, &self.control, threads, seed.as_ref(), dived);
         let start_seconds = clock();
-        // The other trajectories, if there are any, begin from what survives of the moves for the games before, as the
-        // finder's seed rounds begin from what survives of the seed.  The start is at least as heavy as the survivors
-        // of the moves for n − 1, since it began from them, but those of an earlier game may be heavier than the start:
-        // the game's set then begins as theirs (`finder::Lns::rounds` records it as an improvement of round 0).
-        let survivors: Vec<(u32, Bits<W>)> = others
-            .iter()
-            .filter(|_| self.seeds)
-            .map(|&(game, moves)| (game, search::seed_survivors(prepared, &self.board.seed(moves))))
+        // The other trajectories, if there are any, begin from what survives of the game's own moves and of the moves
+        // for the games around it, as the finder's seed rounds begin from what survives of the seed.  The start is at
+        // least as heavy as the survivors of the moves for n − 1, since it began from them, but those of another line
+        // may be heavier than the start: the game's set then begins as theirs (`finder::Lns::rounds` records it as an
+        // improvement of round 0).
+        let own = own.map(|moves| (self.board.n(), moves));
+        let survivors: Vec<(u32, Bits<W>)> = own
+            .into_iter()
+            .chain(others.iter().copied().filter(|_| self.seeds))
+            .map(|(game, moves)| (game, search::seed_survivors(prepared, &self.board.seed(moves))))
             .collect();
         let sums = survivors.iter().map(|(game, set)| (*game, set.sum())).collect();
         let (starts, trajectories) = unsound::trajectories(start, survivors);
@@ -1582,8 +1589,9 @@ impl Earlier {
 
 impl<B> Earlier<B> {
     /// Adds game `n`, whose problem has the size and the digest given, with its promotions and what a repeat of it rests
-    /// on.
+    /// on.  A game added is concluded: it is no longer pending.
     fn add(&mut self, n: u32, size: ProblemSize, digest: u64, promotions: Vec<u32>, basis: B) {
+        self.pending.remove(&n);
         self.games.insert(n, Searched { size, digest, promotions, basis });
     }
 
@@ -1675,6 +1683,11 @@ pub struct RangeSummary {
     /// Of those, the repairs of the best-known file's lines of the games below the run's first, which the run has no
     /// line of.
     pub best_known_repaired: usize,
+    /// The roots that the unsound mode's descent went down from (none in the proven mode), the games it played again
+    /// below them, and of those the games whose line it raised.
+    pub descents: usize,
+    pub played_again: usize,
+    pub gained_again: usize,
     /// The game whose search stopped at a limit, or at a signal; the range ends there.
     pub stopped_at: Option<u32>,
 }

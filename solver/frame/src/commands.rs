@@ -156,9 +156,8 @@ const SOLVE_FLAGS: [&str; 10] = [
 ];
 
 /// The flags of the unsound mode that take a value, besides `--out` and the solver's: the level of effort, the seed,
-/// the games above that the trajectories begin from, the stop on the growth of the gap, the best-known file, and the
-/// game the built-in table is cut at.
-const UNSOUND_FLAGS: [&str; 6] = ["--effort", "--seed", "--above", "--stop-growth", "--best-known", "--known-to"];
+/// the stop on the growth of the gap, the best-known file, and the game the built-in table is cut at.
+const UNSOUND_FLAGS: [&str; 5] = ["--effort", "--seed", "--stop-growth", "--best-known", "--known-to"];
 
 /// The switch of the unsound mode: the mode itself.
 const UNSOUND_SWITCHES: [&str; 1] = ["--unsound"];
@@ -234,13 +233,13 @@ fn proof_search_flags() -> impl Iterator<Item = &'static str> {
     solve.chain(SEARCH_FLAGS).chain(SEARCH_SWITCHES).chain(["--force-search"])
 }
 
-/// `solve A-B --unsound --effort L --out FILE [--seed S] [--above J] [--stop-growth T|off] [--best-known FILE|off]
-/// [--known-to N]`, with `--threads`, `--tactic` and `--show`: plays the games in the unsound mode
-/// (`solver::unsound::solve_range`), with no proof, and appends their unsound lines to FILE, and the lines that the
-/// repair replaces.  An option not given has its default ([`Plan::default`]).  The run keeps a best-known file,
-/// `best-known.jsonl` beside FILE unless `--best-known` says otherwise (`unsound::best_known_path`).  `--known-to N`
-/// has `solve_range` cut the built-in table at N, so that the games above N are as if unproven.  It stops on SIGINT
-/// and SIGTERM between rounds, the game in play unrecorded.
+/// `solve A-B --unsound --effort L --out FILE [--seed S] [--stop-growth T|off] [--best-known FILE|off] [--known-to N]`,
+/// with `--threads`, `--tactic` and `--show`: plays the games in the unsound mode (`solver::unsound::solve_range`),
+/// with no proof, and appends their unsound lines to FILE, the lines that the repair replaces, and those of the games
+/// that the descent plays again.  An option not given has its default ([`Plan::default`]).  The run keeps a best-known
+/// file, `best-known.jsonl` beside FILE unless `--best-known` says otherwise (`unsound::best_known_path`).
+/// `--known-to N` has `solve_range` cut the built-in table at N, so that the games above N are as if unproven.  It
+/// stops on SIGINT and SIGTERM between rounds, the game in play unrecorded.
 fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     if let Some(flag) = proof_search_flags().find(|flag| args.has(flag)) {
         return Err(CliError::Usage(format!("{flag} is a flag of the proof search, which --unsound does not run")));
@@ -251,13 +250,11 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
     })?;
     let effort = unsound::parse_effort(effort).map_err(CliError::Usage)?;
     let default = Plan::default();
-    let above = args.value("--above").map(unsound::parse_above).transpose().map_err(CliError::Usage)?;
     let stop_growth =
         args.value("--stop-growth").map(unsound::parse_stop_growth).transpose().map_err(CliError::Usage)?;
     let plan = Plan {
         effort,
         seed: args.parsed("--seed")?.unwrap_or(default.seed),
-        above: above.unwrap_or(default.above),
         known_to: args.parsed("--known-to")?,
         stop_growth: stop_growth.unwrap_or(default.stop_growth),
         ..default
@@ -303,6 +300,8 @@ fn solve_unsound(args: &Args, lo: u32, hi: u32) -> CliResult {
             best_known.display()
         );
     }
+    let (roots, again, gained) = (summary.descents, summary.played_again, summary.gained_again);
+    outln!("the descent went down from {roots} roots: {again} games played again, {gained} of them raised");
     if let Some(n) = summary.stopped_at {
         outln!("stopped: a signal ended the run in game n={n}, which is not recorded; run the same command to go on");
     }

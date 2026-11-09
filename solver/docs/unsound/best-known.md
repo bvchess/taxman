@@ -17,10 +17,13 @@ built-in table is never in it, since the table's proven line is that game's best
 
 ## How a run uses it
 
-* **It starts from the best-known lines.**  Where a game takes the moves for the games below it (and above it, with
-  `--above`), it takes, of the run's line (its own, else `--out`'s) and the best-known file's, the one that scores more,
-  the run's on a tie, and then the built-in table's.  A line says so: `prev.source` is `best_known`.  Before each game
-  the run reads what the other runs appended since it last read the file.
+* **It starts from the best-known lines.**  Where a game takes the moves for the games below it and above it, it
+  takes, of the run's line (its own, else `--out`'s) and the best-known file's, the one that scores more, the run's on a
+  tie, and then the built-in table's.  A line says so: `prev.source` is `best_known`.  Before each game the run reads
+  what the other runs appended since it last read the file.
+* **It measures its gains against them.**  A game's known score is the score of its best-known line when the run
+  begins the game (`known_before`).  A game whose line beats it, while the game below does not, has the games below it
+  played again from its line ([the descent](shortfalls.md#the-descent)).
 * **It adds every line it records.**  A line of a game, or a repair of one, is appended to the best-known file if it
   scores more than the best-known file's line of its game.
 * **It offers its file when it opens it.**  Before its first game, a run offers the best-known file the last line of

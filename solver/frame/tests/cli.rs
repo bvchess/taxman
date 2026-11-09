@@ -36,7 +36,6 @@ fn help_lists_the_commands_and_every_tactic() {
             "--unsound",
             "--effort L",
             "--seed S",
-            "--above J",
             "--stop-growth T|off",
             "--best-known FILE|off",
             "--known-to N",
@@ -58,13 +57,15 @@ fn help_lists_the_commands_and_every_tactic() {
             "--no-repair",
             "--stop-at-known",
             "--from-known",
+            "--above",
         ] {
             assert!(!run.stdout.contains(gone), "{args:?}: the help still names {gone}");
         }
-        // The help says what the defaults are.
+        // The help says what the defaults are, and what is built in.
         let help = run.stdout.split_whitespace().collect::<Vec<_>>().join(" ");
         for text in [
-            "(J from 0 to 8, default 0: none)",
+            "follows trajectories from the 8 games before it and the 8 above it",
+            "the descent plays again the 8 games below a line that beats the best-known file's line it began with",
             "and the last 4 rounds raised nothing, from the end of the rounds of level 1 on (default 25)",
             "(default best-known.jsonl in the directory of --out; off: none)",
         ] {
@@ -484,23 +485,18 @@ fn the_unsound_mode_keeps_its_lines_apart_and_refuses_the_flags_of_the_proof_sea
         let message = format!("{} is a flag of the proof search, which --unsound does not run", flag[0]);
         assert_usage_error(&[&base[..], flag].concat(), &message);
     }
-    let unsound_only: [&[&str]; 6] = [
-        &["--effort", "1"],
-        &["--seed", "2"],
-        &["--above", "2"],
-        &["--stop-growth", "0"],
-        &["--best-known", "off"],
-        &["--known-to", "5"],
-    ];
+    let unsound_only: [&[&str]; 5] =
+        [&["--effort", "1"], &["--seed", "2"], &["--stop-growth", "0"], &["--best-known", "off"], &["--known-to", "5"]];
     for flag in unsound_only {
         let message = format!("{} is a flag of the unsound mode: give --unsound with it", flag[0]);
         assert_usage_error(&[&["solve", "12"][..], flag].concat(), &message);
     }
     // The options that the mode builds in are not flags of it, with or without `--unsound`.
-    let removed: [&[&str]; 14] = [
+    let removed: [&[&str]; 15] = [
         &["--fix", "0.5,0.7"],
         &["--tilt", "50"],
         &["--back", "2"],
+        &["--above", "8"],
         &["--widen", "3"],
         &["--unseeded-every", "8"],
         &["--unseeded-effort", "1"],
@@ -546,6 +542,11 @@ fn a_run_has_a_best_known_file_beside_its_file_unless_told_otherwise() {
     let run = solve("off/o.jsonl", &["--best-known", "off"]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(!dir.join("off/best-known.jsonl").exists() && !run.stdout.contains("best-known file"), "{}", run.stdout);
+    // With no best-known file, no game has a known score, and the run never descends.
+    let line = Json::parse(fs::read_to_string(dir.join("off/o.jsonl")).unwrap().trim_end()).unwrap();
+    assert_eq!((line.get("known_before"), line.get("descent")), (Some(&Json::Null), Some(&Json::Null)));
+    let none = "the descent went down from 0 roots: 0 games played again, 0 of them raised";
+    assert!(run.stdout.contains(none), "{}", run.stdout);
     // The file of the run, however it is named, is not its best-known file.
     let same = dir.join("same.jsonl");
     for best_known in [path(&same), path(&dir.join("named/../same.jsonl"))] {
@@ -593,16 +594,12 @@ fn known_to_treats_the_games_above_it_as_unproven() {
     assert_usage_error(&[&base[..], &["--known-to", "many"]].concat(), "--known-to: cannot read \"many\"");
 }
 
-/// `--above J` takes a whole number from 0 to 8, and `--stop-growth T` a whole number of points from 0 up or `off`.
+/// `--stop-growth T` takes a whole number of points from 0 up or `off`.
 #[test]
-fn above_and_stop_growth_are_checked() {
+fn stop_growth_is_checked() {
     let dir = TempDir::new("unsound-checked");
     let file = dir.join("checked.jsonl");
     let base = ["solve", "12", "--unsound", "--effort", "1", "--threads", "1", "--out", path(&file)];
-    for above in ["9", "-1", "", "a", "1.5", "99999999999"] {
-        let message = format!("--above takes J, a whole number from 0 to 8: got {above:?}");
-        assert_usage_error(&[&base[..], &["--above", above]].concat(), &message);
-    }
     for growth in ["", "a", "1.5", "Off", "-1"] {
         let message = format!("--stop-growth takes T, a whole number of points from 0 up, or off: got {growth:?}");
         assert_usage_error(&[&base[..], &["--stop-growth", growth]].concat(), &message);
@@ -652,14 +649,14 @@ fn unsound_lines(dir: &TempDir, tag: &str, games: &[u32], effort: u32, extra: &[
         .collect()
 }
 
-/// With no option, `--unsound` plays the rounds of `--above 0 --seed 1 --stop-growth 25`: the lines are the same, but
-/// for the build and the times.
+/// With no option, `--unsound` plays the rounds of `--seed 1 --stop-growth 25`: the lines are the same, but for the
+/// build and the times.
 #[test]
 fn the_defaults_are_the_options_given_by_name() {
     let dir = TempDir::new("unsound-defaults");
     let games = &REACH_THEIR_CEILING;
     let by_default = unsound_lines(&dir, "default", games, 1, &[]);
-    let named = ["--above", "0", "--seed", "1", "--stop-growth", "25"];
+    let named = ["--seed", "1", "--stop-growth", "25"];
     let by_name = unsound_lines(&dir, "named", games, 1, &named);
     assert_eq!(by_default, by_name);
     for line in &by_default {
@@ -679,21 +676,24 @@ fn the_line_records_the_flags_of_the_mode_and_none_of_the_options_it_builds_in()
     let dir = TempDir::new("unsound-line");
     let out = dir.join("385.jsonl");
     let args = ["solve", "385", "--unsound", "--effort", "1", "--tactic", "seed_incumbent=off", "--threads", "1"];
-    let flags = ["--seed", "2", "--above", "3", "--stop-growth", "7", "--out", path(&out)];
+    let flags = ["--seed", "2", "--stop-growth", "7", "--out", path(&out)];
     let run = taxman(&[&args[..], &flags].concat());
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     let line = Json::parse(fs::read_to_string(&out).unwrap().lines().next().unwrap()).unwrap();
     let flag = |key: &str, value: Json| assert_eq!(line.get(key), Some(&value), "{key}");
     flag("seed", Json::from(2u64));
-    flag("above", Json::from(3u32));
     flag("stop_growth", Json::from(7u64));
     flag("effort", Json::from(1u32));
     flag("budget", Json::from(131_072u64));
     flag("known_to", Json::Null);
+    // The game is the built-in table's, so the best-known file has no line of it: no known score, and no descent.
+    flag("known_before", Json::Null);
+    flag("descent", Json::Null);
     for built_in in [
         "fix",
         "tilt",
         "back",
+        "above",
         "widen",
         "unseeded_every",
         "unseeded_effort",

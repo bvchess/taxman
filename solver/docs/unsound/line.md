@@ -18,7 +18,7 @@ added:
  "pushed":false,
  "repeats":null,                          # a repeat names the line whose promotions it plays here
  "setup":{"frames":6,"candidates":141,"max_total":33,"greedy_sum":8396,"digest":"c6fe37bd55f2b043"},
- "effort":3, "budget":524288, "seed":1, "above":0, "stop_growth":25, "unseeded":false,
+ "effort":3, "budget":524288, "seed":1, "stop_growth":25, "unseeded":false,
  "start":110839,                          # the start fell 21 short of the table's score
  "trajectories":["start",594,593,591],    # the moves for 592 and for 590 to 587 gave a set one of these began from
  "survivor_scores":[[594,110682],[593,110489],[592,110489],[591,110303],...,[587,110303]],
@@ -29,6 +29,8 @@ added:
  "other":null,                            # a game played twice says what its other play came to
  "seconds":1.4379, "start_seconds":0.0122, "threads":4,
  "known_to":null,                         # the whole built-in table was known
+ "known_before":null,                     # the best-known file never holds a game of the table
+ "descent":null,                          # a line the descent played says its root and the score it played again
  "repaired":null,                         # a line the repair wrote again says what replaced its moves
  "tactics":"default", "build":{"commit":"928ad6abc7d8...","dirty":true}}
 ```
@@ -47,6 +49,21 @@ and the second line of 5042 in the file has `"score":8000296`, the new moves and
 still, `prev.short_by` 11, since the new score proves the line of 5041 short by 11, and
 `"repaired":{"from":5043,"was":8000285,"seconds":0.082}`.  The walk went on to replace the lines of 5041 and 5040.
 
+A game that [the descent](shortfalls.md#the-descent) played again has a line as a game played has, after the game's line
+before.  A run of 3880-3896 at level 3, with the table cut at 3000, started from a best-known file whose line of 3888
+was 28 short.  It raised 3888 by 28 while 3887 gained nothing, so 3888 was a root, and it played 3880 to 3887 again; the
+summary lines were
+
+```
+n=3888  score=4759730   search  rounds=12     improved=2      54.554 s  unsound  growth -58
+n=3880  score=4738336   search  rounds=12     improved=0      48.134 s  unsound  descent from 3888, +0  growth 0
+n=3881  score=4738340   prime   rounds=0      improved=0       0.002 s  unsound  descent from 3888, +0  growth 0
+```
+
+and so on to 3887, and then the run went on with 3889, the prime above 3888, which it played from 3888's line and which
+gained 28 too.  The second line of 3880 in the file has `"descent":{"root":3888,"was":4738336}`, the `known_before` of
+its first line, and `survivor_scores` that begin with `[3880,4738336]`, its own line.
+
 | field | meaning |
 |---|---|
 | `unsound` | true: the mark of an unsound line |
@@ -61,10 +78,10 @@ still, `prev.short_by` 11, since the new score proves the line of 5041 short by 
 | `repeats` | for a repeat, the n of the line whose promotions it plays; null otherwise |
 | `setup` | as in [a results line](../REFERENCE.md#a-results-line---out-schema-5), without `cap`; null on a `trivial` or `prime` line |
 | `effort`, `budget`, `seed` | the level of effort, the work its rounds run until, and the seed of the rounds' random choices |
-| `above`, `stop_growth` | `--above`'s J (0 without it), and the T of `--stop-growth` (null for `off`) |
+| `stop_growth` | the T of `--stop-growth` (null for `off`) |
 | `unseeded` | whether the line is of the [unseeded play](shortfalls.md#games-played-twice) of a game played twice |
 | `start` | the score of a searched game's start; null on any other line |
-| `trajectories` | for a searched game, what each incumbent its rounds kept began from: `"start"`, then the games whose survivors it began from, such as `["start",4231,4224]`; null on any other line |
+| `trajectories` | for a searched game, what each incumbent its rounds kept began from: `"start"`, then the games whose survivors it began from, such as `["start",4231,4224]`, the game itself first on a line that the descent played; null on any other line |
 | `survivor_scores` | for a searched game, each game whose moves a trajectory could begin from, in the order of `trajectories`, with the score of what survives of its moves here, whether or not it began one, such as `[[594,110682],[593,110489]]`; null on any other line |
 | `rounds`, `neighborhoods`, `steps`, `work` | the rounds done, their neighborhoods, the engine's steps in them, and their work (the steps and 32 for each neighborhood) |
 | `stage_rounds` | for a searched game, for each trajectory, the rounds it spent at each of the three stages of [the widening](play.md#the-options-that-shape-the-rounds); null on any other line |
@@ -73,6 +90,8 @@ still, `prev.short_by` 11, since the new score proves the line of 5041 short by 
 | `seconds`, `start_seconds` | the game's wall time, from the end of the game before and of the repair's walk after it (or the start of the run) to its line (both plays of a game played twice), and the part of its play before the rounds; a game's setup is made while the game before plays, so it counts only in the first game of a run |
 | `threads` | the threads it ran on |
 | `known_to` | with `--known-to`: N, the last game of the built-in table that the run took as proven, so that a game above N was as if unproven; null without the flag |
+| `known_before` | the game's [known score](shortfalls.md#the-descent): the score of the best-known file's line of the game when the run first began the game, which a game played again keeps; null if the file had none, or the run has no best-known file |
+| `descent` | null on a line of a game played in its order; on a line of a game that [the descent](shortfalls.md#the-descent) played again, `root`, the root whose window the game is in, and `was`, the score of the game's line before, which it scores no less than.  A repair of such a line keeps it |
 | `repaired` | null on a line as its game was played; on a line that [the repair](shortfalls.md#the-repair) wrote again, `from`, the game whose line gave the new moves (a game above, or for a prime the game below), `was`, the score of the line it replaced, and `seconds`, the time the repair took |
 | `tactics`, `build` | as in a results line, `build` the one that wrote the line |
 | `best_known` | only on a line of the [best-known file](best-known.md), after the others: `file`, the name of the run's `--out` file that the line came from (null for a run with no file), and `was`, the score of the game's line in the best-known file before this one (null for the first) |

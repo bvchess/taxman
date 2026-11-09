@@ -13,7 +13,7 @@ use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, gate_trial, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
 use taxman::solver::unsound::{
-    DEFAULT_BEST_KNOWN, DEFAULT_STOP_GROWTH, MAX_ABOVE, MAX_EFFORT, MIN_EFFORT, ROUND_WORK, STOP_QUIET,
+    ABOVE, BACK, DEFAULT_BEST_KNOWN, DEFAULT_STOP_GROWTH, MAX_EFFORT, MIN_EFFORT, ROUND_WORK, STOP_QUIET,
 };
 use taxman::tactics::Tactics;
 
@@ -76,17 +76,15 @@ commands:
                                line, appended to --out (needed), holds legal moves and their score, a lower bound,
                                and is marked unsound, which every reader of proven lines refuses.  It takes
                                --threads, --tactic, --show and the flags below, and refuses the others.  A game
-                               follows trajectories from the games before it, and a game whose gap to its bound
-                               grows is played twice, also unseeded; the repair replaces a line that a line above
-                               it shows short
+                               follows trajectories from the {back} games before it and the {above} above it, and a
+                               game whose gap to its bound grows is played twice, also unseeded; the repair replaces
+                               a line that a line above it shows short, and the descent plays again the {above} games
+                               below a line that beats the best-known file's line it began with
       --effort L               with --unsound: the level of effort, from {min_effort} to {max_effort}.
                                Level L runs rounds of {neighborhoods} neighborhoods of the finder's search until
                                their work (their steps and {neighborhood_work} for each neighborhood) reaches
                                2^L x {round_work}; a higher level does the rounds of a lower one first
       --seed S                 with --unsound: the seed of the rounds' random choices (default {seed})
-      --above J                with --unsound: besides the games before, follow an incumbent from what survives of the
-                               moves for each of the games n+1 .. n+J that the run, --out or the best-known file has
-                               (J from 0 to {max_above}, default 0: none)
       --stop-growth T|off      with --unsound: end a searched game's rounds once its gap is within T of the gap of the
                                moves for n-1 it starts from (T >= 0) and the last {stop_quiet} rounds raised nothing,
                                from the end of the rounds of level {min_effort} on (default {stop_growth}).  The gap is
@@ -138,7 +136,8 @@ fn usage() -> String {
         .replace("{round_work}", &ROUND_WORK.to_string())
         .replace("{neighborhood_work}", &finder::NEIGHBORHOOD_WORK.to_string())
         .replace("{seed}", &finder::Options::default().seed.to_string())
-        .replace("{max_above}", &MAX_ABOVE.to_string())
+        .replace("{back}", &BACK.to_string())
+        .replace("{above}", &ABOVE.to_string())
         .replace("{stop_growth}", &DEFAULT_STOP_GROWTH.map_or("off".to_owned(), |t| t.to_string()))
         .replace("{stop_quiet}", &STOP_QUIET.to_string())
         .replace("{default_best_known}", DEFAULT_BEST_KNOWN)

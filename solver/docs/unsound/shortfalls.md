@@ -15,9 +15,13 @@ a line above it is a real game of n, and when it scores more than the line of n,
   survives of the lines within 8 games above it that the walk has written, the line just recorded and those it has
   replaced, the heaviest, the nearest on a tie.  If that scores more than the game's line, it replaces it, and the walk
   goes on from it too.  The walk ends at the first game with none of its lines within 8 above.  What survives is taken
-  as `--back` takes it, so the new line is a set of promotions and the moves they make, which a repeat can play.  A
-  game below the run's first, which the run has no line of, is weighed on the
-  [best-known file's](best-known.md#how-a-run-uses-it) line.
+  as a trajectory from the games back takes it, so the new line is a set of promotions and the moves they make, which a
+  repeat can play.
+* **Which lines.**  The repair writes the lines of the run's own games, in FILE, and in the [best-known
+  file](best-known.md#how-a-run-uses-it) alone those of the games below the run's first, which it weighs on that file's
+  lines, and never a line of a game at or above the run's first that the run has no line of yet.  Such a game is the
+  run's to play, or another run's, and its [known score](#the-descent) stays the best-known file's from before it is
+  played.
 * **Primes, trivial games and the table.**  A prime's line is not weighed: it follows from the line below it, and is
   played again from it once that is replaced.  A trivial line is optimal, and the built-in table's lines are proven, so
   neither is weighed.
@@ -34,7 +38,51 @@ a line above it is a real game of n, and when it scores more than the line of n,
   boards it sets up again, a few seconds each at n ≈ 5,000: the run keeps the boards of its last 8 games, so a walk
   that goes further needs them, and so does the walk that a run takes up from FILE.
 
-In a range the repair can change the moves that later games start from, as a level does.
+In a range the repair can change the moves that later games start from, as a level does.  It takes back only what the
+better line, cut down, scores: [the descent](#the-descent) plays the games below a line that beats its best-known one
+again, with trajectories from it, which finds much more.
+
+## The descent
+
+A pass over a range from the [best-known lines](best-known.md) plays the games in order, so the 8 games below a game
+whose line beats its best-known one were played before that line existed, and never followed a trajectory from it.
+Most games stop at [the run's ceiling](play.md#the-runs-ceiling), so a shortfall carries up through them, and a gain
+high in a streak means that the games below it may be short too.  The *descent* plays those games again, from the
+better line.
+
+* **Gains and roots.**  A game's *known score* is the score of the best-known file's line of the game when the run
+  first began it, or none if the file had no line of it or the run has no best-known file.  A game played again keeps
+  the known score it began with.  A *gain* is a game of the run whose line, as played or as the repair or the descent
+  wrote it again, scores more than its known score, and a *root* is a gain whose game below is no gain of the run.  A
+  game below the run's first is no game of the run.  So a run with no best-known file, or a first pass over games the
+  file has no lines of, never descends.
+* **When.**  After each game's line and the repair's walk after it, the run descends from each root it has not
+  descended from, the lowest first.  It plays again, lowest first, the games of the root's *window*: from root − 8, or
+  the run's first game if that is higher, to root − 1.  These are the games whose trajectories from the 8 games above
+  take the root's line, and the run's first game has none.  A game of a window that gains while its game below does not
+  is a new root, and the run descends from it in its turn.  The run goes on to its next game once no root is left that
+  it has not descended from, and as it descends from each game once at most, the descent ends.
+* **A game played again** is played as any game of the run is: its level, seed and ceiling, the push, and the
+  trajectories from the 8 games before and the 8 above, all from the lines as they now stand.  One more trajectory comes
+  first after the start's: the game's own line as it stands, the better of the run's and the best-known file's, in both
+  plays of a game played twice.  So a searched game never scores less than it did.  A prime or a repeat searches
+  nothing and plays the line it follows, which can score less than its own, as a repeat of a game whose line is below
+  the repeat's can; such a play is not recorded, and the game keeps its line.
+* **Its lines** are recorded as a game's are: appended to FILE, offered to the best-known file, and walked down from by
+  the repair.  Each says the root and the score of the line it played again from (`descent` in [the line](line.md)).
+* **The range below.**  A descent never plays a game below the run's first.  A run over the range above another's
+  leaves those games to the run below, whose trajectories from the games above take the new lines.
+* **A run cut short** goes on with the descent where FILE leaves it, before its next game.  FILE holds each game's
+  known score (`known_before`), the roots descended from, and in its last line that is no repair, where the last window
+  was.  A line is determined by the game, its start, the moves it starts from, the level and the seed ([how a game is
+  played](play.md#how-a-game-is-played)), so the run ends with the lines of one that was not stopped.
+* **The cost.**  A game played again is a game's play at the run's level.  It takes the board it was played on if the
+  run kept it, as it keeps those of its last 8 games, and the setup of the next game of the window is made while it
+  plays; the repair's walk after it may set boards up again, a few seconds each at n ≈ 5,000.
+* **What it gains.**  On the 8 games below each of the 22 gains of a pass at level 3, 184 games, playing them again with
+  trajectories from the 8 games above raised 49 games in 10 streaks by 4,432 points.  The same work on 184 games in
+  random windows raised 6 games in 1 streak by 18 points.  In 8 of the 10 streaks the gain came from a trajectory that
+  began from a line above.  The pass was scripted, with seed 3, on 2026-11-08.
 
 ## Games played twice
 
@@ -48,9 +96,9 @@ down from it.
 * **Which games.**  The *push* plays a game twice when its [gap grows](#the-bound-and-the-gap) by more than 25 in its
   play, unless the game is trivial.  Which games depends on n and on the moves for n − 1 alone.
 * **The unseeded play.**  It is searched on the game's board at the game's level, never played by the prime formula or
-  as a repeat: its start has no seed, its rounds follow the start's trajectory alone (and those of `--above`, if
-  given), and it has no run's ceiling and no stop on growth.  A prime, which has no board, takes the one set up for its
-  bound.
+  as a repeat: its start has no seed, its rounds follow the start's trajectory and those of the 8 games above (and of
+  the game's own line, where [the descent](#the-descent) plays it again), and it has no run's ceiling and no stop on
+  growth.  A prime, which has no board, takes the one set up for its bound.
 * **The line.**  The better play's, the seeded one on a tie, as that play alone writes it, with `other`, what the other
   play came to.  A line of the unseeded play has no `prev` and no ceiling.  Its `seconds` are those of both plays.
 * **The work.**  The unseeded play runs its rounds to the level's budget, as a searched game does that is not stopped

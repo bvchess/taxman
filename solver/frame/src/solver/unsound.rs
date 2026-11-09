@@ -43,10 +43,10 @@
 //!
 //! # The shape of the rounds
 //!
-//! Four settings change what the rounds search, and so the line.  Three are built in ([`BACK`], [`TILT`] and
-//! [`WIDEN`]), and the plan's `above` is an option.  Every value keeps what the rounds guarantee: a line depends on the
-//! game, its start, the moves it starts from, the level, the seed and `above` only, never on the threads, and a run at
-//! L + 1 does the rounds of L first.
+//! Four settings change what the rounds search, and so the line, and all four are built in ([`BACK`], [`ABOVE`],
+//! [`TILT`] and [`WIDEN`]).  Every value keeps what the rounds guarantee: a line depends on the game, its start, the
+//! moves it starts from, the level and the seed only, never on the threads, and a run at L + 1 does the rounds of L
+//! first.
 //!
 //! * **`TILT`** P makes P percent of a round's neighborhoods, an equal share of each trajectory's, choose the
 //!   promotions they free by their size, the small ones more often, with the same number freed; the others draw
@@ -61,10 +61,11 @@
 //!   game's score is then that of the survivors from the first, which the line records as an improvement of round 0.
 //!   The line records the score of what survives of each of these games, whether or not it began a trajectory
 //!   (`survivor_scores`).
-//! * **`above`** J (0 by default) adds, after those of `BACK`, a trajectory for each distinct set that survives of the
-//!   moves for the games n + 1, ..., n + J that the run or its files have: the moves above n are dropped
+//! * **`ABOVE`** J adds, after those of `BACK`, a trajectory for each distinct set that survives of the moves for the
+//!   games n + 1, ..., n + J that the run or its files have: the moves above n are dropped
 //!   ([`Board::seed`](crate::board::Board::seed)).  A game played in order has no line above it in its own run, so
-//!   this is for a run over a range whose files already hold lines above it.
+//!   these come from the files of a run that already hold lines above its games, as in a pass from the best-known
+//!   lines, and from the descent ("The descent", below).
 //! * **`WIDEN`** S moves the neighborhoods of a trajectory whose incumbent has not grown heavier in S rounds down the
 //!   ladder of the share kept fixed ([`LADDER`](crate::search::finder::LADDER)), and back to its first stage when it
 //!   grows ([`Options::widen`](crate::search::finder::Options::widen)).  The ladder's first stage is the finder's
@@ -74,10 +75,11 @@
 //! # The built-in settings
 //!
 //! The user names a level of effort and nothing else: `BACK` is 8, `TILT` 25 and `WIDEN` 4, the setting that two races
-//! chose on the 251 hard games of 3441-5060, and `STOP_QUIET` and `PUSH_GROWTH` ("The bound and the gap", below) are 4
-//! and 25.  solver/docs/unsound/play.md ("The options that shape the rounds") has the races and their numbers, and
-//! solver/docs/unsound/shortfalls.md ("The bound and the gap") those of the stop and the push.  The finder beside a
-//! proof search never tilts, widens or goes back, and its options ([`finder::Options::default`]) are not these.
+//! chose on the 251 hard games of 3441-5060, `ABOVE` is 8, which a second pass from the best-known lines chose, and
+//! `STOP_QUIET` and `PUSH_GROWTH` ("The bound and the gap", below) are 4 and 25.  solver/docs/unsound/play.md ("The
+//! options that shape the rounds") has the races and the pass and their numbers, and solver/docs/unsound/shortfalls.md
+//! ("The bound and the gap") those of the stop and the push.  The finder beside a proof search never tilts, widens or
+//! goes back, and its options ([`finder::Options::default`]) are not these.
 //!
 //! # A range
 //!
@@ -85,15 +87,17 @@
 //! a game starts from, for j = 1 and the j up to [`BACK`], are this run's line of n − j, else the file's, or the
 //! best-known file's if that scores more ("The best-known file"), else the built-in table's (as a seed only, never a
 //! line).  Each line is appended to the file and synced as soon as its game ends, and a restarted run skips the games
-//! the file has.  A stop signal (SIGINT, SIGTERM) ends the run between rounds, and the game in play is not recorded.
-//! The file holds unsound lines only: [`UnsoundFile::open`] refuses a line of a proven run, as every reader of proven
-//! lines refuses an unsound one ([`refuse_unsound`](crate::game::refuse_unsound)).
+//! the file has.  After each game, the repair walks down from its line ("The repair") and the descent plays again the
+//! games below a line that beats the best-known one ("The descent").  A stop signal (SIGINT, SIGTERM) ends the run
+//! between rounds, and the game in play is not recorded.  The file holds unsound lines only: [`UnsoundFile::open`]
+//! refuses a line of a proven run, as every reader of proven lines refuses an unsound one
+//! ([`refuse_unsound`](crate::game::refuse_unsound)).
 //!
 //! While a game plays, a thread of its own makes the setup of the next game to play, and its start's dive
 //! ([`Boards`]): neither depends on what the game in play scores, and on many threads both would otherwise be a large
 //! part of a game's time at a low level of effort, since they run on one thread.  A setup made ahead is the one the game
 //! would make, so the lines are the same.  The run keeps the boards of its last [`REPAIR_REACH`] games in the same
-//! place, for the repair.
+//! place, for the repair and for the descent, which plays a game again on the board it was played on.
 //!
 //! # The repair
 //!
@@ -116,6 +120,10 @@
 //!   up again.  A prime's line is not weighed, since it follows from the line below it: once that is replaced, the
 //!   prime is played again from it (the prime formula, N5).  A trivial line is optimal, and the built-in table's lines
 //!   are proven: neither is weighed.
+//! * **Which lines.**  The repair writes the lines of the run's own games, in its file, and those of the games below
+//!   the run's first, in the best-known file alone ("The best-known file", below), and never a line of a game at or
+//!   above the run's first that the run has no line of yet ([`Run::repairs`]): that game is the run's to play, or
+//!   another run's, and its known score stays the best-known file's from before it is played ("The descent").
 //! * **What it changes above.**  Nothing the walk does not reach: the games above the line just recorded are not played
 //!   yet, and the games between it and a game repaired were weighed first.  A repeat of a game whose line is replaced
 //!   plays its new promotions, and the games that follow begin their trajectories from the new lines.
@@ -130,8 +138,8 @@
 //!   n ≈ 5,000: a walk past the boards kept needs them, and so does a walk that a run takes up from its file.  The
 //!   run's summary has the time of its walks ([`RangeSummary::repair_time`](super::RangeSummary::repair_time)).
 //! * **What a line depends on.**  The walk's steps depend on the lines alone, never on the threads, so a line still
-//!   depends on nothing but the game, its start, the moves it starts from, the level, the seed and `above`.  The rounds
-//!   of a game at E + 1 begin with those at E from the same moves; in a range the repair can change the moves that later
+//!   depends on nothing but the game, its start, the moves it starts from, the level and the seed.  The rounds of a
+//!   game at E + 1 begin with those at E from the same moves; in a range the repair can change the moves that later
 //!   games start from, as a level does.
 //!
 //! # Games played twice
@@ -140,18 +148,18 @@
 //! short game are made from it: they start from it, copy it or stop at the ceiling it sets.  A game that takes nothing
 //! from the games below escapes that.  So the push `PUSH_GROWTH` T plays a game whose gap grew by more than T twice
 //! ("The bound and the gap"): as any game is played, then *unseeded*, searched on the same board at the game's level
-//! with no seed, no trajectory of `BACK` and no run's ceiling (the trajectories of `above` as given).  The line is the
-//! better play's, the seeded one on a tie, with what the other came to (`other`), so the games above start from it and
-//! the repair walks down from it as from any line.  A prime has no board, and its unseeded play takes the one set up
-//! for its bound; a trivial game is played once.
+//! with no seed, no trajectory of `BACK` and no run's ceiling, but with those of `ABOVE`.  The line is the better
+//! play's, the seeded one on a tie, with what the other came to (`other`), so the games above start from it and the
+//! repair walks down from it as from any line.  A prime has no board, and its unseeded play takes the one set up for
+//! its bound; a trivial game is played once.
 //!
 //! * **The work.**  The unseeded play runs the rounds of its level to the budget, as a game does, so a game played
 //!   twice does up to twice a level's work; with no ceiling, its rounds stop only at the budget.  The line's `work` is
 //!   its own play's and `other` has the other's.
 //! * **What a line depends on.**  Which games are played twice depends on the growth of the gap, which depends on n and
 //!   the moves for n − 1, and each play on what a game's line depends on, so a line still depends on nothing but the
-//!   game, its start, the moves it starts from, the level, the seed and `above`, never on the threads.  Each play of a
-//!   level runs the rounds of the levels below first.
+//!   game, its start, the moves it starts from, the level and the seed, never on the threads.  Each play of a level
+//!   runs the rounds of the levels below first.
 //! * **Where the push comes from.**  solver/docs/unsound/shortfalls.md ("Games played twice") has the measurements.
 //!
 //! # The bound and the gap
@@ -186,8 +194,8 @@
 //!   higher level, whose seeded play brings the growth to T or below, plays it once and scores less: the push breaks
 //!   the rule that a higher level scores at least as much, which the seeded play keeps.
 //! * **What a line depends on.**  The bound is a function of n, and the growth of n and of the moves for n − 1, so a
-//!   line still depends on nothing but the game, its start, the moves it starts from, the level, the seed and `above`,
-//!   never on the threads.
+//!   line still depends on nothing but the game, its start, the moves it starts from, the level and the seed, never on
+//!   the threads.
 //! * **The built-in values**, [`DEFAULT_STOP_GROWTH`], [`STOP_QUIET`] and [`PUSH_GROWTH`], and the measurements that
 //!   chose them are in solver/docs/unsound/shortfalls.md ("The bound and the gap").
 //!
@@ -206,10 +214,10 @@
 //!   scores more, the run's on a tie, and then the table.  The line says so: `prev.source` is `best_known`.  Before
 //!   each game the run reads what the other holders appended since it last read the file, so a game starts from what
 //!   the others found while it ran.
-//! * **Offering.**  Each line the run records, a game's or a repair's, is offered to the best-known file, and appended
-//!   if it scores more than the best-known file's line of its game.  A run that opens its file offers the file's last
-//!   line of each game first, so a run over the range of an old file, with a copy of the file as `--out`, plays nothing
-//!   and offers all it has.
+//! * **Offering.**  Each line the run records, a game's, a repair's or the descent's, is offered to the best-known
+//!   file, and appended if it scores more than the best-known file's line of its game.  A run that opens its file
+//!   offers the file's last line of each game first, so a run over the range of an old file, with a copy of the file as
+//!   `--out`, plays nothing and offers all it has.
 //! * **The repair.**  The walk down weighs the best-known file's lines of the games below the run's first, which the
 //!   run has no line of, against the run's lines within [`REPAIR_REACH`] above them, with the code that weighs the
 //!   run's own lines ([`Run::weigh`]), and appends a repair of one to the best-known file alone, as a line with
@@ -219,6 +227,45 @@
 //!   runs had found when its game began, and its `prev` (the source and the digest of the moves) says what that was.  A
 //!   run that must not depend on the others, such as one of an experiment that compares settings, uses
 //!   `--best-known off`, or a best-known file of its own.
+//!
+//! # The descent
+//!
+//! A pass over a range from the best-known lines plays the games in order, so the [`ABOVE`] games below a game whose
+//! line beats the best-known one were played before that line existed, and never followed a trajectory from it.  Most
+//! games stop at their ceiling, so a shortfall carries up through them, and a gain high in a streak says that the games
+//! below it may be short too.  The repair takes that back only where the better line, cut down, scores more; the
+//! descent plays those games again, with trajectories from the better line.
+//!
+//! * **Gains and roots.**  A game's *known score* is the score of the best-known file's line of the game when the run
+//!   first began the game, none if the file had none or the run has no best-known file (`known_before`); a game played
+//!   again keeps the known score it began with.  A *gain* is a game of the run whose line, as played or as the repair
+//!   or the descent wrote it again, scores more than its known score, and a *root* is a gain whose game below is no
+//!   gain of the run, a game below the run's first being none.  So a run with no best-known file never descends, nor
+//!   does a first pass over games the file has no lines of.
+//! * **When.**  After each game's line and the walk of the repair after it, the run descends from each root that it has
+//!   not descended from, the lowest first ([`next_descent`]): it plays again, lowest first, the games of the root's
+//!   *window*, from max(lo, root − `ABOVE`) to root − 1, lo the run's first game, which are the games whose
+//!   trajectories from above take the root's line.  A game of a window that gains while its game below does not is a
+//!   new root, and its turn comes.  The run goes on to its next game once no root is left that it has not descended
+//!   from, which ends, as it descends from each game once at most.  A descent never plays a game below the run's first:
+//!   a run over the range above it leaves those games to the run below, whose trajectories from the games above take
+//!   the new lines.
+//! * **A game played again** is played as a game of the run is ([`play`]), from the lines as they now stand, with one
+//!   more trajectory, the first after the start's: the game's own line as it stands, the better of the run's and the
+//!   best-known file's, in both plays of a game played twice and whether or not the game takes a seed.  So a searched
+//!   game never scores less than it did.  A prime or a repeat plays the line it follows, which can score less (a repeat
+//!   of a game whose line falls below its own); then its line stands, and the play is not recorded.  Each line is
+//!   recorded as a line of the run is: appended, offered to the best-known file and walked down from by the repair,
+//!   with `descent`, the root and the score of the game's line before ([`Descent`]).
+//! * **A run cut short** goes on with the descent where its file leaves it, before its next game: the file has each
+//!   game's known score, the roots descended from (`descent.root`) and where the last window was (its last line that
+//!   is no repair).  The lines depend on what a line depends on alone, so the run ends with the lines of a run that was
+//!   not stopped.
+//! * **The work** is that of the games played again, each played as a game is.  A game of a window takes the board it
+//!   was played on if the run kept it, and the setup of the next game of the window is made while it plays
+//!   ([`Boards`]).  The summary counts the roots descended from, the games played again and the games that gained
+//!   ([`RangeSummary::descents`](super::RangeSummary::descents)).  solver/docs/unsound/shortfalls.md ("The descent")
+//!   has the measurement that built it in.
 //!
 //! # Rehearsing
 //!
@@ -243,10 +290,11 @@ use crate::tactics::Tactics;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::io::Write as _;
+use std::ops::{Range, RangeInclusive};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 mod best_known;
 
@@ -267,9 +315,6 @@ pub const MIN_EFFORT: u32 = 1;
 /// The most effort a run may ask for: a budget of 64 rounds of work, which is 2^22 with the default.
 pub const MAX_EFFORT: u32 = 6;
 
-/// The games above a game that its trajectories may begin from: `above` goes up to this.
-pub const MAX_ABOVE: u32 = 8;
-
 /// How far below a line the repair looks: what survives of a line is set against the lines of the games up to this
 /// many below it (the module documentation, "The repair").
 pub const REPAIR_REACH: u32 = 8;
@@ -278,6 +323,12 @@ pub const REPAIR_REACH: u32 = 8;
 /// the 8 games before.  The races that chose it, with [`TILT`] and [`WIDEN`], are in the module documentation, "The
 /// built-in settings".
 pub const BACK: u32 = 8;
+
+/// The games above a game that its trajectories begin from, after those of [`BACK`]: one from each distinct set that
+/// survives of the moves for the 8 games above that the run or its files have.  It is also the reach of the descent:
+/// the window of a root is the games below it that begin a trajectory from its line.  The pass that chose it is in the
+/// module documentation, "The built-in settings".
+pub const ABOVE: u32 = 8;
 
 /// The percent of a round's neighborhoods that draw tilted: 25 (chosen with [`BACK`] and [`WIDEN`]; the module
 /// documentation, "The built-in settings", has the races).
@@ -304,17 +355,14 @@ pub const PUSH_GROWTH: i64 = 25;
 /// [`finder::NEIGHBORHOOD_WORK`] for each neighborhood.)
 pub const ROUND_WORK: u64 = NEIGHBORHOODS * finder::UNIT_STEPS;
 
-/// How the unsound mode plays: the level of effort, the seed of the rounds' random choices, the games above that the
-/// rounds may use, the cut of the built-in table, and the stop on growth.  The rest of how the rounds are shaped is
-/// built in ([`BACK`], [`TILT`], [`WIDEN`], [`STOP_QUIET`], [`PUSH_GROWTH`]).
+/// How the unsound mode plays: the level of effort, the seed of the rounds' random choices, the cut of the built-in
+/// table, and the stop on growth.  The rest of how the rounds are shaped is built in ([`BACK`], [`ABOVE`], [`TILT`],
+/// [`WIDEN`], [`STOP_QUIET`], [`PUSH_GROWTH`]).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Plan {
     /// From [`MIN_EFFORT`] to [`MAX_EFFORT`].
     pub effort: u32,
     pub seed: u64,
-    /// `--above J`, J from 0 to [`MAX_ABOVE`]: a game also follows a trajectory from each distinct set that survives of
-    /// the moves for the games n + 1, ..., n + J that the run or its files have.  0 takes none.
-    pub above: u32,
     /// The work of one round, which level L budgets 2^L times: [`ROUND_WORK`] unless a test or a measurement lowers it.
     /// No flag sets it, and a line records the budget it gave (`budget`).
     pub round_work: u64,
@@ -328,14 +376,12 @@ pub struct Plan {
     pub stop_growth: Option<u64>,
 }
 
-/// The least effort, the finder's seed, no trajectory from above, the whole built-in table, and the stop on growth
-/// ([`DEFAULT_STOP_GROWTH`]).
+/// The least effort, the finder's seed, the whole built-in table, and the stop on growth ([`DEFAULT_STOP_GROWTH`]).
 impl Default for Plan {
     fn default() -> Plan {
         Plan {
             effort: MIN_EFFORT,
             seed: finder::Options::default().seed,
-            above: 0,
             round_work: ROUND_WORK,
             known_to: None,
             stop_growth: DEFAULT_STOP_GROWTH,
@@ -379,20 +425,6 @@ fn effort_error(got: &str) -> String {
     format!("--effort takes L, the level of effort, a whole number from {MIN_EFFORT} to {MAX_EFFORT}: got {got:?}")
 }
 
-/// Reads the value of `--above`, J: a whole number from 0 to [`MAX_ABOVE`].
-///
-/// # Errors
-///
-/// What `text` should have been.
-pub fn parse_above(text: &str) -> Result<u32, String> {
-    text.parse().ok().filter(|&above| above <= MAX_ABOVE).ok_or_else(|| above_error(text))
-}
-
-/// The message of an `--above` that is not a whole number from 0 to [`MAX_ABOVE`], quoting what it was given.
-fn above_error(got: &str) -> String {
-    format!("--above takes J, a whole number from 0 to {MAX_ABOVE}: got {got:?}")
-}
-
 /// Reads the value of `--stop-growth`: T, a whole number of points from 0 up, as `Some(T)`, or `off`, `None`.
 ///
 /// # Errors
@@ -407,8 +439,7 @@ pub fn parse_stop_growth(text: &str) -> Result<Option<u64>, String> {
         .map_err(|_| format!("--stop-growth takes T, a whole number of points from 0 up, or off: got {text:?}"))
 }
 
-/// Checks the plan's options: an effort from [`MIN_EFFORT`] to [`MAX_EFFORT`], `above` of at most [`MAX_ABOVE`], and a
-/// work of a round above 0.
+/// Checks the plan's options: an effort from [`MIN_EFFORT`] to [`MAX_EFFORT`], and a work of a round above 0.
 ///
 /// # Errors
 ///
@@ -416,9 +447,6 @@ pub fn parse_stop_growth(text: &str) -> Result<Option<u64>, String> {
 pub fn check_plan(plan: &Plan) -> Result<(), String> {
     if !(MIN_EFFORT..=MAX_EFFORT).contains(&plan.effort) {
         return Err(effort_error(&plan.effort.to_string()));
-    }
-    if plan.above > MAX_ABOVE {
-        return Err(above_error(&plan.above.to_string()));
     }
     if plan.round_work == 0 {
         return Err("the work of a round is 0".to_owned());
@@ -552,8 +580,8 @@ pub struct Line {
     pub plan: Plan,
     /// The score of a searched game's start.
     pub start: Option<u64>,
-    /// What each trajectory of a searched game's rounds began from: the start, then the games [`BACK`] and `--above`
-    /// took distinct sets from.
+    /// What each trajectory of a searched game's rounds began from: the start, then the game itself where the descent
+    /// plays it again, and the games [`BACK`] and [`ABOVE`] took distinct sets from.
     pub trajectories: Option<Vec<Origin>>,
     /// For a searched game, each game whose moves a trajectory could begin from, in the order of `trajectories`, and
     /// the score of what survives of its moves here, whether or not it began one.
@@ -594,6 +622,26 @@ pub struct Line {
     pub growth_stop: bool,
     /// The game was played twice because its growth after the seeded play was above [`PUSH_GROWTH`].
     pub pushed: bool,
+    /// The game's known score: the score of the best-known file's line of the game when the run first began it; `None`
+    /// if the file had none, or the run has none (the module documentation, "The descent").
+    pub known: Option<u64>,
+    /// For a game that the descent played again, the root it descended from and the score of the game's line before.
+    pub descent: Option<Descent>,
+}
+
+/// What a line that the descent played records of it (the module documentation, "The descent"): the root whose window
+/// the game is in, and the score of the game's line that it played again from, which the line scores no less than.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Descent {
+    pub root: u32,
+    pub was: u64,
+}
+
+impl Descent {
+    /// The value in a line: `{"root": ..., "was": ...}` (null on a line that the descent did not play).
+    fn to_json(self) -> Json {
+        Json::object([("root", Json::from(self.root)), ("was", Json::from(self.was))])
+    }
 }
 
 /// What the play that a line of a game played twice is not came to ([`Line::other`]): whether it was the unseeded one,
@@ -653,6 +701,8 @@ impl Line {
             growth: None,
             growth_stop: false,
             pushed: false,
+            known: None,
+            descent: None,
         }
     }
 
@@ -729,7 +779,6 @@ impl Line {
             ("effort", Json::from(self.plan.effort)),
             ("budget", Json::from(self.plan.budget())),
             ("seed", Json::from(self.plan.seed)),
-            ("above", Json::from(self.plan.above)),
             ("stop_growth", self.plan.stop_growth.map_or(Json::Null, Json::from)),
             ("unseeded", Json::Bool(self.unseeded)),
             ("start", self.start.map_or(Json::Null, Json::from)),
@@ -746,6 +795,8 @@ impl Line {
             ("start_seconds", Json::Num(self.start_seconds)),
             ("threads", Json::from(self.threads)),
             ("known_to", self.plan.known_to.map_or(Json::Null, Json::from)),
+            ("known_before", self.known.map_or(Json::Null, Json::from)),
+            ("descent", self.descent.map_or(Json::Null, Descent::to_json)),
             // A line as a game is played; the repair writes it again with what replaced its moves ([`Repair`]).
             ("repaired", Json::Null),
             ("tactics", Json::from(self.tactics.description())),
@@ -754,10 +805,13 @@ impl Line {
     }
 
     /// One line for a person: n, score, method, the rounds and how many raised the score, the time, `unsound`, and
-    /// whether the game is at the run's ceiling and a line of n − 1 that this one proves short, if anything, the growth
-    /// of the gap and whether it stopped the rounds, and for a game the push played twice what its unseeded play
-    /// scored.
+    /// for a game the descent played again the root it descended from and what it gained on the line before, whether
+    /// the game is at the run's ceiling and a line of n − 1 that this one proves short, if anything, the growth of the
+    /// gap and whether it stopped the rounds, and for a game the push played twice what its unseeded play scored.
     pub fn summary_line(&self) -> String {
+        let descent = self.descent.map_or_else(String::new, |Descent { root, was }| {
+            format!("  descent from {root}, +{}", self.score.saturating_sub(was))
+        });
         let ceiling = if self.at_ceiling { "  at ceiling" } else { "" };
         let short = self
             .prev
@@ -776,7 +830,7 @@ impl Line {
             }
             Some(other) => format!("  pushed, unseeded play {}", other.score),
         };
-        let notes = format!("{ceiling}{short}{growth}{twice}");
+        let notes = format!("{descent}{ceiling}{short}{growth}{twice}");
         format!(
             "n={:<5} score={:<9} {:<7} rounds={:<6} improved={:<3} {:>9.3} s  unsound{notes}",
             self.n,
@@ -865,17 +919,22 @@ struct Stored {
     method: Method,
     /// The size and the digest of the search problem of a searched or repeat game.
     problem: Option<(ProblemSize, u64)>,
+    /// The game's known score (`known_before`), and the descent's record of a line it played again (`descent`), which
+    /// a repair of the line keeps.
+    known: Option<u64>,
+    descent: Option<Descent>,
     /// The line as it was written, which a repair writes again with its own moves ([`repaired_line`]).
     text: String,
 }
 
 /// The lines of a run: those of the file of unsound lines that it appends to, one JSON object a line, an unsound line
 /// each, and its own as it records them.  Opening the file locks it against other processes and checks it; each line
-/// is appended and synced as its game ends or a repair replaces it.  It has the torn last line of a results file, and
-/// is mended as one is.  A run without a file keeps its lines here alone.
+/// is appended and synced as its game ends, a repair replaces it or the descent plays it again.  It has the torn last
+/// line of a results file, and is mended as one is.  A run without a file keeps its lines here alone.
 ///
-/// A game has one line, or more if the repair replaced it: the last line of a game is the game's, and each line after
-/// the first records a repair and scores more than the one before it.
+/// A game has one line, or more if the repair replaced it or the descent played it again: the last line of a game is
+/// the game's, and each line after the first records a repair, which scores more than the line before it, or the
+/// descent's play, which scores no less.
 pub struct UnsoundFile {
     /// The file and its path, if the run has one, locked (`flock`) for as long as it is open.
     file: Option<(File, PathBuf)>,
@@ -884,30 +943,37 @@ pub struct UnsoundFile {
     /// The games of the file's last line that is no repair and of the repairs after it: where the repair's walk down
     /// was when the file was last written, which a run that opens it takes up again ([`Run::walk`]).
     walk: BTreeSet<u32>,
+    /// The roots of the descent's lines of the file, which the run has descended from, and where the descent was when
+    /// the file was last written: the root and the game of the file's last line that is no repair, if that is the
+    /// descent's, so that a run that opens the file plays the rest of that window first ([`Run::descend`]).
+    descended: BTreeSet<u32>,
+    descending: Option<(u32, u32)>,
 }
 
 impl UnsoundFile {
     /// Opens (creating if need be) the file at `path`, locks it, and checks every line: an unsound line (a line of a
     /// proven run is refused, as is a line that is not a game), whose moves replay to its score, whose promotions are
     /// moves in ascending order, which scores `in_the_bag` plus their sum where it records `in_the_bag`, no more than
-    /// the score of `optimal` where that has the game, and either the first line of its game or a repair of the line
-    /// before it, which scores more.  A torn last line is cut off.
+    /// the score of `optimal` where that has the game, and either the first line of its game, a repair of the line
+    /// before it, which scores more, or the descent's play of the game again from the line before it, which scores no
+    /// less.  A torn last line is cut off.
     pub fn open(path: &Path, optimal: &Optimal) -> Result<UnsoundFile, String> {
         let at = |e: String| format!("{}: {e}", path.display());
         let (mut file, text) = open_locked(path)?;
         let (mut games, mut walk) = (BTreeMap::new(), BTreeSet::new());
+        let (mut descended, mut descending) = (BTreeSet::new(), None);
         let kept = each_line(&text, |number, json| {
             let (n, stored, was) = read_line(json, optimal).map_err(|e| format!("line {number}: {e}"))?;
-            match (games.get(&n).map(|game: &Stored| game.score), was) {
-                (None, None) => walk.clear(),
-                (Some(score), Some(was)) if was == score => (),
-                (None, Some(_)) => {
-                    return Err(format!("line {number}: a repair of n={n}, which has no line before it"))
-                }
-                (Some(score), Some(was)) => {
-                    return Err(format!("line {number}: a repair of a line of n={n} that scored {was}, not {score}"))
-                }
-                (Some(_), None) => return Err(format!("line {number}: a second line for n={n} that is no repair")),
+            // A repair keeps the record of the descent's play that it repairs: only a line that is no repair is one.
+            let again = stored.descent.filter(|_| was.is_none());
+            let before = games.get(&n).map(|game: &Stored| game.score);
+            follows(n, before, stored.score, was, again).map_err(|e| format!("line {number}: {e}"))?;
+            if was.is_none() {
+                walk.clear();
+                descending = again.map(|descent| (descent.root, n));
+            }
+            if let Some(descent) = again {
+                descended.insert(descent.root);
             }
             walk.insert(n);
             games.insert(n, stored);
@@ -915,12 +981,13 @@ impl UnsoundFile {
         })
         .map_err(at)?;
         mend(&mut file, &text, kept, 0).map_err(|e| at(e.to_string()))?;
-        Ok(UnsoundFile { file: Some((file, path.to_owned())), games, walk })
+        Ok(UnsoundFile { file: Some((file, path.to_owned())), games, walk, descended, descending })
     }
 
     /// The lines of a run that has no file.
     fn none() -> UnsoundFile {
-        UnsoundFile { file: None, games: BTreeMap::new(), walk: BTreeSet::new() }
+        let (games, walk, descended) = (BTreeMap::new(), BTreeSet::new(), BTreeSet::new());
+        UnsoundFile { file: None, games, walk, descended, descending: None }
     }
 
     /// The moves for `n` that the file has, and their score.
@@ -955,7 +1022,35 @@ fn stored_of(line: &Line, json: &Json) -> Stored {
         promotions: line.promotions.clone(),
         method: line.method,
         problem: line.setup.map(|setup| (setup.size(), setup.digest)),
+        known: line.known,
+        descent: line.descent,
         text: json.to_string(),
+    }
+}
+
+/// Whether a line of game `n` that scores `score` may follow the game's line before it in a run's file, which scores
+/// `before` (none if the line is the game's first).  The first line of a game is no repair and not the descent's; a
+/// repair (`was`, the score of the line it replaced) replaces the line before it, and scores more ([`read_line`]); and
+/// the descent's line (`again`) plays the game again from the line before it, and scores no less.
+///
+/// # Errors
+///
+/// What is wrong with the order.
+fn follows(n: u32, before: Option<u64>, score: u64, was: Option<u64>, again: Option<Descent>) -> Result<(), String> {
+    match (before, was, again) {
+        (None, None, None) => Ok(()),
+        (Some(before), Some(was), _) if was == before => Ok(()),
+        (Some(before), None, Some(descent)) if descent.was == before && score >= before => Ok(()),
+        (None, Some(_), _) => Err(format!("a repair of n={n}, which has no line before it")),
+        (Some(before), Some(was), _) => Err(format!("a repair of a line of n={n} that scored {was}, not {before}")),
+        (None, None, Some(_)) => Err(format!("the descent's line of n={n}, which has no line before it")),
+        (Some(before), None, Some(descent)) if descent.was != before => {
+            Err(format!("the descent's line of a line of n={n} that scored {}, not {before}", descent.was))
+        }
+        (Some(before), None, Some(_)) => {
+            Err(format!("the descent's line of n={n} scores {score}, less than the line before it, {before}"))
+        }
+        (Some(_), None, None) => Err(format!("a second line for n={n} that is no repair and not the descent's")),
     }
 }
 
@@ -1009,8 +1104,24 @@ fn read_line(json: &Json, optimal: &Optimal) -> Result<(u32, Stored, Option<u64>
     if f.get("repaired")? != &Json::Null && was.is_none() {
         return Err(fail(format!("it records a repair, and scores {score}, no more than the line it replaced")));
     }
+    // The keys of the descent, which a line of an older build lacks: it has no known score, and is no descent's.
+    let known = match json.get("known_before") {
+        None | Some(Json::Null) => None,
+        Some(known) => Some(known.as_u64().ok_or_else(|| fail(Fields::bad("known_before")))?),
+    };
+    let descent = match json.get("descent") {
+        None | Some(Json::Null) => None,
+        Some(descent) => {
+            let d = Fields(descent);
+            let (root, was) = (d.u32("root").map_err(fail)?, d.u64("was").map_err(fail)?);
+            if root <= n {
+                return Err(fail(format!("the descent's root {root} is not a game above it")));
+            }
+            Some(Descent { root, was })
+        }
+    };
     let text = json.to_string();
-    Ok((n, Stored { score, moves, promotions, method, problem, text }, was))
+    Ok((n, Stored { score, moves, promotions, method, problem, known, descent, text }, was))
 }
 
 /// The line `old`, the JSON of a line of game `n`, written again for `repair`: its moves, promotions and score are the
@@ -1127,15 +1238,16 @@ fn same_file(a: &Path, b: &Path) -> Result<bool, String> {
 /// it replaces is appended and handed to `on_repair` (the module documentation, "The repair"); first, a walk down that
 /// a stop cut short in the file goes on.  A run with a best-known file `files.best_known` seeds from it, offers it every
 /// line of the file and every line it records, and repairs its lines of the games below the range (the module
-/// documentation, "The best-known file").  A stop signal ends the range with the game in play unrecorded
-/// (`stopped_at`).
+/// documentation, "The best-known file").  After each game, and first where the file leaves it, the descent plays again
+/// the games below each root, handing each line to `on_game` (the module documentation, "The descent").  A stop signal
+/// ends the range with the game in play unrecorded (`stopped_at`).
 ///
 /// # Errors
 ///
 /// A range that is empty or starts below 1; a plan that [`check_plan`] refuses (an effort outside [`MIN_EFFORT`] to
-/// [`MAX_EFFORT`], an `above` above [`MAX_ABOVE`], a work of a round of 0); the same file for `out` and `best_known`; a
-/// file that cannot be opened or written, or holds a line it may not ([`UnsoundFile::open`], [`BestKnownFile::open`]);
-/// and a game or a repair whose moves fail a check (the module documentation, "One game").
+/// [`MAX_EFFORT`], a work of a round of 0); the same file for `out` and `best_known`; a file that cannot be opened or
+/// written, or holds a line it may not ([`UnsoundFile::open`], [`BestKnownFile::open`]); and a game or a repair whose
+/// moves fail a check (the module documentation, "One game").
 pub fn solve_range(
     lo: u32,
     hi: u32,
@@ -1167,9 +1279,12 @@ pub fn solve_range(
         }
     }
     let name = files.out.and_then(Path::file_name).map(|name| name.to_string_lossy().into_owned());
+    let descended = lines.descended.clone();
     let mut run = Run {
         opts,
+        plan,
         optimal,
+        range: lo..=hi,
         lines,
         best_known,
         name,
@@ -1177,68 +1292,87 @@ pub fn solve_range(
         recent: BTreeMap::new(),
         bounds: BTreeMap::new(),
         mine: BTreeSet::new(),
+        descended,
         boards: Boards::new(opts),
         summary: RangeSummary::default(),
     };
     run.offer_file()?;
     let walk = run.lines.walk.clone();
     run.walk(walk, &mut on_repair)?;
+    if !run.descend(&mut on_game, &mut on_repair)? {
+        return Ok(run.summary);
+    }
     for n in lo..=hi {
         if run.lines.games.contains_key(&n) {
             run.summary.skipped += 1;
             continue;
         }
-        if engine::stop_signal().is_some() {
-            run.summary.stopped_at = Some(n);
-            break;
-        }
-        if let Some(best_known) = &mut run.best_known {
-            best_known.refresh()?;
-        }
-        let past = moves_before(n, &run.recent, &run.lines, run.best_known.as_ref(), optimal);
-        let above = moves_above(n, &run.recent, &run.lines, run.best_known.as_ref(), plan);
-        // The gap of the moves for n − 1 that the game starts from, unless it takes none.
-        let gap_below = match past.first().and_then(Option::as_ref) {
-            Some(below) => Some(gap(below.n, run.bound_of(below.n)?, below.score)?),
-            None => None,
-        };
         // The next game to play has the moves for its n − 1, this game's line or the file's.
-        if let Some(next) = (n + 1..=hi).find(|m| !run.lines.games.contains_key(m)) {
-            run.boards.start(next);
-        }
-        let played = play(n, &past, &above, gap_below, opts, plan, &mut run.earlier, &mut run.boards, optimal)?;
-        let Some((line, board)) = played else {
-            run.summary.stopped_at = Some(n);
+        let next = (n + 1..=hi).find(|m| !run.lines.games.contains_key(m));
+        if !run.play_game(n, None, next, &mut on_game, &mut on_repair)? {
             break;
-        };
-        run.record(line, board, &mut on_game)?;
-        run.walk(BTreeSet::from([n]), &mut on_repair)?;
+        }
+        if !run.descend(&mut on_game, &mut on_repair)? {
+            break;
+        }
     }
     Ok(run.summary)
 }
 
+/// The next descent of a run whose first game is `lo` and whose gains are `gains` (the module documentation, "The
+/// descent"), if any: the lowest root that is not in `descended` and has a window, and its window, the games from
+/// max(`lo`, root − [`ABOVE`]) to root − 1.  A root is a gain whose game below is no gain, and a game below `lo` is no
+/// game of the run, so no gain; `lo`, the root of an empty window, is never descended from.
+fn next_descent(gains: &BTreeSet<u32>, lo: u32, descended: &BTreeSet<u32>) -> Option<(u32, Range<u32>)> {
+    let root = gains.range(lo + 1..).copied().find(|&g| !gains.contains(&(g - 1)) && !descended.contains(&g))?;
+    Some((root, lo.max(root.saturating_sub(ABOVE))..root))
+}
+
 /// A board that the run set up for a searched or repeat game, which the repair weighs lines on and the unseeded play of
-/// a game played twice searches: the game's job, what the game with no promotions scores, and what the board was set
-/// up with.
+/// a game played twice searches: the game's job, what the game with no promotions scores, what the board was set up
+/// with, and, where the game was played from it with moves for n − 1, the problem it poses, so that the descent can
+/// play the game again on it ([`ready`](Self::ready)).
 #[derive(Clone)]
 struct KeptBoard {
     job: Arc<dyn Job>,
     in_the_bag: u64,
     setup: SearchSetup,
+    played: Option<Arc<Problem>>,
 }
 
 impl KeptBoard {
-    /// The board of `set`.
+    /// The board of `set`, set up for something else than the game's play from moves for n − 1: a prime's bound, a
+    /// game with no such moves, or the repair.
     fn of(set: &SearchSetUp) -> KeptBoard {
-        KeptBoard { job: Arc::clone(&set.job), in_the_bag: set.in_the_bag, setup: set.setup }
+        KeptBoard { job: Arc::clone(&set.job), in_the_bag: set.in_the_bag, setup: set.setup, played: None }
+    }
+
+    /// The board of `set`, which the game was played from with moves for n − 1, and which poses `problem`.
+    fn played(set: &SearchSetUp, problem: &Problem) -> KeptBoard {
+        KeptBoard { played: Some(Arc::new(problem.clone())), ..KeptBoard::of(set) }
+    }
+
+    /// The setup of the game on this board, as [`Ready::of`] makes it with moves for n − 1, if the game was played from
+    /// it so (a board set up for something else may not be the game's: a prime's is not).  The job is the one the game
+    /// was played on, whose start and rounds do not depend on what it searched before, as the unseeded play of a game
+    /// played twice relies on too.
+    fn ready(&self) -> Option<Ready> {
+        let problem = Problem::clone(self.played.as_ref()?);
+        let (job, setup, in_the_bag) = (Arc::clone(&self.job), self.setup, self.in_the_bag);
+        let set = SearchSetUp { job, setup, in_the_bag, frames: Duration::ZERO, greedy: Duration::ZERO };
+        Some(Ready { set: SetUp::Search(set, problem), bound: in_the_bag + self.job.bound(), prime: None })
     }
 }
 
 /// A run of the unsound mode as it goes: its lines and the best-known file, the lines a repeat may repeat, its own
-/// lines of the games a game starts from, its boards (made ahead, and kept for the repair), and what it has done.
+/// lines of the games a game starts from, the roots it descended from, its boards (made ahead, and kept for the repair
+/// and the descent), and what it has done.
 struct Run<'a> {
     opts: &'a SolveOptions,
+    plan: &'a Plan,
     optimal: &'a Optimal,
+    /// The games the run plays, lo to hi.
+    range: RangeInclusive<u32>,
     lines: UnsoundFile,
     /// The best-known file, if the run has one (the module documentation, "The best-known file").
     best_known: Option<BestKnownFile<'a>>,
@@ -1246,40 +1380,163 @@ struct Run<'a> {
     /// say they came from.
     name: Option<String>,
     earlier: Earlier<()>,
-    /// This run's lines of the games before, for as many as a game may begin a trajectory from.
+    /// This run's lines of the games before, for as many as a game may begin a trajectory from, and of the games
+    /// above the one the descent plays.
     recent: BTreeMap<u32, Moves>,
-    /// The bounds of the games before ([`Line::bound`]), of the games this run played and those it set up for one.
+    /// The bounds ([`Line::bound`]) of the games this run played and of those it set up for one, which the games
+    /// after them and the descent's take their gap below from.
     bounds: BTreeMap<u32, u64>,
     /// The games whose line this run wrote, played or repaired.
     mine: BTreeSet<u32>,
+    /// The roots the run, and the runs before it on its file, descended from (the module documentation, "The
+    /// descent").
+    descended: BTreeSet<u32>,
     boards: Boards,
     summary: RangeSummary,
 }
 
 impl Run<'_> {
+    /// Plays game `n` and records its line, then walks the repair down from it: a game of the range in its order, or,
+    /// with `root`, a game of that root's window that the descent plays again, from its own line as it stands and with
+    /// the known score it began with (the module documentation, "The descent").  The setup of the game `ahead`, the
+    /// next to play, is made while this one plays.  A play of the descent that scores less than the game's line, a
+    /// prime's or a repeat's, is not recorded.  False if a stop signal ended the run, before the game or in its
+    /// rounds, which leaves the game unrecorded (`stopped_at`).
+    fn play_game(
+        &mut self,
+        n: u32,
+        root: Option<u32>,
+        ahead: Option<u32>,
+        on_game: &mut impl FnMut(&Line),
+        on_repair: &mut impl FnMut(&Repair),
+    ) -> Result<bool, String> {
+        if engine::stop_signal().is_some() {
+            self.summary.stopped_at = Some(n);
+            return Ok(false);
+        }
+        if let Some(best_known) = &mut self.best_known {
+            best_known.refresh()?;
+        }
+        let best_known = self.best_known.as_ref();
+        let past = moves_before(n, &self.recent, &self.lines, best_known, self.optimal);
+        let above = moves_above(n, &self.recent, &self.lines, best_known);
+        let (known, again, own) = match root {
+            None => (best_known.and_then(|best_known| best_known.score(n)), None, None),
+            Some(root) => {
+                let line = self.lines.games.get(&n).ok_or_else(|| format!("n={n}: no line to play again"))?;
+                let again = Descent { root, was: line.score };
+                (line.known, Some(again), kept_moves(n, &self.recent, &self.lines, best_known))
+            }
+        };
+        // The gap of the moves for n − 1 that the game starts from, unless it takes none.
+        let gap_below = match past.first().and_then(Option::as_ref) {
+            Some(below) => Some(gap(below.n, self.bound_of(below.n)?, below.score)?),
+            None => None,
+        };
+        if let Some(ahead) = ahead {
+            self.boards.ahead(ahead);
+        }
+        let (opts, plan, optimal, earlier, boards) =
+            (self.opts, self.plan, self.optimal, &mut self.earlier, &mut self.boards);
+        let played = play(n, &past, own.as_ref(), &above, gap_below, opts, plan, earlier, boards, optimal)?;
+        let Some((line, board)) = played else {
+            self.summary.stopped_at = Some(n);
+            return Ok(false);
+        };
+        let line = Line { known, descent: again, ..line };
+        match again {
+            None => self.summary.solved += 1,
+            Some(Descent { root, was }) => {
+                self.summary.played_again += 1;
+                if line.score < was {
+                    let _ = writeln!(
+                        std::io::stderr(),
+                        "note: n={n}: played again in the descent from {root}, it scores {}, below the {was} of its \
+                         line, which stands",
+                        line.score
+                    );
+                    return Ok(true);
+                }
+                self.summary.gained_again += usize::from(line.score > was);
+            }
+        }
+        self.record(line, board, on_game)?;
+        self.walk(BTreeSet::from([n]), on_repair)?;
+        Ok(true)
+    }
+
+    /// The descent (the module documentation, "The descent"): first the rest of the window that the file's last lines
+    /// leave unplayed, then the window of each root the run has not descended from, the lowest first
+    /// ([`next_descent`]), until no root is left.  False if a stop signal ended the run.
+    fn descend(
+        &mut self,
+        on_game: &mut impl FnMut(&Line),
+        on_repair: &mut impl FnMut(&Repair),
+    ) -> Result<bool, String> {
+        if let Some((root, game)) = self.lines.descending.take() {
+            if !self.play_window(root, game + 1..root, on_game, on_repair)? {
+                return Ok(false);
+            }
+        }
+        let lo = *self.range.start();
+        while let Some((root, window)) = next_descent(&self.gains(), lo, &self.descended) {
+            self.descended.insert(root);
+            self.summary.descents += 1;
+            if !self.play_window(root, window, on_game, on_repair)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    /// Plays again the games `window` of the root `root`, lowest first ([`play_game`](Self::play_game)); false if a
+    /// stop signal ended the run.
+    fn play_window(
+        &mut self,
+        root: u32,
+        window: Range<u32>,
+        on_game: &mut impl FnMut(&Line),
+        on_repair: &mut impl FnMut(&Repair),
+    ) -> Result<bool, String> {
+        for k in window.clone() {
+            let ahead = Some(k + 1).filter(|next| window.contains(next));
+            if !self.play_game(k, Some(root), ahead, on_game, on_repair)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    /// The gains of the run (the module documentation, "The descent"): the games whose line scores more than their
+    /// known score, of the games of the range from its first up to the first that the run has no line of, those it
+    /// has played or found in its file.
+    fn gains(&self) -> BTreeSet<u32> {
+        let games = self.range.clone().map_while(|m| self.lines.games.get(&m).map(|line| (m, line)));
+        games.filter(|(_, line)| line.known.is_some_and(|known| line.score > known)).map(|(m, _)| m).collect()
+    }
+
     /// Records `line`, a game played on `board` (if it set one up): appends it, hands it to `on_game`, and keeps what
-    /// the games after it and the repair need of it.
+    /// the games after it, the repair and the descent need of it.  A game the descent played again may lie below others
+    /// the run has played: what the run keeps of those stays.
     fn record(&mut self, line: Line, board: Option<KeptBoard>, on_game: &mut impl FnMut(&Line)) -> Result<(), String> {
         let n = line.n;
         let json = line.to_json();
         self.lines.append(n, &json, stored_of(&line, &json))?;
         self.offer(n)?;
         on_game(&line);
-        self.summary.solved += 1;
         if let Some(setup) = line.setup {
             self.earlier.add(n, setup.size(), setup.digest, line.promotions.clone(), ());
         }
         self.recent.insert(n, Moves { n, moves: line.moves, score: line.score, source: Source::Run });
         self.recent.retain(|&m, _| m + BACK > n);
         self.bounds.insert(n, line.bound);
-        self.bounds.retain(|&m, _| m >= n);
         self.mine.insert(n);
         self.boards.keep(n, board);
         Ok(())
     }
 
-    /// The bound of game `k`: the run's, if it played the game, else that of its board, set up now
-    /// ([`Ready::of`]).
+    /// The bound of game `k`: the run's, if it played the game or set its board up before, else that of its board,
+    /// set up now ([`Ready::of`]).
     fn bound_of(&mut self, k: u32) -> Result<u64, String> {
         if let Some(&bound) = self.bounds.get(&k) {
             return Ok(bound);
@@ -1289,9 +1546,20 @@ impl Run<'_> {
         Ok(bound)
     }
 
-    /// The line of game `k` that the repair works on: the run's own, else the best-known file's (of a game below the
-    /// run's first, which the run has no line of).
+    /// Whether the repair may write a line of game `k` (the module documentation, "The repair"): a game the run has a
+    /// line of, in its file, or a game below the run's first, in the best-known file alone.  A game at or above the
+    /// run's first that the run has no line of yet is the run's to play, or another run's, and its known score stays
+    /// the best-known file's from before it is played.
+    fn repairs(&self, k: u32) -> bool {
+        self.lines.games.contains_key(&k) || k < *self.range.start()
+    }
+
+    /// The line of game `k` that the repair works on, if it may write one ([`repairs`](Self::repairs)): the run's own,
+    /// else the best-known file's of a game below the run's first.
     fn line(&self, k: u32) -> Option<&Stored> {
+        if !self.repairs(k) {
+            return None;
+        }
         self.lines.games.get(&k).or_else(|| self.best_known.as_ref()?.line(k))
     }
 
@@ -1325,10 +1593,11 @@ impl Run<'_> {
     /// this run has just recorded, or where a walk was when a stop cut it short, as its file says.  Each game below
     /// them, from the highest down, is weighed against the lines of `changed` up to [`REPAIR_REACH`] above it
     /// ([`weigh`](Self::weigh)), and a game whose line is replaced joins them, with the prime above it played
-    /// again from it ([`prime_after`](Self::prime_after)).  A game below the run's first, which the run has no line of,
-    /// is weighed on the best-known file's line, and a repair of it goes to the best-known file alone.  The walk ends
-    /// at the first game that none of `changed` is that near, or at a stop signal, which leaves it to the next run that
-    /// opens the file.
+    /// again from it ([`prime_after`](Self::prime_after)).  It writes the lines of the run's own games in the run's
+    /// file, and those of the games below the run's first in the best-known file alone, never a line of a game at or
+    /// above the run's first that the run has no line of yet ([`repairs`](Self::repairs)).  The walk ends at the first
+    /// game that none of `changed` is that near, or at a stop signal, which leaves it to the next run that opens the
+    /// file.
     fn walk(&mut self, changed: BTreeSet<u32>, on_repair: &mut impl FnMut(&Repair)) -> Result<(), String> {
         let began = Instant::now();
         let walked = self.walk_from(changed, on_repair);
@@ -1357,8 +1626,9 @@ impl Run<'_> {
     }
 
     /// Replaces the line of game `k` if what survives on its board of the line of one of the games `sources`, above
-    /// it, scores more: the heaviest, the nearest on a tie.  The line is the run's, or the best-known file's where the
-    /// run has none of the game.  A game that neither has a line for (the built-in table's, which are proven, stay as
+    /// it, scores more: the heaviest, the nearest on a tie.  The line is the run's, or for a game below the run's first
+    /// the best-known file's, and a game at or above the run's first that the run has no line of yet is not weighed
+    /// ([`repairs`](Self::repairs)).  A game that has no such line (the built-in table's, which are proven, stay as
     /// they are), and a prime or trivial line, are not weighed: a prime follows from the line below it, and a trivial
     /// line is optimal.  Returns whether it replaced the line.
     fn weigh(&mut self, k: u32, sources: &[u32], on_repair: &mut impl FnMut(&Repair)) -> Result<bool, String> {
@@ -1389,9 +1659,10 @@ impl Run<'_> {
         Ok(true)
     }
 
-    /// Plays the prime game k + 1 again from the line of game `k`, if the run or the best-known file has a prime line
-    /// of it and the prime formula on the line of `k` scores more, as it does once that line is repaired; it joins
-    /// `changed` if so.
+    /// Plays the prime game k + 1 again from the line of game `k`, if it has a prime line and the prime formula on the
+    /// line of `k` scores more, as it does once that line is repaired; it joins `changed` if so.  The line is the
+    /// run's, or for a game below the run's first the best-known file's, and a prime at or above the run's first that
+    /// the run has no line of yet is left to its play ([`repairs`](Self::repairs)).
     fn prime_after(
         &mut self,
         k: u32,
@@ -1431,7 +1702,8 @@ impl Run<'_> {
     /// more than the table's) and that they score more than the line they replace, appends the line again with them
     /// ([`repaired_line`], with `prev` for a prime played again) to the run's file, tells the repeats and the games
     /// that follow of them, and hands the repair to `on_repair`.  A repair of the best-known file's line alone, of a
-    /// game the run has no line of, goes to the best-known file only.  Either way the best-known file is offered it.
+    /// game below the run's first that the run has no line of, goes to the best-known file only.  Either way the
+    /// best-known file is offered it.
     fn replace(
         &mut self,
         repair: Repair,
@@ -1449,9 +1721,9 @@ impl Run<'_> {
             return Err(fail(format!("its moves score {score}, above the table's {best}, which is proven")));
         }
         let json = repaired_line(&old.text, &repair, prev)?;
-        let (method, problem) = (old.method, old.problem);
+        let (method, problem, known, descent) = (old.method, old.problem, old.known, old.descent);
         let (moves, promotions, text) = (repair.moves.clone(), repair.promotions.clone(), json.to_string());
-        let stored = Stored { score, moves, promotions, method, problem, text };
+        let stored = Stored { score, moves, promotions, method, problem, known, descent, text };
         if repair.best_known_only {
             let added = match &mut self.best_known {
                 Some(best_known) => best_known.offer(self.name.as_deref(), [(n, &stored)])?,
@@ -1535,18 +1807,17 @@ fn moves_before(
         .collect()
 }
 
-/// The moves for the games `n + 1`, ..., `n + plan.above` that game `n` begins trajectories from: each is this run's
-/// line of the game (`run`), else the file's line, or the best-known file's if that scores more; a game that none of
-/// them has gives none.  The table gives none: a run never takes the proven game above one it plays.
+/// The moves for the games `n + 1`, ..., `n + ABOVE` that game `n` begins trajectories from: each is this run's line of
+/// the game (`run`), else the file's line, or the best-known file's if that scores more; a game that none of them has
+/// gives none.  The table gives none: a run never takes the proven game above one it plays.
 fn moves_above(
     n: u32,
     run: &BTreeMap<u32, Moves>,
     file: &UnsoundFile,
     best_known: Option<&BestKnownFile>,
-    plan: &Plan,
 ) -> Vec<Moves> {
     let moves_of = |game: u32| kept_moves(game, run, file, best_known);
-    (1..=plan.above).filter_map(|j| n.checked_add(j).filter(|&game| game <= super::MAX_N).and_then(moves_of)).collect()
+    (1..=ABOVE).filter_map(|j| n.checked_add(j).filter(|&game| game <= super::MAX_N).and_then(moves_of)).collect()
 }
 
 /// A game's setup ([`set_up`]), its bound ([`Line::bound`]), and for a prime, the board its bound was made on.
@@ -1591,15 +1862,17 @@ impl Ready {
 /// ([`set_up`]) depends on the game, on whether it has moves for n − 1, and on the options, and not on the moves
 /// themselves, so it can be made before the game before it ends; with it go the dive of a searched game's start
 /// (`Job::ready`) and the game's bound ([`Ready`]), which depend on the board alone.  A board is set up once: the game
-/// takes the setup made ahead, and the run keeps its board for the repair.
+/// takes the setup made ahead, and the run keeps its board for the repair, and for the descent, which plays a game
+/// again on it.  The descent plays the games below the last one played, and what the boards keep of the games above
+/// the one it plays stays: the setup made ahead for the next game of the range, and the boards kept above.
 struct Boards {
     opts: SolveOptions,
     /// The setups being made.
     making: Vec<Making>,
-    /// The boards of the run's searched and repeat games, of the last [`REPAIR_REACH`] games it played, and those that
-    /// the repair set up for a game that far below the last ([`board`](Self::board)).
+    /// The boards of the run's searched and repeat games, of the last [`REPAIR_REACH`] games it played and of the
+    /// games above them, and those that the repair set up for a game that far below the last ([`board`](Self::board)).
     kept: BTreeMap<u32, KeptBoard>,
-    /// The last game the run played (0 before the first).
+    /// The last game the run played (0 before the first), which is below others where the descent played it.
     latest: u32,
 }
 
@@ -1615,31 +1888,39 @@ impl Boards {
         Boards { opts: opts.clone(), making: Vec::new(), kept: BTreeMap::new(), latest: 0 }
     }
 
-    /// Starts making the setup of game `n`, which will have moves for n − 1.
-    fn start(&mut self, n: u32) {
+    /// Starts making the setup of game `n`, which will have moves for n − 1, unless it is being made, or the run kept
+    /// the board the game was played from, which the descent plays it again on ([`take`](Self::take)).
+    fn ahead(&mut self, n: u32) {
+        let kept = self.kept.get(&n).is_some_and(|board| board.played.is_some());
+        if kept || self.making.iter().any(|making| making.n == n) {
+            return;
+        }
         let opts = self.opts.clone();
         let make = move || Ready::of(n, &Before::Run, &opts, true);
         self.making.push(Making { n, thread: thread::spawn(make) });
     }
 
     /// The setup of game `n`, with `given` for its moves for n − 1, and its bound: the one made ahead if there is one
-    /// and `given` has moves for n − 1, else one made now with `opts`.
+    /// and `given` has moves for n − 1, or the board the game was played from with such moves if the run kept it, a
+    /// game the descent plays again ([`KeptBoard::ready`]), else one made now with `opts`.
     fn take(&mut self, n: u32, given: &Before, opts: &SolveOptions) -> Result<Ready, Failure> {
         let made = self.making.iter().position(|making| making.n == n).map(|i| self.making.swap_remove(i));
+        let with_moves = matches!(given, Before::Run);
         match made {
-            Some(making) if matches!(given, Before::Run) => {
-                making.thread.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))
-            }
+            Some(making) if with_moves => making.thread.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic)),
             Some(making) => {
                 let _ = making.thread.join();
                 Ready::of(n, given, opts, false)
             }
-            None => Ready::of(n, given, opts, false),
+            None => match self.kept.get(&n).filter(|_| with_moves).and_then(KeptBoard::ready) {
+                Some(ready) => Ok(ready),
+                None => Ready::of(n, given, opts, false),
+            },
         }
     }
 
     /// Keeps `board`, the board of game `n`, which the run has just played, and lets go of those more than
-    /// [`REPAIR_REACH`] games below it.
+    /// [`REPAIR_REACH`] games below it; those above it, where the descent played it, stay.
     fn keep(&mut self, n: u32, board: Option<KeptBoard>) {
         if let Some(board) = board {
             self.kept.insert(n, board);
@@ -1678,16 +1959,18 @@ impl Drop for Boards {
 
 /// Game `n` played in the unsound mode, from the moves for the games before it, `past` ([`moves_before`]: the first is
 /// the moves for `n − 1`, which the start is seeded with, and the others begin trajectories; see the module
-/// documentation, "One game"), and for the games above it that `above` has ([`moves_above`]), which begin
-/// trajectories too; and its line, checked, with the board it set up if it searched or repeated, which the repair may
-/// weigh lines on; `None` if a stop signal ended its rounds.  `gap_below` is the gap of the moves for `n − 1` that the
-/// game starts from, over which the gap grows ([`Line::growth`]).  `earlier` has the lines a repeat may repeat, and is
-/// told of the problem of this game's board.  The setup is the one `boards` made ahead, if it made this game's.  An
-/// error names the game.
+/// documentation, "One game"), for a game the descent plays again its own line as it stands, `own`, which begins the
+/// first trajectory after the start's in each play, and the moves for the games above it that `above` has
+/// ([`moves_above`]), which begin trajectories too; and its line, checked, with the board it set up if it searched or
+/// repeated, which the repair may weigh lines on; `None` if a stop signal ended its rounds.  `gap_below` is the gap of
+/// the moves for `n − 1` that the game starts from, over which the gap grows ([`Line::growth`]).  `earlier` has the
+/// lines a repeat may repeat, and is told of the problem of this game's board.  The setup is the one `boards` made
+/// ahead or kept, if it has this game's.  An error names the game.
 #[allow(clippy::too_many_arguments)]
 fn play(
     n: u32,
     past: &[Option<Moves>],
+    own: Option<&Moves>,
     above: &[Moves],
     gap_below: Option<u64>,
     opts: &SolveOptions,
@@ -1705,6 +1988,7 @@ fn play(
     let ceiling = before.map(|before| ceiling_over(n, before));
     let Ready { set, bound, prime } = boards.take(n, &given, opts).map_err(Failure::message)?;
     let mut line = Line::blank(n, plan, opts, ceiling, bound);
+    let own = own.map(|own| own.moves.as_slice());
     // The stop on growth: from the end of the rounds of the least level on, a score whose gap is within the plan's T of
     // the gap below, after the last `STOP_QUIET` rounds that raised nothing.
     let floor = plan.stop_floor();
@@ -1724,10 +2008,11 @@ fn play(
         }
         SetUp::Search(set, problem) => {
             let repeated = opts.tactics.same_search.then(|| earlier.find(n, &problem)).flatten();
+            // The board a game is played from with moves for n − 1 is the one the descent plays it again on.
+            let kept = if before.is_some() { KeptBoard::played(&set, &problem) } else { KeptBoard::of(&set) };
             earlier.remember(n, problem);
             line.setup = Some(set.setup);
             line.in_the_bag = Some(set.in_the_bag);
-            let kept = KeptBoard::of(&set);
             if let Some(m) = repeated {
                 let promotions = earlier.promotions(m).expect("a game that find found").to_vec();
                 (line.method, line.repeats) = (Method::Repeat, Some(m));
@@ -1745,7 +2030,7 @@ fn play(
                 // The games a trajectory may begin from, from n − 1 down, then from n + 1 up.
                 let others: Vec<(u32, &[u32])> =
                     past.iter().flatten().chain(above).map(|m| (m.n, m.moves.as_slice())).collect();
-                if !searched(&mut line, &kept, seed, &others, &clock, &enough) {
+                if !searched(&mut line, &kept, seed, own, &others, &clock, &enough) {
                     return Ok(None);
                 }
             }
@@ -1773,7 +2058,7 @@ fn play(
     let mut unseeded = Line { unseeded: true, ..Line::blank(n, plan, opts, None, bound) };
     (unseeded.setup, unseeded.in_the_bag) = (Some(board.setup), Some(board.in_the_bag));
     let others: Vec<(u32, &[u32])> = above.iter().map(|m| (m.n, m.moves.as_slice())).collect();
-    if !searched(&mut unseeded, &board, None, &others, &clock, &|_, _, _| false) {
+    if !searched(&mut unseeded, &board, None, own, &others, &clock, &|_, _, _| false) {
         return Ok(None);
     }
     conclude(&mut unseeded, None, optimal).map_err(|e| format!("n={n}, unseeded: {e}"))?;
@@ -1806,20 +2091,21 @@ fn growth(bound: u64, score: u64, below: u64) -> i64 {
 }
 
 /// The search of a game on `board` into `line`: the start, seeded with the moves `seed` for n − 1 if any, and the rounds
-/// of `line.plan` on `line.threads` threads, with trajectories from what survives of the moves of `others`, ended once
-/// `enough` says so of the promotion sum and the work of the rounds so far ([`Job::improve`]); `clock` is the play's
-/// seconds so far.  Fills in what the line records of the search, and its moves and promotions; false if a stop signal
-/// ended the rounds.
+/// of `line.plan` on `line.threads` threads, with trajectories from what survives of the game's own moves `own`, if
+/// given, and of the moves of `others`, ended once `enough` says so of the promotion sum and the work of the rounds so
+/// far ([`Job::improve`]); `clock` is the play's seconds so far.  Fills in what the line records of the search, and its
+/// moves and promotions; false if a stop signal ended the rounds.
 fn searched(
     line: &mut Line,
     board: &KeptBoard,
     seed: Option<&[u32]>,
+    own: Option<&[u32]>,
     others: &[(u32, &[u32])],
     clock: &dyn Fn() -> f64,
     enough: &dyn Fn(u64, u64, u64) -> bool,
 ) -> bool {
     let bag = board.in_the_bag;
-    let improved = board.job.improve(seed, others, &line.plan, line.threads, clock, enough);
+    let improved = board.job.improve(seed, own, others, &line.plan, line.threads, clock, enough);
     if improved.interrupted {
         return false;
     }
@@ -1910,13 +2196,9 @@ mod tests {
     #[test]
     fn the_plan_tilts_goes_back_and_widens_as_the_races_chose() {
         let plan = Plan::default();
-        assert_eq!((TILT, BACK, WIDEN), (25, 8, 4));
+        assert_eq!((TILT, BACK, ABOVE, WIDEN), (25, 8, 8, 4));
         assert_eq!((plan.effort, plan.seed, plan.round_work), (MIN_EFFORT, 1, ROUND_WORK));
-        assert_eq!(
-            (plan.above, plan.known_to),
-            (0, None),
-            "no trajectory begins from above, and the whole table is known"
-        );
+        assert_eq!(plan.known_to, None, "the whole table is known");
         let growth = (DEFAULT_STOP_GROWTH, plan.stop_growth, STOP_QUIET, PUSH_GROWTH);
         assert_eq!(growth, (Some(25), Some(25), 4, 25), "the stop and the push on growth are on");
         // The rounds search with the plan's seed, the built-in tilt and widening, and the finder's other options.
@@ -1941,15 +2223,6 @@ mod tests {
     }
 
     #[test]
-    fn a_number_of_games_above_is_a_whole_number_in_range() {
-        for text in ["9", "-1", "", "a", "1.5", "1,2", " 1", "99999999999"] {
-            let err = parse_above(text).unwrap_err();
-            assert!(err.starts_with("--above takes J, a whole number from 0 to 8"), "{text:?}: {err}");
-        }
-        assert_eq!((parse_above("0"), parse_above("4"), parse_above("8")), (Ok(0), Ok(4), Ok(8)));
-    }
-
-    #[test]
     fn a_growth_is_a_whole_number_of_points_or_off() {
         // The stop's T is a distance from the gap below, 0 or more.
         assert_eq!(["0", "25", "off"].map(parse_stop_growth), [Ok(Some(0)), Ok(Some(25)), Ok(None)]);
@@ -1964,7 +2237,7 @@ mod tests {
 
     #[test]
     fn a_plan_with_an_option_out_of_range_is_refused() {
-        let plan = Plan { effort: 3, above: 8, ..Plan::default() };
+        let plan = Plan { effort: 3, ..Plan::default() };
         assert_eq!(check_plan(&plan), Ok(()));
         let refused = |plan: Plan| check_plan(&plan).unwrap_err();
         for effort in [MIN_EFFORT - 1, MAX_EFFORT + 1] {
@@ -1972,7 +2245,6 @@ mod tests {
                 format!("--effort takes L, the level of effort, a whole number from 1 to 6: got \"{effort}\"");
             assert_eq!(refused(Plan { effort, ..plan }), message);
         }
-        assert!(refused(Plan { above: MAX_ABOVE + 1, ..plan }).starts_with("--above takes J"));
         assert!(refused(Plan { round_work: 0, ..plan }).contains("is 0"));
         // Any cut of the table, and any stop on growth, is a plan.
         let cut = Plan { known_to: Some(0), stop_growth: Some(9), ..plan };
@@ -1997,6 +2269,45 @@ mod tests {
             Json::array([Origin::Start, Origin::Game(4224)].map(Origin::to_json)).to_string(),
             r#"["start",4224]"#
         );
+    }
+
+    #[test]
+    fn a_descent_goes_down_from_the_lowest_root_it_has_not_descended_from_through_the_window_below_it() {
+        let set = |games: &[u32]| games.iter().copied().collect::<BTreeSet<u32>>();
+        let none = set(&[]);
+        // Gains in four streaks, 100 to 102, 106, 115 to 116 and 130, of a run from 100.  The root of each streak is
+        // its first game.  The window of 100 is empty, so the run never descends from it; 106's is cut at 100.
+        let gains = set(&[100, 101, 102, 106, 115, 116, 130]);
+        assert_eq!(next_descent(&gains, 100, &none), Some((106, 100..106)));
+        // The window of a root is the ABOVE games below it, and the run descends from each root once, the lowest first.
+        assert_eq!(next_descent(&gains, 100, &set(&[106])), Some((115, 107..115)));
+        assert_eq!(next_descent(&gains, 100, &set(&[106, 115])), Some((130, 122..130)));
+        assert_eq!(next_descent(&gains, 100, &set(&[106, 115, 130])), None);
+        // A game of a window that gains while its game below does not is a new root, below the one descended from.
+        let more = set(&[100, 101, 102, 104, 106, 115, 116, 130]);
+        assert_eq!(next_descent(&more, 100, &set(&[106])), Some((104, 100..104)));
+        // A game below the run's first is none of the run's: in a run from 103, the window of 106 starts at 103; in a
+        // run from 105, which gains, 106 is no root.
+        assert_eq!(next_descent(&gains, 103, &none), Some((106, 103..106)));
+        assert_eq!(next_descent(&set(&[105, 106]), 105, &none), None);
+        assert_eq!(next_descent(&none, 1, &none), None);
+    }
+
+    #[test]
+    fn a_line_follows_the_line_before_it_as_a_repair_that_scores_more_or_a_descent_that_scores_no_less() {
+        let again = |root, was| Some(Descent { root, was });
+        assert_eq!(follows(7, None, 50, None, None), Ok(()), "a game's first line");
+        assert_eq!(follows(7, Some(50), 60, Some(50), None), Ok(()), "a repair of the line before it");
+        assert_eq!(follows(7, Some(50), 50, None, again(9, 50)), Ok(()), "the descent's play, as good");
+        assert_eq!(follows(7, Some(50), 60, None, again(9, 50)), Ok(()), "the descent's play, better");
+        let refused = |before, score, was, descent| follows(7, before, score, was, descent).unwrap_err();
+        assert!(refused(Some(50), 49, None, again(9, 50)).contains("scores 49, less than the line before it, 50"));
+        assert!(refused(Some(50), 60, None, again(9, 40)).contains("that scored 40, not 50"));
+        assert!(refused(None, 60, None, again(9, 40)).contains("which has no line before it"));
+        assert!(refused(Some(50), 60, None, None).contains("no repair and not the descent's"));
+        assert!(refused(Some(50), 60, Some(40), None).contains("a repair of a line of n=7 that scored 40, not 50"));
+        // The record of the descent in a line.
+        assert_eq!(Descent { root: 9, was: 50 }.to_json().to_string(), r#"{"root":9,"was":50}"#);
     }
 
     #[test]

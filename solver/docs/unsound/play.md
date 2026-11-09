@@ -22,8 +22,8 @@ The setup does not depend on the moves for n − 1, so a run makes each game's s
 start and the game's [bound](shortfalls.md#the-bound-and-the-gap), on a thread of its own while the game before it
 plays.  On many threads they would otherwise be a large part of the time of a run at a low level of effort.
 
-A line depends on the game, its start, the moves it starts from, the level, the seed and `--above`, and not on the
-threads or the machine, but for its times and threads.
+A line depends on the game, its start, the moves it starts from, the level and the seed, and not on the threads or the
+machine, but for its times and threads.
 
 ### The rounds
 
@@ -91,12 +91,11 @@ lines' `budget` gives the work.
 
 ### The options that shape the rounds
 
-Three settings of the rounds are built in, so that a user names a level of effort and nothing else: the games back that
-the trajectories begin from (8), the share of the neighborhoods that are tilted (25 percent), and the rounds after which
-a stalled trajectory widens its neighborhoods (4).  The fourth, `--above`, is an option, and off unless given.  A game
-follows one *trajectory* of incumbents, the one that begins from the start; the settings change what the rounds search,
-and so the line, and every value of them keeps what the rounds guarantee above: a level runs the rounds of the levels
-below it first.
+Four settings of the rounds are built in, so that a user names a level of effort and nothing else: the games back that
+the trajectories begin from (8), the games above them (8), the share of the neighborhoods that are tilted (25 percent),
+and the rounds after which a stalled trajectory widens its neighborhoods (4).  A game follows one *trajectory* of
+incumbents, the one that begins from the start; the settings change what the rounds search, and so the line, and every
+value of them keeps what the rounds guarantee above: a level runs the rounds of the levels below it first.
 
 **Back: 8 games.**  A game adds a trajectory for each distinct set that survives of the moves for the games n − 1, n − 2,
 ..., n − 8: their promotions that can still be promoted here, from the largest down, as the proven finder's seed rounds
@@ -110,11 +109,13 @@ The line says which games the trajectories began from (`trajectories`), and the 
 moves, whether or not it began one (`survivor_scores`).  A game that is not seeded follows the start's trajectory
 alone.
 
-**`--above J`** adds, after those of the games back, a trajectory for each distinct set that survives of the moves for
-the games n + 1, ..., n + J: the moves above n are left out, and what survives of the rest is taken as for the games
-back.  The moves are the run's lines, else FILE's, else the best-known file's; the built-in table gives none.  A game
-played in order has no line above it in its own run, so the option is for a run over a range whose files hold lines
-above it; [the repair](shortfalls.md#the-repair) is what a run takes from the lines above it.
+**Above: 8 games.**  A game adds, after those of the games back, a trajectory for each distinct set that survives of the
+moves for the games n + 1, ..., n + 8: the moves above n are left out, and what survives of the rest is taken as for the
+games back.  The moves are the run's lines, else FILE's, else the best-known file's; the built-in table gives none.  A
+game played in order has no line above it in its own run, so a first pass has none of these trajectories.  They come
+from the lines of a pass over a range whose files hold lines above it, and from [the
+descent](shortfalls.md#the-descent), which plays the 8 games below a gain again; [the repair](shortfalls.md#the-repair)
+takes what survives of the lines above too.
 
 **Tilt: 25 percent.**  A quarter of a round's neighborhoods free the small promotions more often than the large ones,
 with the same number freed as without the tilt; the rest free them uniformly.  Neighborhood k of a round of T
@@ -131,10 +132,10 @@ returns to stage 0 when its incumbent grows heavier.  A trajectory's stage in a 
 it.  The line records the rounds each trajectory spent at each stage (`stage_rounds`) and the stage of each
 improvement.
 
-**Where the values come from.**  Two races chose the three settings together, on the 251 hard games of 3441-5060 (the
-entries define them), at equal work.  With back 8, tilt 25 and widening 4, the share of those games that reach the
-score that the built-in table has is 87.3, 91.2, 94.0, 95.2, 96.8 and 97.6% at the levels 1 to 6, against 78.1, 79.7,
-81.3, 82.9, 86.1 and 89.6% with none of the three.  [The first
+**Where the values come from.**  Two races chose the games back, the tilt and the widening together, on the 251 hard
+games of 3441-5060 (the entries define them), at equal work.  With back 8, tilt 25 and widening 4, the share of those
+games that reach the score that the built-in table has is 87.3, 91.2, 94.0, 95.2, 96.8 and 97.6% at the levels 1 to 6,
+against 78.1, 79.7, 81.3, 82.9, 86.1 and 89.6% with none of the three.  [The first
 race](https://github.com/bvchess/taxman-notebook/blob/main/search/tilted-back-and-wider-rounds-2026-11/README.md)
 chose the three together; [the
 second](https://github.com/bvchess/taxman-notebook/blob/main/search/a-share-of-tilted-neighborhoods-2026-11/README.md)
@@ -142,7 +143,11 @@ chose the tilted share, since at every level a tilt of 25 and one of 50 are with
 at the low levels, though not by a significant margin.  The shares of the ladder come from [a race of larger
 neighborhoods](https://github.com/bvchess/taxman-notebook/blob/main/search/larger-neighborhoods-and-a-second-base-2026-11/README.md),
 which cost 10 to 22 times as much per round as the first stage's and reach games that it misses, so a trajectory moves
-to them only after it stalls.
+to them only after it stalls.  The games above come from [a second pass from the lines
+above](https://github.com/bvchess/taxman-notebook/blob/main/search/a-second-pass-from-the-lines-above-2026-11/README.md):
+from a best-known file that left 33 of the games 3001-5060 below opt(n), in 10 streaks, a pass over the windows around
+them at level 3 closed 26 of the 33 and 8 of the streaks for 24.9 M work with trajectories from the 8 games above, and
+16 and 5 for 25.8 M without them.
 
 ### The run's ceiling
 
