@@ -36,7 +36,7 @@ export function el(name, attrs = {}, parent = null) {
 export const SIZE = { circle: 15, square: 13, ring: 4.5, gap: 2, tag: 8.5, head: 8, depth: 3 };
 
 /** The shape axis of a number: 0 a square, 1 a circle, halfway a plain number, one the story has not yet sorted into
- *  source or factor.  A promotion moves a number from 0 to 1. */
+ *  a source or the bottom half.  A promotion moves a number from 0 to 1. */
 export const SHAPE = { square: 0, plain: 0.5, circle: 1 };
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -95,7 +95,7 @@ export const LOOKS = {
   source: { shape: SHAPE.circle },
   move: { shape: SHAPE.circle },
   factor: { shape: SHAPE.square },
-  plain: { shape: SHAPE.plain }, // a number the story has not yet sorted into source or factor
+  plain: { shape: SHAPE.plain }, // a number the story has not yet sorted into a source or the bottom half
   kept: { kept: 1 },
   rejected: { dashed: 1 },
   candidate: { ring: 1 },

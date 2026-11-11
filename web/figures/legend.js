@@ -102,8 +102,18 @@ function columnsSample(r) {
  *  rendering has no such mark).  core marks the entries the chapter's own legend shows. */
 export const ENTRIES = [
   { key: 'move', name: 'Circle', words: 'a source, a number above n/2, or a move', use: 'Every number that is or could be a move.', draw: one(21, 'move'), core: true },
-  { key: 'factor', name: 'Square', words: 'a factor: a number up to n/2', use: 'Every number up to n/2 that the player does not play, once the story has told factors from sources.', draw: one(7, 'factor'), core: true },
-  { key: 'plain', name: 'Rounded square', words: 'a plain number: one the story has not yet sorted into source or factor', use: 'Before the sources of chapter 3: the pot and the layers of game 21, and the games of the introduction and chapter 1.', draw: one(14, 'plain'), core: true },
+  {
+    key: 'factor', name: 'Square', words: 'a number of the bottom half, up to n/2',
+    use: 'Every number up to n/2 that the player does not play, from the sources of chapter 3 on.',
+    draw: one(7, 'factor'), core: true,
+  },
+  {
+    key: 'plain', name: 'Rounded square',
+    words: 'a plain number: one the story has not yet sorted into the sources or the bottom half',
+    use: 'Before the sources of chapter 3: the pot and the layers of game 21, and the games of the introduction and ' +
+      'chapter 1.',
+    draw: one(14, 'plain'), core: true,
+  },
   { key: 'kept', name: 'Gray fill', words: 'kept: a source descending greedy keeps, or a move the player plays', use: 'Once a figure has decided a number is in the set.', draw: one(19, 'move', 'kept'), core: true },
   { key: 'rejected', name: 'Hollow and dashed', words: 'rejected: a source the player does not play', use: 'A source descending greedy drops, or a move the player leaves out. Faded, it is a number the game leaves out: a dashed circle above n/2, a square at or below it; with a halo, a move the player gives up.', draw: one(17, 'move', 'rejected'), core: true },
   { key: 'candidate', name: 'Double outline', words: 'a candidate: a factor the player could promote', use: 'A factor whose frame can spare it and whose frame in front can take it on.', draw: one(9, 'factor', 'candidate'), core: true },

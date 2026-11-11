@@ -1,6 +1,6 @@
 // Play the game: the pot as a tray of sockets, and the two trays that fill as the reader plays.  The numbers are
 // raised tokens, since the reader takes them.  Every piece is plain, in the pot and in the trays: the game sorts no number
-// into source or factor, and the trays and their colors tell a move from its tax.
+// into a source or the bottom half, and the trays and their colors tell a move from its tax.
 //
 // The game itself, its controls and its caption are js/play.js's; this file draws its board.  A legal number stands
 // in its socket; one that is not lies flat and refuses to move.  Taking back, or starting over, sends the pieces back to

@@ -28,8 +28,8 @@ const CENTER_X = W / 2;
 /** The named states, in order, and the title of each. */
 export const STOPS = ['pot', 'layers', 'sources', 'greedy', 'layered', 'frames', 'freedoms', 'promote', 'play'];
 const TITLES = {
-  pot: 'The pot', layers: 'Layers', sources: 'Sources and factors', greedy: 'Descending greedy', layered: 'Layers',
-  frames: 'Frames', freedoms: 'Freedoms and candidates', promote: 'The promotion', play: 'The game',
+  pot: 'The pot', layers: 'Layers', sources: 'Sources and the bottom half', greedy: 'Descending greedy',
+  layered: 'Layers', frames: 'Frames', freedoms: 'Freedoms and candidates', promote: 'The promotion', play: 'The game',
 };
 // The word for a state on the timeline and on the links that open it: its name, but layers for layered, which is
 // never on a page with the layers state.
@@ -45,12 +45,12 @@ const stopLabel = (name) => (name === 'layered' ? 'layers' : name);
 const potAt = (m) => [CENTER_X + (((m - 1) % 7) - 3) * 58, 112 + Math.floor((m - 1) / 7) * 56];
 
 // The layers: one column a layer, layer 0 at the right and layer 4 at the left, each ascending from the bottom and
-// centered, so that once the columns are cut at n/2 the sources, the top half, stand above the line and the factors
-// below it.
+// centered, so that once the columns are cut at n/2 the sources, the top half, stand above the line and the bottom
+// half below it.
 const COLUMN_X = [516, 397, 278, 159, 40];
 const MID_Y = 154; // the middle of the columns, and the line at n/2 once they are cut
 const STEP = 34;
-const SPLIT = 22; // once cut, how far the sources stand above the line and the factors below it
+const SPLIT = 22; // once cut, how far the sources stand above the line and the bottom half below it
 
 // The frames, side by side in boxes of one size, the larger numbers higher where the rule below allows.  Rows are 48
 // apart, and a factor stands level with the factor it divides in the frame in front (4 with 2, 9 with 3, 7 with 1), so
@@ -161,7 +161,7 @@ const closedPayments = (f) => {
 };
 
 // Each layer's column, ascending from the bottom; once split at n/2, the sources stand above the line, the smallest
-// nearest it, and the factors below it, the largest nearest it.
+// nearest it, and the bottom half below it, the largest nearest it.
 function layersAt(split) {
   const columns = [[], [], [], [], []];
   for (const x of numbers) columns[M.omega(x)].push(x);
@@ -221,9 +221,9 @@ function buildStates(f) {
   for (let k = 0; k <= 4; k++) layers[`layer${k}`] = { x: COLUMN_X[k], y: NAME_Y, at: [0.5, 1] };
   S.layers = layers;
 
-  // Sources and factors: each column cut at n/2, the sources above the line and the factors below it.  The line is
-  // named at its left end, below it, under 16; the words for its two sides sit clear of the one line that crosses
-  // there.
+  // Sources and the bottom half: each column cut at n/2, the sources above the line and the bottom half below it.  The
+  // line is named at its left end, below it, under 16; the words for its two sides sit clear of the one line that
+  // crosses there.
   const split = { _duration: 1100 };
   for (const x of numbers) split[x] = { ...pos(splitAt[x]), shape: shapeOf(x), halo: isSource(x) ? 1 : 0 };
   for (const [a, b] of allEdges) split[`e${a}-${b}`] = { faded: isSource(a) ? 0 : 0.6 };
@@ -411,7 +411,9 @@ function captions(f) {
   return {
     pot: `The pot holds the numbers 1 to ${N}.`,
     layers: 'Each number stands in the column of its layer, its count of prime factors, with layer 1 at the right. A line runs rightward from each number to each of its maximal factors: 12 to 6 and 4.',
-    sources: `The line cuts each column at n/2. Above it are the sources, ${M.sources(N)[0]} to ${N}: they divide no other number on the board, so no move takes them as tax. Below it are the factors, 1 to ${half}.`,
+    sources: `The line cuts each column at n/2. Above it are the sources, ${M.sources(N)[0]} to ${N}: ` +
+      'they divide no other number on the board, so no move takes them as tax. ' +
+      `Below it is the bottom half, 1 to ${half}.`,
     greedy: `From ${N} down, descending greedy keeps ${listWords(f.keptDown)}, each still playable with those it kept before. It rejects ${listWords(f.rejectedDown)}: their one maximal factor, 1, already pays for ${f1.kept[0]}. U* scores ${f.inTheBag}.`,
     layered: 'Game 21 as descending greedy left it, in its layers, with a line cutting them at n/2: the sources it kept in gray, those it ' +
       'rejected dashed. The lines of each source run to factors one layer down, in the column to its right.',

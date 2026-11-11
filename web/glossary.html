@@ -18,285 +18,261 @@
 
 <header class="essay-head para">
   <h1>Glossary</h1>
-  <p class="lede">The words of this site, each with its meaning and an example.  The groups follow the order of the
-  story, and each idea has one name.</p>
+  <p class="lede">The words of this site, each with its meaning and an example.  Each idea has one name.</p>
 </header>
 
-<section class="chapter" id="the-game" data-toc="the-game" aria-labelledby="h-g-game">
-  <h2 id="h-g-game">The game</h2>
-  <div class="para">
-    <aside class="note tech" aria-label="Divisors and opt(n)">
-      <div class="note-head"><span class="note-name">Divisors and opt(n)</span></div>
-      <p>A divisor here is always a proper one, smaller than the move.  opt(n) is a maximum over every legal game of
-      n, and opt(1), opt(2), opt(3), … is <a href="https://oeis.org/A019312">A019312</a> in the OEIS.</p>
-    </aside>
-    <dl class="glossary">
-      <dt id="game">game n</dt>
-      <dd>Taxman played on the numbers 1 to n.  Game 21 is Taxman on 1 to 21.  A <em>game</em> also means one play
-      of it, as in “an optimal game”.</dd>
-      <dt id="board">board</dt>
-      <dd>The numbers 1 to n of game n.</dd>
-      <dt id="proper-divisor">divisor, proper divisor</dt>
-      <dd>A divisor of a number divides it with nothing left over.  A proper divisor is one smaller than the number
-      itself: the proper divisors of 12 are 1, 2, 3, 4 and 6.  In Taxman, a divisor is always a proper one.</dd>
-      <dt id="pot">pot</dt>
-      <dd>The numbers that neither you nor the taxman has taken yet.  It starts as the whole board.</dd>
-      <dt id="move">move</dt>
-      <dd>A number you take.  It must still have a divisor in the pot, and you score it.</dd>
-      <dt id="tax">tax</dt>
-      <dd>The divisors of a move still in the pot, which the taxman takes with it.  When no move remains, the taxman
-      takes the rest of the pot too.</dd>
-      <dt id="score">score</dt>
-      <dd>The sum of your moves.  You beat the taxman when your score is higher than the total he collects.</dd>
-      <dt id="opt">opt(n)</dt>
-      <dd>The best score anyone can make in game n.  opt(10) = 40.</dd>
-      <dt id="optimal-game">optimal game</dt>
-      <dd>A game that scores opt(n).</dd>
-      <dt id="taxman-sequence">Taxman sequence</dt>
-      <dd>The best scores opt(1), opt(2), opt(3), … in order.</dd>
-    </dl>
-  </div>
-</section>
-
-<section class="chapter" id="sets" data-toc="sets" aria-labelledby="h-g-sets">
-  <h2 id="h-g-sets">Sets and payments</h2>
-  <div class="para">
-    <aside class="note tech" aria-label="Maximal factors and schemes">
-      <div class="note-head"><span class="note-name">Maximal factors and schemes</span></div>
-      <p>The maximal factors of x are x/p for each prime p dividing x.  A payment scheme of a set S gives each member
-      a distinct maximal factor outside S, and a set is playable iff it has a scheme whose precedence, which says what
-      the player must play before what, has no cycle.  S*(n) is an optimal set of game n, and ΣS the sum of a set S.</p>
-    </aside>
-    <dl class="glossary">
-      <dt id="playable">playable</dt>
-      <dd>A set of numbers that the player can take as moves, every one of them, in some order.  {9, 15} is playable on the board of game
-      21: 9 first, then 15.</dd>
-      <dt id="optimal-set">optimal set</dt>
-      <dd>The set of moves of an optimal game, and so a playable set with the largest sum.  Most games have one; from
-      game 425 on, some have two or three.</dd>
-      <dt id="weight">weight</dt>
-      <dd>The sum of a set's members, the score it earns as moves.  A <em>heaviest</em> set has the largest
-      weight.</dd>
-      <dt id="maximal-factor">maximal factor</dt>
-      <dd>A number divided by one of its primes.  12 has the maximal factors 6 and 4, 9 has only 3, and a prime has
-      only 1.  A move is legal exactly when one of its maximal factors is still in the pot.</dd>
-      <dt id="maximal-factor-graph">maximal-factor graph</dt>
-      <dd>The board as a directed graph, with an edge from each number to each of its maximal factors.  Every edge leads
-      to a smaller number, so the figures draw the edges as lines without arrowheads.  Each number the player takes
-      leaves the graph with its edges.  A move is legal exactly when an edge still leads from it, and its tax is
-      everything it still reaches along its edges.</dd>
-      <dt id="pays-for">pays for</dt>
-      <dd>A maximal factor of a move, still in the pot when the player makes the move, <em>pays for</em> it.  Two moves
-      can never share a payment.</dd>
-      <dt id="payment-scheme">payment scheme</dt>
-      <dd>A choice, for each number of a set, of a maximal factor outside the set to pay for it, no two the same.</dd>
-      <dt id="peel">peel</dt>
-      <dd>The quick test of whether a set is playable.  It pairs numbers with their payments one at a time by two
-      safe steps: a number with only one maximal factor left to pay with takes it (a <em>front move</em>), and a
-      factor that only one number can still use goes to that number (a <em>back move</em>).  The set is playable
-      exactly when peel pairs every number.</dd>
-      <dt id="loop">loop</dt>
-      <dd>A ring of numbers and the maximal factors they could pay with, with a line from each to the next, that comes
-      back to where it started.  10, 15, 21 and 14 make one with their primes: 2 – 10 – 5 – 15 – 3 – 21 – 7 – 14 – 2.
-      Numbers with two such factors each are not playable if they make a loop.  Here the first one the player plays
-      takes two of the four primes as tax, which leaves two for the other three.</dd>
-      <dt id="forest">forest</dt>
-      <dd>Numbers and the maximal factors they could pay with, with lines between them and no loop among them.  Numbers
-      with two such factors each are playable exactly when they form a forest with those factors.  10, 15 and 21 alone
-      make 2 – 10 – 5 – 15 – 3 – 21 – 7, with no loop, and they are playable: 10, then 15, then 21.</dd>
-    </dl>
-  </div>
-</section>
-
-<section class="chapter" id="the-chain" data-toc="the-chain" aria-labelledby="h-g-chain">
-  <h2 id="h-g-chain">The chain</h2>
-  <div class="para">
-    <aside class="note tech" aria-label="The chain’s formulas">
-      <div class="note-head"><span class="note-name">The chain’s formulas</span></div>
-      <p>The ceiling is opt(n − 1) + n.  At a prime p, opt(p) = opt(p − 1) + p − q(p − 1), where q(p − 1) is the
-      largest prime below p.  A repeat's answer carries over given statement U at n.</p>
-    </aside>
-    <dl class="glossary">
-      <dt id="chain">chain</dt>
-      <dd>The games from game 1 up, which we solve in order, each from an optimal game of the one before.</dd>
-      <dt id="ceiling">ceiling</dt>
-      <dd>n more than the best score of game n − 1.  No score in game n can beat it, so a game that reaches it is
-      optimal.</dd>
-      <dt id="prime-formula">prime formula</dt>
-      <dd>When n is an odd prime, take an optimal game of n − 1 and play n in place of the largest prime below n.  The
-      result is an optimal game of n, and the score rises by the difference of the two primes.</dd>
-      <dt id="repeat">repeat</dt>
-      <dd>A game that poses the same search problem as an earlier game, so the earlier game's answer carries
-      over.</dd>
-      <dt id="fits">fits</dt>
-      <dd>n fits into an optimal set of game n − 1 when the set is still playable with n added.  Then game n is at
-      its ceiling: 10 fits into game 9's optimal set, and 12 does not fit into game 11's.</dd>
-      <dt id="search-problem">search problem</dt>
-      <dd>What remains to choose in a game once it has its frames: the frames, the candidates and how many of them
-      the player may promote.  Two games that pose the same search problem have the same best promotions.</dd>
-      <dt id="cofactor">cofactor</dt>
-      <dd>n divided by its largest prime factor: 30 = 6 · 5 has the cofactor 6.  One can usually tell from it whether a
-      game needs a search.</dd>
-    </dl>
-  </div>
-</section>
-
-<section class="chapter" id="the-top-half" data-toc="the-top-half" aria-labelledby="h-g-top">
-  <h2 id="h-g-top">The top half</h2>
-  <div class="para">
-    <aside class="note tech" aria-label="Sources, layers and statement U">
-      <div class="note-head"><span class="note-name">Sources, layers and statement U</span></div>
-      <p>The sources of game n are the s with n/2 &lt; s ≤ n, and the factors are 1 to ⌊n/2⌋.  The layer of x is
-      Ω(x), its prime factors counted with multiplicity.  Statement U at n says that some optimal set of n contains
-      every member of U* in layers 3 and up.</p>
-    </aside>
-    <dl class="glossary">
-      <dt id="source">source</dt>
-      <dd>A number above n/2.  It divides nothing else on the board, so no move takes it as tax.  Either the player
-      plays it, or the taxman takes it at the end.  On the board of game 21 the sources are 11 to 21.</dd>
-      <dt id="factor">factor</dt>
-      <dd>A number up to n/2.  It divides some larger number on the board, so a move can take it as tax, and any factor
-      but 1 can also be a move.</dd>
-      <dt id="layer">layer</dt>
-      <dd>A number's count of prime factors, with repeats.  12 = 2 · 2 · 3 is in layer 3, every prime is in layer 1,
-      and 1 alone is in layer 0.</dd>
-      <dt id="descending-greedy">descending greedy</dt>
-      <dd>The pass that chooses the sources.  From the largest down, it keeps each source that is still playable with
-      the ones it has kept.</dd>
-      <dt id="u-star">U*</dt>
-      <dd>The sources that descending greedy keeps.  In game 21, U* is 12, 14, 15, 16, 18, 19, 20 and 21.</dd>
-      <dt id="statement-u">statement U</dt>
-      <dd>The one open statement between our model of the game and the game itself.  It says that some optimal game
-      plays every number of U* with three or more prime factors.  The prover proves it in every game it reaches, and it
-      is open in general.</dd>
-      <dt id="top-half">top half</dt>
-      <dd>The numbers above n/2, the sources, and the part of the score they make.  In the games that need a search, it is about 93% of the score.</dd>
-      <dt id="exchange-property">exchange property</dt>
-      <dd>What makes a greedy choice safe in general.  Whenever one playable set is smaller than another, some member
-      of the larger one can join the smaller one, and the result is still playable.  The playable sets of
-      sources lack it in game 2,873.</dd>
-    </dl>
-  </div>
-</section>
-
-<section class="chapter" id="frames" data-toc="frames" aria-labelledby="h-g-frames">
-  <h2 id="h-g-frames">Frames</h2>
-  <div class="para">
-    <aside class="note tech" aria-label="Frames, freedoms and promotion sets">
-      <div class="note-head"><span class="note-name">Frames, freedoms and promotion sets</span></div>
-      <p>A frame is a connected component of the graph that joins each source to its maximal factors.  A frame's
-      freedoms are its factors less its moves.  A promotion set is a set of candidates that the player can promote
-      together, keeping every frame winnable.</p>
-    </aside>
-    <dl class="glossary">
-      <dt id="frame">frame</dt>
-      <dd>A group of sources with every factor that can pay for them, a small game inside the big one.  Game 21 has
-      four.  We number the frames with freedoms from the front, frame 0 first: in game 21, frame 0 has 14, 15 and
-      21, and frame 1 has 12, 18 and 20.  In a larger game, we collapse frames with freedoms at the same distance from
-      the front into a single frame, with one number.</dd>
-      <dt id="in-front">in front of</dt>
-      <dd>Frame A is in front of frame B when some number of B has a maximal factor in A, as 9 has 3 in game 21.
-      A game plays the frames in front first, and in the figures they sit to the right.</dd>
-      <dt id="freedom">freedom</dt>
-      <dd>A factor that a frame can spare.  Each move of a frame needs a factor of its own to pay for it, so a frame
-      has as many freedoms as it has factors beyond its moves: frame 0 of game 21 has four factors and three moves,
-      and one freedom.  A frame with none is <em>closed</em>.</dd>
-      <dt id="candidate">candidate</dt>
-      <dd>A factor that its frame can spare and the frame in front of it can take on.  Game 21 has the candidates 4 and
-      9.</dd>
-      <dt id="promote">promote</dt>
-      <dd>To play a factor as a move.  A promoted factor leaves its frame and becomes a move of the frame in front,
-      where one of its maximal factors pays for it.  An optimal game of 21 promotes 9 from frame 1 into frame 0, where
-      3 pays for it.</dd>
-      <dt id="frame-model">frame model</dt>
-      <dd>The game as frames, with U* as its sources, so that the promotions are all that remains to choose.  Its
-      best score is the best score of the game when statement U holds.</dd>
-      <dt id="closed">closed</dt>
-      <dd>A frame with as many factors as moves, so it has none to spare.  It takes no part in the search.</dd>
-      <dt id="promotion-set">promotion set</dt>
-      <dd>A set of candidates that the player can promote together, with every frame still able to play all of its
-      moves.</dd>
-    </dl>
-  </div>
-</section>
-
-<section class="chapter" id="the-search" data-toc="the-search" aria-labelledby="h-g-search">
-  <h2 id="h-g-search">The search</h2>
-  <dl class="glossary">
-    <dt id="search">search</dt>
-    <dd>The program's way of choosing the promotions.  It tries promoting each candidate or not, and drops any branch
-    that cannot beat the best game it has found.</dd>
-    <dt id="node">node</dt>
-    <dd>One point of a search, where it has decided some promotions and left the rest open.</dd>
-    <dt id="bound">bound</dt>
-    <dd>An upper limit on the sum of the promotions of any game in a node’s branch, counting those already made.  The
-    search drops a node whose bound cannot beat the best game it has found.</dd>
-    <dt id="gap">gap</dt>
-    <dd>How far a bound is above the best game the search has found.  The larger the gap, the larger the search.</dd>
-      <dt id="branch-and-bound">branch and bound</dt>
-      <dd>A way of searching that splits on one choice at a time, keeps the best answer found so far, and drops every
-      branch whose bound cannot beat it.</dd>
-      <dt id="conflict">conflict</dt>
-      <dd>A few candidates that the player cannot promote all together at a node.  Any set the player can promote leaves
-      at least one of them out, so the search splits on one of them.</dd>
-      <dt id="nogood">nogood</dt>
-      <dd>A set of candidates that the player cannot promote together from the start of a search, which the search
-      remembers, so that no branch tries it again.</dd>
-  </dl>
-</section>
-
-<section class="chapter" id="the-bound" data-toc="the-bound" aria-labelledby="h-g-bound">
-  <h2 id="h-g-bound">The bound</h2>
-  <dl class="glossary">
-      <dt id="parity-test">parity test</dt>
-      <dd>A quick test that every playable set passes.  List, for each number of a set, the maximal factors outside
-      the set that could pay for it.  The set fails when some of its numbers, taken together, list every factor an
-      even number of times: 10, 14, 15 and 21 list each of 2, 3, 5 and 7 twice.</dd>
-      <dt id="parity-bound">parity bound</dt>
-      <dd>The weight of the heaviest set that passes the parity test.  Frame by frame, it limits what the
-      promotions of a node can add; on the whole board, it bounds opt(n), and it is the prover's bound.  In
-      the games we measured, its gap above opt(n) on the whole board is about a tenth of the gap of Franklín and
-      Moniot's bound.</dd>
-      <dt id="fm-bound">Franklín and Moniot's bound</dt>
-      <dd>An upper bound on opt(n), the heaviest set whose numbers can each take a maximal factor of their own, from
-      outside the set, to pay with.</dd>
-      <dt id="odd-core">odd core</dt>
-      <dd>A set that passes the parity test yet is not playable, and contains no smaller such set.  Every set that
-      passes the test but is not playable contains one.  The first is on the board of game 45: 12, 18, 20, 30 and 45.
-      Odd cores are all that the search's bound misses.</dd>
-  </dl>
-</section>
-
-<section class="chapter" id="the-statement" data-toc="the-statement" aria-labelledby="h-g-statement">
-  <h2 id="h-g-statement">Statement U</h2>
-  <dl class="glossary">
-    <dt id="frame-solver">frame solver</dt>
-    <dd>The program that finds the optimal games, by searching the frame model.</dd>
-    <dt id="prover">prover</dt>
-    <dd>A second program, which shares no proof code with the frame solver and proves the scores on the whole board,
-    without frames.</dd>
-      <dt id="proof-kind">proof kind</dt>
-      <dd>What proves a game's score: a search of the whole tree, the ceiling, the prime formula, a repeat, or nothing
-      to choose.  Each game's record names its own.</dd>
-  </dl>
-</section>
-
-<section class="chapter" id="the-results" data-toc="the-results" aria-labelledby="h-g-results">
-  <h2 id="h-g-results">The results</h2>
-  <dl class="glossary">
-      <dt id="share">player's share</dt>
-      <dd>opt(n) as a share of 1 + 2 + ⋯ + n, the whole board.  It tends to a limit, and the chain's best scores put
-      it near 63%.</dd>
-      <dt id="longest-game">longest game</dt>
-      <dd>A game with the most moves its board allows.  An optimal game is usually one, but not in games 833 to
-      835.</dd>
-  </dl>
-</section>
-
+<dl class="glossary">
+  <dt id="back-move">back move</dt>
+  <dd>One of the two steps of <a class="gloss" href="#peel">peel</a>.</dd>
+  <dt id="board">board</dt>
+  <dd>The numbers 1 to n of game n.</dd>
+  <dt id="bottom-half">bottom half</dt>
+  <dd>The numbers up to n/2.  Each divides some larger number on the board, so a move can take it as tax, and any of
+  them but 1 can also be a move.  On the board of game 21 the bottom half is 1 to 10.
+  <aside class="note tech" aria-label="Technical note on the bottom half"><p>The bottom half of game n is 1 to
+  ⌊n/2⌋.</p></aside></dd>
+  <dt id="bound">bound</dt>
+  <dd>An upper limit on the sum of the <a class="gloss" href="#promote">promotions</a> of any game in a
+  <a class="gloss" href="#node">node</a>’s branch, counting those already made.  The search drops a node whose bound
+  cannot beat the best game it has found.</dd>
+  <dt id="branch-and-bound">branch and bound</dt>
+  <dd>A way of searching that splits on one choice at a time, keeps the best answer found so far, and drops every
+  branch whose <a class="gloss" href="#bound">bound</a> cannot beat it.</dd>
+  <dt id="candidate">candidate</dt>
+  <dd>A factor that its <a class="gloss" href="#frame">frame</a> can spare and the frame
+  <a class="gloss" href="#in-front">in front of</a> it can take on.  Game 21 has the candidates 4 and 9.</dd>
+  <dt id="ceiling">ceiling</dt>
+  <dd>n more than the best score of game n − 1.  No score in game n can beat it, so a game that reaches it is
+  optimal.
+  <aside class="note tech" aria-label="Technical note on the ceiling"><p>The ceiling is
+  opt(n − 1) + n.</p></aside></dd>
+  <dt id="chain">chain</dt>
+  <dd>The games from game 1 up, which we solve in order, each from an
+  <a class="gloss" href="#optimal-game">optimal game</a> of the one before.</dd>
+  <dt id="closed">closed</dt>
+  <dd>A <a class="gloss" href="#frame">frame</a> with as many factors as moves, so it has none to spare.  It takes no
+  part in the search.</dd>
+  <dt id="cofactor">cofactor</dt>
+  <dd>n divided by its largest prime factor: 30 = 6 · 5 has the cofactor 6.  One can usually tell from it whether a
+  game needs a search.</dd>
+  <dt id="conflict">conflict</dt>
+  <dd>A few <a class="gloss" href="#candidate">candidates</a> that the player cannot
+  <a class="gloss" href="#promote">promote</a> all together at a <a class="gloss" href="#node">node</a>.  Any set the
+  player can promote leaves at least one of them out, so the search splits on one of them.</dd>
+  <dt id="descending-greedy">descending greedy</dt>
+  <dd>The pass that chooses the <a class="gloss" href="#source">sources</a>.  From the largest down, it keeps each
+  source that is still <a class="gloss" href="#playable">playable</a> with the ones it has kept.</dd>
+  <dt id="proper-divisor">divisor, proper divisor</dt>
+  <dd>A divisor of a number divides it with nothing left over.  A proper divisor is one smaller than the number
+  itself: the proper divisors of 12 are 1, 2, 3, 4 and 6.  In Taxman, a divisor is always a proper one.</dd>
+  <dt id="exchange-property">exchange property</dt>
+  <dd>What makes a greedy choice safe in general.  Whenever one <a class="gloss" href="#playable">playable</a> set is
+  smaller than another, some member of the larger one can join the smaller one, and the result is still playable.
+  The playable sets of <a class="gloss" href="#source">sources</a> lack it in game 2,873.</dd>
+  <dt id="fits">fits</dt>
+  <dd>n fits into an <a class="gloss" href="#optimal-set">optimal set</a> of game n − 1 when the set is still
+  <a class="gloss" href="#playable">playable</a> with n added.  Then game n is at its
+  <a class="gloss" href="#ceiling">ceiling</a>: 10 fits into game 9's optimal set, and 12 does not fit into game
+  11's.</dd>
+  <dt id="forest">forest</dt>
+  <dd>Numbers and the <a class="gloss" href="#maximal-factor">maximal factors</a> they could pay with, with lines
+  between them and no <a class="gloss" href="#loop">loop</a> among them.  Numbers with two such factors each are
+  <a class="gloss" href="#playable">playable</a> exactly when they form a forest with those factors.  10, 15 and 21
+  alone make 2 – 10 – 5 – 15 – 3 – 21 – 7, with no loop, and they are playable: 10, then 15, then 21.</dd>
+  <dt id="frame">frame</dt>
+  <dd>A group of <a class="gloss" href="#source">sources</a> with every factor that can
+  <a class="gloss" href="#pays-for">pay for</a> them, a small game inside the big one.  Game 21 has four.  We
+  number the frames with <a class="gloss" href="#freedom">freedoms</a> from the front, frame 0 first: in game 21,
+  frame 0 has 14, 15 and 21, and frame 1 has 12, 18 and 20.  In a larger game, we collapse frames with freedoms at
+  the same distance from the front into a single frame, with one number.
+  <aside class="note tech" aria-label="Technical note on frames"><p>A frame is a connected component of the graph
+  that joins each source to its maximal factors.</p></aside></dd>
+  <dt id="frame-model">frame model</dt>
+  <dd>The game as <a class="gloss" href="#frame">frames</a>, with <a class="gloss" href="#u-star">U*</a> as its
+  <a class="gloss" href="#source">sources</a>, so that the <a class="gloss" href="#promote">promotions</a> are all
+  that remains to choose.  Its best score is the best score of the game when
+  <a class="gloss" href="#statement-u">statement U</a> holds.</dd>
+  <dt id="frame-solver">frame solver</dt>
+  <dd>The program that finds the <a class="gloss" href="#optimal-game">optimal games</a>, by searching the
+  <a class="gloss" href="#frame-model">frame model</a>.</dd>
+  <dt id="fm-bound">Franklín and Moniot's bound</dt>
+  <dd>An upper bound on <a class="gloss" href="#opt">opt(n)</a>, the <a class="gloss" href="#heaviest">heaviest</a>
+  set whose numbers can each take a <a class="gloss" href="#maximal-factor">maximal factor</a> of their own, from
+  outside the set, to pay with.</dd>
+  <dt id="freedom">freedom</dt>
+  <dd>A factor that a <a class="gloss" href="#frame">frame</a> can spare.  Each
+  move of a frame needs a factor of its own to pay for it, so a frame has as many freedoms as it has factors beyond
+  its moves: frame 0 of game 21 has four factors and three moves, and one freedom.  A frame with none is
+  <a class="gloss" href="#closed">closed</a>.
+  <aside class="note tech" aria-label="Technical note on freedoms"><p>A frame's freedoms are its factors less its
+  moves.</p></aside></dd>
+  <dt id="front-move">front move</dt>
+  <dd>One of the two steps of <a class="gloss" href="#peel">peel</a>.</dd>
+  <dt id="game">game n</dt>
+  <dd>Taxman played on the numbers 1 to n.  Game 21 is Taxman on 1 to 21.  A <em>game</em> also means one play of
+  it, as in “an optimal game”.</dd>
+  <dt id="gap">gap</dt>
+  <dd>How far a <a class="gloss" href="#bound">bound</a> is above the best game the
+  <a class="gloss" href="#search">search</a> has found.  The larger the gap, the larger the search.</dd>
+  <dt id="heaviest">heaviest</dt>
+  <dd>With the largest <a class="gloss" href="#weight">weight</a>.  An
+  <a class="gloss" href="#optimal-set">optimal set</a> is a heaviest <a class="gloss" href="#playable">playable</a>
+  set.</dd>
+  <dt id="in-front">in front of</dt>
+  <dd><a class="gloss" href="#frame">Frame</a> A is in front of frame B when some number of B has a
+  <a class="gloss" href="#maximal-factor">maximal factor</a> in A, as 9 has 3 in game 21.  A game plays the frames
+  in front first, and in the figures they sit to the right.</dd>
+  <dt id="layer">layer</dt>
+  <dd>A number's count of prime factors, with repeats.  12 = 2 · 2 · 3 is in layer 3, every prime is in layer 1, and
+  1 alone is in layer 0.
+  <aside class="note tech" aria-label="Technical note on layers"><p>The layer of x is Ω(x), its prime factors
+  counted with multiplicity.</p></aside></dd>
+  <dt id="longest-game">longest game</dt>
+  <dd>A game with the most moves its board allows.  An <a class="gloss" href="#optimal-game">optimal game</a> is
+  usually one, but not in games 833 to 835.</dd>
+  <dt id="loop">loop</dt>
+  <dd>A ring of numbers and the <a class="gloss" href="#maximal-factor">maximal factors</a> they could pay with, with
+  a line from each to the next, that comes back to where it started.  10, 15, 21 and 14 make one with their primes:
+  2 – 10 – 5 – 15 – 3 – 21 – 7 – 14 – 2.  Numbers with two such factors each are not
+  <a class="gloss" href="#playable">playable</a> if they make a loop.  Here the first one the player plays takes two
+  of the four primes as tax, which leaves two for the other three.</dd>
+  <dt id="maximal-factor">maximal factor</dt>
+  <dd>A number divided by one of its primes.  12 has the maximal factors 6 and 4, 9 has only 3, and a prime has only
+  1.  A move is legal exactly when one of its maximal factors is still in the pot.
+  <aside class="note tech" aria-label="Technical note on maximal factors"><p>The maximal factors of x are x/p for
+  each prime p dividing x.</p></aside></dd>
+  <dt id="maximal-factor-graph">maximal-factor graph</dt>
+  <dd>The board as a directed graph, with an edge from each number to each of its
+  <a class="gloss" href="#maximal-factor">maximal factors</a>.  Every edge leads to a smaller number, so the figures
+  draw the edges as lines without arrowheads.  Each number the player takes leaves the graph with its edges.  A move
+  is legal exactly when an edge still leads from it, and its tax is everything it still reaches along its edges.</dd>
+  <dt id="move">move</dt>
+  <dd>A number you take.  It must still have a divisor in the pot, and you score it.</dd>
+  <dt id="node">node</dt>
+  <dd>One point of a <a class="gloss" href="#search">search</a>, where it has decided some
+  <a class="gloss" href="#promote">promotions</a> and left the rest open.</dd>
+  <dt id="nogood">nogood</dt>
+  <dd>A set of <a class="gloss" href="#candidate">candidates</a> that the player cannot
+  <a class="gloss" href="#promote">promote</a> together from the start of a
+  <a class="gloss" href="#search">search</a>, which the search remembers, so that no branch tries it again.</dd>
+  <dt id="odd-core">odd core</dt>
+  <dd>A set that passes the <a class="gloss" href="#parity-test">parity test</a> yet is not
+  <a class="gloss" href="#playable">playable</a>, and contains no smaller such set.  Every set that passes the test
+  but is not playable contains one.  The first is on the board of game 45: 12, 18, 20, 30 and 45.  Odd cores are all
+  that the search's bound misses.</dd>
+  <dt id="opt">opt(n)</dt>
+  <dd>The best score anyone can make in game n.  opt(10) = 40.
+  <aside class="note tech" aria-label="Technical note on opt(n)"><p>opt(n) is a maximum over every legal game of
+  n.</p></aside></dd>
+  <dt id="optimal-game">optimal game</dt>
+  <dd>A game that scores <a class="gloss" href="#opt">opt(n)</a>.</dd>
+  <dt id="optimal-set">optimal set</dt>
+  <dd>The set of moves of an <a class="gloss" href="#optimal-game">optimal game</a>, and so a
+  <a class="gloss" href="#playable">playable</a> set with the largest sum.  Most games have one; from game 425 on,
+  some have two or more.
+  <aside class="note tech" aria-label="Technical note on optimal sets"><p>S*(n) is an optimal set of game
+  n.</p></aside></dd>
+  <dt id="parity-bound">parity bound</dt>
+  <dd>The <a class="gloss" href="#weight">weight</a> of the <a class="gloss" href="#heaviest">heaviest</a> set that
+  passes the <a class="gloss" href="#parity-test">parity test</a>.  Frame by frame, it limits what the promotions of
+  a node can add; on the whole board, it bounds opt(n), and it is the prover's bound.  In the games we measured, its
+  gap above opt(n) on the whole board is about a tenth of the gap of
+  <a class="gloss" href="#fm-bound">Franklín and Moniot's bound</a>.</dd>
+  <dt id="parity-test">parity test</dt>
+  <dd>A quick test that every <a class="gloss" href="#playable">playable</a> set passes.  List, for each number of a
+  set, the maximal factors outside the set that could pay for it.  The set fails when some of its numbers, taken
+  together, list every factor an even number of times: 10, 14, 15 and 21 list each of 2, 3, 5 and 7 twice.</dd>
+  <dt id="payment-scheme">payment scheme</dt>
+  <dd>A choice, for each number of a set, of a <a class="gloss" href="#maximal-factor">maximal factor</a> outside
+  the set to <a class="gloss" href="#pays-for">pay for</a> it, no two the same.</dd>
+  <dt id="pays-for">pays for</dt>
+  <dd>A <a class="gloss" href="#maximal-factor">maximal factor</a> of a move, still in the pot when the player makes
+  the move, <em>pays for</em> it.  Two moves can never share a payment.</dd>
+  <dt id="peel">peel</dt>
+  <dd>The quick test of whether a set is <a class="gloss" href="#playable">playable</a>.  It pairs numbers with
+  their payments one at a time by two safe steps: a number with only one maximal factor left to pay with takes it
+  (a <em>front move</em>), and a factor that only one number can still use goes to that number (a
+  <em>back move</em>).  The set is playable exactly when peel pairs every number.</dd>
+  <dt id="playable">playable</dt>
+  <dd>A set of numbers that the player can take as moves, every one of them, in some order.  {9, 15} is playable on
+  the board of game 21: 9 first, then 15.
+  <aside class="note tech" aria-label="Technical note on playable sets"><p>A set is playable iff it has a
+  <a class="gloss" href="#payment-scheme">payment scheme</a> whose precedence, which says what the player must play
+  before what, has no cycle.</p></aside></dd>
+  <dt id="share">player's share</dt>
+  <dd><a class="gloss" href="#opt">opt(n)</a> as a share of 1 + 2 + ⋯ + n, the whole board.  It tends to a limit,
+  and the chain's best scores put it near 63%.</dd>
+  <dt id="pot">pot</dt>
+  <dd>The numbers that neither you nor the taxman has taken yet.  It starts as the whole board.</dd>
+  <dt id="prime-formula">prime formula</dt>
+  <dd>When n is an odd prime, take an <a class="gloss" href="#optimal-game">optimal game</a> of n − 1 and play n in
+  place of the largest prime below n.  The result is an optimal game of n, and the score rises by the difference of
+  the two primes.
+  <aside class="note tech" aria-label="Technical note on the prime formula"><p>At a prime p,
+  opt(p) = opt(p − 1) + p − q(p − 1), where q(p − 1) is the largest prime below p.</p></aside></dd>
+  <dt id="promote">promote</dt>
+  <dd>To play one of a <a class="gloss" href="#frame">frame</a>'s factors as a move.  A promoted factor leaves its
+  frame and becomes a move of the frame in front, where one of its maximal factors
+  pays for it.  An optimal game of 21 promotes 9 from frame 1 into frame 0, where 3 pays for it.</dd>
+  <dt id="promotion-set">promotion set</dt>
+  <dd>A set of <a class="gloss" href="#candidate">candidates</a> that the player can
+  <a class="gloss" href="#promote">promote</a> together, with every <a class="gloss" href="#frame">frame</a> still
+  able to play all of its moves.</dd>
+  <dt id="proof-kind">proof kind</dt>
+  <dd>What proves a game's score: a <a class="gloss" href="#search">search</a> of the whole tree, the
+  <a class="gloss" href="#ceiling">ceiling</a>, the <a class="gloss" href="#prime-formula">prime formula</a>, a
+  <a class="gloss" href="#repeat">repeat</a>, or nothing to choose.  Each game's record names its own.</dd>
+  <dt id="prover">prover</dt>
+  <dd>A second program, which shares no proof code with the <a class="gloss" href="#frame-solver">frame solver</a>
+  and proves the scores on the whole board, without <a class="gloss" href="#frame">frames</a>.</dd>
+  <dt id="repeat">repeat</dt>
+  <dd>A game that poses the same <a class="gloss" href="#search-problem">search problem</a> as an earlier game, so
+  the earlier game's answer carries over.
+  <aside class="note tech" aria-label="Technical note on repeats"><p>A repeat's answer carries over given
+  <a class="gloss" href="#statement-u">statement U</a> at n.</p></aside></dd>
+  <dt id="score">score</dt>
+  <dd>The sum of your moves.  You beat the taxman when your score is higher than the total he collects.</dd>
+  <dt id="search">search</dt>
+  <dd>The program's way of choosing the <a class="gloss" href="#promote">promotions</a>.  It tries promoting each
+  <a class="gloss" href="#candidate">candidate</a> or not, and drops any branch that cannot beat the best game it has
+  found.</dd>
+  <dt id="search-problem">search problem</dt>
+  <dd>What remains to choose in a game once it has its <a class="gloss" href="#frame">frames</a>: the frames, the
+  <a class="gloss" href="#candidate">candidates</a> and how many of them the player may
+  <a class="gloss" href="#promote">promote</a>.  Two games that pose the same search problem have the same best
+  promotions.</dd>
+  <dt id="source">source</dt>
+  <dd>A number above n/2.  It divides nothing else on the board, so no move takes it as tax.  Either the player plays
+  it, or the taxman takes it at the end.  On the board of game 21 the sources are 11 to 21.
+  <aside class="note tech" aria-label="Technical note on sources"><p>The sources of game n are the s with
+  n/2 &lt; s ≤ n.</p></aside></dd>
+  <dt id="statement-u">statement U</dt>
+  <dd>The one open statement between our <a class="gloss" href="#frame-model">model</a> of the game and the game
+  itself.  It says that some optimal game plays every number of <a class="gloss" href="#u-star">U*</a> with three or
+  more prime factors.  The prover proves it in every game it reaches, and it is open in general.
+  <aside class="note tech" aria-label="Technical note on statement U"><p>Statement U at n says that some optimal set
+  of n contains every member of U* in layers 3 and up.</p></aside></dd>
+  <dt id="tax">tax</dt>
+  <dd>The divisors of a move still in the pot, which the taxman takes with it.  When no move remains, the taxman
+  takes the rest of the pot too.</dd>
+  <dt id="taxman-sequence">Taxman sequence</dt>
+  <dd>The best scores opt(1), opt(2), opt(3), … in order.
+  <aside class="note tech" aria-label="Technical note on the Taxman sequence"><p>opt(1), opt(2), opt(3), … is
+  <a href="https://oeis.org/A019312">A019312</a> in the OEIS.</p></aside></dd>
+  <dt id="top-half">top half</dt>
+  <dd>The numbers above n/2, the <a class="gloss" href="#source">sources</a>, and the part of the score they make.
+  In the games that need a search, it is about 93% of the score.</dd>
+  <dt id="u-star">U*</dt>
+  <dd>The <a class="gloss" href="#source">sources</a> that
+  <a class="gloss" href="#descending-greedy">descending greedy</a> keeps.  In game 21, U* is 12, 14, 15, 16, 18, 19,
+  20 and 21.</dd>
+  <dt id="weight">weight</dt>
+  <dd>The sum of a set's members, the score it earns as moves.
+  <aside class="note tech" aria-label="Technical note on weight"><p>ΣS is the weight of a set S.</p></aside></dd>
+</dl>
 
 </div></main>
 </div>
-
 <script type="module">
 import { initEssay } from './js/essay.js';
 

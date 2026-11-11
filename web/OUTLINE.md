@@ -19,6 +19,8 @@ entries are meant to be moved, merged and cut.
   built or loaded, never typed.
 * **One name for each idea**, the site glossary's (`glossary.html`).  A term is defined where it first appears, and a
   page links it to the glossary.
+* **A word of mathematics keeps its meaning.**  The site never gives a basic word a meaning of its own.  The numbers
+  up to n/2 are the bottom half, not the factors, and a factor is what it is in school.
 * **"To our knowledge"** appears once, on the About page, where the site says what this work adds.
 
 ## How the site is written
@@ -173,7 +175,8 @@ game 14.  *One search, eight games:* games 2512 to 2519 all depend on one search
 greedy pass chooses them.
 
 * Where n fits or is a prime, game n − 1 has settled game n (chapter 2); game 21 is neither, so it starts here.
-* A number above n/2 divides nothing else on the board, so it is never tax: a move or nothing.  These are the sources.
+* A number above n/2 divides nothing else on the board, so it is never tax: a move or nothing.  These are the sources,
+  and the numbers up to n/2 are the bottom half.
 * Layers: a number's count of prime factors.  A number's maximal factors sit one layer down.
 * Descending greedy: from n down, keep each source that can still be played with those kept.  What it keeps is U\*.
 * In layers 1 and 2 it is provably right.  A number with two prime factors is an edge between two primes; a set of them
@@ -316,9 +319,9 @@ introduction offers it at its top: "In a hurry? Go straight to the summary."
 
 ## Glossary
 
-The site's words, each with its meaning and an example, grouped in the order of the story, with their precise forms
-in the right column.  Pages link a term to it, as the front page links *proper divisor*; no page links the repository's
-glossary.
+The site's words in alphabetical order, each with its meaning and an example.  An entry links the other terms its
+meaning depends on, and a term's precise form sits beside it in the right column.  Pages link a term to it, as the
+front page links *proper divisor*; no page links the repository's glossary.
 
 ## Notation
 

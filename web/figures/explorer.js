@@ -222,7 +222,7 @@ export function mountExplorer(host, { games, small }) {
   function aboutNumber(g, b, x) {
     const w = b.who.get(x);
     if (w.kind === 'move') {
-      const promo = b.promotions.includes(x) ? ` It is up to n/2, so it is a promotion: a factor the player plays as a move.` : '';
+      const promo = b.promotions.includes(x) ? ` It is up to n/2, so it is a promotion.` : '';
       return `Move ${w.turn} of ${b.turns.length}: the player takes ${x}, and the taxman takes ${listWords(w.tax)}.${promo}`;
     }
     if (w.kind === 'tax') return `${x} goes to the taxman as tax on ${w.by}, move ${w.turn} of ${b.turns.length}.`;
