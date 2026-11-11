@@ -99,6 +99,8 @@ reach.
 | N5 | [the prime formula](neighbors.md#the-prime-formula) | opt(p) = opt(p − 1) + p − q(p − 1) at a prime p, by exchanging the first move | proved |
 | N6 | [the step theorem](neighbors.md#the-step-theorem) | game n is at its ceiling iff some optimal set of n − 1 stays playable with n added, and its optimal sets are then exactly those; at a prime p, the optimal sets are those of p − 1 with q(p − 1) exchanged for p | proved |
 | N7 | [the half lemma](neighbors.md#the-half-lemma) | at an even n, if some optimal game of n − 1 does not play n/2, game n is at its ceiling | proved |
+| N8 | [the 8p theorem](neighbors.md#the-8p-theorem) | at n = 8p ≥ 187, p a prime, with 9q(p − 1) > n: opt(n) ≤ opt(n − 1) + n − 4q(p − 1), on the whole board, with no U; the bound fails at 184, which meets neither hypothesis | proved, resting on [F10](frame-model.md#the-square-theorem) and the computation of its finite part |
+| | [the exchange at 8p](neighbors.md#the-8p-theorem) | in every game of the committed chain that N8 covers, from 248 on, the recorded optimal set of n − 1 with 4q(p − 1) exchanged for n is playable and scores N8's bound, so N8 proves game n from game n − 1 | proved by computation |
 
 ### The heaviest playable set of sources
 

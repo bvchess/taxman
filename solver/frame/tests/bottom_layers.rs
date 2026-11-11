@@ -1,4 +1,5 @@
-//! The bottom-layers theorem (F4) against every recorded and enumerated optimal set.
+//! The bottom-layers theorem (F4) against every recorded and enumerated optimal set, and the 8p theorem (N8), which
+//! rests on its closed case, against the committed chain.
 //!
 //! The theorem (F4, docs/theory/frame-model.md):
 //!
@@ -32,19 +33,25 @@
 //!   again, by an exhaustive search over the playable sets that uses no model of the game, only the oracle and the
 //!   table's opt(n).  The brute force of the rules has opt(n) itself on the boards it reaches, and the number of
 //!   optimal sets is the prover's.
+//! * [`the_8p_theorem_holds_on_the_committed_chain`]: the 8p theorem (N8, docs/theory/neighbors.md).  At every game
+//!   n = 8p of the committed chain that it covers (p a prime, n ≥ 187, and 9r > n for r the prime before p), opt(n)
+//!   is the bound opt(n − 1) + n − 4r, and the committed optimal set of game n − 1 with 4r exchanged for n, in the
+//!   order of the peel, plays by the rules to the bound: to game [`EXCHANGES_QUICK_TO`] here, and past it in
+//!   [`the_8p_exchange_reaches_the_bound_on_the_rest_of_the_chain`].  [`the_8p_bound_fails_at_184`]: the bound fails
+//!   at 184, which meets neither hypothesis.
 
 mod common;
 
-use common::{committed_results, playable};
+use common::{committed_results, play_order, playable};
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::RangeInclusive;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use taxman::board::Board;
 use taxman::brute;
-use taxman::game::Optimal;
+use taxman::game::{replay, Optimal};
 use taxman::json::Json;
-use taxman::numtheory::Tables;
+use taxman::numtheory::{sieve, Tables};
 use taxman::solver::MAX_N;
 use taxman::with_width;
 
@@ -656,4 +663,127 @@ fn theorem_b_holds_for_every_optimal_set_of_the_small_boards() {
 fn theorem_b_holds_for_every_optimal_set_of_more_small_boards() {
     let failures = check_small_boards(SMALL_BOARDS_TO + 1..=MORE_SMALL_BOARDS_TO);
     assert!(failures.is_empty(), "F4 fails on {} small boards:\n{}", failures.len(), failures.join("\n"));
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The 8p theorem
+
+/// The quick test of the 8p theorem replays the exchanges of the games up to this one, and the long test those of the
+/// games above it.  The peel's order of a set costs about the square of its size ([`play_order`]), so the exchanges to
+/// here cost a fifteenth of them all.
+const EXCHANGES_QUICK_TO: u32 = 2000;
+
+/// A game n = 8p, p a prime, with r = q(p − 1), the largest prime below p.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct EightP {
+    n: u32,
+    r: u32,
+}
+
+impl EightP {
+    /// Whether the 8p theorem (N8, docs/theory/neighbors.md) covers the game: n ≥ 187 and 9r > n.
+    fn covered(self) -> bool {
+        self.n >= 187 && 9 * self.r > self.n
+    }
+
+    /// The theorem's bound on opt(n), opt(n − 1) + n − 4r, with the committed score of game n − 1.
+    fn bound(self, table: &Optimal) -> u64 {
+        let before = table.score(self.n - 1).expect("the committed chain has game n - 1");
+        before + u64::from(self.n) - 4 * u64::from(self.r)
+    }
+
+    /// The theorem's exchange: the committed optimal set of game n − 1 with 4r exchanged for n, in the order of its
+    /// peel ([`play_order`], which uses nothing of the frame model), or why there is none.
+    fn exchange(self, table: &Optimal) -> Result<Vec<u32>, String> {
+        let (n, four_r) = (self.n, 4 * self.r);
+        let before = table.moves(n - 1).expect("the committed chain has game n - 1");
+        if !before.contains(&four_r) {
+            return Err(format!("the optimal game of {} does not play 4r = {four_r}", n - 1));
+        }
+        let mut set: Vec<u32> = before.iter().copied().filter(|&x| x != four_r).collect();
+        set.push(n);
+        play_order(&Tables::new(n), &set).ok_or_else(|| "the exchange is not playable".to_owned())
+    }
+}
+
+/// The games n = 8p of the boards up to `last`, ascending, for the primes p from 3 on (2 has no prime below it).
+fn eight_p_games(last: u32) -> Vec<EightP> {
+    let primes = sieve(last / 8).1;
+    primes.windows(2).map(|pair| EightP { n: 8 * pair[1], r: pair[0] }).collect()
+}
+
+/// The 8p theorem (N8, docs/theory/neighbors.md) at `game`, a game of the committed chain that it covers: opt(n) is
+/// its bound and, if `exchange`, the exchange plays by the rules ([`replay`]) to the bound.
+fn check_eight_p(table: &Optimal, game: EightP, exchange: bool) -> Result<(), String> {
+    let (bound, opt) = (game.bound(table), table.score(game.n).expect("the committed chain has game n"));
+    if opt != bound {
+        return Err(format!("opt(n) = {opt}, not the bound {bound}"));
+    }
+    if exchange {
+        match replay(game.n, &game.exchange(table)?) {
+            Ok(score) if score == bound => {}
+            Ok(score) => return Err(format!("the exchange scores {score}, not the bound {bound}")),
+            Err(e) => return Err(format!("the exchange is no game: {e}")),
+        }
+    }
+    Ok(())
+}
+
+/// The 8p theorem at the games of the committed chain that it covers and `games` keeps, with the exchange at those
+/// that `exchange` keeps.  Prints what it checked, and returns the covered games it checked, ascending, and the
+/// failures.
+fn check_eight_p_games(games: impl Fn(u32) -> bool, exchange: impl Fn(u32) -> bool) -> (Vec<u32>, Vec<String>) {
+    let start = Instant::now();
+    let table = Optimal::built_in();
+    let covered = eight_p_games(table.max_n()).into_iter().filter(|game| game.covered() && games(game.n));
+    let (mut checked, mut failures, mut exchanged) = (Vec::new(), Vec::new(), 0);
+    for game in covered {
+        let replayed = exchange(game.n);
+        checked.push(game.n);
+        exchanged += usize::from(replayed);
+        if let Err(e) = check_eight_p(table, game, replayed) {
+            failures.push(format!("n={} (r={}): {e}", game.n, game.r));
+        }
+    }
+    let (first, last) = (checked.first().copied().unwrap_or(0), checked.last().copied().unwrap_or(0));
+    println!(
+        "8p theorem: {} games, n from {first} to {last}, {exchanged} exchanges replayed, {} failures, {:.1?}",
+        checked.len(),
+        failures.len(),
+        start.elapsed()
+    );
+    (checked, failures)
+}
+
+/// The 8p theorem (N8, docs/theory/neighbors.md) on the committed chain: at every game n = 8p that it covers, opt(n)
+/// is its bound opt(n − 1) + n − 4r, and to game [`EXCHANGES_QUICK_TO`] the committed optimal set of game n − 1 with 4r
+/// exchanged for n plays by the rules to the bound.  The first game it covers is 248 = 8·31: at 232 = 8·29, r = 23 and
+/// 9r = 207 ≤ 232.
+#[test]
+fn the_8p_theorem_holds_on_the_committed_chain() {
+    let (checked, failures) = check_eight_p_games(|_| true, |n| n <= EXCHANGES_QUICK_TO);
+    assert!(failures.is_empty(), "N8 fails on {} games:\n{}", failures.len(), failures.join("\n"));
+    assert_eq!(checked.first(), Some(&248), "the first game that N8 covers");
+    assert!(checked.last().is_some_and(|&n| n > EXCHANGES_QUICK_TO), "no game past {EXCHANGES_QUICK_TO}: {checked:?}");
+}
+
+/// [`the_8p_theorem_holds_on_the_committed_chain`] for the exchanges of the games above [`EXCHANGES_QUICK_TO`].
+#[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_8p_theorem_holds_on_the_committed_chain")]
+fn the_8p_exchange_reaches_the_bound_on_the_rest_of_the_chain() {
+    let (checked, failures) = check_eight_p_games(|n| n > EXCHANGES_QUICK_TO, |_| true);
+    assert!(failures.is_empty(), "N8's exchange fails on {} games:\n{}", failures.len(), failures.join("\n"));
+    assert!(!checked.is_empty(), "no game past {EXCHANGES_QUICK_TO}");
+}
+
+/// Some hypothesis of the 8p theorem (N8, docs/theory/neighbors.md) is needed: game 184 = 8·23, with r = 19, meets
+/// neither (184 < 187, and 9r = 171 ≤ 184), and opt(184) is above the bound opt(183) + 184 − 76.
+#[test]
+fn the_8p_bound_fails_at_184() {
+    let game = EightP { n: 184, r: 19 };
+    assert!(eight_p_games(184).contains(&game), "184 = 8·23, and 19 is the prime before 23");
+    assert!(game.n < 187 && 9 * game.r <= game.n && !game.covered(), "184 meets neither hypothesis");
+    let table = Optimal::built_in();
+    let (bound, opt) = (game.bound(table), table.score(game.n).expect("the committed chain has game 184"));
+    assert!(opt > bound, "opt(184) = {opt}, not above the bound {bound}");
 }

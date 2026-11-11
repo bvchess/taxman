@@ -416,11 +416,12 @@ search (R4), or a floor under which a search completed having found nothing ([R5
 without [statement U](exactness.md#statement-u), but for one case: a search that ended nodes by [the near-repeat
 lemma](#the-near-repeat-lemma) with Z = hi(m′) − ΣU\*(m′), for an earlier game m′, rests on what hi(m′) rests on (R7).
 ΣU\*(m) + P\*(Π_m) is opt(m) given U at m (X8).  An upper bound passes from n − 1 to n by adding n (N4), from n to n − 1
-unchanged (N3), between p − 1 and a prime p by adding or taking away p − q(p − 1) (N5), from n − 1 to an odd n with two
-prime factors by adding n − x where [the semiprime formula (J3)](arrival.md#the-semiprime-formula) applies, and from m
-to n by taking away ΣU\*(m) and adding ΣU\*(n) when root problems of n and m are equal (R6).  All of these passages hold
-without U but the last, which needs U at n.  So hi(n) ≥ opt(n) rests on U at the game where its bound was made, at
-every game that a repeat carried it to, and at the games behind any hi(m′) that the near-repeat lemma used.
+unchanged (N3), between p − 1 and a prime p by adding or taking away p − q(p − 1) (N5), from n − 1 to n by adding n − x
+where [the semiprime formula (J3)](arrival.md#the-semiprime-formula) applies and n − 4q(p − 1) where [the 8p theorem
+(N8)](neighbors.md#the-8p-theorem) does, and from m to n by taking away ΣU\*(m) and adding ΣU\*(n) when root problems
+of n and m are equal (R6).  All of these passages hold without U but the last, which needs U at n.  So hi(n) ≥ opt(n)
+rests on U at the game where its bound was made, at every game that a repeat carried it to, and at the games behind any
+hi(m′) that the near-repeat lemma used.
 
 So a game whose bounds meet is proven within the frame model, given U at the games its upper bound came through.  A
 lower bound above an upper bound would be a bug, or a counterexample to U at one of those games: the lower bound is the
