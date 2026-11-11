@@ -10,8 +10,10 @@
 //! written): a longest sequence for n − 1 is legal for n, M(n) <= M(n − 1) + 1, and M(n) = M(n − 1) for a prime
 //! n >= 3.  Per game: the recorded moves are replayed by the rules (`recorded_moves`, of which
 //! `recorded_upper` above n/2); M(n) lies between the longer of them and the predecessor's longest sequence, and the
-//! smaller of ν(n) (`nu`), the matching number of the board's maximal-factor graph, and what M(n − 1) allows.
-//! Where the two meet, M(n) is settled (`"how":"matching"` if ν(n) is met, `"predecessor"` otherwise);
+//! smaller of ν(n) (`nu`), the matching number of the board's maximal-factor graph, what M(n − 1) allows, and, where
+//! those leave a gap, the unit-weight parity bound (`parity`, null where not computed).
+//! Where the two meet, M(n) is settled (`"how":"matching"` if ν(n) is met, `"parity"` if the parity bound is,
+//! `"predecessor"` otherwise);
 //! elsewhere the unit-weight branch and bound decides it (`"search"`, with the segment cuts from the smaller
 //! games' bounds; `"budget"` if `--budget` nodes did not suffice, and `most` is then null).  A range should
 //! start at 2, so that each game has its predecessor; one that does not starts from the recorded moves alone.
@@ -29,7 +31,7 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use taxman_prover::game::Board;
 use taxman_prover::jsonl::{committed_chain, field_nums, field_u64, parse_items, recorded_games, Appender, Obj};
-use taxman_prover::moves::{heaviest_longest, longest, matching_numbers, play_order};
+use taxman_prover::moves::{heaviest_longest, longest, matching_numbers, parity_bound, play_order};
 use taxman_prover::primes::{is_prime, smallest_prime_factors};
 
 /// What a game's line says its successor needs: M(n) if decided, and a longest sequence found.
@@ -100,10 +102,19 @@ fn main() {
         witness.sort_unstable();
         let below = witness.len() as u64;
         let step = u64::from(!(n >= 3 && is_prime(n, &spf)));
-        let above = prev.and_then(|p| p.most).map_or(nu[n as usize], |m| nu[n as usize].min(m + step));
+        let mut above = prev.and_then(|p| p.most).map_or(nu[n as usize], |m| nu[n as usize].min(m + step));
+        let parity = if below < above { parity_bound(&board) } else { None };
+        above = above.min(parity.unwrap_or(u64::MAX));
         assert!(below <= above, "n={n}: {below} moves above the bound {above}");
         let (most, how, nodes) = if below == above {
-            (Some(below), if nu[n as usize] == below { "matching" } else { "predecessor" }, 0)
+            let how = if nu[n as usize] == below {
+                "matching"
+            } else if parity == Some(below) {
+                "parity"
+            } else {
+                "predecessor"
+            };
+            (Some(below), how, 0)
         } else {
             // Upper bounds on M(m), m < n, for the segment cuts.
             let smaller: Vec<u64> =
@@ -120,6 +131,7 @@ fn main() {
             .num("recorded_moves", k)
             .num("recorded_upper", upper_part.len())
             .num("nu", nu[n as usize])
+            .raw("parity", &parity.map_or("null".into(), |p| p.to_string()))
             .raw("most", &most.map_or("null".into(), |m| m.to_string()))
             .str("how", how)
             .num("nodes", nodes);
