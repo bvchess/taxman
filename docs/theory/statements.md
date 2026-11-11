@@ -99,8 +99,6 @@ reach.
 | N5 | [the prime formula](neighbors.md#the-prime-formula) | opt(p) = opt(p − 1) + p − q(p − 1) at a prime p, by exchanging the first move | proved |
 | N6 | [the step theorem](neighbors.md#the-step-theorem) | game n is at its ceiling iff some optimal set of n − 1 stays playable with n added, and its optimal sets are then exactly those; at a prime p, the optimal sets are those of p − 1 with q(p − 1) exchanged for p | proved |
 | N7 | [the half lemma](neighbors.md#the-half-lemma) | at an even n, if some optimal game of n − 1 does not play n/2, game n is at its ceiling | proved |
-| N8 | [the 8p theorem](neighbors.md#the-8p-theorem) | at n = 8p ≥ 187, p a prime, with 9q(p − 1) > n: opt(n) ≤ opt(n − 1) + n − 4q(p − 1), on the whole board, with no U; the bound fails at 184, which meets neither hypothesis | proved, resting on [F10](frame-model.md#the-square-theorem) and the computation of its finite part |
-| | [the exchange at 8p](neighbors.md#the-8p-theorem) | in every game of the committed chain that N8 covers, from 248 on, the recorded optimal set of n − 1 with 4q(p − 1) exchanged for n is playable and scores N8's bound, so N8 proves game n from game n − 1 | proved by computation |
 
 ### The heaviest playable set of sources
 
@@ -232,6 +230,17 @@ claim about the program ([exact searches](search-rules.md#exact-searches)).
 | | [the shadow law](arrival.md#the-shadow-law) | when the recorded optimal sets of n − 1 and n have the same promotion set and differ by n replacing one move x, x is the shadow of n for odd n and n/2 for even n; and for odd n, when game n poses the root problem of game n − 1, U\* gives up exactly the shadow of n | measured; proved at a prime, by [N6](neighbors.md#the-step-theorem) |
 | | [the half law](arrival.md#the-half-law) | for even n ≥ 4 but 14, game n poses the root problem of game n − 1 iff n/2 ∉ U\*(n − 1) | measured; the "if" proved where J1 applies |
 | | [the cofactor rule](arrival.md#the-cofactor-rule) | for n ≥ 28 whose layer 2 has no freedom in game n or in the game m before it (n − 2 when n − 1 is prime), as for every n ≥ 188 by [F10](frame-model.md#the-square-theorem): game n has the root problem of game m if n divided by its largest prime factor is a prime or twice a prime, and is at its ceiling if it is 9 | measured; the first case proved, by J2 |
+
+### Below the ceiling
+
+| label | result | statement | standing |
+|---|---|---|---|
+| L1 | [the re-payment lemma](below-the-ceiling.md#the-re-payment-lemma) | in a layer instance, a member, or a number that joins, can take a factor that nobody else pays and keep the scheme acyclic if the factor's other listers have no edge out or nobody else pays a factor it lists; so a number joins through a factor whose other listers have factors of their own | proved |
+| L2 | [the 8p theorem](below-the-ceiling.md#the-8p-theorem) | at n = 8p ≥ 187, p a prime, with 9q(p − 1) > n: opt(n) ≤ opt(n − 1) + n − 4q(p − 1), on the whole board, with no U; the bound fails at 184, which meets neither hypothesis | proved, resting on [F10](frame-model.md#the-square-theorem) and the computation of its finite part |
+| | [the exchange at 8p](below-the-ceiling.md#the-8p-theorem) | in every game of the committed chain that L2 covers, from 248 on, the recorded optimal set of n − 1 with 4q(p − 1) exchanged for n is playable and scores L2's bound, so L2 proves game n from game n − 1 | proved by computation |
+| L3 | [the cycle lemma](below-the-ceiling.md#the-cycle-lemma) | for distinct primes p and r of 5 or more, a playable set that holds 8p, 8r, 12p and 12r holds at most one of 6p and 6r | proved |
+| L4 | [the 12p theorem](below-the-ceiling.md#the-12p-theorem) | at n = 12p ≥ 187, p a prime, with 15q(p − 1) > n: if some optimal set of n holds 8p, 8q(p − 1), 12q(p − 1) and 8t for a prime t with 4p/3 < t ≤ 3p/2, then opt(n) ≤ opt(n − 1) + n − 6q(p − 1); U at n gives such a set when the four lie in U\*(n); the bound fails at 204, which meets all but 15q(p − 1) > n | proved, resting on [F10](frame-model.md#the-square-theorem) and the computation of its finite part; its hypothesis given U at n when the four lie in U\*(n) |
+| | [the exchange at 12p](below-the-ceiling.md#the-12p-theorem) | in every game of the committed chain that meets L4's hypotheses with its recorded optimal set of n, from 276 on, the recorded optimal set of n − 1 with 6q(p − 1) exchanged for n is playable and scores L4's bound | proved by computation |
 
 ## Open questions
 

@@ -2,16 +2,14 @@
 
 Part of [the theory](../THEORY.md).
 
-Game n differs from game n − 1 by one number, and much passes between them.  The best score always rises, but never by
-more than n.  At a prime it rises by an exact amount, and at its ceiling a game's optimal sets are those of the game
-before that stay playable with n added.  At eight times a prime it stays below its ceiling by at least four times the
-prime before, when that prime is close enough.  The proofs rest on the rules alone and two facts about primes, but for
-the last, [the 8p theorem](#the-8p-theorem), which draws on [playability.md](playability.md) and
-[frame-model.md](frame-model.md); only one example before it draws on the rest of the theory, and
-[arrival.md](arrival.md) follows the arrival of n through the frame model.  Monotonicity, [the ceiling
-lemma](#the-ceiling-lemma) and the prime formula each come with a construction that turns a game of one board into a
-game of the other, and needs of that game only that it be finished, not that it be optimal.  So the lower bounds carried
-between games are the scores of real games, which anyone can replay by the rules
+Game n differs from game n − 1 by one number, and much passes between them.  The best score always rises, but never
+by more than n.  At a prime it rises by an exact amount, and at its ceiling a game's optimal sets are those of the game
+before that stay playable with n added.  The proofs rest on the rules alone and two facts about primes; only one example
+below draws on the rest of the theory.  [arrival.md](arrival.md) follows the arrival of n through the frame model, and
+[below-the-ceiling.md](below-the-ceiling.md) shows how far below its ceiling game n stays at some multiples of a prime.
+Monotonicity, [the ceiling lemma](#the-ceiling-lemma) and the prime formula each come with a construction that turns a
+game of one board into a game of the other, and needs of that game only that it be finished, not that it be optimal.  So
+the lower bounds carried between games are the scores of real games, which anyone can replay by the rules
 ([search-rules.md](search-rules.md#bounds-carried-between-games)); an upper bound crosses by the inequalities alone.
 
 The words of the game (board, pot, move, tax, score, opt(n), optimal set, playable, ceiling) are the
@@ -262,81 +260,3 @@ no more.  ∎
 The optimal game of 21 does not play 11, so game 22 is at its ceiling, and so is game 34, since the optimal game of 33
 does not play 17.  Game 20 is below its ceiling, 124 against 113 + 20, so by the lemma every optimal game of 19 plays
 10.  At a ceiling the step theorem gives the optimal sets: those of n − 1 that stay playable with n added.
-
-## The 8p theorem
-
-At n = 8p, with p a prime and r the prime before p, game n falls at least 4r short of its ceiling, the bound of [the
-ceiling lemma (N4)](#the-ceiling-lemma), when n ≥ 187 and r is close enough to p.  The factor 8 can pay for only one of
-n and 8r.  As in game 248 below, it pays for 8r in game n − 1, which leaves 4r free to be a move, and for n in game n,
-so 8r pays with 4r.  The bound holds on the whole board, with no statement U.
-
-*Words.*  Instances, with their members, pools and lists, payment schemes, pay(x) and the precedence are
-[playability.md](playability.md#payment-schemes)'s, mf(x) is the set of maximal factors of x, and S_k is the part of a
-set S in layer k.  A set S of game n is playable iff each of its layer instances is, by [the layer theorem
-(F3)](frame-model.md#the-layer-theorem); the one at k has the members S_k and, as its pool, the numbers of layer k − 1
-up to n/2 that are not in S.
-
-**Theorem N8 (the 8p theorem).**  Let n = 8p ≥ 187 with p a prime, let r = q(p − 1) be the largest prime below p, and
-suppose that 9r > n.  Then opt(n) ≤ opt(n − 1) + n − 4r.  So a game of n that scores opt(n − 1) + n − 4r is optimal.
-
-*Proof.*  Take n out of an optimal set of game n, and one of 4p, 4r and 8r can join what is left in game n − 1: it pays
-with a factor that n paid with, or that at most one other member lists, and that member has a factor of its own to move
-to.
-
-Let S be an optimal set of game n.  It holds n ([monotonicity (N3)](#monotonicity)); let T = S ∖ {n}.  We find an x ∉ S,
-at least 4r, with T ∪ {x} playable in game n, and so in game n − 1, as it does not hold n (N3).  Then
-opt(n − 1) ≥ ΣT + x = opt(n) − n + x.  The layer instances below are those of sets of game n, and S's scheme at k is an
-acyclic payment scheme of S's layer instance at k, which exists by F3.
-
-1. *What lists what.*  A number f is a maximal factor of fs for each prime s and of nothing else, so on the board of n a
-   number f with 3f > n is one of 2f alone, and one with 5f > n of 2f and 3f alone.  The numbers 12p, 9p and 10p exceed
-   n, and so do 12r, 9r and 10r, since 9r > n.  So 4p, 3p, 4r and 3r are maximal factors of 8p, 6p, 8r and 6r alone, 2p
-   of 4p and 6p alone, and 2r of 4r and 6r alone.  And as p and r exceed 3, mf(n) = {4p, 8}, mf(8r) = {4r, 8}, mf(4p) =
-   {2p, 4} and mf(4r) = {2r, 4}.  The numbers n and 8r lie in layer 4 and above n/2, as r > p/2, so in no pool.  The
-   numbers 4p, 4r, 6p, 6r and 8 lie in layer 3, and 2p, 3p, 2r and 3r in layer 2, and all but 6p and 6r are at most
-   n/2 = 4p.
-2. *The pool of layer 3.*  As n ≥ 187, S holds no number of layer 2 up to n/2 ([the square theorem
-   (F10)](frame-model.md#the-square-theorem)), so the pool of S's layer instance at 3 holds 2p, 3p, 2r and 3r.
-3. *One payment changed.*  Within a layer instance an edge a → b of a precedence
-   ([P2](playability.md#the-playability-theorem)) means that b lists pay(a), since a does not divide b, which lies in
-   its layer, and pay(a), one layer below b, divides it only as a maximal factor.  So if, in an acyclic scheme, a member
-   a, or a number a of the layer that joins the members, pays with a factor f that it lists and no other member pays,
-   only the edges at a change: those out of a go to the other members that list f, and those into a come from the
-   members whose payments a lists.  No cycle passes through a, and the scheme stays acyclic, if each other member that
-   lists f has no edge out, or if no other member pays with a factor that a lists.  When a joins and no other member
-   lists f, this is [the extension lemma (P6)](playability.md#the-extension-lemma).
-4. *A number of layer 3 joins.*  Let (x, y, f, g) be (4p, 6p, 2p, 3p) or (4r, 6r, 2r, 3r), with x ∉ S.  Then S_3 + x is
-   playable against the pool of S's layer instance at 3.  By steps 1 and 2, f and g are in that pool, x lists f and not
-   g, only x and y list f, and only y lists g.  If y ∉ S, no member lists f, and x joins S's scheme at 3 paying with f
-   (P6).  If y ∈ S, y first pays with g, and then x joins paying with f, since y, the only other member that lists f,
-   has no edge out (step 3, twice).
-5. *Case A: 4p ∉ S.*  Take x = 4p.  Only the layer instances of T ∪ {4p} at 3 and 4 differ from S's, since n, of layer
-   4, lies in no pool, and 4p, of layer 3, only in the pool at 4.  At 3 the members are S_3 + 4p, playable by step 4.
-   At 4 they are S_4 − n, and 4p leaves the pool.  S's scheme at 4, restricted to them, pays none with 4p, which only n
-   lists, so it is an acyclic scheme there.
-6. *Case B: 4p ∈ S.*  Then n lists only 8 in S's layer instance at 4, so it pays with 8, and 8 ∉ S.
-   * *Case B1: 8r ∈ S.*  Then 8r cannot pay with 8, n's payment, so it pays with 4r, and 4r ∉ S; take x = 4r.  As in
-     case A, layer 3 is step 4's, and at 4 the members are S_4 − n and 4r leaves the pool.  In S's scheme at 4,
-     restricted to S_4 − n, 8r can pay with 8: nobody else pays with 8, which n paid, or with 4r, which only 8r lists,
-     so step 3 applies.  Then nobody pays with 4r, which can leave the pool.
-   * *Case B2: 8r ∉ S.*  Take x = 8r, of layer 4 and in no pool, so that only layer 4 changes, where 8r takes the place
-     of n.  It joins S's scheme at 4, restricted to S_4 − n, paying with 8, and as in case B1 nobody else pays with a
-     factor that it lists (step 3).
-7. *The bound.*  In each case every layer instance of T ∪ {x} is playable, so T ∪ {x} is playable in game n (F3),
-   and x ≥ 4r.  ∎
-
-The hypothesis n ≥ 187 enters only in step 2, through the square theorem, which needs it; so N8 rests on F10's
-computation of its finite part ([evidence.md](evidence.md#observations)).  The hypothesis 9r > n enters in step 1:
-12r > n and 10r > n need only r > 2p/3 and r > 4p/5, but the proof cannot spare 9r > n, which keeps 3r for 6r alone.
-Some hypothesis is needed.  Game 184 = 8·23, with r = 19, meets neither, and rises by 136 over game 183, more than the
-184 − 76 = 108 that the bound would allow.  Its recorded optimal set plays 91 = 7·13, of layer 2 up to n/2, against
-step 2, and both 114 = 6r and 171 = 9r, which list 57 = 3r, so that 6r has no factor of its own for step 4.  Nor are
-the hypotheses sharp: games 152 = 8·19, below 187, and 232, 296 and 424, where 9r ≤ n, rise by exactly n − 4r all the
-same.
-
-Game 248 = 8·31, with r = 29, is the first that the theorem covers.  In game 247, 232 = 8r pays with 8 and 116 = 4r is a
-move; in game 248, 124 = 4p is a move, so 248 pays with 8 and 232 with 116.  The bound, opt(247) + 248 − 116 = 19,291,
-is opt(248), and the recorded optimal set of game 247 with 116 exchanged for 248 is that of game 248.  The same exchange
-reaches the bound in every game of the committed chain that the theorem covers, so with the theorem it proves game n
-from game n − 1 ([the standing](statements.md#neighboring-games), [the computation](evidence.md#observations)).  The
-scores and sets of the examples are those of `results/optimal.jsonl.gz`.

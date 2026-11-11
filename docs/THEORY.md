@@ -11,20 +11,18 @@ computations behind the standings that rest on computation, and the heuristics' 
 
 ## The files
 
-In reading order.  Each file's proofs rest only on the files above it, with two exceptions.  In
+In reading order.  Each file's proofs rest only on the files above it, with one exception: in
 [sources.md](theory/sources.md), [the span theorem](theory/sources.md#the-span-theorem) and the equivalence of (★) with
 the weighted [sources conjecture](theory/sources.md#the-sources-conjecture) use [the uniqueness
-theorem](theory/uniqueness-and-longest-games.md#the-uniqueness-theorem) of the next file.  In
-[neighbors.md](theory/neighbors.md), [the 8p theorem](theory/neighbors.md#the-8p-theorem) uses [the layer
-theorem](theory/frame-model.md#the-layer-theorem) and [the square theorem](theory/frame-model.md#the-square-theorem) of
-frame-model.md.  Remarks look forward in places.
+theorem](theory/uniqueness-and-longest-games.md#the-uniqueness-theorem) of the next file.  Remarks look forward in
+places.
 
 | file | letter | read it for |
 |---|---|---|
 | [primer.md](theory/primer.md) | | the standard mathematics: GF(2), linear independence and forests, the greedy algorithm, weight splits, permanents |
 | [statements.md](theory/statements.md) | | every result with its standing and a link to it, the notation, and the open questions |
 | [playability.md](theory/playability.md) | P | when a set of moves can be played: payment schemes, peel, cores, linear independence |
-| [neighbors.md](theory/neighbors.md) | N | what passes from game n − 1 to game n: [the prime lemma](theory/neighbors.md#the-prime-lemma), monotonicity, the ceiling, the prime formula, the 8p theorem |
+| [neighbors.md](theory/neighbors.md) | N | what passes from game n − 1 to game n: [the prime lemma](theory/neighbors.md#the-prime-lemma), monotonicity, the ceiling, the prime formula |
 | [sources.md](theory/sources.md) | S | whether U\*, the sources that descending greedy keeps, is the heaviest playable set of sources: the sources conjecture, (★) and (♦) |
 | [uniqueness-and-longest-games.md](theory/uniqueness-and-longest-games.md) | Q | whether the optimal set is unique, and whether an optimal game plays the most moves |
 | [frame-model.md](theory/frame-model.md) | F | the frame model that the frame solver searches: frames, layers, the bottom layers, promotion sets, the promotion limit |
@@ -35,6 +33,7 @@ frame-model.md.  Remarks look forward in places.
 | [frame-bounds.md](theory/frame-bounds.md) | B | the bounds on the promotions: the frame bound and the decomposition bound |
 | [search-rules.md](theory/search-rules.md) | R | what a search of the frame model proves, every rule it may cut by, and the bounds carried between games |
 | [arrival.md](theory/arrival.md) | J | from game n − 1 to game n: the arrival lemma, the semiprime formula, the shadow law, the cofactor rule |
+| [below-the-ceiling.md](theory/below-the-ceiling.md) | L | how far below its ceiling game n stays at 8p and 12p: the re-payment lemma, the 8p theorem, the cycle lemma, the 12p theorem |
 | [evidence.md](theory/evidence.md) | | the computations behind the statements that are not proved |
 | [writing.md](theory/writing.md) | | how the theory is written, for those who write it |
 
@@ -44,18 +43,20 @@ One open statement, U, stands between the frame model and opt(n), and the frame 
 other proof has reached.  The open statements about the sources bear on no score: the frame model fixes the sources to
 U\*, and its exactness needs neither (★) nor (♦).
 
-* **Proved outright:** playability (P1 to P11); neighboring games (N1 to N8); the frame model and its exactness (F1 to
+* **Proved outright:** playability (P1 to P11); neighboring games (N1 to N7); the frame model and its exactness (F1 to
   F10, X1 to X7, [the holes theorem X9](theory/exactness.md#boards-with-holes), and the inequality of [the corollary of
   U, X8](theory/exactness.md#statement-u)); the parity and barred bounds (W1 to W3); the extended problem and its
   certificates (E1 to E6); the bounds on the promotions (B1 to B5, and B6 but its last part); the rules of a search (R1
   to R5, [the near-repeat lemma R7](theory/search-rules.md#the-near-repeat-lemma), and the first part of [the repeat
-  lemma R6](theory/search-rules.md#the-repeat-lemma)); J1 to J3; the relaxation and length propositions (Q2, Q4) and
-  the first two parts of [the length lemma (Q3)](theory/uniqueness-and-longest-games.md#the-length-lemma); the
-  equivalence in [the cardinality conjecture (S4)](theory/sources.md#the-cardinality-conjecture); and the explanatory
-  [victim law](theory/sources.md#the-victim-law), [frontier theorem](theory/sources.md#the-frontier-theorem), [span
-  theorem](theory/sources.md#the-span-theorem) and Franklín–Moniot results (S2, S3, S6, C1 to C3).
-* **Given statement U at n:** the equality of the corollary of U (X8), and the inequality and last part of the repeat
-  lemma (R6).
+  lemma R6](theory/search-rules.md#the-repeat-lemma)); J1 to J3 and L1 to L4; the relaxation and length propositions
+  (Q2, Q4) and the first two parts of [the length lemma (Q3)](theory/uniqueness-and-longest-games.md#the-length-lemma);
+  the equivalence in [the cardinality conjecture (S4)](theory/sources.md#the-cardinality-conjecture); and the
+  explanatory [victim law](theory/sources.md#the-victim-law), [frontier
+  theorem](theory/sources.md#the-frontier-theorem), [span theorem](theory/sources.md#the-span-theorem) and
+  Franklín–Moniot results (S2, S3, S6, C1 to C3).
+* **Given statement U at n:** the equality of the corollary of U (X8), the inequality and last part of the repeat lemma
+  (R6), and the hypothesis of [the 12p theorem (L4)](theory/below-the-ceiling.md#the-12p-theorem) when its four numbers
+  lie in U\*(n).
 * **Given (★) in game n:** [the uniqueness theorem (Q1)](theory/uniqueness-and-longest-games.md#the-uniqueness-theorem),
   the last part of the length lemma (Q3), and through Q1 [the sources
   conjecture](theory/sources.md#the-sources-conjecture) there.
