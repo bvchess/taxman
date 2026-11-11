@@ -200,9 +200,10 @@ every second line of the Java fixtures), and the comment on each says what the w
   what it says is refused; an assumption travels down a chain; a score that is not the table's is a hard error; a
   tampered results file, or one whose line contradicts itself or is of another schema, is refused by both verifiers,
   naming the line; a torn last line is dropped; the committed results pass the verifier and the built-in table holds
-  their games; a game stopped by a node limit and resumed reads back assuming nothing; a game's line has the CPU time
-  of its workers (`seconds.cpu`, zero for a game that runs no search) and its active time, and its summary line ends
-  with those over all its runs and its best promotion sum.  Both verifiers refuse forged repeats (another game
+  their games, and the proven games past the chain (`results/beyond-the-chain.jsonl`) pass both verifiers with none
+  of them in the table; a game stopped by a node limit and resumed reads back assuming nothing; a game's line has the
+  CPU time of its workers (`seconds.cpu`, zero for a game that runs no search) and its active time, and its summary line
+  ends with those over all its runs and its best promotion sum.  Both verifiers refuse forged repeats (another game
   named; the digests, promotions or promotion sum changed; the game repeated unfinished, after the repeat, or settling
   no search; its assumptions dropped), and `verify-results` refuses two more that only setting the problems up again can
   catch (the Python referee accepts them, as its docstring says).  A search that took no step is the method `start`:

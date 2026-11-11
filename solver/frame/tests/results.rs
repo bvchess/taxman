@@ -9,7 +9,7 @@ mod common;
 
 use common::TempDir;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use taxman::game::Optimal;
 use taxman::json::Json;
@@ -41,14 +41,19 @@ fn with(line: &Json, path: &str, value: &Json) -> Json {
 /// table as the Rust verifier takes the built-in one.
 const TABLE_GAMES: usize = 400;
 
-/// The Python referee `solver/tools/check_results.py` on the files `paths`.  Its table is the first [`TABLE_GAMES`]
-/// lines of the committed results, in a file beside the first of `paths`.
-fn python_referee(paths: &[PathBuf]) -> std::process::Output {
-    let table = common::referee_table(&paths[0], TABLE_GAMES);
+/// The Python referee `solver/tools/check_results.py` on the files `paths`, with the lines of the file `table` as its
+/// table.
+fn python_referee_with(table: &Path, paths: &[PathBuf]) -> std::process::Output {
     let mut command = Command::new("python3");
     command.arg("-I").arg(crate_path("../tools/check_results.py"));
-    command.arg("--table").arg(&table);
+    command.arg("--table").arg(table);
     command.args(paths).output().expect("python3 runs solver/tools/check_results.py")
+}
+
+/// The Python referee on the files `paths`.  Its table is the first [`TABLE_GAMES`] lines of the committed results, in
+/// a file beside the first of `paths`.
+fn python_referee(paths: &[PathBuf]) -> std::process::Output {
+    python_referee_with(&common::referee_table(&paths[0], TABLE_GAMES), paths)
 }
 
 /// A change to a line: the field at a path (as [`with`] takes it) and its new value.
@@ -598,4 +603,41 @@ fn the_start_of_the_committed_results_passes_the_verifier() {
 )]
 fn the_committed_results_pass_the_verifier() {
     check_the_committed_results(None);
+}
+
+/// The games that `results/beyond-the-chain.jsonl` holds past the end of the committed chain pass the verifier: every
+/// line is a completed line, none is the line of a stopped search or torn, each game is there once, and the table built
+/// into the library holds none of them (a game of the committed chain never goes in the file).  A line that rests on an
+/// earlier game is checked against that game's line in the file.  The file's counts are `results/README.md`'s to print
+/// (`taxman verify-results results/beyond-the-chain.jsonl`), and no test fixes them.
+#[test]
+fn the_games_beyond_the_chain_pass_the_verifier() {
+    let path = common::beyond_the_chain();
+    let optimal = Optimal::built_in();
+    let report = verify_files(std::slice::from_ref(&path), optimal, 1).unwrap_or_else(|e| panic!("{e}"));
+    println!("{report}");
+    let [file] = &report.files[..] else { panic!("one file") };
+    let contents = &file.contents;
+    let shown = file.path.display();
+    // The verifier refuses a game that two completed lines give, so each game is there once if every line is the
+    // completed line of a game: none is blank or unfinished, and the file does not end in a torn line.
+    assert!(!contents.games.is_empty(), "{shown}: no game");
+    assert_eq!(contents.lines, contents.games.len(), "{shown}: a line that is not the line of a game");
+    assert_eq!((contents.incomplete_lines, contents.torn), (0, false), "{shown}");
+    assert!(contents.runs.is_empty(), "{shown}: a game left unfinished");
+    for &n in contents.games.keys() {
+        assert_eq!(optimal.score(n), None, "{shown}: n={n} is a game of the committed chain");
+    }
+}
+
+/// The Python referee passes `results/beyond-the-chain.jsonl` too, as the other verifier does
+/// ([`the_games_beyond_the_chain_pass_the_verifier`]).  It is a test of its own, so that each stays inside the quick
+/// check's 3 s of CPU.
+#[test]
+fn the_games_beyond_the_chain_pass_the_python_referee() {
+    let dir = TempDir::new("beyond-the-chain");
+    // The table is a file of the temporary directory: a file written in `results/` would be a results file there.
+    let table = common::referee_table(&dir.join("beyond-the-chain.jsonl"), TABLE_GAMES);
+    let run = python_referee_with(&table, &[common::beyond_the_chain()]);
+    assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stdout));
 }

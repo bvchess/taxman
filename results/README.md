@@ -1,10 +1,10 @@
 # Results of the solver
 
-This directory holds the project's results: the chain of optimal moves, and the chain's scores in the OEIS's format.
-This page says what each file holds, how far it reaches, how it was made and what supports its scores.  The
-[glossary](../docs/GLOSSARY.md) defines the terms; [the frame model](../docs/theory/frame-model.md#the-frame-model) and
-statement U, on which the frame solver's scores rest, are defined in the theory, and the prover in [its
-README](../solver/noframe/README.md).
+This directory holds the project's results: the chain of optimal moves, the proven games past its end, and the chain's
+scores in the OEIS's format.  This page says what each file holds, how far it reaches, how it was made and what supports
+its scores.  The [glossary](../docs/GLOSSARY.md) defines the terms; [the frame
+model](../docs/theory/frame-model.md#the-frame-model) and statement U, on which the frame solver's scores rest, are
+defined in the theory, and the prover in [its README](../solver/noframe/README.md).
 
 A results file has one JSON line per game, as `taxman solve --out` writes it.  The fields are described in
 `src/results.rs` and in [the frame solver's reference](../solver/docs/REFERENCE.md#a-results-line---out-schema-5).  The
@@ -16,6 +16,7 @@ counts on this page are a snapshot, dated 2026-11-06, which no test pins: the co
 | file | holds | games | made by |
 |---|---|---|---|
 | `optimal.jsonl.gz` | the committed chain: the moves of an optimal game for every n, each found from the moves for n − 1; the table of moves built into the frame solver | 1–5060 on 2026-11-06 | one run of `taxman solve` ([below](#optimaljsonlgz)) |
+| `beyond-the-chain.jsonl` | the proven games past the end of the chain, in blocks that each start with a standalone game | past the end of the chain | `taxman solve`, a standalone game and the games after it ([below](#beyond-the-chainjsonl)) |
 | `b019312.txt` | the scores of `optimal.jsonl.gz`, as a b-file of [A019312](https://oeis.org/A019312) in the OEIS | 1–5060 | the command [below](#b019312txt) |
 
 How far each proof kind reaches:
@@ -26,14 +27,16 @@ How far each proof kind reaches:
 * **Games 2532 on** are proven within the frame model, which is exact given statement U.  U is not proven past 2531.
   A line of them proven by the ceiling or the prime formula is opt(n)
   wherever the game before it is.
+* **Every line of `beyond-the-chain.jsonl`** is proven within the frame model too, so it holds given U as the games 2532
+  on do, and a line that is not standalone rests on a line of that file ([below](#beyond-the-chainjsonl)).
 
 "What supports the scores", below, gives the evidence for each.
 
-**A file that is not a chain from game 1 never goes into `optimal.jsonl.gz`.**  Such a file starts above game 1 or has
-a gap, where a run began with a standalone game with no ceiling, or has the line of an unfinished search (a lower bound,
-nothing proven).  Each completed line in it is proven on its own terms, given what it assumes, but one that follows a
-gap may rest on nothing the chain would have given it.  The verifiers read such files
-([verifiers.md](../solver/docs/verifiers.md)); none is committed here.
+**A file that is not a chain from game 1 never goes into `optimal.jsonl.gz`.**  The frame solver builds that file in and
+reads its line n as game n, so it can hold no gap, and a game past a gap rests on no game of it.  The proven games past
+the end of the chain go into [`beyond-the-chain.jsonl`](#beyond-the-chainjsonl).  The line of an unfinished search (a
+lower bound, nothing proven) goes into no committed file.  The verifiers read files of every kind
+([verifiers.md](../solver/docs/verifiers.md)).
 
 ## optimal.jsonl.gz
 
@@ -228,6 +231,42 @@ What that evidence amounts to:
 The checks cannot catch a game that is legal, finished and within the chain bounds but not optimal, when the moves for n
 − 1 are not optimal either.  That is what the proof kinds and the assumptions track, and why the chain from n = 1 and
 the standalone solves (3) matter.
+
+## beyond-the-chain.jsonl
+
+**The proven games past the end of the chain**, which `optimal.jsonl.gz` cannot hold because a gap of games parts them
+from it.  The file has one line a game in schema 5, no line of an unfinished search, and blocks: a block starts with a
+game solved [standalone](../docs/GLOSSARY.md#results-and-trust) and goes on with the games after it, each settled from
+the game before it.
+
+**Each line is proven, and says what it rests on.**  A standalone line, the first of a block, is proven by a search
+that started from no earlier game, so it rests on none.  A line settled by the [prime
+formula](../docs/GLOSSARY.md#the-game), a [repeat](../docs/GLOSSARY.md#results-and-trust) or the
+[ceiling](../docs/GLOSSARY.md#the-game) rests on the line in this file of the game before it, or for a repeat of the
+game it repeats.  All are proven within the frame model, and so rest on [statement
+U](../docs/theory/exactness.md#statement-u) as the chain's games past 2531 do.
+
+**How it was made.**  On 2026-11-10, on one clean build (commit aeffc29), the game 5260 was solved standalone, with no
+seed, no ceiling and no near-repeat cut (`--force-search --tactic prev_cap=off --tactic near_repeat=off`).  The search
+was stopped at its budget and resumed from its checkpoint on 88 threads, and exhausted its tree after 78.5 CPU-hours.
+The games after it, 5261 (the prime formula), 5262 and 5263 (repeats) and 5264 (the ceiling), were solved from it in
+chain mode with every tactic at its default.  [The lab notebook's
+entry](https://github.com/bvchess/taxman-notebook/blob/main/the-first-proofs-past-5060-2026-11/README.md) has the full
+record.
+
+To check it, from the top of the repository:
+
+    taxman verify-results results/beyond-the-chain.jsonl
+    python3 solver/tools/check_results.py results/beyond-the-chain.jsonl
+
+Both accept the file and print its games and proof kinds as they stand, and `tests/results.rs` runs both on it.
+
+**The rules for adding lines:**
+
+* Only completed lines that both verifiers accept go in.
+* A game that `optimal.jsonl.gz` holds never goes in.
+* Each game goes in once.
+* A new block starts with a standalone line.
 
 ## b019312.txt
 

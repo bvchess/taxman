@@ -28,8 +28,8 @@ also proven on the whole board by a second program that shares no proof code wit
 [results/README.md](results/README.md) gives how far the chain reaches, how far each kind of proof reaches, and what
 supports every score.
 
-For the games past the end of the chain, the [results](results/README.md) directory also keeps an upper bound on
-opt(n) and the best score found.
+The games proven past the end of the chain are in `results/beyond-the-chain.jsonl`, which
+[results/README.md](results/README.md#beyond-the-chainjsonl) describes.
 
 ## The programs
 

@@ -76,6 +76,11 @@ pub fn committed_results() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/optimal.jsonl.gz")
 }
 
+/// The proven games past the end of the committed chain, the file `results/beyond-the-chain.jsonl`.
+pub fn beyond_the_chain() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/beyond-the-chain.jsonl")
+}
+
 /// One line of the committed results: its score and moves.
 pub type StoredGames = BTreeMap<u32, (u64, Vec<u32>)>;
 
