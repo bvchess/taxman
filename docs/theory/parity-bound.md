@@ -279,3 +279,118 @@ Between it and the bounds it is compared with:
   relaxation proposition (Q2)](uniqueness-and-longest-games.md#the-relaxation-proposition), by which no greedy
   relaxation of a game with two or more optimal sets is exact, does not apply to it: a greedy relaxation, as Q2 defines
   it, is a family on which the greedy algorithm finds a heaviest set for every nonnegative weighting.
+
+## The parity steps
+
+From game n − 1 to game n the parity bound moves in one of four ways, which the greedy basis decides with no search.
+Where n's vector is a sum of old sources' vectors, the bound rises by n less the smallest source that the sum needs, and
+the promotions it allows do not change ([W4](#the-parity-steps)).  So its excess over opt(n) stays at every prime and
+every odd semiprime from 189 on ([W5](#where-the-parity-gap-stays)).
+
+*Words.*  For a game m, G(m) is the greedy basis of its sources' vectors, V(m) their span, and PB(m) the parity bound of
+m.  A set L of numbers of 2..⌊m/2⌋ is *admissible* for G(m) when G(m) ∪ L is independent at both parities, and Q\*(m) is
+the largest ΣL of an admissible L.  By W3 the heaviest sets independent at both parities are the sets G(m) ∪ L with L
+admissible, so PB(m) = ΣG(m) + Q\*(m).  The *parity gap* of game m is PB(m) − opt(m), as in [the
+glossary](../GLOSSARY.md#bounds).  Game n ≥ 3 is an *exchange step* when n is odd and v(n) ∈ V(n − 1), and an *added
+step* when n is odd and v(n) ∉ V(n − 1); with s = n/2 for even n, it is a *half-in step* when s ∈ G(n − 1), and a
+*half-out step* when s ∉ G(n − 1).
+
+**Theorem W4 (the parity steps).**  Let n ≥ 3.  Always PB(n) ≤ PB(n − 1) + n, and:
+
+1. At an exchange step, exactly one set C ⊆ G(n − 1) has Σ_{c ∈ C} v(c) = v(n), and its members lie in n's layer.  With
+   x_G its smallest member, G(n) = G(n − 1) − x_G + n, the same sets are admissible for G(n) and for G(n − 1), and
+   PB(n) = PB(n − 1) + n − x_G.
+2. At an added step, G(n) = G(n − 1) + n, and every set admissible for G(n) is admissible for G(n − 1).
+3. At a half-in step, G(n) = G(n − 1) − s + n, every set admissible for G(n − 1) is admissible for G(n), and
+   PB(n) ≥ PB(n − 1) + n − s.
+4. At a half-out step, G(n) = G(n − 1) + n and PB(n) = PB(n − 1) + n.
+
+None of it needs statement U or (♦).
+
+*Proof.*  The vector of n is new, has a coordinate of its own, or is a sum of old vectors, and then n takes the place of
+the smallest of them.
+
+1. *The two boards.*  For odd n, ⌊n/2⌋ = (n − 1)/2, so the boards n − 1 and n have the same coordinates; for even n,
+   board n has one more, s, and of the numbers below n only s has a parity vector there, e_s, since the next multiple of
+   s is n.  So the numbers below n keep their parity vectors, but s, which trades its extra coordinate for e_s.  The
+   sources of board n are those of board n − 1 and n, less s for even n, which is the smallest source of board n − 1.
+2. *The ceiling.*  For a heaviest set I of board n, the parity vectors of I − n on board n − 1 are those of board n, but
+   e_s, which becomes an extra coordinate, which no circuit holds.  So I − n is independent at both parities on board
+   n − 1, and PB(n) ≤ Σ(I − n) + n ≤ PB(n − 1) + n.
+3. *G(n) at the other steps.*  The greedy algorithm on board n keeps n first, as v(n) ≠ 0, and then decides the old
+   sources in turn; let K_y be the members of G(n − 1) above y.  For even n, v(n) alone has a 1 at s, so v(y) lies in
+   the span of K_y + n only if it lies in that of K_y.  At an added step, a member y of G(n − 1) with v(y) in the span
+   of K_y + n would put v(n) in that of K_y + y, in V(n − 1).  Either way each old source is decided as before.
+4. *G(n) at an exchange step.*  C exists and is unique, since G(n − 1) is a basis of V(n − 1) ([the greedy
+   algorithm](primer/greedy.md#the-greedy-algorithm), part (a)).  The vectors of a layer k lie on the coordinates of
+   layer k − 1, so members of C of another layer than n's would sum to 0 alone, and there are none.  Above x_G, a member
+   y of G(n − 1) with v(y) in the span of K_y + n would give v(n) a second representation, missing x_G.  At x_G,
+   v(x_G) = v(n) + Σ v(c) over C − x_G, which lies in K_{x_G}, so x_G is rejected.  Below it, K_y − x_G + n spans what
+   K_y spans, as each of v(n) and v(x_G) is a sum of the other and of members of K_y.
+5. *The admissible sets.*  The members of L have no extra coordinates, so whether L is admissible for G depends only on
+   W₀(G) and W₁(G), with W_i(G) the span of v(g) over the members g of G whose layer is not of parity i ([the
+   primer](primer/linear-algebra.md#linear-independence)).  At an exchange step x_G and n lie in n's layer, so at its
+   parity they enter neither W_i, and at the other each of v(n) and v(x_G) is a sum of the other and of members of both
+   G(n − 1) and G(n): the W_i agree.  At an added step G(n − 1) ∪ L is part of G(n) ∪ L.  At a half-in step an L
+   admissible for G(n − 1) lies below s and keeps its vectors on board n, with G(n − 1) − s, and it stays independent
+   with n, by s at one parity and n's extra coordinate at the other.
+6. *The bound.*  PB = ΣG + Q\* gives parts 1 and 3.  At a half-out step a heaviest set of board n − 1 holds no s, by W3,
+   and with n it is independent at both parities on board n, by s and n's extra coordinate; with step 2, part 4 follows.
+   ∎
+
+Game 39 is an exchange step: v(39) = e₃ + e₁₃ is the sum over C = {22, 26, 33} in G(38), so x_G = 22 and
+PB(39) = PB(38) + 17 = 503.  Games 21, 22 and 20 are an added, a half-out and a half-in step: the bound rises by 20, by
+22, and by 11, as 10 leaves the greedy basis (`solver/noframe/data/exact_parity_2_2531.jsonl`).
+
+### Where the parity gap stays
+
+At three kinds of game the parity gap stays.
+
+**Corollary W5 (where the parity gap stays).**  Let n ≥ 3.
+
+1. *Exchanges of U\*.*  For odd n, given (♦) in games n − 1 and n, U\*(n) = U\*(n − 1) − x + n for a source x of game
+   n − 1 exactly at an exchange step, with x = x_G.  So there opt(n) = opt(n − 1) + n − x exactly when the parity gap
+   stays.
+2. *Primes and semiprimes.*  At every prime n, and every odd n ≥ 189 with two prime factors, the parity gap stays:
+   opt(n) − opt(n − 1) = PB(n) − PB(n − 1).
+3. *Half-out steps.*  At a half-out step, given statement U and (♦) in game n − 1, the parity gap stays.
+4. *The gap.*  Given U and (♦) in game m, the parity gap of game m is Q\*(m) − P\*(Π_m).
+
+*Proof.*  Each part puts W4 beside a result about opt.
+
+1. By W3, (♦) makes G = U\* in both games.  An exchange of U\* is no added step (W4, part 2), so it is an exchange step,
+   with x = x_G (part 1), and conversely.
+2. At a prime n, v(n) = e₁, which only the primes have, and G(n − 1) holds one prime, q(n − 1), so C = {q(n − 1)} and
+   [the prime formula (N5)](neighbors.md#the-prime-formula) gives opt(n) the same rise.  For odd n ≥ 189 with two prime
+   factors, three facts make the part of G(n − 1) in layer 2 the U\*_2(n − 1) of [the bottom-layers theorem
+   (F4)](frame-model.md#the-bottom-layers-theorem): the greedy basis splits by layer, as the layers' vectors lie on
+   disjoint coordinates; numbers of layer 2 have independent vectors iff they are a forest in F4's graph G_n ([the
+   two-factor proposition (P11)](playability.md#the-two-factor-proposition)); and descending greedy keeps a source of
+   layer 2 iff it closes no cycle with those kept (F4's proof, step 3).  By [the semiprime formula
+   (J3)](arrival.md#the-semiprime-formula), whose hypothesis holds from 189 on (its step 7), n closes a cycle with
+   U\*_2(n − 1), and the cycle's other members sum to v(n), as a path from p to q sums to e_p + e_q and one from p to
+   the ground vertex to e_p.  So C is that path, x_G is J3's x, and J3 gives opt(n) − opt(n − 1) = n − x.
+3. W4 (part 4) gives the bound's rise, n.  By W3, (♦) leaves s out of U\*(n − 1).  Given U, some optimal set of game
+   n − 1 holds U\*_{≥3}, so, with F4, all of U\*(n − 1) and, by step 1 of the proof of [the corollary of U
+   (X8)](exactness.md#statement-u), no other source.  It does not play s, and [the half lemma
+   (N7)](neighbors.md#the-half-lemma) puts game n at its ceiling.
+4. Given U, X8 gives opt(m) = ΣU\*(m) + P\*(Π_m), and given (♦), W3 gives G(m) = U\*(m).  ∎
+
+So, given U and (♦), the gap changes only at added and half-in steps and at the exchange steps where opt rises by other
+than n − x_G.  The committed chain has none of the last, and at each of its exchange steps x_G is the shadow of n ([the
+shadow law](arrival.md#the-shadow-law); [the standing](statements.md#the-parity-bound), [the
+computation](evidence.md#observations)).
+
+### The transfer lemma
+
+The change from an optimal set of game n − 1 to one of game n keeps the parity gap from shrinking if it applies to a
+heaviest set of the parity bound.
+
+**Lemma W6 (the transfer lemma).**  Let T be an optimal set of game n − 1, and (T ∖ D) ∪ A ∪ {n} an optimal set of game
+n, with D ⊆ T and A disjoint from T ∪ {n}.  If a heaviest set I independent at both parities on board n − 1 holds D and
+avoids A, and (I ∖ D) ∪ A ∪ {n} is independent at both parities on board n, then the parity gap of game n is at least
+that of game n − 1.
+
+*Proof.*  PB(n) ≥ ΣI − ΣD + ΣA + n = PB(n − 1) − ΣD + ΣA + n, while opt(n) = opt(n − 1) − ΣD + ΣA + n.  ∎
+
+The other direction needs no lemma: a game of n that scores opt(n − 1) + PB(n) − PB(n − 1) keeps the gap from growing.

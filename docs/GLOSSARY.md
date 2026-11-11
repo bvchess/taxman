@@ -327,7 +327,8 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   the number of prime factors, its vectors over GF(2) are linearly independent at each parity, and the bound is the
   heaviest set independent at both ([the parity bound (W1)](theory/parity-bound.md#the-parity-bound)).  Independence
   holds because a playable set's incidence vectors, a 1 at each maximal factor, are linearly independent ([the
-  independence lemma (P10)](theory/playability.md#the-independence-lemma)).
+  independence lemma (P10)](theory/playability.md#the-independence-lemma)).  How it moves from game to game, by
+  exchange, added, half-in and half-out steps, is [the parity steps (W4)](theory/parity-bound.md#the-parity-steps).
 * **barred bound**: the parity bound with one member u of U\* barred ([the barred bound
   (W2)](theory/parity-bound.md#the-barred-bound)).  The prover *certifies* u when the barred bound is
   at most the recorded score: then every set of moves that beats the score, and keeps the layers 1 and 2 that [the

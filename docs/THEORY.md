@@ -27,7 +27,7 @@ places.
 | [uniqueness-and-longest-games.md](theory/uniqueness-and-longest-games.md) | Q | whether the optimal set is unique, and whether an optimal game plays the most moves |
 | [frame-model.md](theory/frame-model.md) | F | the frame model that the frame solver searches: frames, layers, the bottom layers, promotion sets, the promotion limit |
 | [exactness.md](theory/exactness.md) | X | why the frame model is exact, [statement U](theory/exactness.md#statement-u), and boards with holes |
-| [parity-bound.md](theory/parity-bound.md) | W | the parity bound on opt(n), which bounds the prover's searches, and the barred bound |
+| [parity-bound.md](theory/parity-bound.md) | W | the parity bound on opt(n), which bounds the prover's searches, the barred bound, and the parity steps |
 | [franklin-moniot.md](theory/franklin-moniot.md) | C | how the theory relates to Franklín and Moniot's paper, through a count of payment schemes |
 | [extended-problem.md](theory/extended-problem.md) | E | the extended problem, and the certificates of statement U that search it |
 | [frame-bounds.md](theory/frame-bounds.md) | B | the bounds on the promotions: the frame bound and the decomposition bound |
@@ -45,23 +45,23 @@ U\*, and its exactness needs neither (★) nor (♦).
 
 * **Proved outright:** playability (P1 to P11); neighboring games (N1 to N7); the frame model and its exactness (F1 to
   F10, X1 to X7, [the holes theorem X9](theory/exactness.md#boards-with-holes), and the inequality of [the corollary of
-  U, X8](theory/exactness.md#statement-u)); the parity and barred bounds (W1 to W3); the extended problem and its
-  certificates (E1 to E6); the bounds on the promotions (B1 to B5, and B6 but its last part); the rules of a search (R1
-  to R5, [the near-repeat lemma R7](theory/search-rules.md#the-near-repeat-lemma), and the first part of [the repeat
-  lemma R6](theory/search-rules.md#the-repeat-lemma)); J1 to J3 and L1 to L4; the relaxation and length propositions
-  (Q2, Q4) and the first two parts of [the length lemma (Q3)](theory/uniqueness-and-longest-games.md#the-length-lemma);
-  the equivalence in [the cardinality conjecture (S4)](theory/sources.md#the-cardinality-conjecture); and the
-  explanatory [victim law](theory/sources.md#the-victim-law), [frontier
-  theorem](theory/sources.md#the-frontier-theorem), [span theorem](theory/sources.md#the-span-theorem) and
-  Franklín–Moniot results (S2, S3, S6, C1 to C3).
+  U, X8](theory/exactness.md#statement-u)); the parity and barred bounds and the parity steps (W1 to W4, W6, and W5's
+  part 2); the extended problem and its certificates (E1 to E6); the bounds on the promotions (B1 to B5, and B6 but its
+  last part); the rules of a search (R1 to R5, [the near-repeat lemma R7](theory/search-rules.md#the-near-repeat-lemma),
+  and the first part of [the repeat lemma R6](theory/search-rules.md#the-repeat-lemma)); J1 to J3 and L1 to L4; the
+  relaxation and length propositions (Q2, Q4) and the first two parts of [the length lemma
+  (Q3)](theory/uniqueness-and-longest-games.md#the-length-lemma); the equivalence in [the cardinality conjecture
+  (S4)](theory/sources.md#the-cardinality-conjecture); and the explanatory [victim
+  law](theory/sources.md#the-victim-law), [frontier theorem](theory/sources.md#the-frontier-theorem), [span
+  theorem](theory/sources.md#the-span-theorem) and Franklín–Moniot results (S2, S3, S6, C1 to C3).
 * **Given statement U at n:** the equality of the corollary of U (X8), the inequality and last part of the repeat lemma
-  (R6), and the hypothesis of [the 12p theorem (L4)](theory/below-the-ceiling.md#the-12p-theorem) when its four numbers
-  lie in U\*(n).
+  (R6), [L4's hypothesis](theory/below-the-ceiling.md#the-12p-theorem) when its four numbers lie in U\*(n), and parts 3
+  and 4 of [W5](theory/parity-bound.md#where-the-parity-gap-stays), with (♦).
 * **Given (★) in game n:** [the uniqueness theorem (Q1)](theory/uniqueness-and-longest-games.md#the-uniqueness-theorem),
   the last part of the length lemma (Q3), and through Q1 [the sources
   conjecture](theory/sources.md#the-sources-conjecture) there.
 * **Given (♦) in game n:** (★) and the sources conjecture there, by the span theorem (S6), so the check of (♦) certifies
-  both game by game; the last part of B6; and J1's value of x.
+  both game by game; the last part of B6; J1's value of x; and part 1 of W5.
 
 What the programs' answers rest on:
 
