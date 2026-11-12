@@ -1,15 +1,16 @@
 # Results of the solver
 
-This directory holds the project's results: the chain of optimal moves, the proven games past its end, and the chain's
-scores in the OEIS's format.  This page says what each file holds, how far it reaches, how it was made and what supports
-its scores.  The [glossary](../docs/GLOSSARY.md) defines the terms; [the frame
-model](../docs/theory/frame-model.md#the-frame-model) and statement U, on which the frame solver's scores rest, are
-defined in the theory, and the prover in [its README](../solver/noframe/README.md).
+This directory holds the project's results: the chain of optimal moves, the proven games past its end, the best-known
+games past that and what has been tried on them, and the chain's scores in the OEIS's format.  This page says what each
+file holds, how far it reaches, how it was made and what supports its scores.  The [glossary](../docs/GLOSSARY.md)
+defines the terms; [the frame model](../docs/theory/frame-model.md#the-frame-model) and statement U, on which the frame
+solver's scores rest, are defined in the theory, and the prover in [its README](../solver/noframe/README.md).
 
-A results file has one JSON line per game, as `taxman solve --out` writes it.  The fields are described in
+A file of proven games has one JSON line per game, as `taxman solve --out` writes it.  The fields are described in
 `src/results.rs` and in [the frame solver's reference](../solver/docs/REFERENCE.md#a-results-line---out-schema-5).  The
-counts on this page are a snapshot, dated 2026-11-06, which no test pins: the commands in
-[the next section](#optimaljsonlgz) print the current ones.
+two files about the best-known games have lines of their own kind ([below](#best-knownjsonlgz)).  The counts on this
+page are a snapshot, dated 2026-11-06 (2026-11-11 for the best-known games), which no test pins: the commands in the
+section of each file print the current ones.
 
 ## The files
 
@@ -17,6 +18,8 @@ counts on this page are a snapshot, dated 2026-11-06, which no test pins: the co
 |---|---|---|---|
 | `optimal.jsonl.gz` | the committed chain: the moves of an optimal game for every n, each found from the moves for n − 1; the table of moves built into the frame solver | 1–5060 on 2026-11-06 | one run of `taxman solve` ([below](#optimaljsonlgz)) |
 | `beyond-the-chain.jsonl` | the proven games past the end of the chain, in blocks that each start with a standalone game | past the end of the chain | `taxman solve`, a standalone game and the games after it ([below](#beyond-the-chainjsonl)) |
+| `best-known.jsonl.gz` | the best-known game of each game past the chain, none of them proven, with the parity bound, the step and the rule that settles it from the game before | 5061–10000 but the proven games, on 2026-11-11 | `solver/tools/best_known_table.py` ([below](#best-knownjsonlgz)) |
+| `search-effort.jsonl` | what has been tried on those games: the dedicated plays and the passes of the finder | the same games | the same tool ([below](#search-effortjsonl)) |
 | `b019312.txt` | the scores of `optimal.jsonl.gz`, as a b-file of [A019312](https://oeis.org/A019312) in the OEIS | 1–5060 | the command [below](#b019312txt) |
 
 How far each proof kind reaches:
@@ -29,14 +32,18 @@ How far each proof kind reaches:
   wherever the game before it is.
 * **Every line of `beyond-the-chain.jsonl`** is proven within the frame model too, so it holds given U as the games 2532
   on do, and a line that is not standalone rests on a line of that file ([below](#beyond-the-chainjsonl)).
+* **Every line of `best-known.jsonl.gz`** is a game that was played, so its score is a lower bound on opt(n) and no
+  more.  Where the line has a `rule`, its game is optimal if the game that the rule rests on, the one before it or the
+  one it repeats, is ([below](#best-knownjsonlgz)).
 
 "What supports the scores", below, gives the evidence for each.
 
 **A file that is not a chain from game 1 never goes into `optimal.jsonl.gz`.**  The frame solver builds that file in and
 reads its line n as game n, so it can hold no gap, and a game past a gap rests on no game of it.  The proven games past
 the end of the chain go into [`beyond-the-chain.jsonl`](#beyond-the-chainjsonl).  The line of an unfinished search (a
-lower bound, nothing proven) goes into no committed file.  The verifiers read files of every kind
-([verifiers.md](../solver/docs/verifiers.md)).
+lower bound, nothing proven) goes into no file of proven lines: the best-known games, which are lower bounds, are in
+[`best-known.jsonl.gz`](#best-knownjsonlgz), as games with their scores and moves and not as lines of a search.  The
+verifiers read files of every kind ([verifiers.md](../solver/docs/verifiers.md)).
 
 ## optimal.jsonl.gz
 
@@ -267,6 +274,127 @@ Both accept the file and print its games and proof kinds as they stand, and `tes
 * A game that `optimal.jsonl.gz` holds never goes in.
 * Each game goes in once.
 * A new block starts with a standalone line.
+
+## best-known.jsonl.gz
+
+**The best-known game of each game past the end of the chain, with what the proved results say of it.**  A best-known
+game is the game with the highest score that a run of the unsound mode has found for n ([the best-known
+file](../solver/docs/unsound/best-known.md#what-the-best-known-file-is)).  Its score is a lower bound on opt(n) that
+nothing proves, so the file says "best-known" and never "optimal".  It has a line for each game from the one after the
+chain's end to the last that the runs reach, in order of n, but for the games that
+[`beyond-the-chain.jsonl`](#beyond-the-chainjsonl) proves: those are left out, so that each fact has one home, and the
+file has a gap at each.
+
+**A line has six fields**, `moves` last, so that a reader can skip it:
+
+| field | holds |
+|---|---|
+| `n` | the game |
+| `score` | the best-known score: the sum of the moves |
+| `parity_bound` | the game's [parity bound](../docs/theory/parity-bound.md#the-parity-bound), an upper bound on opt(n) |
+| `step` | how the parity bound moves from the game before to this one: `exchange`, `added`, `half-in` or `half-out` ([below](#the-step)) |
+| `rule` | the proved rule that gives this score from the game before's, or `null` ([below](#the-rule)) |
+| `moves` | the best-known game: a legal game that is over and opens with the largest prime |
+
+    gzip -dc results/best-known.jsonl.gz | sed -n 1p | cut -c1-100
+    {"n":5061,"score":8057936,"parity_bound":8060985,"step":"added","rule":null,"moves":[5059,5041,4757,
+
+**What arithmetic gives is not stored.**  The parity gap is `parity_bound` less `score`.  The ceiling is the score of the
+game before plus n ([the ceiling lemma](../docs/theory/neighbors.md#the-ceiling-lemma)), that score being the proven one
+where the game before is proven (the chain's last game, and those of `beyond-the-chain.jsonl`); the shortfall is the
+ceiling less `score`, and a game at its ceiling has 0.  Three fields are stored because they cannot be had from the rest:
+`parity_bound` is the prover's and lies in the notebook, not in this repository, and `step` and `rule` cost real
+computation: a GF(2) basis of each board's sources, and for `rule` the forest of layer 2, a basis of layer 4 and the root
+problem of each game.
+
+### The step
+
+The step says how the parity bound moves from the game before ([the parity steps
+(W4)](../docs/theory/parity-bound.md#the-parity-steps)).  At an odd n it is `exchange` if n takes the place of a
+[source](../docs/GLOSSARY.md#the-frame-model) that the game before keeps, as every prime does (it replaces the prime
+before it), and `added` if n joins them.  At an even n it is `half-out` if n/2 is not among those sources, and
+`half-in` if it is, and leaves when n joins.  The tool reads it from the change in the sum of the sources that descending
+greedy keeps, which the prover recorded with each board's parity bound.
+
+### The rule
+
+The rule names a proved relation between this game and the game before that the best-known score meets exactly.  Where it
+is set, the best-known game is optimal if the best-known game it rests on is, the game before or, for `same_search`, the
+game it repeats; so a run of games with rules is as optimal as the game that starts it.  Where it is `null`, no proved
+relation connects the score to the game before's, and a short game can start there with the game before it not short.
+
+| `rule` | the relation, and where it applies | the score is | rests on U |
+|---|---|---|---|
+| `prime_formula` | [the prime formula](../docs/theory/neighbors.md#the-prime-formula), n prime | the score before + n − q, q the prime before n | no |
+| `cap` | [the ceiling lemma](../docs/theory/neighbors.md#the-ceiling-lemma), n composite | the score before + n | no |
+| `theorem_8p` | [the 8p theorem](../docs/theory/below-the-ceiling.md#the-8p-theorem), n = 8p ≥ 187 | the score before + n − 4r | no |
+| `semiprime_formula` | [the semiprime formula](../docs/theory/arrival.md#the-semiprime-formula), n odd with two prime factors, n ≥ 189 | the score before + n − x | no |
+| `theorem_12p` | [the 12p theorem](../docs/theory/below-the-ceiling.md#the-12p-theorem), n = 12p ≥ 187 | the score before + n − 6r | yes, at n |
+| `same_search` | [the repeat lemma](../docs/theory/search-rules.md#the-repeat-lemma), n poses the root problem of the game before it (of the one before that if the game before is prime) | that game's promotion sum | yes, at n |
+
+The theorems define p, r, x and the hypotheses that the tool checks.  [Statement U](../docs/theory/exactness.md#statement-u)
+is the 12p theorem's hypothesis and the repeat lemma's third part.  Where several rules hold, the file names the first
+row, which puts the rules that need no U first.  At a half-out step the [half lemma](../docs/theory/neighbors.md#the-half-lemma)
+puts opt(n) at the ceiling given U at the game before, so a half-out game at its ceiling meets it and `cap`, and the file
+names `cap`.
+
+### What the lines rest on, and how they were made
+
+`score` and `moves` rest on the runs that found them, and a test replays every game by the rules.  `parity_bound` is
+proven.  `step` follows from the prover's sums, and `rule` from a theorem and the hypotheses that the tool checks; a test
+checks the rules' arithmetic against the scores.
+
+The tool `solver/tools/best_known_table.py` reads a copy of the best-known file, taken once so that a second run reads
+the same bytes, and keeps each game's line of the highest score (the later of two).  The parity bounds and sums of the
+sources are those of the prover's example `paritysplit` for the boards 2 to 10000 ([the notebook's
+entry](https://github.com/bvchess/taxman-notebook/blob/main/search/the-parity-bound-against-the-frame-bound-2026-10/README.md#the-provers-side-to-10000-2026-11-09)).
+It stops and writes nothing when a source does not fit: moves that do not make a game of their board with its score, a
+game that does not open with the largest prime, a score above its bound, a bound that is not the prover's, a step that is
+none of the four, or a game or board with no line.
+
+**The snapshot of 2026-11-11**, from a copy taken at 20:06 PST of 6,961 lines of 4,940 games: 4,935 games, 5061 to 10000
+but 5260 to 5264, in ten gzip members of at most 500 lines, 1,235,327 bytes, decompressing to 80,806,018.  By step, 1,708
+are `exchange` (551 of them primes), 760 `added`, 1,350 `half-in` and 1,117 `half-out`.  By rule, 551 are `prime_formula`,
+1,702 `cap`, 89 `theorem_8p`, 947 `semiprime_formula`, 63 `theorem_12p`, 26 `same_search` and 1,557 have none.
+
+To check the file, `tests/results.rs` replays the games (the quick check the first 100) and checks their order, parity
+bounds, steps and rules.  To refresh it, copy the best-known file and the lab's ledgers (`rootfirst/ledger.tsv`,
+`rootfirst/ledger2.tsv`, `hammer/ledger.tsv`, `transplant/driver/ledger.tsv`) into `COPY`, run the tool with the notebook
+entry's parity files as `PARITY1` and `PARITY2`, and name the time of the copies in the commit message:
+
+    python3 -I solver/tools/best_known_table.py --best-known COPY/best-known.jsonl --parity PARITY1 PARITY2 \
+        --plays COPY/ledger.tsv:3 --plays COPY/ledger2.tsv --plays COPY/hammer-ledger.tsv --finder COPY/finder-ledger.tsv:60
+
+## search-effort.jsonl
+
+**What has been tried on each best-known game**: its dedicated plays and the passes of the finder.  It backs the claim of
+how many best-known games are short ([the notebook's
+entry](https://github.com/bvchess/taxman-notebook/blob/main/how-many-best-known-games-past-5060-are-short-2026-11/README.md)),
+since the chance that a fresh play raises a short game depends on the plays the game has had.  It has a line for each game
+of `best-known.jsonl.gz` that has a play or a pass, in order of n; a game that nothing was tried on has none, and a play
+or a pass on a proven game is left out with the game.
+
+**A line has three fields:** `n`; `plays`, a `[level, seed, raised]` for each play, sorted by level and seed; and
+`finder`, a `[B, seconds, outcome]` for each pass of the finder, sorted by B.
+
+    {"n":6615,"plays":[[3,41,0],[3,42,0],[3,43,0],[3,44,0],[4,41,0],[4,42,0],[5,41,0],[5,42,0],[5,43,0]],"finder":[[13,60,"none"],[19,60,"stopped"]]}
+
+A *play* is one run of the unsound mode on game n from its best-known line, at a [level of
+effort](../solver/docs/unsound/play.md#the-level-of-effort) and with a seed that sets its random choices; `raised` is 1
+if it reached a score above the game's best-known score when it began.  A play made twice at one level and seed appears
+twice.  A *pass* is an exact search of game n for a better game, with the numbers up to n/2 whose prime factors are all
+at most B free and every other number up to n/2 held as the best-known game has it.  `seconds` is the time limit of each
+search of the pass, and `outcome` is `none` if every search finished, so that no better game has the rest so held,
+`stopped` if a limit ended a search and none found a better game, and `gain` if one was found.  The file leaves out the
+ledgers' times of day, CPU times and scores.
+
+**The snapshot of 2026-11-11**, from copies of the ledgers taken at 20:06 PST: 4,935 games, 3,167 plays and 9,870
+passes.  The plays are 53 at level 3, 2,839 at level 4 and 275 at level 5, on 1,536 games, and 47 raised their game.  The
+passes are at B = 13 (4,806 `none`, 129 `stopped`) and B = 19 (569 `none`, 4,366 `stopped`), one of each for every game,
+all with a limit of 60 seconds.  None found a better game.  The finder's ledger does not record the limit, nor the pilot's
+ledger (level 3) its level, so the tool takes each after the path.  To check the file,
+`tests/results.rs` checks that it names only games of the table, each once and in order, with these fields.  The command
+above refreshes it too.
 
 ## b019312.txt
 

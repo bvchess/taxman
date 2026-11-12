@@ -46,8 +46,13 @@ impl Drop for TempDir {
 /// The first `count` lines of the committed results, `results/optimal.jsonl.gz`, as text: the members that hold them are
 /// decoded and no others (the file is read member by member, as the built-in table is).
 pub fn committed_text(count: usize) -> String {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/optimal.jsonl.gz");
-    let bytes = fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    gzip_prefix(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/optimal.jsonl.gz"), count)
+}
+
+/// The first `count` lines of the gzip file at `path` as text, in whole members: only the members that hold them are
+/// decoded.
+pub fn gzip_prefix(path: &Path, count: usize) -> String {
+    let bytes = fs::read(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     let (mut text, mut lines) = (String::new(), 0);
     for member in taxman_gzip::Members::new(&bytes) {
         let member = member.unwrap_or_else(|e| panic!("{}: {e}", path.display()));

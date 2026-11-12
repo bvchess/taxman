@@ -15,7 +15,7 @@ pub use binary::{path, python, taxman, Run};
 #[allow(unused_imports)]
 pub use support::QUICK;
 #[allow(unused_imports)]
-pub use support::{committed_text, gzip_stored, referee_table, Rng, TempDir};
+pub use support::{committed_text, gzip_prefix, gzip_stored, referee_table, Rng, TempDir};
 #[allow(unused_imports)]
 pub use taxman::playable::{peel, play_order, playable};
 
@@ -79,6 +79,16 @@ pub fn committed_results() -> PathBuf {
 /// The proven games past the end of the committed chain, the file `results/beyond-the-chain.jsonl`.
 pub fn beyond_the_chain() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/beyond-the-chain.jsonl")
+}
+
+/// The best-known games past the end of the committed chain, the file `results/best-known.jsonl.gz`.
+pub fn best_known() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/best-known.jsonl.gz")
+}
+
+/// What has been tried on those games, the file `results/search-effort.jsonl`.
+pub fn search_effort() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/search-effort.jsonl")
 }
 
 /// One line of the committed results: its score and moves.

@@ -29,7 +29,9 @@ also proven on the whole board by a second program that shares no proof code wit
 supports every score.
 
 The games proven past the end of the chain are in `results/beyond-the-chain.jsonl`, which
-[results/README.md](results/README.md#beyond-the-chainjsonl) describes.
+[results/README.md](results/README.md#beyond-the-chainjsonl) describes.  The best-known games past it, which nothing
+proves, are in [`results/best-known.jsonl.gz`](results/README.md#best-knownjsonlgz), and what has been tried on them is
+in [`results/search-effort.jsonl`](results/README.md#search-effortjsonl).
 
 ## The programs
 

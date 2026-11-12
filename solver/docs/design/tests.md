@@ -216,6 +216,16 @@ every second line of the Java fixtures), and the comment on each says what the w
   with an incomplete line and refuse one whose moves do not score its `best_so_far`; a line's record of the game before
   it (score, moves, proof, assumptions) must be the file's own line of that game, and a line that records an assumption
   the rules do not give is refused.
+* **The best-known games past the chain** (`tests/results.rs`; `results/best-known.jsonl.gz` and
+  `results/search-effort.jsonl`, which no verifier reads): every game replays by the rules to its score, over and
+  opening with the largest prime (the quick check the first 100, `the_start_of_the_best_known_games_replays_by_the_rules`,
+  and the full suite all of them); the games come once and in order, with a gap only at the proven games of
+  `results/beyond-the-chain.jsonl`; no score is above its parity bound; each step is of the game's parity and moves the
+  parity bound as the parity steps (W4) say; each rule is a formula that the score meets from the score of the game
+  before, and a game that meets the prime formula, the ceiling or the 8p theorem has its rule; and the effort file names
+  only games of the table, once each and in order, with the fields of its README.  The tool that makes the files has unit
+  tests of its own (`solver/tools/test_best_known_table.py`, run with `python3 -I`): a file that is being appended to is
+  read up to its last whole line, the ledgers are read as the README says, and a small run writes the same bytes twice.
 * **Repeats** (`tests/same_search.rs`): the games that repeat an earlier search are found from the setups alone, and a
   chain concludes exactly those, with the scores of a chain that searches them, from n = 1 (1..300) and from a results
   file that a stopped run left; a game with a checkpoint is resumed, not repeated.  A unit test of `board` checks that

@@ -3,15 +3,18 @@
 //! n − 1, and the arithmetic and provenance of the line hold; the files agree on every game they share.  No count of
 //! the file is asserted here: they are `results/README.md`'s to print.  And both verifiers, `verify-results` and the
 //! Python referee, refuse lines that a hand edit made contradict themselves, and derive assumptions by the same
-//! rules.
+//! rules.  The two files about the games past the end of the chain, `results/best-known.jsonl.gz` and
+//! `results/search-effort.jsonl`, have lines of other kinds, which no verifier reads: their games replay by the rules,
+//! come once and in order, and keep to the parity bound, and their steps and rules fit the scores and the bounds.
 
 mod common;
 
 use common::TempDir;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use taxman::game::Optimal;
+use taxman::game::{read_results_text, replay_finished, Optimal};
 use taxman::json::Json;
 use taxman::results::{verify_files, Proof};
 use taxman::solver::{self, unsound, GameResult, Method};
@@ -640,4 +643,272 @@ fn the_games_beyond_the_chain_pass_the_python_referee() {
     let table = common::referee_table(&dir.join("beyond-the-chain.jsonl"), TABLE_GAMES);
     let run = python_referee_with(&table, &[common::beyond_the_chain()]);
     assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stdout));
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The best-known games past the end of the chain (`results/best-known.jsonl.gz`) and the effort spent on them
+// (`results/search-effort.jsonl`): `results/README.md` says what each field of a line is.  The scores are lower bounds
+// that nothing proves, so the tests check what holds of any game: the rules, the order, the bound, the theory's steps.
+
+/// How many of the first games the quick check replays; the long test replays them all, which takes some 12 s.
+const BEST_KNOWN_QUICK: usize = 100;
+
+/// One line of `results/best-known.jsonl.gz` as far as the fields before its moves go.  The moves are the last field
+/// of a line, so every test but the replay reads the head of each line and skips them, which keeps a test over all the
+/// games well inside the quick check's 3 s of CPU.
+struct Head {
+    n: u32,
+    score: u64,
+    parity_bound: u64,
+    step: String,
+    rule: Option<String>,
+}
+
+fn head_of(line: &str) -> Head {
+    let shown = &line[..line.len().min(80)];
+    let (head, _) = line.split_once(",\"moves\":[").unwrap_or_else(|| panic!("no moves at the end of {shown}"));
+    let json = Json::parse(&format!("{head}}}")).unwrap_or_else(|e| panic!("{e}: {head}"));
+    let number = |key: &str| json.get(key).and_then(Json::as_u64).unwrap_or_else(|| panic!("no {key} in {head}"));
+    assert!(json.get("rule").is_some(), "no rule in {head}");
+    Head {
+        n: u32::try_from(number("n")).unwrap(),
+        score: number("score"),
+        parity_bound: number("parity_bound"),
+        step: json.get("step").and_then(Json::as_str).unwrap_or_else(|| panic!("no step in {head}")).to_owned(),
+        rule: json.get("rule").and_then(Json::as_str).map(str::to_owned),
+    }
+}
+
+/// The heads of all the lines of the table, in file order.
+fn best_known_heads() -> Vec<Head> {
+    let text = read_results_text(&common::best_known()).unwrap_or_else(|e| panic!("{e}"));
+    text.lines().map(head_of).collect()
+}
+
+/// The last game of the committed chain and its score: the game that the best-known games follow.
+fn chain_end() -> (u32, u64) {
+    let path = common::committed_results();
+    let bytes = fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let members =
+        taxman_gzip::Members::new(&bytes).map(|member| member.unwrap_or_else(|e| panic!("{}: {e}", path.display())));
+    let text = String::from_utf8(members.last().expect("a member")).unwrap();
+    let line = Json::parse(text.lines().last().expect("a line")).unwrap();
+    (line.get("n").and_then(Json::as_u32).unwrap(), line.get("score").and_then(Json::as_u64).unwrap())
+}
+
+/// The proven games past the end of the chain, `results/beyond-the-chain.jsonl`, with their scores.
+fn proven_beyond_the_chain() -> BTreeMap<u32, u64> {
+    let text = read_results_text(&common::beyond_the_chain()).unwrap_or_else(|e| panic!("{e}"));
+    let line = |text: &str| Json::parse(text).unwrap_or_else(|e| panic!("{e}: {text}"));
+    let games = text
+        .lines()
+        .map(|text| (line(text).get("n").and_then(Json::as_u32), line(text).get("score").and_then(Json::as_u64)));
+    games.map(|(n, score)| (n.expect("n"), score.expect("score"))).collect()
+}
+
+fn is_prime(n: u64) -> bool {
+    n >= 2 && (2..).take_while(|d| d * d <= n).all(|d| !n.is_multiple_of(d))
+}
+
+/// The largest prime below `n`.
+fn prime_before(n: u64) -> u64 {
+    (2..n).rev().find(|&p| is_prime(p)).expect("a prime below n")
+}
+
+/// How many prime factors `n` has, counted with multiplicity.
+fn prime_factors(mut n: u64) -> u32 {
+    let mut count = 0;
+    for d in 2.. {
+        while n.is_multiple_of(d) {
+            n /= d;
+            count += 1;
+        }
+        if d * d > n {
+            break;
+        }
+    }
+    count + u32::from(n > 1)
+}
+
+/// Every best-known game replays by the rules to its score: the moves are legal, the game is over and it opens with
+/// the largest prime, as every optimal game does.  The first `last` games, or all of them (`None`).
+fn check_that_the_best_known_games_replay(last: Option<usize>) {
+    let path = common::best_known();
+    let text = match last {
+        Some(last) => common::gzip_prefix(&path, last),
+        None => read_results_text(&path).unwrap_or_else(|e| panic!("{e}")),
+    };
+    let mut games = 0;
+    for line in text.lines() {
+        let json = Json::parse(line).unwrap_or_else(|e| panic!("{e}: {}", &line[..line.len().min(80)]));
+        let n = json.get("n").and_then(Json::as_u32).expect("n");
+        let score = json.get("score").and_then(Json::as_u64).expect("score");
+        let moves = json.get("moves").and_then(Json::as_u32_vec).expect("moves");
+        assert_eq!(replay_finished(n, &moves), Ok(score), "game {n}");
+        games += 1;
+    }
+    assert_eq!(games, last.unwrap_or(games), "{}: fewer games than asked for", path.display());
+    assert!(games > 0, "{}: no game", path.display());
+}
+
+/// The first games of the table replay by the rules to their scores ([`the_best_known_games_replay_by_the_rules`]).
+#[test]
+fn the_start_of_the_best_known_games_replays_by_the_rules() {
+    check_that_the_best_known_games_replay(Some(BEST_KNOWN_QUICK));
+}
+
+/// All the best-known games replay by the rules to their scores.
+#[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_start_of_the_best_known_games_replays_by_the_rules"
+)]
+fn the_best_known_games_replay_by_the_rules() {
+    check_that_the_best_known_games_replay(None);
+}
+
+/// The table has each game once and in order, from the game after the chain's last to its own last, and misses only
+/// the proven games of `results/beyond-the-chain.jsonl`, which `results/README.md` says it leaves out.
+#[test]
+fn the_best_known_games_come_once_in_order_with_no_gap_but_the_proven_games() {
+    let heads = best_known_heads();
+    let (chain_last, _) = chain_end();
+    let proven = proven_beyond_the_chain();
+    let last = heads.last().expect("a game").n;
+    let expected: Vec<u32> = (chain_last + 1..=last).filter(|n| !proven.contains_key(n)).collect();
+    for (i, (head, n)) in heads.iter().zip(&expected).enumerate() {
+        assert_eq!(head.n, *n, "line {}: game {} where game {n} should come", i + 1, head.n);
+    }
+    assert_eq!(
+        heads.len(),
+        expected.len(),
+        "the table has {} games, and {} lie between its ends",
+        heads.len(),
+        expected.len()
+    );
+}
+
+/// The parity bound is an upper bound on opt(n), so no best-known score is above it (`docs/theory/parity-bound.md`,
+/// "The parity bound").
+#[test]
+fn the_parity_bound_of_each_best_known_game_is_at_least_its_score() {
+    for head in best_known_heads() {
+        assert!(
+            head.score <= head.parity_bound,
+            "game {}: the score {} is above the bound {}",
+            head.n,
+            head.score,
+            head.parity_bound
+        );
+    }
+}
+
+/// The kind of step of a game fits its parity (even games take halves, odd ones are added or exchanged) and moves the
+/// parity bound as the theory says it does (W4, "The parity steps" of `docs/theory/parity-bound.md`): never by more
+/// than n, by n at a half-out step, by at least n/2 at a half-in step, by less than n at an exchange step, and by n
+/// less the prime before it at a prime.
+#[test]
+fn the_steps_of_the_best_known_games_move_the_parity_bound_as_the_theory_says() {
+    let heads = best_known_heads();
+    for pair in heads.windows(2) {
+        let (before, head) = (&pair[0], &pair[1]);
+        if head.n != before.n + 1 {
+            continue; // a proven game lies between them, and the table holds no bound for it
+        }
+        let n = i64::from(head.n);
+        let rise = head.parity_bound as i64 - before.parity_bound as i64;
+        let step = head.step.as_str();
+        assert!(rise <= n, "game {n}: the bound rises by {rise}, more than n");
+        match (step, n % 2) {
+            ("exchange" | "added", 1) | ("half-in" | "half-out", 0) => {}
+            _ => panic!("game {n}: a step of kind {step}"),
+        }
+        if is_prime(n as u64) {
+            assert_eq!((step, rise), ("exchange", n - prime_before(n as u64) as i64), "game {n}: a prime");
+            continue;
+        }
+        match step {
+            "half-out" => assert_eq!(rise, n, "game {n}: a half-out step"),
+            "half-in" => assert!(rise >= n - n / 2, "game {n}: a half-in step, the bound rises by {rise}"),
+            "exchange" => assert!(rise < n, "game {n}: an exchange step, the bound rises by {rise}"),
+            _ => {}
+        }
+    }
+}
+
+/// The rule of a game is a formula that its score meets from the score of the game before, and a game whose score
+/// meets a formula that is easy to check (the prime formula, the ceiling and the 8p theorem) has its rule.  The score
+/// of the game before is the table's, the chain's for the first game, or a proven game's.
+#[test]
+fn the_rule_of_a_best_known_game_is_a_formula_that_its_score_meets() {
+    let heads = best_known_heads();
+    let (chain_last, chain_score) = chain_end();
+    let mut scores: BTreeMap<u32, u64> = proven_beyond_the_chain();
+    scores.insert(chain_last, chain_score);
+    scores.extend(heads.iter().map(|head| (head.n, head.score)));
+    for head in &heads {
+        let n = u64::from(head.n);
+        let gain = head.score as i64 - scores[&(head.n - 1)] as i64;
+        let rule = head.rule.as_deref();
+        let at = |formula: i64| gain == formula;
+        // The 8p and 12p theorems: n = 8p or 12p for a prime p, with r the prime before p and a window of r's multiples.
+        let eight_p = |n: u64| n.is_multiple_of(8) && n >= 187 && is_prime(n / 8) && 9 * prime_before(n / 8) > n;
+        let twelve_p = |n: u64| n.is_multiple_of(12) && n >= 187 && is_prime(n / 12) && 15 * prime_before(n / 12) > n;
+        match rule {
+            None => {}
+            Some("prime_formula") => assert!(is_prime(n) && at(n as i64 - prime_before(n) as i64), "game {n}"),
+            Some("cap") => assert!(!is_prime(n) && at(n as i64), "game {n}"),
+            Some("theorem_8p") => assert!(eight_p(n) && at(n as i64 - 4 * prime_before(n / 8) as i64), "game {n}"),
+            Some("theorem_12p") => assert!(twelve_p(n) && at(n as i64 - 6 * prime_before(n / 12) as i64), "game {n}"),
+            Some("semiprime_formula") => {
+                // x is a source of layer 2 of the board n - 1, so it has two prime factors and lies above (n - 1)/2.
+                let x = n as i64 - gain;
+                let lies_between = (n as i64 - 1) / 2 < x && x < n as i64;
+                assert!(n % 2 == 1 && n >= 189 && prime_factors(n) == 2 && lies_between, "game {n}");
+                assert_eq!(prime_factors(x as u64), 2, "game {n}: x = {x}");
+            }
+            Some("same_search") => assert!(!is_prime(n), "game {n}: a prime repeats no search"),
+            Some(other) => panic!("game {n}: the rule {other}"),
+        }
+        if is_prime(n) && at(n as i64 - prime_before(n) as i64) {
+            assert_eq!(rule, Some("prime_formula"), "game {n} meets the prime formula");
+        } else if !is_prime(n) && at(n as i64) {
+            assert_eq!(rule, Some("cap"), "game {n} is at its ceiling");
+        } else if eight_p(n) && at(n as i64 - 4 * prime_before(n / 8) as i64) {
+            assert_eq!(rule, Some("theorem_8p"), "game {n} meets the 8p theorem");
+        }
+    }
+}
+
+/// The file of the search effort names only games of the table, each once and in order, and its plays and passes of
+/// the finder have the fields `results/README.md` says.
+#[test]
+fn the_search_effort_names_only_games_of_the_best_known_table() {
+    let games: BTreeSet<u32> = best_known_heads().iter().map(|head| head.n).collect();
+    let path = common::search_effort();
+    let text = fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let numbers =
+        |json: &Json, key: &str, at: usize| json.at(at).and_then(Json::as_u64).unwrap_or_else(|| panic!("{key} {at}"));
+    let mut previous = 0;
+    for line in text.lines() {
+        let json = Json::parse(line).unwrap_or_else(|e| panic!("{e}: {line}"));
+        let n = json.get("n").and_then(Json::as_u32).expect("n");
+        assert!(n > previous, "game {n} follows game {previous}: each game once, in order");
+        assert!(games.contains(&n), "game {n} is not a game of the best-known table");
+        previous = n;
+        for play in json.get("plays").and_then(Json::as_arr).unwrap_or_else(|| panic!("game {n}: no plays")) {
+            assert_eq!(play.as_arr().map(<[Json]>::len), Some(3), "game {n}: a play is [level, seed, raised]");
+            numbers(play, "level", 0);
+            numbers(play, "seed", 1);
+            assert!(numbers(play, "raised", 2) <= 1, "game {n}: a play raised the game or it did not");
+        }
+        for pass in json.get("finder").and_then(Json::as_arr).unwrap_or_else(|| panic!("game {n}: no finder")) {
+            assert_eq!(pass.as_arr().map(<[Json]>::len), Some(3), "game {n}: a pass is [B, seconds, outcome]");
+            numbers(pass, "B", 0);
+            assert!(numbers(pass, "seconds", 1) > 0, "game {n}: a pass with no time limit");
+            let outcome = pass.at(2).and_then(Json::as_str);
+            assert!(matches!(outcome, Some("none" | "stopped" | "gain")), "game {n}: the outcome {outcome:?}");
+        }
+    }
+    assert!(previous > 0, "{}: no game", path.display());
 }
