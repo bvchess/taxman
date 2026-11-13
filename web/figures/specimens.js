@@ -320,12 +320,16 @@ export function mountControls(host) {
 // The layout at each width
 // ---------------------------------------------------------------------------------------------------------------
 
-/** The three columns and how they fold, drawn small: a box for each column at 1440, 1100, 820 and 390 px. */
+/** The three columns and how they fold, drawn small: a box for each column at 1440, 1100, 820 and 390 px.
+ *  Three tiers: the rail and the notes from 1300 px, the rail alone from 960, the bar below 960. */
 export function mountLayout(host) {
   const widths = [
     { w: 1440, nav: 'rail', tech: 'margin', words: 'Three columns: the contents, the story, the technical layer.' },
-    { w: 1100, nav: 'bar', tech: 'margin', words: 'Below 1300 px the contents fold into a bar with a button.' },
-    { w: 820, nav: 'bar', tech: 'folded', words: 'Below about 1050 px each note folds under its paragraph, and opens when tapped.' },
+    {
+      w: 1100, nav: 'rail', tech: 'folded',
+      words: 'Below about 1300 px each note folds under its paragraph, and opens when tapped.',
+    },
+    { w: 820, nav: 'bar', tech: 'folded', words: 'Below 960 px the contents fold into a bar with a button.' },
     { w: 390, nav: 'bar', tech: 'folded', words: 'A phone: the same, with a 16 px gutter; figures scale to fit.' },
   ];
   const scale = 0.16;

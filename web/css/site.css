@@ -723,8 +723,10 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
 
 /* ---- narrower windows ---------------------------------------------------------------------------------------- */
 
-/* Below 1300 px the contents fold into a bar at the top, with a button that opens them. */
-@media (max-width: 1299px) {
+/* Three tiers.  From 1300 px: the contents rail, the story and the right column of notes.  From 960 to 1299 px: the
+   rail stays and the notes fold into the text (the container query below).  Below 960 px the rail goes too, and the
+   contents fold into a bar at the top, with a button that opens them. */
+@media (max-width: 959px) {
   .site { display: block; }
   .rail { display: none; }
   .topbar {
@@ -749,7 +751,8 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
 
 /* When the essay is narrower than its two columns, the margin folds into the text: each
    note becomes a short line under its paragraph, plainly marked as the technical layer, that opens when tapped.
-   The column needs 988 px, so the fold comes at a window of about 1050 px. */
+   The column needs 988 px, and the rail and the essay's padding take 304 px, so the fold comes at a window of about
+   1300 px, while the rail is still at the left. */
 @container essay (max-width: 987px) {
   .column { padding-right: 0; max-width: var(--measure); }
   .column::before { display: none; }
