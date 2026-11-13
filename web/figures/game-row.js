@@ -1,10 +1,10 @@
 // A game of n drawn as a row of moves, each over its tax, and at the right of the row what is left in the pot.  A
 // header line above the row names the moves at the left and, at the right, the numbers left out.  The moves are the
 // player's (blue circles), their tax the taxman's (orange squares), joined by the thick line of a payment (as in
-// figures/game40.js); a move that takes several numbers stacks them.  The numbers left in the pot at the end are out of
-// focus: a dashed circle for a number above n/2 and a square for one up to n/2, and a move given up is a faded dashed
-// circle with a halo.  A halo marks what the prose beside the figure names.  Two rows can
-// share their columns, an empty column standing where a move of the other row has no move of this one.  A flat figure.
+// figures/game40.js); a move that takes several numbers stacks them.  The numbers left out of the game are the rest the
+// taxman takes at the end, orange squares too, and a move given up is one more, with a halo.  A halo marks what the
+// prose beside the figure names.  Two rows can share their columns, an empty column standing where a move of the other
+// row has no move of this one.  A flat figure.
 //
 // The game is replayed with js/model.js (replay), so a row cannot show an illegal game: the taxes and the numbers left
 // are the model's, and so is the score.  The figures that draw rows (figures/slip.js, figures/fits.js) take their moves
@@ -55,10 +55,10 @@ export const rowHeight = (rows) => {
 export const idOf = (tag, x) => (tag ? `${tag}${x}` : x);
 export const payId = (tag, m) => `${tag}pay${m}`;
 
-/** The look of a number left in the pot of game n, or given up: a dashed circle above n/2, a square up to it. */
-export function potLook(x, n, { given = false } = {}) {
-  if (given) return { shape: 1, dashed: 1, faded: 1, halo: 1 };
-  return x > n / 2 ? { shape: 1, dashed: 1, faded: 1 } : { shape: 0, faded: 1 };
+/** The look of a number left in the pot of game n, or a move given up: an orange square, the taxman's at the end, with
+ *  a halo for a move given up. */
+export function potLook({ given = false } = {}) {
+  return { shape: 0, taxman: 1, ...(given ? { halo: 1 } : {}) };
 }
 
 /** The numbers to register in a scene for a row: its moves, their taxes and what is left. */
@@ -101,7 +101,7 @@ export function rowLooks(row, {
     looks[payId(tag, t.move)] = {};
   }
   row.rest.forEach((x, k) => {
-    const look = potLook(x, row.n, { given: given.has(x) });
+    const look = potLook({ given: given.has(x) });
     looks[idOf(tag, x)] = { ...look, x: columnX(pot + k, left), y: top + MOVE_Y, ...wear(x) };
   });
   return looks;

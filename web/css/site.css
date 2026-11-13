@@ -469,13 +469,24 @@ figure { margin: 30px 0 34px; }
 
 /* ---- the legend ---------------------------------------------------------------------------------------------- */
 
-.legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 22px; margin: 12px 0 28px; }
-.legend-item { display: grid; grid-template-columns: 46px 46px 1fr; gap: 6px; align-items: center; font-size: 0.82rem; line-height: 1.32; }
+.legend { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; align-items: start; margin: 12px 0 28px; }
+.legend-group { margin: 0 0 18px; }
+.legend-group h4 { margin: 0 0 4px; font-size: 0.86rem; font-weight: 700; }
+.legend-item + .legend-item { margin-top: 4px; }
+.legend-item {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+  gap: 0 6px;
+  align-items: center;
+  font-size: 0.82rem;
+  line-height: 1.32;
+}
+/* The sample is the item's first child and spans both rows; the name sits above the words in the second column. */
+/* The name and the words meet at the row boundary, so they stay together beside the centered sample. */
+.legend-item > :first-child { grid-row: 1 / span 2; }
 .legend-item svg { display: block; justify-self: center; }
-.legend-item b { display: block; font-weight: 700; }
-.legend-item span { color: var(--ink-2); }
-.legend-head { display: grid; grid-template-columns: 46px 46px 1fr; gap: 6px; font-size: 0.7rem; color: var(--ink-3); text-align: center; border-bottom: 1px solid var(--hair); padding-bottom: 2px; margin-bottom: 4px; }
-.legend-head span:last-child { text-align: left; }
+.legend-item > b { display: block; grid-column: 2; grid-row: 1; align-self: end; font-weight: 700; }
+.legend-item > span { display: block; grid-column: 2; grid-row: 2; align-self: start; color: var(--ink-2); }
 
 /* The paragraph that the figure's state belongs to carries a bar at its left. */
 [data-follows] { position: relative; }
@@ -539,7 +550,6 @@ figure { margin: 30px 0 34px; }
 .piece svg { width: 100%; height: auto; display: block; pointer-events: none; }
 .piece.is-legal { cursor: pointer; }
 .piece.is-legal:hover .tk-hover { transform: translateY(-3px); }
-.piece.is-stuck { cursor: not-allowed; }
 .piece.is-moving { z-index: 5; }
 .piece:focus-visible { outline-offset: -2px; }
 /* Below it lies the page's space after a figure.  game.js gives the caption the height of its longest message and the
@@ -555,7 +565,6 @@ figure { margin: 30px 0 34px; }
 .graph-board { padding-bottom: 4px; }
 .graph-board .is-gone { visibility: hidden; }
 .graph-wrap svg { display: block; }
-.graph-board .tk.is-stuck { cursor: not-allowed; }
 .graph-board .tk.is-takeable.is-pointed .tk-hover { transform: translateY(-4px); }
 .tk.is-refused .tk-hover { animation: nudge 0.28s 2; }
 
@@ -563,6 +572,10 @@ figure { margin: 30px 0 34px; }
 .fig-panel { max-width: 30rem; }
 .fig-panel .fig-controls { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
 .fig-panel .fig-controls output { font-weight: 700; font-size: 0.9rem; min-width: 8.5em; text-align: center; }
+/* The switch between a figure's two views (figures/layer-view.js). */
+.fig-view { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
+.fig-view-word { font-size: 0.8rem; font-weight: 600; color: var(--ink-3); margin-right: 2px; }
+.fig-view .btn { padding: 6px 10px; font-size: 0.8rem; }
 .loop-status, .orders-status { font-size: 0.9rem; color: var(--ink-2); margin: 8px 2px 0; }
 .loop-status { min-height: 4.6em; }
 .loop-status strong, .orders-status strong { color: var(--ink); }
@@ -610,8 +623,6 @@ figure { margin: 30px 0 34px; }
 .chart-table th:first-child, .chart-table td:first-child { text-align: left; }
 .table-scroll { overflow-x: auto; max-width: 100%; }
 .chart-key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 0.82rem; color: var(--ink-2); margin: -4px 0 10px; }
-.key-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-2); opacity: 0.75; }
-.key-ring { width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--ink); background: var(--paper); }
 .key-item { display: inline-flex; align-items: center; gap: 7px; margin-right: 14px; }
 code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 0.06); padding: 0 5px; border-radius: 5px; font-size: 0.92em; }
 
@@ -704,30 +715,6 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
 .finding-cards .to { display: flex; align-items: center; gap: 7px; margin-top: 12px; font-size: 0.72rem; font-weight: 600; color: var(--ink-3); }
 .finding-cards .to svg { flex: none; display: block; color: var(--ink-2); }
 
-/* The idea in three steps, drawn by figures/steps.js, and the route of the site, by figures/site-map.js. */
-.step-list { list-style: none; margin: 0 0 18px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 30px; }
-.step-list li { min-width: 0; }
-.step-pic-host { border: 1px solid var(--hair); border-radius: 16px; padding: 12px 14px; margin-bottom: 14px; }
-.step-pic { display: block; max-width: 250px; margin: 0 auto; overflow: visible; }
-.step-list h3 { display: flex; align-items: center; gap: 10px; font-size: 1.15rem; margin-bottom: 6px; }
-.step-n svg { display: block; }
-.step-list p { font-size: 0.95rem; color: var(--ink-2); margin: 0; }
-
-.route { list-style: none; margin: 26px 0 0; padding: 0; position: relative; max-width: 50rem; }
-.route::before { content: ""; position: absolute; left: 19px; top: 20px; bottom: 26px; width: 4px; border-radius: 2px; background: var(--ink); }
-.stop { position: relative; display: grid; grid-template-columns: 42px 1fr; gap: 18px; padding: 0 0 26px; }
-.stop-coin { position: relative; z-index: 1; }
-.stop-coin svg { display: block; }
-.stop-text { padding-top: 6px; }
-.stop-text > a, .stop-text > span { font-weight: 700; font-size: 1.08rem; }
-.stop-text p { margin: 2px 0 0; color: var(--ink-2); font-size: 0.92rem; }
-.stop.is-unwritten .stop-text > span, .stop.is-unwritten .stop-text p { color: var(--ink-3); }
-.pin { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; margin: 10px 0 0; color: var(--ink-2); font-size: 0.88rem; }
-.pin svg { margin-top: 2px; }
-.pin a, .pin span { font-weight: 700; }
-.pin small { display: block; color: var(--ink-3); font-size: 0.76rem; }
-.pin.is-unwritten span { color: var(--ink-3); }
-
 /* The sources: the repository, the data and the papers. */
 .source-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 12px 30px; }
 .source-list li { padding: 12px 0; border-top: 1.5px solid var(--hair); }
@@ -790,7 +777,6 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
   .note.is-open { padding-bottom: 0.6rem; }
   .note.is-open > :not(.note-fold) { padding: 0 0.8rem; }
   .legend { grid-template-columns: 1fr; }
-  .legend-head-2 { display: none; }
 }
 
 /* A phone's width of essay: the figure of the chapters sets each bar under its title, the findings and the way on
@@ -804,10 +790,6 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
   .front-along .finding-cards { grid-template-columns: 1fr; }
   .chapter-nav { grid-template-columns: 1fr; }
   .chapter-nav .next { grid-column: 1; }
-}
-
-@media (max-width: 860px) {
-  .step-list { grid-template-columns: 1fr; gap: 26px; }
 }
 
 @media (max-width: 560px) {
@@ -824,7 +806,7 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
   .aside .open-mark { grid-column: 2; }
   .exchange-row { grid-template-columns: 1fr auto; }
   .exchange-label { grid-column: 1 / -1; }
-  .legend-item, .legend-head { grid-template-columns: 40px 40px 1fr; }
+  .legend-item { grid-template-columns: 56px 1fr; }
   .tl-row { gap: 4px; }
   .tl-track { margin: 0 6px; }
   .tl-btn { width: 30px; height: 30px; }

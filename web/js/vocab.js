@@ -3,18 +3,22 @@
 // marks once.
 //
 // The grammar is the theory's (docs/theory/img/draw.py):
-// * a circle is a move or a source, a square a factor; a promotion turns a square into a circle;
-// * a gray fill is kept, a hollow dashed outline rejected, a double outline a candidate;
+// * shape says what can still happen to a number: a circle is a move the player could take, a square a number that
+//   will go to the taxman, one way or another; a number can be taken only while one of its proper divisors is still in
+//   the pot, so once none is left its circle turns into a square, and 1 is always a square;
+// * fill and outline say what has been decided: a gray fill is in the set of moves and not yet played, a double
+//   outline on a square is a candidate, a factor the player could promote, and a double circle is a promotion, a
+//   candidate added to the set of moves;
 // * a thin line joins a number to one of its maximal factors, a thick line is a payment, and a dotted line joins a
 //   candidate to each of its maximal factors in the frame in front, and a dotted arrow is the path of a promotion;
 //   a light solid line is a branch of a search tree;
 // * a box is a frame, dashed when it is closed;
-// * blue is the player's and orange the taxman's: a number wears one of them once a figure says who takes it, and no
-//   other color (style.html, Color); what the prose names wears a halo of ink.
+// * color says who took it: blue is the player's and orange the taxman's, and no other color (style.html, Color);
+//   what the prose names wears a halo of ink.
 //
 // The rule that joins the two renderings: depth means you can touch it.  A number the reader plays is a raised token
-// (a coin for a circle, a tile for a square) standing on the page with an edge and a shadow, and one that cannot be
-// taken lies flat.  A number in an explanatory figure is drawn flat, in ink.  Both renderings read the same look
+// (a coin) standing on the page with an edge and a shadow: a circle the player can take now.  Every other number is
+// drawn flat, as is every number in an explanatory figure.  Both renderings read the same look
 // (NUMBER below), so the same look means the same thing in either.
 //
 // Colors are the custom properties of css/site.css, which gives the player's and the taxman's in three tones.  They
@@ -76,14 +80,15 @@ export function reducedMotion() {
 // ---------------------------------------------------------------------------------------------------------------
 
 /** The look of a number, the same in both renderings.  The axes run from 0 to 1 and blend from state to state:
- *    shape   0 a square (a factor), 1 a circle (a move or a source), halfway a plain number (not yet sorted)
- *    kept    the gray fill of a number kept, or played
- *    dashed  hollow, with a dashed outline: rejected, or not played
- *    ring    the double outline of a candidate
- *    player  the player's (blue); taxman, the taxman's (orange)
+ *    shape   0 a square (a number that will go to the taxman), 1 a circle (a move the player could take); a circle
+ *            turns into a square once no divisor of it is left in the pot
+ *    kept    the gray fill of a number in the set of moves and not yet played
+ *    dashed  retired: a hollow dashed outline (a source left out goes to the taxman, so it is a square)
+ *    ring    the double outline of a candidate; on a circle, a promotion
+ *    player  the player took it as a move (blue); taxman, the taxman took it (orange)
  *    halo    a halo of ink and a heavier weight: what the prose beside the figure names
  *    faded   out of focus, as the closed frames are once they drop out
- *    depth   raised only: 1 standing, a token that can be taken; 0 lying flat, one that cannot
+ *    depth   raised only: 1 a coin standing, one the player can take now (0 lying flat is retired)
  *    lift    raised only: how far the token is held above the page, in figure units */
 export const NUMBER = {
   x: 0, y: 0, scale: 1, shape: SHAPE.circle, kept: 0, dashed: 0, ring: 0, player: 0, taxman: 0, halo: 0, faded: 0,
@@ -95,7 +100,7 @@ export const LOOKS = {
   source: { shape: SHAPE.circle },
   move: { shape: SHAPE.circle },
   factor: { shape: SHAPE.square },
-  plain: { shape: SHAPE.plain }, // a number the story has not yet sorted into a source or the bottom half
+  plain: { shape: SHAPE.plain }, // retired from the figures
   kept: { kept: 1 },
   rejected: { dashed: 1 },
   candidate: { ring: 1 },
@@ -103,7 +108,7 @@ export const LOOKS = {
   taxman: { taxman: 1 },
   named: { halo: 1 },
   faded: { faded: 1 },
-  lying: { depth: 0, faded: 0.55 }, // raised only: a number that cannot be taken now
+  lying: { depth: 0, faded: 0.55 }, // retired: a number the player cannot take is a square
   hidden: { opacity: 0 },
 };
 
@@ -208,7 +213,8 @@ function placeRect(rect, x, y, h, rx) {
   rect.setAttribute('rx', round(rx));
 }
 
-/** A flat number: a shape with a halo, a second outline, a dashed twin of its outline, and its label. */
+/** A flat number: a shape with a halo, a second outline, a dashed twin of its outline, and its
+ *  label. */
 export function numberMark(parent, label) {
   const g = el('g', { class: 'v-num', 'data-n': label }, parent);
   const halo = el('rect', { class: 'v-halo', fill: 'none' }, g);

@@ -1,9 +1,10 @@
 // The game the reader plays, apart from its board: the rules of js/model.js, the controls, and the caption.
 //
-// A number is taken only if a divisor of it is still in the pot, and the taxman takes every such divisor; a number
-// that cannot be taken refuses, and the caption says why.  The controls are − n +, Take back, Start over and the blue
-// "Play an optimal game", which plays the recorded game of n from data/small.json.  The caption opens with the
-// figure's opening line, says what each move took, and at the end compares the score with opt(n).
+// A number is taken only if a divisor of it is still in the pot, and the taxman takes every such divisor.  A circle is
+// a number the player can take, a square one that will go to the taxman; a number with no divisor left in the pot
+// can never be a move again, and the board draws it as a square.  The controls are − n +, Take back, Start over and
+// the blue "Play an optimal game", which plays the recorded game of n from data/small.json.  The caption opens with
+// the figure's opening line, says what each move took, and at the end compares the score with opt(n).
 //
 // A figure gives the game its board, which draws the state and calls take(x) when the reader takes x: figures/game.js
 // draws the pot of sockets and the two trays, figures/graph-game.js the maximal-factor graph as the pot, over the same
@@ -18,7 +19,7 @@
 //                  move in this step, in the order they should start (the move, its tax, then the rest); a number
 //                  that the state brings back from a tray to the pot travels back, whatever the order, and every other
 //                  number is drawn at once as the state says
-//   refuse(x)      x cannot be taken: shake it
+//   refuse(x)      x is a square and cannot be taken: shake it
 //   reserve(n)     keep the room that the fullest state of game n needs at the present width
 //   settle()       end every motion, for a game that opens with moves played
 //
@@ -122,8 +123,8 @@ export function mountPlay(host, {
     ? ` No move remains, so the taxman takes the rest: ${listWords(rest)}.`
     : ' No move remains, and the pot is empty.') + ` ${you} ${mine}, taxman ${theirs}. ${verdict(mine)}`;
   const refusal = (x) => (x === 1
-    ? '1 isn’t a legal move: it has no divisor below it, so the taxman would get nothing.'
-    : `${x} isn’t a legal move: none of its divisors remains in the pot, so the taxman would get nothing.`);
+    ? '1 is a square: it has no divisor below it, so it can only go to the taxman.'
+    : `${x} is a square: none of its divisors remains in the pot, so it can only go to the taxman.`);
   const takenBack = (mine) => `Taken back. ${mine.length ? `You have ${listWords(mine)}.` : 'Take a number.'}`;
 
   function take(x, { quiet = false } = {}) {

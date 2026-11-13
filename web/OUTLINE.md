@@ -260,8 +260,9 @@ a quick test of even and odd, on the frames of a search or on the whole board.
   in every game to the end of the chain, and a search with it exploring far more (the prover's searches of every game
   to 1,000 under each bound).
 
-**Figures.**  Game 78's odd core.  The ladder of three conditions, at least one, an odd number, exactly one payment
-scheme, on small examples, and the tables of two of them.  Each bound's height above opt(n) in every game of the chain.
+**Figures.**  Game 78's odd core, as a ring or in its layers.  The ladder of three conditions, at least one, an odd
+number, exactly one payment scheme, on small examples, and the tables of two of them.  Each bound's height above opt(n)
+in every game of the chain.
 
 **Right column.**  The signed frame theorem (B1) and the frame bound (B2) over GF(2), the parity bound (W1), the first
 odd core (C3), the parity bound exact to 77 (measured), the counting theorem (C2), the two gaps (measured).
@@ -325,9 +326,10 @@ front page links *proper divisor*; no page links the repository's glossary.
 
 ## Notation
 
-What the marks, colors, standing pills and symbols mean: the three columns, the legend of the marks flat and raised,
-the two colors, each standing with its meaning, and the table of symbols.  The navigation links it.  The style
-page, a guide for those who build the site, is not linked.
+What the marks, colors, standing pills and symbols mean: the three columns, the legend of the marks (shape says what
+can still happen to a number, fill and outline what has been decided, color who took it; a circle turns into a square
+once no divisor of it is left in the pot), the two colors, each standing with its meaning, and the table of symbols.
+The navigation links it.  The style page, a guide for those who build the site, is not linked.
 
 ## About
 

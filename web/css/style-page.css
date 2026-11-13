@@ -63,15 +63,13 @@
 
 /* ---- marks ---- */
 .marks { margin: 12px 0 10px; }
-.marks-head, .marks-row { display: grid; grid-template-columns: 70px 70px minmax(0, 1fr) minmax(0, 1.25fr); gap: 4px 16px; align-items: center; }
+.marks-head, .marks-row { display: grid; grid-template-columns: 84px 90px minmax(0, 1fr); gap: 4px 16px; align-items: center; }
 .marks-head { font-size: 0.7rem; color: var(--ink-3); padding-bottom: 4px; border-bottom: 1px solid var(--hair); }
-.marks-head span:nth-child(-n+2) { text-align: center; }
+.marks-head span:first-child { text-align: center; }
 .marks-row { padding: 4px 0; border-bottom: 1px solid var(--hair); }
 .marks-pic { display: grid; place-items: center; min-height: 56px; }
 .marks-pic svg { display: block; }
-.marks-none { font-size: 0.68rem; color: var(--ink-3); }
-.marks-name { font-size: 0.84rem; color: var(--ink-2); line-height: 1.35; }
-.marks-name b { display: block; color: var(--ink); }
+.marks-key { font-size: 0.84rem; }
 .marks-use { font-size: 0.8rem; color: var(--ink-2); line-height: 1.4; }
 
 .promo { margin: 16px 0 26px; }
@@ -148,8 +146,8 @@
   .tokens { grid-template-columns: 1fr; }
   .note-grid { grid-template-columns: 1fr; }
   .nav-specimen { grid-template-columns: 1fr; }
-  .marks-head, .marks-row { grid-template-columns: 64px 64px minmax(0, 1fr); }
-  .marks-use { grid-column: 3; font-size: 0.76rem; }
+  .marks-head, .marks-row { grid-template-columns: 76px minmax(0, 1fr); }
+  .marks-use { grid-column: 1 / -1; font-size: 0.76rem; }
   .marks-head span:last-child { display: none; }
   .lane { grid-template-columns: 1fr; gap: 0; }
 }

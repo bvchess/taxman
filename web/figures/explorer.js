@@ -2,9 +2,8 @@
 // data/small.json, the optimal game itself on its board.
 //
 // The record is data/games.json's.  The game is data/small.json's, replayed with js/model.js, which gives each move's
-// tax and the rest.  The board is flat, since it explains: ten numbers a row, the player's moves blue circles, the
-// taxman's numbers orange, a square up to n/2 and a circle above it, and a dashed circle a number above n/2 that the
-// game does not play.
+// tax and the rest.  The board is flat, since it explains: ten numbers a row, the player's moves blue circles, a move
+// up to n/2, a promotion, a blue double circle, and the taxman's numbers all orange squares.
 //
 // The explorer fills the center column: the controls, then the record, then the board under it.  Every number keeps
 // its place on the board from game to game, and the board has the rows of the game shown.  Each line of the record
@@ -139,8 +138,7 @@ export function boardOf(game) {
 }
 
 const lookOf = (n, x, w, halo = 0) => {
-  if (w.kind === 'move') return { ...NUMBER, shape: 1, player: 1, halo };
-  if (x > n / 2) return { ...NUMBER, shape: 1, taxman: 1, dashed: 1, halo };
+  if (w.kind === 'move') return { ...NUMBER, shape: 1, player: 1, ring: x <= n / 2 ? 1 : 0, halo };
   return { ...NUMBER, shape: 0, taxman: 1, halo };
 };
 
@@ -215,14 +213,17 @@ export function mountExplorer(host, { games, small }) {
     const p = b.promotions;
     const promoted = p.length === 0
       ? 'It promotes nothing.'
-      : `${listWords(p)} ${p.length === 1 ? 'is a move up to n/2, a promotion' : 'are moves up to n/2, its promotions'}.`;
-    return `The player’s ${plural(b.turns.length, 'move')}, in blue, score ${fmt(g.score)}; the taxman’s ${plural(g.n - b.turns.length, 'number')}, in orange, total ${fmt(b.taxman)}. ${promoted} Point at a number to see where it goes.`;
+      : `${listWords(p)} ${p.length === 1 ? 'is a move up to n/2, a promotion, a double circle'
+        : 'are moves up to n/2, its promotions, double circles'}.`;
+    const player = `The player’s ${plural(b.turns.length, 'move')}, blue circles, score ${fmt(g.score)}`;
+    const taxman = `the taxman’s ${plural(g.n - b.turns.length, 'number')}, orange squares, total ${fmt(b.taxman)}`;
+    return `${player}; ${taxman}. ${promoted} Point at a number to see where it goes.`;
   }
 
   function aboutNumber(g, b, x) {
     const w = b.who.get(x);
     if (w.kind === 'move') {
-      const promo = b.promotions.includes(x) ? ` It is up to n/2, so it is a promotion.` : '';
+      const promo = b.promotions.includes(x) ? ` It is up to n/2, so it is a promotion, a double circle.` : '';
       return `Move ${w.turn} of ${b.turns.length}: the player takes ${x}, and the taxman takes ${listWords(w.tax)}.${promo}`;
     }
     if (w.kind === 'tax') return `${x} goes to the taxman as tax on ${w.by}, move ${w.turn} of ${b.turns.length}.`;

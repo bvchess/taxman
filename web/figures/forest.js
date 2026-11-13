@@ -19,7 +19,7 @@ import * as M from '../js/model.js';
 import { SHAPE, SIZE, listWords } from '../js/vocab.js';
 import { scene, timeline } from '../js/scene.js';
 import { holdHeight } from './hold-height.js';
-import { layerColumns, mountViewSwitch, viewFromUrl } from './layer-view.js';
+import { CLEAR, layerColumns, mountViewSwitch, viewFromUrl } from './layer-view.js';
 
 const N = 100;
 const W = 530;
@@ -33,8 +33,9 @@ const PRIME_AT = {
   37: [20, HUB - 128], 41: [20, HUB - 44], 43: [20, HUB + 44], 47: [20, HUB + 128],
 };
 
-// The layers view: the pitch of the sources in their column, the length of a line of numbers.
-const PITCH = 32;
+// The layers view: the pitch of the sources in their column, the length of a line of numbers.  It keeps the
+// marks at full size, CLEAR units apart.
+const PITCH = 2 * SIZE.circle + CLEAR;
 const VIEW_PARAM = 'forest-view';
 
 const COUNT = { 3: 'three', 4: 'four', 5: 'five', 6: 'six', 7: 'seven', 8: 'eight' };
@@ -133,9 +134,10 @@ function states(f, places) {
   const list = [base()];
   f.steps.forEach((step, i) => {
     const st = base();
-    // Every source decided so far, kept (gray) or refused (dashed, its edge out of focus).
+    // Every source decided so far, kept (a gray circle) or refused (a square, since the taxman takes it; its edge
+    // out of focus).
     for (const done of f.steps.slice(0, i + 1)) {
-      st[done.s] = { ...st[done.s], ...(done.keep ? { kept: 1 } : { dashed: 1, faded: done === step ? 0 : 0.6 }) };
+      st[done.s] = { ...st[done.s], ...(done.keep ? { kept: 1 } : { shape: SHAPE.square }) };
       if (!done.keep && done !== step) for (const p of M.primeFactors(done.s)) st[`e${done.s}-${p}`] = { faded: 1 };
     }
     // The source greedy is deciding wears a halo, and so does the loop it would close.
@@ -155,7 +157,7 @@ function states(f, places) {
   for (const step of f.steps) {
     if (step.keep) tree[step.s] = { ...tree[step.s], kept: 1 };
     else {
-      tree[step.s] = { ...tree[step.s], dashed: 1, faded: 0.6, opacity: 0.7 };
+      tree[step.s] = { ...tree[step.s], shape: SHAPE.square };
       for (const p of M.primeFactors(step.s)) tree[`e${step.s}-${p}`] = { faded: 1, opacity: 0.6 };
     }
   }
@@ -165,7 +167,9 @@ function states(f, places) {
 
 function captions(f) {
   const words = [
-    `Game ${f.n}'s ${f.scan.length} sources with two prime factors, each between its two primes. The ${f.primes.length} primes up to ${f.n / 2} sit in squares.`,
+    `Game ${f.n}'s ${f.scan.length} sources with two prime factors, each between its two primes. `
+      + `The ${f.primes.length} primes up to ${f.n / 2} sit in squares. `
+      + 'A source greedy keeps turns gray; one it refuses turns into a square, since the taxman takes it.',
   ];
   let keptSoFar = 0;
   for (const step of f.steps) {

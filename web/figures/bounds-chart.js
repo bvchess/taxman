@@ -2,8 +2,9 @@
 // and data/games.json (opt(n)).  The gap is drawn as a percentage of opt(n), on a scale from 0 to 0.5%.  A game whose
 // gap is off the scale gets a small triangle at the top edge, and its tooltip gives the real value.
 //
-// The parity bound is the point of the chart, so it is drawn in the search's green, heavier; Franklín and Moniot's bound
-// is context, in gray.  Neither is the player's blue or the taxman's orange.
+// The parity bound is the point of the chart, so it is drawn in ink, heavier, with filled marks; Franklín and Moniot's
+// bound is context, in gray, solid and thinner, with hollow marks.  Green is the search's, and blue and orange are the
+// player's and the taxman's, so none is used here.
 
 import { el, fmt } from '../js/vocab.js';
 import { freshSVG, keyboard, responsive, tableView, tooltip } from '../js/chart.js';
@@ -13,7 +14,7 @@ const STEP = 0.1; // the ticks, in percent
 const FM_NAME = "Franklín and Moniot's bound";
 const PARITY_NAME = 'The parity bound';
 const FM_COLOR = 'var(--ink-3)';
-const PARITY_COLOR = 'var(--search)';
+const PARITY_COLOR = 'var(--ink)';
 
 const pctText = (x, digits = 3) => `${x.toFixed(digits)}%`;
 
@@ -51,7 +52,7 @@ export function mountBoundsChart(host, { games, bounds }) {
   const box = host.querySelector('.chart-box');
   const tip = tooltip(box);
   const series = [
-    { key: 'fmPct', name: FM_NAME, color: FM_COLOR, width: 1.2 },
+    { key: 'fmPct', name: FM_NAME, color: FM_COLOR, width: 1.2, hollow: true },
     { key: 'parityPct', name: PARITY_NAME, color: PARITY_COLOR, width: 1.8 },
   ];
 
@@ -81,7 +82,7 @@ export function mountBoundsChart(host, { games, bounds }) {
       t.textContent = fmt(nn);
     }
 
-    // The lines, the gray under the green; a value off the scale is held at the top edge.
+    // The lines, the gray under the ink; a value off the scale is held at the top edge.
     for (const s of series) {
       const d = rows.map((r, i) => `${i ? 'L' : 'M'}${x(r.n).toFixed(1)} ${y(r[s.key]).toFixed(1)}`).join('');
       el('path', { d, fill: 'none', 'stroke-width': s.width, 'stroke-linejoin': 'round', style: `stroke: ${s.color}` }, svg);
@@ -90,7 +91,7 @@ export function mountBoundsChart(host, { games, bounds }) {
     for (const s of series) {
       const d = rows.filter((r) => r[s.key] > TOP)
         .map((r) => `M${x(r.n).toFixed(1)} ${m.t - 5}l3.5 7h-7z`).join('');
-      el('path', { d, style: `fill: ${s.color}` }, svg);
+      el('path', { d, 'stroke-width': 1.2, style: `fill: ${s.hollow ? 'var(--paper)' : s.color}; stroke: ${s.color}` }, svg);
     }
 
     // The labels at the right end, each above its line's gaps there, at a height the line stays below from game 2,500.
@@ -105,7 +106,7 @@ export function mountBoundsChart(host, { games, bounds }) {
 
     // The hover layer.
     const cross = el('line', { y1: m.t, y2: axisY, class: 'cross', opacity: 0 }, svg);
-    const dots = series.map((s) => el('circle', { r: 3.5, 'stroke-width': 2, opacity: 0, style: `fill: ${s.color}; stroke: var(--paper)` }, svg));
+    const dots = series.map((s) => el('circle', { r: 3.5, 'stroke-width': 2, opacity: 0, style: s.hollow ? `fill: var(--paper); stroke: ${s.color}` : `fill: ${s.color}; stroke: var(--paper)` }, svg));
     const hit = el('rect', { x: m.l, y: m.t - 8, width: plotW, height: plotH + 8, fill: 'transparent', class: 'hit', 'aria-label': 'Explore the games with the arrow keys' }, svg);
     const showGame = (j) => {
       const r = rows[j];

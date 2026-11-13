@@ -132,9 +132,7 @@
 
   <figure class="fig exact-78-fig" id="exact-78">
     <svg role="img" aria-label="The odd core of game 78."></svg>
-    <figcaption class="fig-caption">Each number sits between two factors it can pay with, and
-    <span data-78="threes">30 and 42</span> reach across the ring to a third.  Double outline: the promotions,
-    <span data-78="promoted">28 and 30</span>.</figcaption>
+    <figcaption class="fig-caption"></figcaption>
   </figure>
 
   <p>Each of the nine numbers can pay with two or three of the nine factors, and each factor could pay for two or more
@@ -275,7 +273,6 @@ registerFigure('exact-78', e78);
 const f = e78.facts;
 fill('78', {
   bound: fmt(f.bound), opt: fmt(f.opt), inn: listWords(f.inn), out: listWords(f.out), promotions: listWords(f.promotions),
-  threes: listWords(f.threes), promoted: listWords(f.core.map(([x]) => x).filter((x) => f.promotions.includes(x))),
 });
 </script>
 </body>

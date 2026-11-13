@@ -1,24 +1,28 @@
 // The loop: 10, 14, 15 and 21, each the product of two primes, make a square on 2, 5, 3 and 7.  The reader plays
-// them, with only the four primes as tax, by the rules of js/model.js, and finds that one is always stuck.  The
-// numbers are raised tokens, since the reader takes them.  The claim behind the figure (the four are not playable,
-// any three are) is checked with the model's isPlayable when the figure is made.
+// them, with only the four primes as tax, by the rules of js/model.js, and finds that one is always stuck.  A product
+// is a circle, a raised coin the reader presses, while one of its primes is still in the pot; a product with none left
+// is stuck, and its circle turns into a square, flat.  The primes are squares.  A number taken lies flat in a tray: the
+// player's a blue circle, the taxman's an orange square (js/trays.js has the looks).  The claim behind the figure (the
+// four are not playable, any three are) is checked with the model's isPlayable when the figure is made.
 //
-// The figure has two forms of the same graph, and a button that unfolds one into the other.  In layers it is the
-// maximal-factor graph of the game above it: the four products in a column at the left, the four primes in a column at
-// the right, level with them, each product joined by a line to its two primes; the loop is there, but the lines
-// cross.  In the loop each product stands between its two primes, on a side of the square its lines make.  The button
-// moves every number still on the table to its place in the other form in one motion, each along a smooth curve that
-// passes through its place in a midway pose, chosen so that no two numbers touch on the way, either way (scene.js,
-// through).  The reader may play in either form and switch at any time; the trays and Start over do not depend on the
-// form.  The "stuck" label stands by the stuck number in the loop, and in layers in the primes' column, which the game
-// has emptied, level with the stuck numbers.
+// The figure has two forms of the same graph, and the switch of figures/layer-view.js ("Show: in layers / as a loop")
+// moves between them.  In layers it is the maximal-factor graph of the game above it: the four products in a column
+// at the left, the four primes in a column at the right, level with them, each product joined by a line to its two
+// primes; the loop is there, but the lines cross.  In the loop each product stands between its two primes, on a side
+// of the square its lines make.  The switch moves every number still on the table to its place in the other form in
+// one motion, each along a smooth curve that passes through its place in a midway pose, chosen so that no two numbers
+// touch on the way, either way (scene.js, through).  The reader may play in either form and switch at any time; the
+// trays and Start over do not depend on the form.  The "stuck" label stands by the stuck number in the loop, and in
+// layers in the primes' column, which the game has emptied, level with the stuck numbers.
 //
 // URL parameter: loop=10,14 opens the figure with those moves played, in layers; loop=unfolded:10,14, or just
 // loop=unfolded, opens it as a loop.
 
 import * as M from '../js/model.js';
-import { el, listWords } from '../js/vocab.js';
+import { TRAY_LOOK, potLook } from '../js/trays.js';
+import { el, listWords, look } from '../js/vocab.js';
 import { scene } from '../js/scene.js';
+import { viewSwitch } from './layer-view.js';
 
 const W = 360;
 const H = 372;
@@ -82,7 +86,6 @@ export function mountLoop(host) {
   const traySlot = (who, i) => ({ x: TRAY.x[who] + 28 + 37 * i, y: TRAY.y + 56, scale: 0.92 });
 
   const status = host.querySelector('.loop-status');
-  const toggle = host.querySelector('[data-act="unfold"]');
   let state;
   let form = 'layers'; // 'layers' or 'loop': the form the figure is in, or moving to
 
@@ -92,25 +95,24 @@ export function mountLoop(host) {
   // the numbers on the table pass through their midway places.
   function looks(crossing) {
     const legal = new Set(M.legalMoves(state));
-    const over = legal.size === 0;
     const at = PLACE[form];
     const v = { 'tray-player': {}, 'tray-taxman': {} };
     for (const p of primes) {
       const i = state.taxman.indexOf(p);
       v[p] = i < 0
-        ? { shape: 0, x: at[p][0], y: at[p][1], scale: SCALE, ...pass(p, crossing) }
-        : { shape: 0, taxman: 1, ...traySlot('taxman', i) };
+        ? { ...look(...potLook(false)), x: at[p][0], y: at[p][1], scale: SCALE, ...pass(p, crossing) }
+        : { ...look(...TRAY_LOOK.taxman), ...traySlot('taxman', i) };
     }
     const stuck = [];
     for (const m of PRODUCTS) {
       const i = state.player.indexOf(m);
       const [x, y] = at[m];
       const way = pass(m, crossing);
-      if (i >= 0) v[m] = { shape: 1, player: 1, ...traySlot('player', i) };
-      else if (over) {
-        v[m] = { shape: 1, dashed: 1, depth: 0, faded: 0.5, x, y, scale: SCALE, ...way };
-        stuck.push(m);
-      } else v[m] = { shape: 1, x, y, scale: SCALE, ...way, ...(legal.has(m) ? {} : { depth: 0, faded: 0.55 }) };
+      if (i >= 0) v[m] = { ...look(...TRAY_LOOK.player), ...traySlot('player', i) };
+      else {
+        v[m] = { ...look(...potLook(legal.has(m))), x, y, scale: SCALE, ...way };
+        if (!legal.has(m)) stuck.push(m);
+      }
     }
     stuck.sort((a, b) => a - b);
     // The lines run straight in every pose, as in the maximal-factor graph above.
@@ -131,7 +133,7 @@ export function mountLoop(host) {
       const words = stuck.length === 1 ? `stuck: ${gone} are gone` : `${listWords(stuck)} are stuck`;
       v.stuck = { x: sx, y: sy, words };
     }
-    return { v, stuck, over };
+    return { v, stuck, over: legal.size === 0 };
   }
 
   function say(stuck, over, last) {
@@ -157,7 +159,7 @@ export function mountLoop(host) {
     for (const m of PRODUCTS) {
       const node = s.node(m);
       const canTake = state.pot.has(m) && M.legalMoves(state).includes(m);
-      node.setAttribute('tabindex', state.pot.has(m) ? '0' : '-1');
+      node.setAttribute('tabindex', canTake ? '0' : '-1');
       node.setAttribute('role', 'button');
       node.setAttribute('aria-disabled', String(!canTake));
       node.setAttribute('aria-label', state.pot.has(m) ? `${m} = ${M.maximalFactors(m).sort((a, b) => a - b).join(' × ')}${canTake ? '' : ', stuck'}` : `${m}, taken`);
@@ -184,17 +186,14 @@ export function mountLoop(host) {
     render(false);
   }
 
-  // Name the form on the button: it says what pressing it does.
-  function label() {
-    toggle.textContent = form === 'layers' ? 'Unfold into a loop' : 'Back to layers';
-  }
-
   // Move to the other form in one motion.
-  function unfold() {
-    form = form === 'layers' ? 'loop' : 'layers';
-    label();
-    return render(true, { crossing: true });
-  }
+  const switcher = viewSwitch({ layers: 'in layers', loop: 'as a loop' }, (to) => {
+    if (to === form) return;
+    form = to;
+    switcher.show(form);
+    render(true, { crossing: true });
+  });
+  host.insertBefore(switcher.box, host.querySelector('svg'));
 
   for (const m of PRODUCTS) {
     const node = s.node(m);
@@ -206,11 +205,10 @@ export function mountLoop(host) {
       }
     });
   }
-  toggle.addEventListener('click', unfold);
   host.querySelector('[data-act="reset"]').addEventListener('click', reset);
   const asked = (new URLSearchParams(location.search).get('loop') ?? '').split(/[,:]/);
   if (asked.includes('unfolded')) form = 'loop';
-  label();
+  switcher.show(form);
   reset();
   for (const m of asked.map(Number)) if (state.pot.has(m) && M.legalMoves(state).includes(m)) state = M.play(state, m);
   render(false);

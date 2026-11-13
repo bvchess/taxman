@@ -67,7 +67,9 @@ export function mountOrders(host, { small }) {
     const opening = orders.every((o) => o[0] === orders[0][0]) ? ` Every one opens with ${orders[0][0]}.` : '';
     // The drawing shows the order; a screen reader hears it.
     status.innerHTML = `<span class="sr-only">${orders[k].join(', ')}. </span>`
-      + `Of the ${fmt(factorial(game.moves.length))} orders of these ${game.moves.length} numbers, ${orders.length} are legal games, `
+      + "The player's moves are blue, and the taxman's tax orange.  "
+      + `Of the ${fmt(factorial(game.moves.length))} orders of these ${game.moves.length} numbers, `
+      + `${orders.length} are legal games, `
       + `and every one scores ${[...scores].join(' or ')}${samePay ? ', with each move taking the same tax' : ''}.${opening}`;
     const v = looks(k);
     if (animate) orders[k].forEach((m, i) => {

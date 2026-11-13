@@ -17,7 +17,7 @@
 
 import * as M from '../js/model.js';
 import { tooltip } from '../js/chart.js';
-import { el, fmt, listWords } from '../js/vocab.js';
+import { el, fmt, listWords, numberSVG, restyle } from '../js/vocab.js';
 import { scene, timeline } from '../js/scene.js';
 
 export const N = 45;
@@ -361,9 +361,16 @@ export function mountSearchTree(host, { small }) {
   const boxes = new Map(t.cands.map((x) => {
     const box = document.createElement('span');
     box.className = 'st-cand';
-    box.textContent = String(x);
+    box.append(numberSVG(x, { rendering: 'flat', looks: ['factor', 'candidate'], size: 36, pad: 5 }));
     return [x, box];
   }));
+  // A remaining candidate is a square with a double outline, a promoted one a gray double circle, one the node has
+  // decided not to promote a plain square; the halo names the one the text is on.
+  const LOOKS = { promoted: ['move', 'kept', 'candidate'], remaining: ['factor', 'candidate'], out: ['factor'] };
+  const paint = (box) => {
+    const named = box.classList.contains('is-named') ? ['named'] : [];
+    restyle(box.firstChild, ...LOOKS[box.dataset.state ?? 'remaining'], ...named);
+  };
   const bestText = document.createElement('span');
   bestText.className = 'st-best';
   const boxRow = document.createElement('span');
@@ -379,6 +386,7 @@ export function mountSearchTree(host, { small }) {
     const remaining = node ? node.live : [];
     for (const [x, box] of boxes) {
       box.dataset.state = promoted.includes(x) ? 'promoted' : remaining.includes(x) ? 'remaining' : 'out';
+      paint(box);
     }
     const bestNow = node ? (node.kind === 'best' ? node.bound : node.bestBefore) : t.best;
     const value = Object.assign(document.createElement('b'), { textContent: String(bestNow) });
@@ -432,7 +440,11 @@ export function mountSearchTree(host, { small }) {
     stopName: (k) => names[Number(k) - 1],
     highlight: (n, on) => {
       for (const label of labels(Number(n))) label.classList.toggle('is-named', on);
-      boxes.get(Number(n))?.classList.toggle('is-named', on);
+      const box = boxes.get(Number(n));
+      if (box) {
+        box.classList.toggle('is-named', on);
+        paint(box);
+      }
     },
     facts: {
       n: N, candidates: t.cands.length, sets: 2 ** t.cands.length, nodes: nodes.length,

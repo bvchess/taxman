@@ -6,20 +6,12 @@
 .search-tree-fig { max-width: 30rem; position: relative; }
 .search-tree-fig .fig-caption { min-height: 6.2em; }
 
-/* The strip of candidates: a box for each, promoted, remaining or out at the node the search is at. */
+/* The strip of candidates: a number's mark for each, promoted, remaining or out at the node the search is at. */
 .st-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 6px 0 8px; font-size: 0.86rem; }
 .st-strip-label { color: var(--ink-2); }
-.st-cands { display: flex; gap: 4px; }
-.st-cand {
-  box-sizing: border-box; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
-  border: 1.5px solid var(--ink); border-radius: 6px; background: var(--paper); color: var(--ink);
-  font-size: 0.8rem; font-variant-numeric: tabular-nums lining-nums;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
-}
-.st-cand[data-state="promoted"] { background: var(--kept); font-weight: 750; }
-.st-cand[data-state="out"] { border-style: dashed; border-color: var(--string); color: var(--ink-3); }
-.st-cand.is-named { font-weight: 750; }
-.st-cand.is-named[data-state="out"] { color: var(--ink); }
+.st-cands { display: flex; gap: 2px; }
+.st-cand { display: inline-flex; line-height: 0; }
+.st-cand .mark-svg { display: block; }
 .st-best { margin-left: auto; color: var(--ink-2); font-variant-numeric: tabular-nums lining-nums; }
 .st-best b { color: var(--ink); }
 
@@ -35,10 +27,6 @@
 .search-tree .v-text { pointer-events: none; }
 .search-tree .v-text-label { font-size: 12px; fill: var(--ink-2); }
 .search-tree .v-text.is-named { font-weight: 750 !important; fill: var(--ink) !important; }
-
-@media (prefers-reduced-motion: reduce) {
-  .st-cand { transition: none; }
-}
 
 /* On a phone the figure is drawn at about three quarters of its size, so its words are set larger. */
 @media (max-width: 560px) {

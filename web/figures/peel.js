@@ -1,11 +1,12 @@
-// Peel, step by step, on game 21's optimal set.  A flat figure: the set's nine numbers are circles in a column at the
-// left, and the maximal factors outside the set that they list are squares in a column at the right, each number
+// Peel, step by step, on game 21's optimal set.  A flat figure: the set's nine numbers are gray circles in a column at
+// the left (they are in the set of moves from the start), and the maximal factors outside the set that they list
+// are squares in a column at the right, each number
 // joined by a thin line to each factor it can pay with.  The time slider steps through one run of peel, one pair a
-// step: the pair is drawn with the thick line of a payment, both leave the play and go hollow, and a label names the
-// kind of step, "one way to pay" for a front move (beside the number) or "one taker" for a back move (beside the
-// factor).  The line grows from the end that acts: from the number to its factor for a front move, from the factor to
-// its number for a back move.  At the end every number is paired, in the player's and the taxman's colors, as in the
-// orders figure.
+// step: the pair is drawn with the thick line of a payment, the factors outside the set stay unfilled squares, and a
+// label names the kind of step, "one way to pay" for a front move (beside the number) or "one
+// taker" for a back move (beside the factor).  The line grows from the end that acts: from the number to its factor
+// for a front move, from the factor to its number for a back move.  At the end every number is paired, in the
+// player's and the taxman's colors, as in the orders figure.
 //
 // The set and the game come from data/small.json, and the run is js/model.js's peel, choosing its steps: first the
 // four the text walks through, then back moves, then the rest.  The pairs are checked against the payments of the
@@ -79,7 +80,7 @@ function words(f, k) {
     return `Game ${N}'s optimal set, its ${f.set.length} numbers at the left, and at the right the maximal factors outside it. A thin line joins a number to each factor it can pay with.`;
   }
   if (k > steps.length) {
-    return `Peel pairs every number, so the set is playable. The pairs are the payments of the game itself: in each order above, every number takes its own factor as tax.`;
+    return `Peel pairs every number, so the set is playable. The pairs are the payments of the game itself: in each order above, every number, in the player's blue, takes its own factor, in the taxman's orange, as tax.`;
   }
   // Who is still in play just before the step.
   const done = steps.slice(0, k - 1);
@@ -133,12 +134,13 @@ export function mountPeel(host, { small }) {
       headFactors: { x: FACTOR_X - 14, y: HEAD_Y[0] },
       headFactors2: { x: FACTOR_X - 14, y: HEAD_Y[1] },
     };
-    const mark = (x, shape, done, isNew, color) => ({
-      x: shape ? MEMBER_X : FACTOR_X, y: row.get(x), shape, kept: done ? 0 : 1,
+    // A member is a gray circle throughout; a factor stays an unfilled square; the pairing is the thick line.
+    const mark = (x, shape, isNew, color) => ({
+      x: shape ? MEMBER_X : FACTOR_X, y: row.get(x), shape, kept: shape,
       ...(end ? { [color]: 1 } : {}), ...(isNew ? { halo: 1, at: [0.1, 0.6] } : {}),
     });
-    for (const m of f.set) v[m] = mark(m, 1, doneM.has(m), newest?.member === m, 'player');
-    for (const x of f.pool) v[x] = mark(x, 0, doneF.has(x), newest?.factor === x, 'taxman');
+    for (const m of f.set) v[m] = mark(m, 1, newest?.member === m, 'player');
+    for (const x of f.pool) v[x] = mark(x, 0, newest?.factor === x, 'taxman');
     // A thin line lives while both its ends are in play; one the step takes out fades once the payment is drawn.
     const before = new Set(steps.slice(0, Math.max(0, k - 1)).flatMap((st) => [st.member, st.factor]));
     for (const [m, x] of edges) {

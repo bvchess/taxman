@@ -1,7 +1,10 @@
 // Along the way: the parity bound first misses at game 78.  The figure draws the odd core that the bound's heaviest set
 // holds there: nine numbers on a ring of the nine factors they list, each number between the factors it can pay with,
-// and the two that list three factors (30 and 42) joined across the ring to their third.  A flat figure; the two
-// promotions of the set wear a candidate's double outline.
+// and the two that list three factors (30 and 42) joined across the ring to their third.  A flat figure; the nine
+// numbers are gray circles, in the set being tested, the two promotions of the set wear a double outline, and the
+// factors are squares.  It has two views, the ring and the layers (the nine numbers at the left, the nine factors
+// at the right), with the "Show: as a ring / in layers" switch of
+// figures/layer-view.js; the module writes the caption for the view shown.
 //
 // Everything is computed here from js/model.js and data/small.json: U*, the candidates (figures/search-tree.js), and
 // the heaviest set of candidates that passes the parity test with U* (figures/ladder.js), by a search that stops a
@@ -11,7 +14,10 @@
 // of the ring is written by hand, and it is checked against the core.
 
 import * as M from '../js/model.js';
+import { SIZE, listWords, numberWord } from '../js/vocab.js';
 import { scene } from '../js/scene.js';
+import { holdHeight } from './hold-height.js';
+import { CLEAR, layerColumns, mountViewSwitch, viewFromUrl } from './layer-view.js';
 import { candidatesOf } from './search-tree.js';
 import { listsOf, passesParityTest } from './ladder.js';
 
@@ -21,6 +27,11 @@ const RING = [6, 78, 26, 52, 4, 28, 14, 42, 21, 63, 9, 45, 15, 75, 25, 50, 10, 3
 const W = 380;
 const H = 290;
 const C = { x: 190, y: 143, a: 168, b: 120 };
+// The layers: the pitch between the nine numbers at the left.  It keeps a promotion's double outline CLEAR units clear
+// of the circle beside it at the marks' full size, the size they have on the ring; the extra SIZE.ring is what the
+// shared clearance does not cover.
+const PITCH = 2 * SIZE.circle + SIZE.ring + CLEAR;
+const VIEW_PARAM = 'core-view';
 
 const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 const sorted = (xs) => [...xs].sort((a, b) => a - b);
@@ -77,26 +88,66 @@ export function mountExact78(host, { small }) {
     const sides = [RING[(i + RING.length - 1) % RING.length], RING[(i + 1) % RING.length]];
     if (lists.has(x) && !sides.every((g) => lists.get(x).includes(g))) throw new Error(`game ${N}: ${x} is not between its factors`);
   });
+  const sources = RING.filter((x) => lists.has(x));
+  const k = M.omega(sources[0]);
+  if (!sources.every((x) => M.omega(x) === k) || !f.factors.every((x) => M.omega(x) === k - 1)) {
+    throw new Error(`game ${N}: the core is not in one layer, with its factors in the layer below`);
+  }
+  const layers = layerColumns({
+    sources, factors: f.factors, factorsOf: (x) => lists.get(x), width: W, pitch: PITCH, maxScale: 1,
+  });
+  const boxes = { graph: { width: W, height: H }, layers: { width: W, height: layers.height } };
+  const view = viewFromUrl(VIEW_PARAM);
   const s = scene(host.querySelector('svg'), {
-    width: W, height: H, className: 'is-dense exact-78',
+    ...boxes[view], className: 'is-dense exact-78',
     label: `The odd core of the set that the parity bound allows in game ${N}: the numbers ${f.core.map(([x]) => x).join(', ')}, which list the factors ${f.factors.join(', ')}.`,
   });
-  const look = {};
+  const ringLook = {};
   RING.forEach((x, i) => {
     const angle = -Math.PI / 2 + (2 * Math.PI * i) / RING.length;
     s.number(x, x);
-    const isMember = lists.has(x);
-    look[x] = {
-      x: C.x + C.a * Math.cos(angle), y: C.y + C.b * Math.sin(angle), shape: isMember ? 1 : 0,
-      ring: f.promotions.includes(x) ? 1 : 0,
-    };
+    ringLook[x] = { x: C.x + C.a * Math.cos(angle), y: C.y + C.b * Math.sin(angle) };
   });
+  const marks = {};
+  for (const x of RING) {
+    const inCore = lists.has(x) ? 1 : 0;
+    marks[x] = { shape: inCore, kept: inCore, ring: f.promotions.includes(x) ? 1 : 0 };
+  }
+  const lines = {};
   for (const [x, list] of lists) {
     for (const g of list) {
       s.line(`${x}-${g}`, x, g, 'thin');
-      look[`${x}-${g}`] = {};
+      lines[`${x}-${g}`] = {};
     }
   }
-  s.states([look]).show(0);
+  const look = (places) => {
+    const st = { ...lines };
+    for (const x of RING) st[x] = { ...marks[x], ...places[x] };
+    return st;
+  };
+  const views = { graph: [look(ringLook)], layers: [look(layers.places)] };
+  s.states(views[view]).show(0);
+
+  const promotions = sources.filter((x) => f.promotions.includes(x));
+  if (!sources.every((x) => (promotions.includes(x) ? x <= N / 2 : x > N / 2))) {
+    throw new Error(`game ${N}: a core number is neither a promotion from the bottom half nor a source`);
+  }
+  const numbersWord = numberWord(sources.length);
+  const factorsWord = numberWord(f.factors.length);
+  const ending = ` The gray circles are the numbers of the set being tested, and the double circles, `
+    + `${listWords(promotions)}, are its promotions. The squares are factors.`;
+  const words = {
+    graph: `The odd core of game ${N}. Each number sits between two factors it can pay with, and `
+      + `${listWords(f.threes)} reach across the ring to a third.${ending}`,
+    layers: `The odd core of game ${N} in its layers. Its ${numbersWord} numbers, all of layer ${k}, stand at the `
+      + `left, and the ${factorsWord} factors they can pay with, all of layer ${k - 1}, stand at the right.${ending}`,
+  };
+  const caption = host.querySelector('.fig-caption');
+  holdHeight(caption, Object.values(words));
+  caption.textContent = words[view];
+  mountViewSwitch(host, s, {
+    view, lists: views, boxes, param: VIEW_PARAM, names: { graph: 'as a ring', layers: 'in layers' },
+    onView: (v) => { caption.textContent = words[v]; },
+  });
   return { facts: f, highlight: (n, on) => s.highlight(n, on), goState: () => {} };
 }

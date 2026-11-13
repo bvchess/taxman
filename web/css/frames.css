@@ -6,14 +6,12 @@
 .frames-row .row-box { position: relative; }
 .frames-row-svg .row-frame { fill: none; stroke: var(--ink); stroke-width: 1.2; }
 .frames-row-svg .row-frame.is-closed { stroke-dasharray: 5 3.5; }
-.frames-row-svg .row-kept { fill: var(--mid); }
-.frames-row-svg .row-rejected { fill: var(--paper); stroke: var(--ink-3); stroke-width: 0.8; }
+.frames-row-svg .row-kept { fill: var(--kept); stroke: var(--ink); stroke-width: 0.8; }
 .frames-row-svg .row-factor { fill: none; stroke: var(--ink-2); stroke-width: 0.8; }
 /* A closed frame is out of focus, as in the figure of game 21: its box in the faint tone, its marks in the string tone,
    lighter than an open frame's but still visible at this size, and its label, already in the ink-3 tone, as it is. */
 .frames-row-svg .row-closed .row-frame { stroke: var(--faint); }
-.frames-row-svg .row-closed .row-kept { fill: var(--string); }
-.frames-row-svg .row-closed .row-rejected { stroke: var(--string); }
+.frames-row-svg .row-closed .row-kept { stroke: var(--string); }
 .frames-row-svg .row-closed .row-factor { stroke: var(--string); }
 .frames-row-svg .hit { cursor: default; }
 

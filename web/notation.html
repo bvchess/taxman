@@ -18,55 +18,151 @@
 
 <header class="essay-head para">
   <h1>Notation</h1>
-  <p class="lede">What the marks, colors, pills and symbols of this site mean.  Every figure and every page uses the
-  same ones.</p>
+  <p class="lede">The marks, colors, pills and symbols used across the site.</p>
 </header>
 
 <section class="chapter" id="the-page" data-toc="the-page" aria-labelledby="h-n-page">
   <h2 id="h-n-page">The page</h2>
-  <p>Every page has three columns.  The navigation is on the left.  The story is in the center, and we write it so that
-  you can read it on its own.  The right column has what is more exact than the story, beside the paragraph it belongs
-  to: the precise statement of each result, technical notes, and links to the code, the data and the literature.</p>
-  <p>On a narrow screen the right column folds into the text, and each of its notes opens when you tap it.</p>
+  <p>On a large screen each page has three columns.  Navigation is on the left, the story is in the center, and
+  the right column has more precise notes about how things work.</p>
+  <p>On a narrow screen the navigation moves to a button at the top, and notes fold into the center column where
+  you can tap to read more.</p>
 </section>
 
 <section class="chapter" id="the-marks" data-toc="the-marks" aria-labelledby="h-n-marks">
   <h2 id="h-n-marks">The marks</h2>
-  <p>Every figure draws numbers with the same marks.  A circle is a
-  <a class="gloss" href="glossary.html#source">source</a>, a number above n/2, or any number the player takes as a
-  <a class="gloss" href="glossary.html#move">move</a>; a square is a number of the
-  <a class="gloss" href="glossary.html#bottom-half">bottom half</a>, up to n/2.  Until the story cuts the board at
-  n/2, at the sources of <a href="top-half.html#sources-section">chapter 3</a>, a number is plain, a rounded square,
-  neither one nor the other.  The rest of each mark says what has happened to it.</p>
+  <p>Every figure draws numbers with the same kinds of marks.  The shape around a number says what can still
+  happen to it, its fill and outline say what has already been decided, and a color tells who took it, the player
+  or the taxman.</p>
+  <p>A circle is a move the player could take.  A square is a number that will go to the taxman either as tax or
+  when the taxman sweeps up the remaining <a class="gloss" href="glossary.html#pot">pot</a> at the end of the game.  A
+  number can be taken only while one of its <a class="gloss" href="glossary.html#maximal-factor">maximal factors</a>
+  is still in the pot.  Numbers never come back to the pot, so once a number has none left, it can never be a
+  <a class="gloss" href="glossary.html#move">move</a>, and its circle turns into a square.  The number 1 has no
+  maximal factor, so it is always a square.</p>
 
-  <div id="legend"></div>
+  <div id="legend" class="legend">
+    <div class="legend-col">
+      <section class="legend-group">
+        <h4>Shapes</h4>
+        <div class="legend-item" data-mark="move">
+          <b>Circle</b>
+          <span>a move the player could take</span>
+        </div>
+        <div class="legend-item" data-mark="factor">
+          <b>Square</b>
+          <span>a number that will go to the taxman, one way or another</span>
+        </div>
+      </section>
+      <section class="legend-group">
+        <h4>What has been decided</h4>
+        <div class="legend-item" data-mark="kept">
+          <b>Gray fill</b>
+          <span>in the set of moves, not yet played</span>
+        </div>
+        <div class="legend-item" data-mark="candidate">
+          <b>Double outline</b>
+          <span>a candidate: a factor the player could promote</span>
+        </div>
+        <div class="legend-item" data-mark="promoted">
+          <b>Double circle</b>
+          <span>a promotion: a candidate added to the set of moves</span>
+        </div>
+      </section>
+      <section class="legend-group">
+        <h4>Who took it</h4>
+        <div class="legend-item" data-mark="player">
+          <b>Blue</b>
+          <span>the player took it as a move</span>
+        </div>
+        <div class="legend-item" data-mark="taxman">
+          <b>Orange</b>
+          <span>the taxman took it, as tax or at the end</span>
+        </div>
+      </section>
+      <section class="legend-group">
+        <h4>In a game you play</h4>
+        <div class="legend-item" data-mark="coin">
+          <b>Coin</b>
+          <span>a move you can take now: press it to play it</span>
+        </div>
+      </section>
+    </div>
+    <div class="legend-col">
+      <section class="legend-group">
+        <h4>Lines</h4>
+        <div class="legend-item" data-mark="thin">
+          <b>Thin line</b>
+          <span>a number and one of its maximal factors</span>
+        </div>
+        <div class="legend-item" data-mark="pay">
+          <b>Thick line</b>
+          <span>a payment: a move and the factor that pays for it</span>
+        </div>
+        <div class="legend-item" data-mark="link">
+          <b>Dotted line</b>
+          <span>a candidate and its maximal factors in the frame in front</span>
+        </div>
+        <div class="legend-item" data-mark="hop">
+          <b>Dotted arrow</b>
+          <span>a promotion: the candidate’s hop into the frame in front, drawn while it moves</span>
+        </div>
+        <div class="legend-item" data-mark="rule">
+          <b>Dashed line</b>
+          <span>the line at n/2 that cuts the board</span>
+        </div>
+      </section>
+      <section class="legend-group">
+        <h4>Frames and layers</h4>
+        <div class="legend-item" data-mark="frame">
+          <b>Box</b>
+          <span>a frame</span>
+        </div>
+        <div class="legend-item" data-mark="closed">
+          <b>Dashed box</b>
+          <span>a closed frame: no factor to spare</span>
+        </div>
+        <div class="legend-item" data-mark="columns">
+          <b>Layer columns</b>
+          <span>a column for each layer, layer 1 at the right</span>
+        </div>
+      </section>
+      <section class="legend-group">
+        <h4>Pointing</h4>
+        <div class="legend-item" data-mark="named">
+          <b>Halo</b>
+          <span>the number the words beside the figure are about, or what a move would take when you point at it</span>
+        </div>
+        <div class="legend-item" data-mark="tag">
+          <b>Move number</b>
+          <span>the place of a move in the game</span>
+        </div>
+      </section>
+    </div>
+  </div>
 
-  <p><strong>Flat or raised.</strong>  A number you can play stands up from the page as a token: a coin for a
-  circle, a tile for a square, and a rounded tile for a plain number.  A number the player cannot take lies flat.  The
-  numbers in a figure that explains something lie flat, in ink.  So depth means you can touch it.</p>
+  <p><strong>In a game you play.</strong>  A circle you can take stands up from the page as a coin you can press.  Every
+  other number is drawn flat.</p>
   <p><strong>Layers and frames.</strong> A figure that sets a game out by layers puts each layer in a column, with layer
   1 at the right and the highest layer at the left, so every line runs right, toward the frames a game plays first.  In
   a column the larger numbers stand higher, except where a figure orders a column so that its lines run straight or do
-  not cross.  A box around its sources and its factors stands for a frame, and a dashed box for a closed frame.  We
+  not cross.  A box around sources and their factors represents a frame, and a dashed box is a closed frame.  We
   number the frames with freedoms from the front.  Frame 0 is at the right, frame 1 is behind it, and so on, and we
   collapse frames at the same distance from the front into one.  A dotted line joins a candidate to each of its maximal
   factors in the frame in front, and only a promotion, the candidate's hop into that frame, wears an arrowhead.</p>
   <p><strong>In the text.</strong>  A number in bold with a dotted underline lights up in the figure beside it when
-  you point at it.  A small tag moves the figure to the state it names, after an underlined phrase or, in a list of
-  steps, on its own.</p>
+  you point at it.</p>
 </section>
 
 <section class="chapter" id="color" data-toc="color" aria-labelledby="h-n-color">
   <h2 id="h-n-color">Color</h2>
-  <p>Three colors mean something, one for each actor in the story.  Blue is you, the player: your moves and your
-  score.  Orange is the taxman and his tax.  Green is the search, the computer's work that proves a game: the games a
-  search settled, and what each search cost.  Every other mark is ink and gray.  A shape, a
-  place or a label backs each color too, so a reader who cannot tell the colors apart misses nothing.</p>
+  <p>Blue represents the player's moves.  Orange goes to the taxman.  Green is for the search, the computer's work
+  that proves a game: the games a search settled, and what each search cost.</p>
 </section>
 
 <section class="chapter" id="standings" data-toc="standings" aria-labelledby="h-n-standings">
-  <h2 id="h-n-standings">Where a result stands</h2>
-  <p>Each result in the right column wears a pill that says where it stands.  The pill is a link to the result's
+  <h2 id="h-n-standings">Standings</h2>
+  <p>Each result in the right column wears a pill that explains where it stands.  The pill is a link to the result's
   proof, or to the evidence for it.</p>
 
   <dl class="standings-list">

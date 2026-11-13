@@ -101,14 +101,14 @@
     count prime factors.  The primes stand in the column at the right, 1 beyond them, and each number sits one column to
     the left of its maximal factors, so every line runs to the right.  Taking a number sends the taxman everything it
     reaches by following its lines to the right, and every number the player takes leaves the graph with its lines.  A
-    number is a legal move, and stands up, as long as it still has a line to its right.</p>
+    number is a circle, a move you can take, as long as it still has a line to its right.  Once its lines are gone it
+    can never be a move, and its circle turns into a square.  Blue marks are yours and orange the taxman's.</p>
   </div>
 
   <div class="game-host graph-game-host" id="graph-game"></div>
 
   <p>The maximal-factor graph makes it easy to see what a move will cost before you make it, as well as what it will
-  leave for the moves after it.  That makes the game far easier than playing on the plain board shown in the
-  introduction.</p>
+  leave for the moves after it.  That makes the game far easier than playing on the board in the introduction.</p>
 
   <div class="para">
     <aside class="note card" aria-label="The playability theorem, proved">
@@ -195,8 +195,8 @@
   numbers, so peel has no safe step.  Try to play all four.</p>
 
   <figure class="fig fig-panel" id="loop" data-fig="loop">
-    <svg role="img" aria-label="The numbers 10, 14, 15 and 21 in a column, each joined by lines to its two prime factors among 2, 3, 5 and 7 in a column beside it. A button unfolds them into a square with the primes at the corners and the numbers on its sides, 10 between 2 and 5, 15 between 5 and 3, 21 between 3 and 7, 14 between 7 and 2. Take the numbers one at a time; the primes go to the taxman."></svg>
-    <div class="fig-controls"><button type="button" class="btn" data-act="unfold">Unfold into a loop</button> <button type="button" class="btn" data-act="reset">Start over</button></div>
+    <svg role="img" aria-label="The numbers 10, 14, 15 and 21 in a column, each joined by lines to its two prime factors among 2, 3, 5 and 7 in a column beside it. A switch shows them instead as a loop, a square with the primes at the corners and the numbers on its sides, 10 between 2 and 5, 15 between 5 and 3, 21 between 3 and 7, 14 between 7 and 2. Take the numbers one at a time, circles that turn into squares when their primes are gone; the primes are squares and go to the taxman."></svg>
+    <div class="fig-controls"><button type="button" class="btn" data-act="reset">Start over</button></div>
     <figcaption class="loop-status" aria-live="polite"></figcaption>
   </figure>
 
@@ -245,7 +245,10 @@
       <div class="aside-body">
         <p>A <a class="gloss" href="glossary.html#move">move</a> usually takes one or two numbers as <a class="gloss" href="glossary.html#tax">tax</a>.  In game 40, one
         <a class="gloss" href="glossary.html#optimal-game">optimal game</a> takes 30 when 6, 10 and 15 are all still in the <a class="gloss" href="glossary.html#pot">pot</a>, so the taxman gets three numbers for one move.</p>
-        <figure class="fig fig-strip" id="game-40-fig"></figure>
+        <figure class="fig fig-strip">
+          <div id="game-40-fig"></div>
+          <figcaption class="fig-caption">The player's moves are blue, and the taxman's tax orange.</figcaption>
+        </figure>
         <p>It scores <span data-g40-score>opt(40)</span>, the best possible.  The same happens in larger games.  In game
         1,250, the <a class="gloss" href="glossary.html#chain">chain</a>'s optimal game plays 748, which takes 44, 68
         and 374.</p>
@@ -274,7 +277,10 @@
         <a class="gloss" href="glossary.html#optimal-game">optimal game</a> makes <span data-833="moves">362</span>
         moves, yet some games make one more.  The best of those still scores less, and one of them shows why.  It plays
         five smaller numbers where the optimal game plays four larger ones.</p>
-        <div id="exchange-833"></div>
+        <figure class="fig">
+          <div id="exchange-833"></div>
+          <figcaption class="fig-caption">The player's moves are blue.</figcaption>
+        </figure>
         <p>The trade happens below n/2.  Each of the nine numbers is a
         <a class="gloss" href="glossary.html#maximal-factor">maximal factor</a> of a number the optimal game plays, and
         a number the player takes as a move cannot also pay for another.  The optimal game takes the four large ones and

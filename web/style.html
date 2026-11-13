@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The style of the site · Taxman</title>
-<meta name="description" content="Every piece of the site's look on one page: the type, the colors, the marks in both renderings, the controls, the technical layer, the layout at each width, and the motion.">
+<meta name="description" content="Every piece of the site's look on one page: the type, the colors, the marks, the controls, the technical layer, the layout at each width, and the motion.">
 <meta name="author" content="Brian Chess">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <script src="js/tone.js"></script>
@@ -159,29 +159,31 @@
 
 <!-- The marks ------------------------------------------------------------------------------------------------- -->
 <section class="chapter" id="marks" data-toc="marks" data-title="The marks" aria-labelledby="h-marks">
-  <h2 id="h-marks">The marks: one grammar, two renderings</h2>
+  <h2 id="h-marks">The marks</h2>
   <div class="para">
     <aside class="note tech" aria-label="Which rendering">
       <div class="note-head"><span class="note-name">Which rendering</span></div>
-      <p>Raised: the game, the loop, the game on the maximal-factor graph and the front page's game, and the tokens
-      of the contents and the map, which are links.  Flat: game 21 from the board to the frames, the three steps, the
-      orders, and the numbers of an aside.  A chapter's number in its heading is flat: it is not a thing to press.</p>
+      <p>Raised: a circle the player can take now, in the games the reader plays, and the tokens of the contents,
+      which are links.  Flat: every other number, in the games and in the figures that explain.  A chapter's number
+      in its heading is flat: it is not a thing to press.</p>
     </aside>
-    <p>Depth means you can touch it.  A number the reader plays is a raised token, a coin for a circle, a tile for
-    a square and a rounded tile for a plain number, standing on the page with an edge and a shadow; one that cannot be taken now lies flat.  A number in a
-    figure that explains is drawn flat, in ink.  The two renderings read the same look, so each mark below means the
-    same thing in both.</p>
+    <p>Shape says what can still happen to a number: a circle is a move the player could take, and a square is a
+    number that will go to the taxman, one way or another.  A number can be taken only while one of its proper
+    divisors is still in the pot, so once none is left its circle turns into a square.  Fill and outline say what has
+    been decided: gray is in the set of moves, a double outline is a candidate, and a double circle is a promotion.
+    Color says who took it: blue the player, orange the taxman.  In a game the reader plays, a circle the player can
+    take stands up as a coin to press, and everything else is drawn flat.</p>
   </div>
+  <p>The names and meanings of the marks are those of the <a href="notation.html">notation page</a>; this table
+  gives each mark's key and when to use it.</p>
   <div class="marks spread" id="marks-table"></div>
 
   <h3 class="section-head" id="promotion">A promotion</h3>
-  <p>The moment the vocabulary must make visible.  Flat, the square of 9 rounds into a circle as it hops one frame
-  forward, leaving a dashed ghost, and its payment is drawn.  Raised, the tile turns over in the air and lands as a
-  coin.</p>
+  <p>The moment the vocabulary must make visible.  The candidate 9, a square with a double outline, hops one frame
+  forward and lands as a gray double circle with its payment drawn.  Once played, the circle turns blue.</p>
   <figure class="promo spread" id="promo">
     <div class="promo-pair">
-      <div><svg data-rendering="flat"></svg><p class="promo-name">flat</p></div>
-      <div><svg data-rendering="raised"></svg><p class="promo-name">raised</p></div>
+      <div><svg data-rendering="flat"></svg></div>
     </div>
     <button type="button" class="btn" data-act="replay">Play the promotion again</button>
   </figure>
@@ -305,7 +307,7 @@
   </details>
   <p>The contents sit at the left: the story's chapters, the findings along the way, and the about page.  Each
   chapter's token is raised, since it is a link; the page the reader is on is gray, and a chapter not yet
-  written lies flat and dashed.  Below 1300 px the contents fold into a bar at the top with a button that opens them.</p>
+  written is flat and dashed.  Below 1300 px the contents fold into a bar at the top with a button that opens them.</p>
   <div class="nav-specimen spread">
     <div class="rail-specimen"></div>
     <div class="topbar-specimen"><span class="home"></span><span class="where">Peel</span><span class="btn contents-btn">Contents</span></div>
@@ -331,12 +333,11 @@
 <section class="chapter" id="motion" data-toc="motion" data-title="Motion" aria-labelledby="h-motion">
   <h2 id="h-motion">Motion</h2>
   <p>Motion answers the reader: a figure moves when its slider, a button or a word moves it, and the page itself
-  stays still.  Flat marks glide.  Raised tokens are picked up, carried and set down with a small overshoot, as a
-  thing with weight is, and a tile turns over when it becomes a coin.  With reduced motion every figure jumps.</p>
+  stays still.  Flat marks glide.  Coins are picked up, carried and set down with a small overshoot, as a
+  thing with weight is.  With reduced motion every figure jumps.</p>
   <div class="motion-demo spread" id="motion-demo">
     <div class="lane"><span class="lane-name">a flat mark glides</span><svg aria-label="A flat mark gliding"></svg></div>
-    <div class="lane"><span class="lane-name">a raised token is carried and set down</span><svg aria-label="A raised token carried and set down"></svg></div>
-    <div class="lane"><span class="lane-name">a raised tile turns over and lands as a coin</span><svg aria-label="A raised tile turning over"></svg></div>
+    <div class="lane"><span class="lane-name">a coin is carried and set down</span><svg aria-label="A coin carried and set down"></svg></div>
     <button type="button" class="btn" data-act="motion">Play the motion</button>
   </div>
   <div class="curves" id="curves"></div>

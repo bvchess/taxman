@@ -73,7 +73,8 @@ function words(f) {
   const plural = factors.length > 1 ? 's' : '';
   return [
     `Game ${n - 1}'s optimal game, played in game ${n}: each move takes the same tax, and it leaves ${listWords(before.rest)} `
-    + `out.  It scores ${fmt(before.score)}.`,
+    + `out.  It scores ${fmt(before.score)}.  The player's moves are blue.  The taxman's tax is orange, `
+    + `and so are the numbers left out, which he takes at the end.`,
     `${n} cannot come last: by then its maximal factor${plural}, ${listWords(factors)}, ${gone} gone.  The last to go `
     + `is ${last}, ${last === cut ? 'which the player plays as a move' : `which ${cut} takes`}.`,
     `So ${n} goes just before ${cut} and takes ${listWords(tax)}.  Now ${cut} has no maximal factor left in the pot.`,
@@ -115,7 +116,7 @@ function states(f) {
     [payId('', n)]: { at: [0.65, 1] },
   });
   const fourth = { ...built([]), ...score('score-b') };
-  fourth[dropped] = { ...fourth[dropped], ...potLook(dropped, n, { given: true }) };
+  fourth[dropped] = { ...fourth[dropped], ...potLook({ given: true }) };
   return { list: [first, second, third, fourth], height, width: rowWidth(REFERENCE.columns, REFERENCE.pot) };
 }
 

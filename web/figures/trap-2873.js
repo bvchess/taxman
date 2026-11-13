@@ -121,14 +121,15 @@ export function mountTrap(host) {
     }
     return st;
   };
-  // A set kept: gray, each paid for by the factor a run of peel gives it; the others dashed, their lines faded.
+  // A set kept: gray circles, each paid for by the factor a run of peel gives it; the others squares, since the
+  // taxman takes them, with their lines faded.
   const keeping = (spot, kept) => {
     const st = base(spot);
     const run = M.peel(kept);
     for (const src of SIX) {
       if (kept.includes(src)) st[src].kept = 1;
       else {
-        Object.assign(st[src], { dashed: 1, halo: 1 });
+        Object.assign(st[src], { shape: SHAPE.square, halo: 1 });
         for (const fx of M.maximalFactors(src)) st[`e${src}-${fx}`] = { faded: 1 };
       }
     }

@@ -1,16 +1,16 @@
-// Play the game: the pot as a tray of sockets, and the two trays that fill as the reader plays.  The numbers are
-// raised tokens, since the reader takes them.  Every piece is plain, in the pot and in the trays: the game sorts no number
-// into a source or the bottom half, and the trays and their colors tell a move from its tax.
+// Play the game: the pot as a tray of sockets, and the two trays that fill as the reader plays.  A number in the pot is
+// a circle while the player can take it, a raised coin that the reader presses, and a flat square once it cannot, since
+// a number with no divisor left in the pot can never be a move; 1 is a square from the start.  Taken numbers lie flat
+// in the trays, the player's as blue circles and the taxman's as orange squares.
 //
-// The game itself, its controls and its caption are js/play.js's; this file draws its board.  A legal number stands
-// in its socket; one that is not lies flat and refuses to move.  Taking back, or starting over, sends the pieces back to
-// their sockets, the last of a step to leave the first to return.  Every piece is kept from build to
-// build of the same n, so that it can travel.
+// The game itself, its controls and its caption are js/play.js's; this file draws its board.  Taking back, or starting
+// over, sends the pieces back to their sockets, the last of a step to leave the first to return.  Every piece is kept
+// from build to build of the same n, so that it can travel.
 //
 // URL parameter: game=N or game=N:m1,m2,... opens game N with those moves played.
 
 import { mountPlay } from '../js/play.js';
-import { glide, makePiece, reserveRows, returnDelays, startOf, traysHTML } from '../js/trays.js';
+import { TRAY_LOOK, glide, makePiece, potLook, reserveRows, returnDelays, startOf, traysHTML } from '../js/trays.js';
 import { reducedMotion, restyle } from '../js/vocab.js';
 
 export function mountGame(host, { small, n = 10, minN = 2, maxN = 30, param = 'game', you = 'You' }) {
@@ -41,7 +41,7 @@ function trays({ you, take }) {
     for (let x = 1; x <= n; x++) {
       const socket = document.createElement('div');
       socket.className = 'socket';
-      const piece = makePiece(x, 'plain');
+      const piece = makePiece(x, ...potLook(false));
       piece.addEventListener('click', () => take(x));
       socket.appendChild(piece);
       potGrid.appendChild(socket);
@@ -57,24 +57,26 @@ function trays({ you, take }) {
     for (const [x, p] of pieces) before.set(x, p.getBoundingClientRect());
     for (const [x, p] of pieces) {
       let where;
-      let lookName;
+      let owner = null;
+      let looks;
       if (state.pot.has(x)) {
         where = sockets.get(x);
-        lookName = legal.has(x) ? 'standing' : 'lying';
+        looks = potLook(legal.has(x));
       } else if (state.player.includes(x)) {
         where = playerSlots;
-        lookName = 'player';
+        owner = 'player';
+        looks = TRAY_LOOK.player;
       } else {
         where = taxmanSlots;
-        lookName = 'taxman';
+        owner = 'taxman';
+        looks = TRAY_LOOK.taxman;
       }
       p.classList.toggle('is-legal', legal.has(x));
-      p.classList.toggle('is-stuck', state.pot.has(x) && !legal.has(x));
-      p.disabled = !state.pot.has(x);
-      p.setAttribute('aria-label', state.pot.has(x)
-        ? `${x}${legal.has(x) ? '' : ', not a legal move'}`
-        : `${x}, ${lookName === 'player' ? (you === 'You' ? 'yours' : 'the player’s') : 'the taxman’s'}`);
-      p._next = { where, lookName };
+      p.disabled = !legal.has(x);
+      p.setAttribute('aria-label', owner === null
+        ? `${x}${legal.has(x) ? '' : ', not a move'}`
+        : `${x}, ${owner === 'player' ? (you === 'You' ? 'yours' : 'the player’s') : 'the taxman’s'}`);
+      p._next = { where, looks, owner };
     }
     // Move in the DOM: the trays in the order of the state's lists, so they fill left to right.
     for (const [x, p] of pieces) if (p._next.where === sockets.get(x)) p._next.where.appendChild(p);
@@ -84,7 +86,7 @@ function trays({ you, take }) {
     if (order.length) step++;
     // The pieces that were in a tray and are in the pot now travel back, the last of a step to leave the first to
     // return.
-    const inTray = (p) => ['player', 'taxman'].includes(p._shown);
+    const inTray = (p) => typeof p._owner === 'string'; // _owner: undefined before the first draw, null in the pot
     const back = [...pieces].filter(([x, p]) => p._next.where === sockets.get(x) && inTray(p));
     const after = returnDelays(back.map(([, p]) => ({ step: p._step, place: p._place })));
     const delays = new Map(back.map(([x], i) => [x, after[i]]));
@@ -94,11 +96,10 @@ function trays({ you, take }) {
         p._place = order.indexOf(x);
       }
       const svg = p.querySelector('svg');
-      const { lookName } = p._next;
-      const looks = lookName === 'standing' ? ['plain'] : ['plain', lookName];
+      const { looks, owner } = p._next;
       const k = order.indexOf(x);
-      const was = p._shown;
-      p._shown = lookName;
+      const was = p._owner;
+      p._owner = owner;
       const delay = delays.has(x) ? delays.get(x) : startOf(k);
       if (quick || was === undefined || (k < 0 && !delays.has(x))) {
         clearTimeout(p._restyle); // a restyle scheduled by a motion still in progress would undo this one

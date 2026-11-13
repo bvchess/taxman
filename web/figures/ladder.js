@@ -6,8 +6,8 @@
 //   6, 10 and 15, the triangle: two schemes, on the first rung only;
 //   12, 18, 20, 30 and 45, the first odd core (C3): three schemes, on the first two;
 //   9, 10 and 15, the triangle with 6 swapped for 9: one scheme, on all three.
-// A flat figure: each scheme is drawn as the set's numbers (circles) and the factors outside it (squares), a thin line
-// to each factor a number could pay with and a thick one to the factor it does.  Every count and every answer is
+// A flat figure: each scheme is drawn as the set's numbers (gray circles) and the factors outside it (squares), a thin
+// line to each factor a number could pay with and a thick one to the factor it does.  Every count and every answer is
 // computed here from js/model.js, and checked against the theorem: the odd count against the GF(2) test below, and
 // exactly one against peel.  Only the places are written by hand.
 
@@ -111,7 +111,7 @@ function drawScheme(host, spec, scheme, label) {
     s.number(x, x);
   }
   const look = {};
-  for (const x of spec.set) look[x] = { x: spec.at[x][0], y: spec.at[x][1], shape: 1 };
+  for (const x of spec.set) look[x] = { x: spec.at[x][0], y: spec.at[x][1], shape: 1, kept: 1 };
   for (const f of pool) look[f] = { x: spec.at[f][0], y: spec.at[f][1], shape: 0 };
   for (const [x, list] of lists) {
     for (const f of list) {

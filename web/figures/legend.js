@@ -1,6 +1,6 @@
-// The legend: every mark of the vocabulary, each drawn twice by vocab.js itself, flat as the explanatory figures draw
-// it and raised as the reader's own pieces are, so the legend cannot drift from the figures.  The chapter shows the
-// marks a reader needs; the style page shows every entry, with when to use it.
+// The legend: every mark of the vocabulary, drawn by vocab.js itself as the figures draw it, flat, so the legend cannot
+// drift from the figures.  The one exception is the coin, the raised circle a reader can press in a game they play.
+// The notation page shows the marks a reader needs; the style page shows every entry, with when to use it.
 
 import {
   BOX, LINE_LOOK, NUMBER, TAG, boxMark, el, installDefs, lineMark, look, numberMark, setBox, setLine, setNumber, setTag,
@@ -9,6 +9,7 @@ import {
 
 const W = 60;
 const H = 50;
+const WIDE = 76; // the box of a sample whose line needs room to show
 
 function svgBox(w = W, h = H) {
   installDefs();
@@ -39,9 +40,9 @@ const one = (label, ...parts) => (r) => {
 };
 
 const pair = (style, [a, ...pa], [b, ...pb]) => (r) => {
-  const svg = svgBox();
-  const p = put(svg, r, a, 14, 15, ...pa, { scale: 0.72 });
-  const q = put(svg, r, b, 46, 35, ...pb, { scale: 0.72 });
+  const svg = svgBox(WIDE);
+  const p = put(svg, r, a, 13, 12, ...pa, { scale: 0.66 });
+  const q = put(svg, r, b, WIDE - 13, 38, ...pb, { scale: 0.66 });
   joined(svg, r, style, p, q);
   return svg;
 };
@@ -54,35 +55,28 @@ function frameSample(closed) {
   };
 }
 
-function promotionSample(r) {
+function hopSample(r) {
+  const svg = svgBox(WIDE);
+  // A candidate leaves its square for the frame in front and ends there as a gray double circle; the line runs from
+  // the edge of one to the edge of the other, so the marks stand far enough apart for the dots and the head to show.
+  const from = put(svg, r, 9, 13, 38, 'factor', 'candidate', { scale: 0.66 });
+  const to = put(svg, r, 9, WIDE - 13, 12, 'move', 'kept', 'candidate', { scale: 0.66 });
+  joined(svg, r, 'hop', from, to);
+  return svg;
+}
+
+function ruleSample(r) {
   const svg = svgBox();
-  if (r === 'raised') {
-    // A tile turns over and lands as a coin.
-    el('path', { d: 'M20 14 Q30 2 40 14', fill: 'none', stroke: 'var(--ink-2)', 'stroke-width': 1.5, 'stroke-linecap': 'round' }, svg);
-    el('path', { d: 'm36.4 11.8 3.8 2.6.3-4.4', fill: 'none', stroke: 'var(--ink-2)', 'stroke-width': 1.5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, svg);
-    put(svg, r, 9, 13, 28, 'factor', { scale: 0.66 });
-    put(svg, r, 9, 47, 28, 'move', 'kept', { scale: 0.66 });
-  } else {
-    // A square rounds into a circle one frame forward, and leaves a dashed ghost.
-    const from = put(svg, r, 9, 12, 32, 'factor', 'rejected', 'faded', { scale: 0.66 });
-    const to = { ...NUMBER, ...look('move', 'kept'), x: 46, y: 18, scale: 0.66 };
-    joined(svg, r, 'hop', from, to);
-    put(svg, r, 9, 46, 18, 'move', 'kept', { scale: 0.66 });
-  }
+  const m = lineMark(svg, 'rule', r);
+  setLine(m, { x: 8, y: H / 2, scale: 0, shape: 1, ring: 0 }, { x: W - 8, y: H / 2, scale: 0, shape: 1, ring: 0 }, LINE_LOOK);
   return svg;
 }
 
 function tagSample(r) {
-  if (r === 'raised') return null;
   const svg = svgBox();
   put(svg, r, 19, 28, 28, 'move', 'player');
   setTag(tagMark(svg, 1), { ...TAG, x: 13, y: 11 });
   return svg;
-}
-
-function lyingSample(r) {
-  if (r === 'flat') return null;
-  return one(7, 'move', 'lying')(r);
 }
 
 function columnsSample(r) {
@@ -98,62 +92,125 @@ function columnsSample(r) {
   return svg;
 }
 
-/** Every entry: its name, what it means, when to use it, and how to draw it in a rendering (null where a
- *  rendering has no such mark).  core marks the entries the chapter's own legend shows. */
+/** Every mark, in the key's order: how to draw it (flat, or raised when raised is set) and when to use it.  Its name
+ *  and meaning are the notation page's own words, in the item of notation.html with the same data-mark. */
 export const ENTRIES = [
-  { key: 'move', name: 'Circle', words: 'a source, a number above n/2, or a move', use: 'Every number that is or could be a move.', draw: one(21, 'move'), core: true },
   {
-    key: 'factor', name: 'Square', words: 'a number of the bottom half, up to n/2',
-    use: 'Every number up to n/2 that the player does not play, from the sources of chapter 3 on.',
-    draw: one(7, 'factor'), core: true,
+    key: 'move',
+    use: 'A number can be taken only while one of its divisors is still in the pot. Once none is left it can ' +
+      'never be a move, and its circle turns into a square.',
+    draw: one(21, 'move'),
   },
   {
-    key: 'plain', name: 'Rounded square',
-    words: 'a plain number: one the story has not yet sorted into the sources or the bottom half',
-    use: 'Before the sources of chapter 3: the pot and the layers of game 21, and the games of the introduction and ' +
-      'chapter 1.',
-    draw: one(14, 'plain'), core: true,
+    key: 'factor',
+    use: 'A number that is not a move: it goes to the taxman as tax or at the end. 1 has no divisor, so it is ' +
+      'always a square.',
+    draw: one(7, 'factor'),
   },
-  { key: 'kept', name: 'Gray fill', words: 'kept: a source descending greedy keeps, or a move the player plays', use: 'Once a figure has decided a number is in the set.', draw: one(19, 'move', 'kept'), core: true },
-  { key: 'rejected', name: 'Hollow and dashed', words: 'rejected: a source the player does not play', use: 'A source descending greedy drops, or a move the player leaves out. Faded, it is a number the game leaves out: a dashed circle above n/2, a square at or below it; with a halo, a move the player gives up.', draw: one(17, 'move', 'rejected'), core: true },
-  { key: 'candidate', name: 'Double outline', words: 'a candidate: a factor the player could promote', use: 'A factor whose frame can spare it and whose frame in front can take it on.', draw: one(9, 'factor', 'candidate'), core: true },
-  { key: 'promotion', name: 'Promotion', words: 'a factor becomes a move, one frame forward', use: 'The square becomes a circle: flat, it rounds and hops, leaving a ghost, along a dotted arrow, the only arrow the figures draw; raised, it turns over.', draw: promotionSample, core: true },
-  { key: 'pay', name: 'Thick line', words: 'a payment: the factor that pays for a move', use: 'From a move to the one factor it takes as its payment.', draw: pair('pay', [18, 'move', 'kept'], [6, 'factor']), core: true },
-  { key: 'thin', name: 'Thin line', words: 'a number and one of its maximal factors', use: 'Joins a number to each maximal factor, running rightward. Raised, it hangs as a string; between the columns of a graph it leaves and arrives level, and crosses no number.', draw: pair('thin', [12, 'move'], [6, 'factor']), core: true },
-  { key: 'link', name: 'Dotted line', words: 'a candidate and its maximal factors in the frame in front', use: 'From each candidate to each of its maximal factors in the frame in front, once the story names the candidates. It has no arrowhead.', draw: pair('link', [9, 'factor', 'candidate'], [3, 'factor']), core: true },
-  { key: 'frame', name: 'Box', words: 'a frame', use: 'The figures draw it round a frame’s sources and factors. Raised, it is a tray.', draw: frameSample(false), core: true },
-  { key: 'closed', name: 'Dashed box', words: 'a closed frame: no factor to spare', use: 'From the moment the story counts its freedoms.', draw: frameSample(true), core: true },
-  { key: 'player', name: 'Blue', words: 'the player’s: a move the player takes', use: 'Only for the player and the player’s moves; always with a label or a tray.', draw: one(9, 'move', 'player'), core: true },
-  { key: 'taxman', name: 'Orange', words: 'the taxman’s: his tax, and the rest', use: 'Only for the taxman and what he takes; always with a label or a tray.', draw: one(3, 'factor', 'taxman'), core: true },
-  { key: 'named', name: 'Halo', words: 'the number the words beside the figure are about', use: 'Point at a number in the prose; a figure also uses it for what its caption names.', draw: one(19, 'move', 'kept', 'named'), core: true },
-  { key: 'lying', name: 'Lying flat', words: 'a number the player cannot take now', use: 'Raised figures only, the games the reader plays: the player can take a token that stands, not one that lies flat.', draw: lyingSample, core: true },
-  { key: 'tag', name: 'Tag', words: 'the place of a move in the game', use: 'Flat figures only, when the player plays a game in place; a raised game fills the player’s tray in order instead.', draw: tagSample },
-  { key: 'columns', name: 'Layer columns', words: 'a column for each layer, layer 1 at the right', use: 'Every figure that lays a game out by layers or frames; lines run rightward, toward the front.', draw: columnsSample, core: true },
+  {
+    key: 'kept',
+    use: 'A number a figure has put in the set of moves, until the player plays it.', draw: one(19, 'move', 'kept'),
+  },
+  {
+    key: 'candidate',
+    use: 'On a square. A candidate goes to the taxman unless it is promoted: its frame can spare it and the frame in ' +
+      'front can take it on.',
+    draw: one(9, 'factor', 'candidate'),
+  },
+  {
+    key: 'promoted',
+    use: 'A candidate keeps its double outline when it becomes a circle, so a double circle is always a promotion. ' +
+      'It is gray until played and blue once played.',
+    draw: one(12, 'move', 'kept', 'candidate'),
+  },
+  {
+    key: 'player',
+    use: 'Only for the player and the player\u2019s moves, named by a label, a tray or the caption.',
+    draw: one(9, 'move', 'player'),
+  },
+  {
+    key: 'taxman',
+    use: 'Only for the taxman and what he takes, named by a label, a tray or the caption. A source no one ' +
+      'played, which he takes at the end, is an orange square.',
+    draw: one(3, 'factor', 'taxman'),
+  },
+  {
+    key: 'thin',
+    use: 'Joins a number to each maximal factor, running rightward. Between the columns of a graph it leaves and ' +
+      'arrives level, and crosses no number.',
+    draw: pair('thin', [12, 'move'], [6, 'factor']),
+  },
+  {
+    key: 'pay',
+    use: 'From a move to the factor it takes as its payment. In a game laid out in rows, it runs down the ' +
+      'move\u2019s stack of tax.',
+    draw: pair('pay', [18, 'move', 'kept'], [6, 'factor']),
+  },
+  {
+    key: 'link',
+    use: 'From each candidate to each of its maximal factors in the frame in front, once the story names the ' +
+      'candidates. It has no arrowhead.',
+    draw: pair('link', [9, 'factor', 'candidate'], [3, 'factor']),
+  },
+  {
+    key: 'hop',
+    use: 'The only arrow the figures draw. It runs from where the candidate was to the gray double circle it becomes, ' +
+      'and is drawn only while the candidate moves.',
+    draw: hopSample,
+  },
+  {
+    key: 'rule',
+    use: 'Cuts the board of a game into its top half and its bottom half.', draw: ruleSample,
+  },
+  {
+    key: 'frame',
+    use: 'The figures draw it round a frame\u2019s sources and factors. In a game you play, it is a tray.',
+    draw: frameSample(false),
+  },
+  {
+    key: 'closed',
+    use: 'From the moment the story counts its freedoms.', draw: frameSample(true),
+  },
+  {
+    key: 'columns',
+    use: 'Every figure that lays a game out by layers or frames; lines run rightward, toward the front.',
+    draw: columnsSample,
+  },
+  {
+    key: 'named',
+    use: 'Point at a number in the prose; a figure also uses it for what its caption names.',
+    draw: one(19, 'move', 'named'),
+  },
+  {
+    key: 'tag',
+    use: 'When the player plays a game in place; a game laid out in trays fills the player\u2019s tray in ' +
+      'order instead.',
+    draw: tagSample,
+  },
+  {
+    key: 'coin',
+    use: 'Only in a game you play: a circle the player can take now stands up from the page. Every other number is ' +
+      'drawn flat.',
+    draw: one(21, 'move'), raised: true,
+  },
 ];
 
-/** Draw the legend into host: a row an entry, the flat mark, the raised one, and its meaning. */
-export function mountLegend(host, { all = false } = {}) {
-  host.classList.add('legend');
-  host.setAttribute('role', 'list');
-  const head = document.createElement('div');
-  head.className = 'legend-head';
-  head.setAttribute('aria-hidden', 'true');
-  head.innerHTML = '<span>flat</span><span>raised</span><span>means</span>';
-  host.appendChild(head);
-  const second = head.cloneNode(true);
-  second.classList.add('legend-head-2');
-  host.appendChild(second);
-  for (const entry of ENTRIES.filter((e) => all || e.core)) {
-    const item = document.createElement('div');
-    item.className = 'legend-item';
-    item.setAttribute('role', 'listitem');
-    for (const r of ['flat', 'raised']) {
-      const pic = entry.draw(r);
-      item.appendChild(pic ?? Object.assign(document.createElement('span'), { className: 'legend-none', textContent: '' }));
-    }
-    const text = document.createElement('div');
-    text.innerHTML = `<b>${entry.name}</b><span>${entry.words}</span>`;
-    item.appendChild(text);
-    host.appendChild(item);
+/** The drawing of an entry: flat, or raised for the coin. */
+export const sample = (entry) => entry.draw(entry.raised ? 'raised' : 'flat');
+
+/** Draw each entry's sample into the legend's markup: an item with a data-mark takes the sample of that entry as its
+ *  first child.  The names, the words and the groups are the page's own; every item must name an entry, and every
+ *  entry must have an item, so the page and the drawings cannot drift apart. */
+export function mountLegend(host) {
+  const byKey = new Map(ENTRIES.map((e) => [e.key, e]));
+  const seen = new Set();
+  for (const item of host.querySelectorAll('[data-mark]')) {
+    const key = item.dataset.mark;
+    if (!byKey.has(key)) throw new Error(`the legend has an item for the mark "${key}", which has no entry`);
+    seen.add(key);
+    item.insertBefore(sample(byKey.get(key)), item.firstChild);
+  }
+  for (const key of byKey.keys()) {
+    if (!seen.has(key)) throw new Error(`the mark "${key}" has an entry but no item in the legend`);
   }
 }

@@ -1,7 +1,8 @@
 // A row of a mid-sized game's frames, drawn small, to show their number: every frame of the game the page names as a
-// box, a mark for each of its numbers, the sources at its left (gray if descending greedy keeps them, hollow with a
-// dashed outline if not, as in the figure of game 21) and its factors at its right; a closed frame is drawn dashed and
-// faded, its box, marks and label alike, as game 21 draws its closed frames.  The boxes stand in the wiki's order, the
+// box, a mark for each of its numbers, the sources at its left (a gray circle if descending greedy keeps it, a
+// square like the factors if not, since the taxman takes it) and its factors at its right; a closed frame is
+// drawn dashed and faded, its box, marks and label alike, as game 21 draws its closed frames.  The boxes stand in
+// the wiki's order, the
 // highest layer at the left and the frame in front at the right, and are named by their numbers (js/model.js,
 // frameModel), frame 0 being the one in front; a closed frame has no number and is named closed.  Under a box with
 // freedoms stand its number and its freedoms, the sum over the frames that make it up, in one of two forms: on a line
@@ -17,13 +18,13 @@
 // column.
 
 import * as M from '../js/model.js';
-import { el, fmt } from '../js/vocab.js';
+import { el, fmt, SIZE } from '../js/vocab.js';
 import { freshSVG, tableView, tooltip } from '../js/chart.js';
 
 const MAX_CELL = 12; // the largest mark's cell, in pixels
 const MIN_ROWS = 3;
 const MAX_ROWS = 60;
-const DASHES = 8; // dashes round the outline of a rejected source
+const SOURCE_R = 0.4; // a source's radius, in cells; a factor's half side keeps the proportion of SIZE
 const PAD = 0.6; // a box's margin around its numbers, in cells
 const GAP = 1; // between two boxes, in cells
 const MIN_GAP = 8; // and in pixels
@@ -129,18 +130,16 @@ function draw(box, tip, data, width) {
   const left = (width - total) / 2;
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   svg.setAttribute('height', height);
-  // The marks of the open boxes share three paths; a closed box has a group of its own, with the same three.
-  const open = { kept: '', rejected: '', factors: '' };
-  const dash = (2 * Math.PI * 0.4 * c) / (2 * DASHES);
+  // The marks of the open boxes share two paths; a closed box has a group of its own, with the same two.
+  const open = { kept: '', factors: '' };
   const addPaths = (parent, d) => {
     el('path', { d: d.factors, class: 'row-factor' }, parent);
     el('path', { d: d.kept, class: 'row-kept' }, parent);
-    el('path', { d: d.rejected, class: 'row-rejected', 'stroke-dasharray': `${dash.toFixed(2)} ${dash.toFixed(2)}` },
-      parent);
   };
+  const half = SOURCE_R * (SIZE.square / SIZE.circle); // a square's half side, in cells
   for (const p of placed) {
     const x0 = left + p.x;
-    const marks = p.u.closed ? { kept: '', rejected: '', factors: '' } : open;
+    const marks = p.u.closed ? { kept: '', factors: '' } : open;
     const parent = p.u.closed ? el('g', { class: 'row-closed' }, svg) : svg;
     el('rect', {
       x: x0.toFixed(2), y: top, width: p.w.toFixed(2), height: boxH.toFixed(2), rx: Math.min(6, 1.4 * c),
@@ -149,13 +148,14 @@ function draw(box, tip, data, width) {
     p.u.sources.forEach((s, i) => {
       const cx = x0 + (PAD + Math.floor(i / p.rows) + 0.5) * c;
       const cy = top + (PAD + (i % p.rows) + 0.5) * c;
-      marks[p.u.kept.has(s) ? 'kept' : 'rejected'] += circle(cx, cy, 0.4 * c);
+      if (p.u.kept.has(s)) marks.kept += circle(cx, cy, SOURCE_R * c);
+      else marks.factors += square(cx, cy, half * c);
     });
     const factorsX = x0 + p.w - (PAD + p.factorCols) * c;
     for (let i = 0; i < p.u.factors; i++) {
       const cx = factorsX + (Math.floor(i / p.rows) + 0.5) * c;
       const cy = top + (PAD + (i % p.rows) + 0.5) * c;
-      marks.factors += square(cx, cy, 0.3 * c);
+      marks.factors += square(cx, cy, half * c);
     }
     p.labels.forEach((label, k) => {
       const t = el('text', {
@@ -201,8 +201,10 @@ export function mountFramesRow(host, { games, n }) {
   const facts = { ...M.frameFacts(model), n, candidates: games.columns.candidates[i] };
   const numbers = sum(model, (f) => f.sources.length + f.factors.length);
   caption.textContent = `The frames of game ${fmt(n)}, a mark for each of its ${fmt(numbers)} numbers: in each frame ` +
-    'its sources at the left, gray where descending greedy keeps them and hollow and dashed where it does not, and ' +
-    'its factors at the right.';
+    'its sources at the left, gray circles where descending greedy keeps them and squares where it does not, ' +
+    'since the taxman takes those, and its factors, squares too, at the right. ' +
+    'A dashed box is a closed frame, with no freedom, and the label under ' +
+    'each other box counts its freedoms.';
   const columns = ['frame', 'sources', 'kept', 'factors', 'freedoms'];
   tableView(host, 'The numbers behind the figure', columns, data.boxes.map((u) => {
     const counts = countsOf(u.frames);

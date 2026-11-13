@@ -1,10 +1,16 @@
 // The two trays of the game, the player's and the taxman's, and the motion of a piece into and out of them.  Both
 // boards of the game use them: figures/game.js, whose pot is a tray of sockets, and figures/graph-game.js, whose pot
-// is the maximal-factor graph.  A piece is a raised token in an HTML button, so that it can travel from anywhere on the
+// is the maximal-factor graph.  A piece is a token in an HTML button, so that it can travel from anywhere on the
 // page, and a tray holds the pieces of the numbers taken.
 //
-// glide() is the motion of a take, and of a take back, which the two boards share: the piece is lifted on the way, and
-// a tile taken as a move turns over halfway and lands as a coin, or, going back, turns over again.  A piece travels
+// The marks are the site's system: a circle is a move the player could take, a square a number that will go to the
+// taxman, and a number with no proper divisor left in the pot can never be a move, so its circle turns into a square.
+// In the pot a circle the player can take now is a raised coin, which the reader presses; a square is flat.  Taken
+// numbers lie flat in the trays: the player's as blue circles, the taxman's as orange squares.  potLook() and TRAY_LOOK
+// give the looks, which both boards share.
+//
+// glide() is the motion of a take, and of a take back, which the two boards share: the piece is lifted on the way and
+// lands in its tray as a flat mark, or, going back, returns to its place in the pot.  A piece travels
 // between its place in its tray and a box on the page, by a transform that moves and scales it about its center, so
 // that a piece coming from a token of another size grows or shrinks on the way.  A piece sent somewhere while it is
 // still traveling leaves its first journey at once.  startOf() and returnDelays() say when the pieces of a step set
@@ -13,6 +19,14 @@
 import { MOTION, numberSVG, restyle } from './vocab.js';
 
 const EASE = MOTION.settleCSS; // out, with a little overshoot: a raised token is set down
+
+const FLAT = { depth: 0 };
+
+/** The look of a number in the pot: a raised coin if the player can take it now, else a flat square. */
+export const potLook = (canTake) => (canTake ? ['move'] : ['factor', FLAT]);
+
+/** The look of a taken number in its tray, flat: the player's a blue circle, the taxman's an orange square. */
+export const TRAY_LOOK = { player: ['move', FLAT, 'player'], taxman: ['factor', FLAT, 'taxman'] };
 
 /** When the k-th number of a step sets out, in milliseconds: the move (k = 0) at once, the rest one after another. */
 export const startOf = (k) => (k === 0 ? 0 : 170 + 120 * (k - 1));
@@ -39,7 +53,7 @@ export function traysHTML(you) {
     </div>`;
 }
 
-/** The piece of x: a button holding its raised token, drawn with looks. */
+/** The piece of x: a button holding its token, drawn with looks. */
 export function makePiece(x, ...looks) {
   const piece = document.createElement('button');
   piece.type = 'button';
@@ -82,7 +96,7 @@ function transformTo(box, home) {
 }
 
 /** Slide a piece to its place from the box it was in, or, with to, from its place to that box; delay is when it sets
- *  out.  With flips the tile turns over on the way.  When it is halfway, the piece is drawn with looks.  First stops
+ *  out.  With flips the piece turns over on the way.  When it is halfway, the piece is drawn with looks.  First stops
  *  any motion of the piece in progress and the restyle it had scheduled.  Returns the travel. */
 export function glide(piece, { from = null, to = null, delay = 0, flips = false, looks }) {
   const svg = piece.querySelector('svg');
@@ -96,7 +110,7 @@ export function glide(piece, { from = null, to = null, delay = 0, flips = false,
     { duration: MOTION.move, delay, easing: EASE, fill: to ? 'both' : 'backwards' },
   );
   if (!to) travel.onfinish = () => piece.classList.remove('is-moving');
-  // Lifted on the way, and a tile taken as a move flips over halfway.
+  // Lifted on the way, and a piece that flips turns over halfway.
   const flip = [{ transform: 'scale(1,1)' }, { transform: 'translateY(-10px) scale(0.05,1.08)', offset: 0.45 },
     { transform: 'scale(1,1)' }];
   const lift = [{ transform: 'scale(1)' }, { transform: 'translateY(-8px) scale(1.08)', offset: 0.4 },

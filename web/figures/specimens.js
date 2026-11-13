@@ -1,4 +1,4 @@
-// The specimens of the style page: the scale of the type, the color tokens and their tones, every mark in both renderings, a
+// The specimens of the style page: the scale of the type, the color tokens and their tones, every mark, a
 // promotion in motion, the controls on a small live figure, the layout at each width, and the motion itself.  Each
 // draws with the site's own modules, so the page shows what the site does, not a picture of it.
 
@@ -8,7 +8,7 @@ import { loadSmall } from '../js/data.js';
 import { RULE } from '../js/proof.js';
 import * as M from '../js/model.js';
 import { scene, timeline } from '../js/scene.js';
-import { ENTRIES } from './legend.js';
+import { ENTRIES, sample } from './legend.js';
 
 // ---------------------------------------------------------------------------------------------------------------
 // Type
@@ -41,14 +41,16 @@ export function mountScale(host) {
   addEventListener('resize', fill);
 }
 
-/** Numbers in a figure: the same numbers flat and raised, at the sizes the figures use. */
+/** Numbers in a figure at the sizes the figures use: flat, and the circles also raised, as coins. */
 export function mountFigureNumbers(host) {
   const nums = [1, 7, 10, 17, 71, 101, 144];
   for (const r of ['flat', 'raised']) {
     const row = document.createElement('div');
     row.className = 'num-row';
     row.innerHTML = `<span class="num-row-name">${r}</span>`;
-    for (const n of nums) row.appendChild(numberSVG(n, { rendering: r, looks: [n > 10 ? 'move' : 'factor'], size: 46, pad: 3 }));
+    for (const n of nums.filter((k) => r === 'flat' || k > 10)) {
+      row.appendChild(numberSVG(n, { rendering: r, looks: [n > 10 ? 'move' : 'factor'], size: 46, pad: 3 }));
+    }
     host.appendChild(row);
   }
 }
@@ -138,7 +140,7 @@ export async function mountTones(host) {
     const svg = el('svg', { viewBox: '0 0 300 76', width: '100%', role: 'img', 'aria-label': 'A flat move, 9, the player’s, paid for by its tax, 3, the taxman’s; 17, the rest, the taxman’s; and a chart line in each color.' }, fig.querySelector('.tone-flat'));
     const s = scene(svg, { width: 300, height: 76 });
     s.number(9, 9).number(3, 3).number(17, 17).line('pay', 9, 3, 'pay');
-    s.states([{ 9: { x: 22, y: 20, shape: SHAPE.circle, player: 1 }, 3: { x: 22, y: 60, shape: SHAPE.square, taxman: 1 }, 17: { x: 64, y: 40, shape: SHAPE.circle, dashed: 1, taxman: 1 }, pay: {} }]).render(0);
+    s.states([{ 9: { x: 22, y: 20, shape: SHAPE.circle, player: 1 }, 3: { x: 22, y: 60, shape: SHAPE.square, taxman: 1 }, 17: { x: 64, y: 40, shape: SHAPE.square, taxman: 1 }, pay: {} }]).render(0);
     const line = (d, tone, label, y) => {
       el('path', { d, fill: 'none', 'stroke-width': 2, style: `stroke: var(${tone})` }, svg);
       const t = el('text', { x: 296, y, 'text-anchor': 'end', class: 'v-text' }, svg);
@@ -197,38 +199,34 @@ export function mountTokens(host) {
 // The marks
 // ---------------------------------------------------------------------------------------------------------------
 
-/** Every entry of the legend, in both renderings, with what it means and when to use it. */
+/** Every entry of the legend, in its order, drawn once, with its key and when to use it.  What each is called and
+ *  means is the notation page's. */
 export function mountMarks(host) {
-  host.innerHTML = '<div class="marks-head" aria-hidden="true"><span>flat</span><span>raised</span><span>mark</span><span>when to use it</span></div>';
+  host.innerHTML = '<div class="marks-head" aria-hidden="true"><span>mark</span><span>key</span>' +
+    '<span>when to use it</span></div>';
   for (const entry of ENTRIES) {
     const row = document.createElement('div');
     row.className = 'marks-row';
-    for (const r of ['flat', 'raised']) {
-      const cell = document.createElement('span');
-      cell.className = 'marks-pic';
-      const pic = entry.draw(r);
-      if (pic) {
-        pic.setAttribute('width', 64);
-        pic.setAttribute('height', 54);
-        cell.appendChild(pic);
-      } else cell.innerHTML = `<span class="marks-none">${r === 'flat' ? 'raised' : 'flat'} only</span>`;
-      row.appendChild(cell);
-    }
-    row.insertAdjacentHTML('beforeend', `<span class="marks-name"><b>${entry.name}</b>${entry.words}</span><span class="marks-use">${entry.use}</span>`);
+    const cell = document.createElement('span');
+    cell.className = 'marks-pic';
+    cell.appendChild(sample(entry));
+    row.appendChild(cell);
+    row.insertAdjacentHTML('beforeend', `<span class="marks-key"><code>${entry.key}</code></span>` +
+      `<span class="marks-use">${entry.use}</span>`);
     host.appendChild(row);
   }
 }
 
-// A promotion, small: two frames side by side, 9 a candidate among the factors of the frame behind, then a move of
-// the frame in front, paid for by 3.  18 is joined to its maximal factors 9 and 6; while 9 is a candidate, a dotted
-// line joins 9 to its maximal factor 3 in the frame in front, and it gives way to the hop.  The same states drawn in
-// either rendering.
+// A promotion, small: two frames side by side, 9 a candidate among the factors of the frame behind, then a gray double
+// circle in the frame in front, paid for by 3, and a blue one once played.  18 is joined to its maximal factors 9 and
+// 6; while 9 is a candidate, a dotted line joins 9 to its maximal factor 3 in the frame in front, and it gives way to
+// the hop, which is drawn only while 9 moves.
 function promotionScene(svg, rendering) {
   const s = scene(svg, { width: 260, height: 132, rendering, label: `A promotion, ${rendering}: 9 leaves the factors of one frame and becomes a move of the frame in front, paid for by 3.` });
   s.box('behind').box('front');
-  s.number('ghost', 9).number(9, 9).number(6, 6).number(18, 18).number(3, 3).number(15, 15).number(5, 5);
+  s.number(9, 9).number(6, 6).number(18, 18).number(3, 3).number(15, 15).number(5, 5);
   s.line('18-9', 18, 9, 'thin').line('18-6', 18, 6, 'thin').line('15-3', 15, 3, 'thin').line('15-5', 15, 5, 'thin');
-  s.line('rise', 'ghost', 9, 'hop').line('link', 9, 3, 'link').line('pay', 9, 3, 'pay');
+  s.line('rise', { x: 82, y: 44 }, 9, 'hop').line('link', 9, 3, 'link').line('pay', 9, 3, 'pay');
   const base = {
     behind: { x: 8, y: 10, w: 100, h: 112 },
     front: { x: 128, y: 10, w: 124, h: 112 },
@@ -242,27 +240,32 @@ function promotionScene(svg, rendering) {
   return { s, base };
 }
 
+// The hop is drawn only while 9 moves (the look at rest is invisible): it draws in as 9 leaves, stays while it travels
+// and fades out as it lands.
+const HOP_KEYS = [
+  [0.05, { opacity: 1, draw: 0 }], [0.25, { opacity: 1, draw: 1 }], [0.8, { opacity: 1, draw: 1 }],
+  [0.9, { opacity: 0, draw: 1 }],
+];
+
 function promotionStates(base) {
   return [
     { ...base, 9: { x: 82, y: 44, shape: SHAPE.square }, '18-9': {} },
     { ...base, 9: { x: 82, y: 44, shape: SHAPE.square, ring: 1 }, '18-9': {}, link: {} },
     {
       ...base, _duration: 1500,
-      ghost: { x: 82, y: 44, shape: SHAPE.square, dashed: 1, faded: 1, depth: 0, at: [0.1, 0.5] },
       9: { x: 158, y: 44, shape: SHAPE.circle, kept: 1, ring: 1, at: [0.05, 0.8] },
-      rise: { at: [0.45, 0.9] }, pay: { at: [0.6, 1] }, '18-9': { opacity: 0, at: [0, 0.3] },
+      rise: { opacity: 0, keys: HOP_KEYS }, pay: { at: [0.6, 1] }, '18-9': { opacity: 0, at: [0, 0.3] },
       link: { opacity: 0, at: [0, 0.25] },
     },
     {
       ...base,
-      ghost: { x: 82, y: 44, shape: SHAPE.square, dashed: 1, faded: 1, depth: 0 },
-      9: { x: 158, y: 44, shape: SHAPE.circle, player: 1 },
-      3: { ...base[3], taxman: 1 }, rise: { faded: 1 }, pay: {},
+      9: { x: 158, y: 44, shape: SHAPE.circle, ring: 1, player: 1 },
+      3: { ...base[3], taxman: 1 }, pay: {},
     },
   ];
 }
 
-/** The promotion in both renderings, side by side, with a button that plays it again. */
+/** The promotion, with a button that plays it again. */
 export function mountPromotion(host) {
   const pairs = [...host.querySelectorAll('svg')].map((svg) => promotionScene(svg, svg.dataset.rendering));
   for (const { s, base } of pairs) s.states(promotionStates(base).slice(1, 3)).show(0);
@@ -364,7 +367,7 @@ export function mountLayout(host) {
 
 /** The easing curves, drawn: the share of the way a mark has gone (up) against the share of the time (across). */
 export function mountCurves(host) {
-  const curves = [['glide', MOTION.glide, 'flat marks'], ['settle', MOTION.settle, 'raised tokens set down'], ['smooth', MOTION.smooth, 'the look of a raised token']];
+  const curves = [['glide', MOTION.glide, 'flat marks'], ['settle', MOTION.settle, 'coins set down'], ['smooth', MOTION.smooth, 'the look of a coin']];
   host.innerHTML = '';
   for (const [name, fn, use] of curves) {
     const svg = el('svg', { viewBox: '-6 -14 112 128', width: 112, height: 128, role: 'img', 'aria-label': `The curve ${name}` });
@@ -383,18 +386,17 @@ export function mountCurves(host) {
   }
 }
 
-/** Three lanes of motion: a flat mark gliding, a raised token carried and set down, and a raised token turning over. */
+/** Two lanes of motion: a flat mark gliding, and a coin carried and set down. */
 export function mountMotion(host) {
   const lanes = [
     { r: 'flat', from: { shape: SHAPE.circle, kept: 1 }, to: { shape: SHAPE.circle, kept: 1 } },
     { r: 'raised', from: { shape: SHAPE.circle }, to: { shape: SHAPE.circle, player: 1 } },
-    { r: 'raised', from: { shape: SHAPE.square }, to: { shape: SHAPE.circle, kept: 1 } },
   ];
   const scenes = [...host.querySelectorAll('svg')].map((svg, i) => {
     const lane = lanes[i];
     const s = scene(svg, { width: 300, height: 52, rendering: lane.r, label: svg.getAttribute('aria-label') });
     s.line('track', { x: 30, y: 46 }, { x: 270, y: 46 }, 'rule');
-    s.number('m', i === 2 ? 9 : 19);
+    s.number('m', 19);
     s.states([{ track: {}, m: { ...lane.from, x: 30, y: 26 } }, { track: {}, m: { ...lane.to, x: 270, y: 26 }, _duration: MOTION.step }]).show(0);
     return s;
   });

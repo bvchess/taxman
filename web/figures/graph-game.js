@@ -13,26 +13,28 @@
 // * 1 stands level with the middle of the primes, which all lead to it;
 // * a line is straight, from a number to its maximal factor in the next column, and lies under the tokens, so that
 //   no line crosses a number;
-// * the tokens grow with the width, from their plain size on a phone, where game 30 still fits at 390 px, to a
+// * the tokens grow with the width, from their usual size on a phone, where game 30 still fits at 390 px, to a
 //   quarter larger.
 //
-// The marks are the site's: every number is plain, between a tile and a coin, in the pot and in the trays; a number
-// the reader may take is a raised token standing up, and one that cannot be taken lies flat.  A take plays as in the
-// main game: the move travels down from its place in the graph into the player's tray and its tax into the taxman's,
-// one after another.  A number that leaves the pot is gone from the graph, and so is
-// every line that touches it; since a number leaves the pot only after the divisors it taxes, a line that goes leads
-// only to numbers already gone, and a number left with no line is one that cannot be taken.  Taking back, or
-// starting over, brings the numbers back to their places with their lines.  Pointing at or focusing a number that can
-// be taken puts a halo on its tax, everything still in the pot that it reaches by its lines, and on the lines it
-// follows.  On a touch screen the first tap shows the tax and the second takes the number.
+// The marks are the site's (js/trays.js): a number the reader may take is a circle, a raised coin; one that cannot be
+// taken is a square, flat.  A take plays as in the main game: the move travels down from its place in the graph into
+// the player's tray, as a blue circle, and its tax into the taxman's, as orange squares, one after another.  A number
+// that leaves the pot is gone from the graph, and so is every line that touches it; since a number leaves the pot only
+// after the divisors it taxes, a line that goes leads only to numbers already gone, and a number left with no line can
+// never be taken, so its circle turns into a square.  Taking back, or starting over, brings the numbers back to their
+// places with their lines.  Pointing at or focusing a number that can be taken puts a halo on its tax, everything still
+// in the pot that it reaches by its lines, and on the lines it follows.  On a touch screen the first tap shows the tax
+// and the second takes the number.
 //
 // URL parameter: graph=N or graph=N:m1,m2,... opens game N with those moves played.
 
 import * as M from '../js/model.js';
 import { mountPlay } from '../js/play.js';
 import { scene } from '../js/scene.js';
-import { boxAround, glide, makePiece, reserveRows, returnDelays, startOf, traysHTML } from '../js/trays.js';
-import { MOTION, NS, SHAPE, SIZE, listWords, look, reducedMotion, restyle } from '../js/vocab.js';
+import {
+  TRAY_LOOK, boxAround, glide, makePiece, potLook, reserveRows, returnDelays, startOf, traysHTML,
+} from '../js/trays.js';
+import { MOTION, NS, SIZE, listWords, look, reducedMotion, restyle } from '../js/vocab.js';
 
 export function mountGraphGame(host, { small, n = 10 }) {
   let view;
@@ -104,10 +106,10 @@ function graphBoard({ you, take, maxN, playing }) {
     const halo = lit();
     const v = {};
     for (let x = 1; x <= n; x++) {
-      const base = { ...lay.at.get(x), scale: lay.scale, shape: SHAPE.plain };
+      const base = { ...lay.at.get(x), scale: lay.scale };
       if (state.pot.has(x)) {
-        v[x] = { ...base, ...(legal.has(x) ? {} : look('lying')), halo: halo.has(x) && x !== pointed ? 1 : 0 };
-      } else v[x] = base; // gone from the graph: the board hides it, so it stays where it stands
+        v[x] = { ...base, ...look(...potLook(legal.has(x))), halo: halo.has(x) && x !== pointed ? 1 : 0 };
+      } else v[x] = { ...base, ...look(...potLook(false)) }; // gone from the graph: the board hides it
     }
     for (const [id, x, f] of lines) v[id] = { bend: 0, sag: 0, halo: halo.has(x) && halo.has(f) ? 1 : 0 };
     // The lines of a tax lie over the others.
@@ -145,7 +147,7 @@ function graphBoard({ you, take, maxN, playing }) {
 
   function label(x) {
     if (state.pot.has(x)) {
-      if (!legal.has(x)) return `${x}, not a legal move`;
+      if (!legal.has(x)) return `${x}, not a move`;
       return `${x}: the taxman would take ${listWords(M.properDivisors(x).filter((d) => state.pot.has(d)))}`;
     }
     if (state.player.includes(x)) return `${x}, ${you === 'You' ? 'yours' : 'the player’s'}`;
@@ -160,7 +162,6 @@ function graphBoard({ you, take, maxN, playing }) {
       node.setAttribute('aria-disabled', String(!can));
       node.setAttribute('aria-label', label(x));
       node.classList.toggle('is-takeable', can);
-      node.classList.toggle('is-stuck', state.pot.has(x) && !can);
     }
   }
 
@@ -201,6 +202,7 @@ function graphBoard({ you, take, maxN, playing }) {
       node.addEventListener('blur', () => pointed === x && point(null));
       node.addEventListener('pointerdown', (e) => (armed = e.pointerType === 'mouse' || pointed === x));
       node.addEventListener('click', () => {
+        if (!legal.has(x)) return; // a square is not pressable
         const first = !armed && legal.has(x) && !playing();
         armed = true;
         if (first) point(x);
@@ -209,7 +211,7 @@ function graphBoard({ you, take, maxN, playing }) {
       node.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
         e.preventDefault();
-        take(x);
+        if (legal.has(x)) take(x);
       });
     }
     for (let x = 2; x <= n; x++) {
@@ -252,8 +254,6 @@ function graphBoard({ you, take, maxN, playing }) {
     return { x: r.left + lay.at.get(x).x, y: r.top + lay.at.get(x).y };
   }
 
-  const lookNames = (tray) => (tray === 'player' ? ['plain', 'player'] : ['plain', 'taxman']);
-
   // Put the pieces of the trays where the state says.  A piece of a number taken in this step (order) travels from its
   // token, and one that the state no longer holds travels back to it.  Returns when each number leaves the graph or
   // returns to it, in milliseconds from now.
@@ -274,7 +274,7 @@ function graphBoard({ you, take, maxN, playing }) {
         continue;
       }
       const c = centerOf(x);
-      const near = legal.has(x) ? ['plain'] : ['plain', 'lying'];
+      const near = potLook(legal.has(x));
       const box = boxAround(p, c.x, c.y, lay.scale);
       glide(p, { to: box, delay, looks: near });
       later(() => p.remove(), delay + MOTION.move);
@@ -285,8 +285,8 @@ function graphBoard({ you, take, maxN, playing }) {
       let p = held.get(x);
       if (!p) {
         const coming = animate && order.includes(x);
-        const near = wasLegal.has(x) ? ['plain'] : ['plain', 'lying'];
-        p = makePiece(x, ...(coming ? near : lookNames(tray)));
+        const near = potLook(wasLegal.has(x));
+        p = makePiece(x, ...(coming ? near : TRAY_LOOK[tray]));
         p.disabled = true;
         p._tray = tray;
         p._batch = batch;
@@ -294,7 +294,7 @@ function graphBoard({ you, take, maxN, playing }) {
         held.set(x, p);
         if (coming) fresh.push(x);
       }
-      p._final = lookNames(tray);
+      p._final = TRAY_LOOK[tray];
       p.setAttribute('aria-label', label(x));
     }
     for (const tray of ['player', 'taxman']) {
@@ -354,7 +354,7 @@ function graphBoard({ you, take, maxN, playing }) {
       draw(0);
       return;
     }
-    // A number left with no line lies down as the last lands.
+    // A number left with no line turns into a square as the last lands.
     const last = startOf(order.length - 1);
     const windows = {};
     for (let x = 1; x <= n; x++) if (state.pot.has(x)) windows[x] = [last / (last + MOTION.move), 1];

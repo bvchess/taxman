@@ -147,7 +147,8 @@ export function facts21(small) {
 
 const numbers = Array.from({ length: N }, (_, i) => i + 1);
 const isSource = (x) => x > HALF;
-const shapeOf = (x) => (isSource(x) ? SHAPE.circle : SHAPE.square);
+// A move the player could take is a circle, whatever its size; 1, which no move can take, is always a square.
+const circleOrOne = (x) => (x === 1 ? SHAPE.square : SHAPE.circle);
 const allEdges = numbers.flatMap((x) => M.maximalFactors(x).map((f) => [x, f]));
 // The dotted links: from each candidate to each of its maximal factors, which all lie in the frame in front.
 const candidateLinks = (f) => allEdges.filter(([a]) => f.candidates.includes(a));
@@ -204,18 +205,21 @@ function buildStates(f) {
   const firstKept = Math.max(...frame1.kept);
   const payOf = payers(f);
   const firstPay = `p${firstKept}-${payOf.get(firstKept)}`;
-  const decided = (x) => (isSource(x) ? { kept: f.kept.has(x) ? 1 : 0, dashed: f.kept.has(x) ? 0 : 1 } : {});
+  // What descending greedy decided about a source: kept is a gray circle, rejected a square, since the taxman will
+  // take it.
+  const decided = (x) => (isSource(x) ? (f.kept.has(x) ? { kept: 1 } : { shape: SHAPE.square }) : {});
   const S = {};
 
   // The pot.
   S.pot = { potName: { x: CENTER_X, y: 50 } };
-  for (const x of numbers) S.pot[x] = { ...pos(potAt(x)), shape: SHAPE.plain };
+  for (const x of numbers) S.pot[x] = { ...pos(potAt(x)), shape: circleOrOne(x) };
 
   // Layers: each number in the column of its layer, joined to its maximal factors; 12 and its two are named.
   const layers = { _duration: 1300 };
   for (const x of numbers) {
     const k = M.omega(x);
-    layers[x] = { ...pos(layerAt[x]), shape: SHAPE.plain, halo: [12, 6, 4].includes(x) ? 1 : 0, at: [0.06 * k, 0.06 * k + 0.55] };
+    layers[x] = { ...pos(layerAt[x]), shape: circleOrOne(x),
+      halo: [12, 6, 4].includes(x) ? 1 : 0, at: [0.06 * k, 0.06 * k + 0.55] };
   }
   for (const [a, b] of allEdges) layers[`e${a}-${b}`] = { halo: a === 12 ? 1 : 0, at: [0.55, 1] };
   for (let k = 0; k <= 4; k++) layers[`layer${k}`] = { x: COLUMN_X[k], y: NAME_Y, at: [0.5, 1] };
@@ -225,7 +229,7 @@ function buildStates(f) {
   // line is named at its left end, below it, under 16; the words for its two sides sit clear of the one line that
   // crosses there.
   const split = { _duration: 1100 };
-  for (const x of numbers) split[x] = { ...pos(splitAt[x]), shape: shapeOf(x), halo: isSource(x) ? 1 : 0 };
+  for (const x of numbers) split[x] = { ...pos(splitAt[x]), shape: circleOrOne(x), halo: isSource(x) ? 1 : 0 };
   for (const [a, b] of allEdges) split[`e${a}-${b}`] = { faded: isSource(a) ? 0 : 0.6 };
   for (let k = 0; k <= 4; k++) split[`layer${k}`] = { x: COLUMN_X[k], y: NAME_Y };
   split.rule = {};
@@ -234,12 +238,15 @@ function buildStates(f) {
   split.factorsName = { x: 100, y: MID_Y + 38 };
   S.sources = split;
 
-  // Descending greedy, from 21 down, where the sources stand: each kept (gray) or rejected (hollow, dashed) in its
-  // turn, with a brief halo as the scan reaches it.  1 pays for 19, the first prime kept, and the lines of a rejected
-  // source go out of focus.
+  // Descending greedy, from 21 down, where the sources stand: each kept (a gray circle) or rejected (a square, for
+  // the taxman will take it) in its turn, with a brief halo as the scan reaches it.  1 pays for 19, the first prime
+  // kept, and the lines of a rejected source go out of focus.
   const greedy = {};
   for (const x of numbers) {
-    greedy[x] = { ...pos(splitAt[x]), shape: shapeOf(x), ...decided(x), ...(isSource(x) ? { at: scanSlot(x), via: { halo: 1 } } : {}) };
+    greedy[x] = {
+      ...pos(splitAt[x]), shape: circleOrOne(x), ...decided(x),
+      ...(isSource(x) ? { at: scanSlot(x), via: { halo: 1 } } : {}),
+    };
   }
   for (const [a, b] of allEdges) {
     const spec = { ...split[`e${a}-${b}`] };
@@ -257,13 +264,16 @@ function buildStates(f) {
   S.layered = layered;
 
   // Frames: the board comes apart one frame at a time, the frame in front (layer 1, at the right) first.  A frame's
-  // numbers move together, and its box and the payment of a closed frame are drawn as they arrive; the names of the
-  // layers, the rule and its words, and the lines of the factors, which the frames do not draw, fade out early.
+  // numbers move together, and the bottom half turns into squares, which pay for the moves; its box and the payment
+  // of a closed frame are drawn as they arrive; the names of the layers, the rule and its words, and the lines of the
+  // factors, which the frames do not draw, fade out early.
   const framesView = { _duration: 2400 };
   const frameStart = (layer) => 0.2 * (layer - 1);
   for (const x of numbers) {
     const start = frameStart(f.frameOf.get(x).layer);
-    framesView[x] = { ...layered[x], ...pos(FRAME_AT[x]), at: [start, start + 0.4] };
+    framesView[x] = {
+      ...layered[x], ...pos(FRAME_AT[x]), ...(isSource(x) ? {} : { shape: SHAPE.square }), at: [start, start + 0.4],
+    };
   }
   for (const [a, b] of allEdges) {
     const id = `e${a}-${b}`;
@@ -310,7 +320,15 @@ function buildStates(f) {
   S.freedoms = freedoms;
 
   // The promotion: 9 rounds into a circle as it hops rightward, from the factors of frame 1 into the
-  // moves of frame 0, where 3 pays for it.  Its old place keeps a dashed ghost.
+  // moves of frame 0, where 3 pays for it.  The dotted arrow shows where it came from, but only while it moves: it
+  // draws in as 9 leaves (0.1 to 0.3 of the step), stays while 9 travels (0.1 to 0.75) and fades out as 9 lands, so
+  // that at rest, in every state and with reduced motion, no arrow stands over the spot 9 left.  9 is gray, decided
+  // in, and keeps its double outline: a double circle is a promotion, from here to the end.  The candidates left are
+  // plain squares.
+  const HOP_KEYS = [
+    [0.1, { opacity: 1, draw: 0 }], [0.3, { opacity: 1, draw: 1 }], [0.75, { opacity: 1, draw: 1 }],
+    [0.9, { opacity: 0, draw: 1 }],
+  ];
   const promote = { _duration: 1600 };
   for (const x of numbers) {
     promote[x] = {
@@ -318,13 +336,12 @@ function buildStates(f) {
       ...pos(placeAfter(x)),
       halo: promotedSet.has(x) || [...promotedSet].some((p) => payOf.get(p) === x) ? 1 : 0,
       ...(promotedSet.has(x) ? { shape: SHAPE.circle, kept: 1, ring: 1, at: [0.1, 0.75] } : {}),
-      ...(f.candidates.includes(x) && !promotedSet.has(x) ? { ring: 0.35, faded: 0.5 } : {}),
+      ...(f.candidates.includes(x) && !promotedSet.has(x) ? { ring: 0, faded: 0 } : {}),
     };
     if (!promotedSet.has(x) && PROMOTED_AT[x]) promote[x].at = [0, 0.45];
   }
   for (const x of f.promoted) {
-    promote[`ghost${x}`] = { ...pos(FRAME_AT[x]), shape: SHAPE.square, dashed: 1, faded: 1, at: [0.15, 0.6] };
-    promote[`from${x}`] = { faded: 0.3, at: [0.45, 0.9] };
+    promote[`from${x}`] = { faded: 0.3, opacity: 0, keys: HOP_KEYS };
     promote[`p${x}-${payOf.get(x)}`] = { halo: 1, at: [0.55, 1] };
   }
   for (const [a, b] of allEdges) {
@@ -353,10 +370,13 @@ function buildStates(f) {
 
   // The game: every frame back in focus, every payment drawn; then the moves, from the right.  Each turn makes a
   // move the player's (blue) and its tax the taxman's (orange), with a tag for its place in the game, and the last
-  // turn wears a halo.  At the end the taxman takes the rest.
+  // turn wears a halo.  At the end the taxman takes the rest, the rejected sources among them, all orange squares.
   const start = { _duration: 900 };
   for (const x of numbers) {
-    start[x] = { ...pos(placeAfter(x)), shape: promotedSet.has(x) ? SHAPE.circle : shapeOf(x), ...decided(x), ...(promotedSet.has(x) ? { kept: 1 } : {}) };
+    start[x] = {
+      ...pos(placeAfter(x)), shape: isSource(x) ? SHAPE.circle : SHAPE.square, ...decided(x),
+      ...(promotedSet.has(x) ? { shape: SHAPE.circle, kept: 1, ring: 1 } : {}),
+    };
   }
   for (const [a, b] of allEdges) if (isSource(a) && !promotedSet.has(b)) start[`e${a}-${b}`] = { faded: 1, opacity: 0.7 };
   for (const t of f.turns) start[`p${t.move}-${t.tax[0]}`] = {};
@@ -388,7 +408,9 @@ function buildStates(f) {
   end._duration = 1000;
   for (const x of numbers) end[x].halo = 0;
   for (const key of Object.keys(end)) if (key.startsWith('p') && end[key]) end[key].halo = 0;
-  f.rest.forEach((x, j) => (end[x] = { ...end[x], taxman: 1, halo: 1, at: [0.15 * j, 0.15 * j + 0.6] }));
+  f.rest.forEach((x, j) => {
+    end[x] = { ...end[x], shape: SHAPE.square, kept: 0, taxman: 1, halo: 1, at: [0.15 * j, 0.15 * j + 0.6] };
+  });
   play.push(end);
   S.play = play;
   return S;
@@ -414,23 +436,29 @@ function captions(f) {
     sources: `The line cuts each column at n/2. Above it are the sources, ${M.sources(N)[0]} to ${N}: ` +
       'they divide no other number on the board, so no move takes them as tax. ' +
       `Below it is the bottom half, 1 to ${half}.`,
-    greedy: `From ${N} down, descending greedy keeps ${listWords(f.keptDown)}, each still playable with those it kept before. It rejects ${listWords(f.rejectedDown)}: their one maximal factor, 1, already pays for ${f1.kept[0]}. U* scores ${f.inTheBag}.`,
-    layered: 'Game 21 as descending greedy left it, in its layers, with a line cutting them at n/2: the sources it kept in gray, those it ' +
-      'rejected dashed. The lines of each source run to factors one layer down, in the column to its right.',
+    greedy: `From ${N} down, descending greedy keeps ${listWords(f.keptDown)}, each still playable with ` +
+      `those it kept before. It rejects ${listWords(f.rejectedDown)}, which become squares for the taxman: their one maximal ` +
+      `factor, 1, already pays for ${f1.kept[0]}. U* scores ${f.inTheBag}.`,
+    layered: 'Game 21 as descending greedy left it, in its layers, with a line cutting them at n/2: the sources it ' +
+      'kept gray circles, those it rejected squares, since the taxman will take them. The lines of each source ' +
+      'run to factors one layer down, in the column to its right.',
     frames:
       `The ${numberWord(f.frames.length)} frames side by side: each source with the factors ` +
-      `that can pay for it, greedy's choice in gray, the sources at the left of each frame and its factors ` +
-      `at the right. Each frame stands to the left of the frame in front of it. ` +
+      `that can pay for it, greedy's choice in gray. The bottom half turns into squares, since its numbers pay for ` +
+      `the moves. The sources stand at the left of each frame and its factors at the right. Each frame stands to the ` +
+      `left of the frame in front of it. ` +
       `Thick lines mark the payments already settled: ${paysFor(closedPayments(f))}.`,
     freedoms:
       `The ${numberWord(closed.length)} frames at the ends are closed, with as many factors as moves, and drop out. ` +
       `The other ${numberWord(f.open.length)} have one freedom each: frame ${f.open[0].number} at the right and ` +
       `frame ${f.open[1].number} behind it, counting from the front. The candidates are ${listWords(f.candidates)}, ` +
-      `with a dotted line from each to its maximal factor in the frame in front.`,
+      `squares with a double outline and a dotted line from each to its maximal factor in the frame in front.`,
     promote:
-      `${f.promoted[0]} hops rightward: it leaves the factors of frame ${fp.number} and becomes a move of ` +
-      `frame ${M.promotedInto(f.frames, f.promoted[0])}, and ${payer} pays for it. The freedoms allow only one promotion, and ` +
-      `${f.promoted[0]} is the larger. The score: ${f.inTheBag} + ${f.promoted.join(' + ')} = ${f.score}.`,
+      `${f.promoted[0]} hops rightward along the dotted arrow: it leaves the factors of frame ${fp.number} and ` +
+      `becomes a gray double circle, a promotion, a move of frame ${M.promotedInto(f.frames, f.promoted[0])}, and ` +
+      `${payer} pays for it. The freedoms allow only one promotion, and ` +
+      `${f.promoted[0]} is the larger. The other candidates stay squares. ` +
+      `The score: ${f.inTheBag} + ${f.promoted.join(' + ')} = ${f.score}.`,
   };
 }
 
@@ -465,8 +493,7 @@ export function mountGame21(host, { small, states = STOPS, param = 'fig21', labe
   });
   for (const x of numbers) s.number(x, x);
   for (const x of f.promoted) {
-    s.number(`ghost${x}`, x);
-    s.line(`from${x}`, `ghost${x}`, x, 'hop');
+    s.line(`from${x}`, { x: FRAME_AT[x][0], y: FRAME_AT[x][1], shape: SHAPE.square, ring: 0 }, x, 'hop');
   }
   for (const [a, b] of allEdges) {
     s.line(`e${a}-${b}`, a, b, 'thin');
@@ -485,7 +512,7 @@ export function mountGame21(host, { small, states = STOPS, param = 'fig21', labe
   s.line('rule', { x: 12, y: MID_Y }, { x: W - 12, y: MID_Y }, 'rule');
   s.text('half', 'n/2');
   s.text('sourcesName', 'sources', { anchor: 'middle' });
-  s.text('factorsName', 'factors', { anchor: 'middle' });
+  s.text('factorsName', 'bottom half', { anchor: 'middle' });
   s.text('scoreU', `U* scores ${f.inTheBag}`, { kind: 'score', anchor: 'middle' });
   s.text('scoreP', `${f.inTheBag} + ${f.promoted.join(' + ')} = ${f.score}`, { kind: 'score', anchor: 'middle' });
   for (const fr of f.frames) {
