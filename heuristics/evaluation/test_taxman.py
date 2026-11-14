@@ -1,7 +1,7 @@
 # Copyright (c) Brian Chess 2026
 # SPDX-License-Identifier: MIT
 
-"""Unit tests for core.py, anchored to the examples in the wiki.
+"""Unit tests for core.py, anchored to small worked examples.
 
 Run with:  python3 -m pytest evaluation/test_taxman.py   (from heuristics/)
 """
@@ -36,7 +36,7 @@ def mf_table(numbers):
 
 
 def test_maximal_factors():
-    # From the wiki definitions page: the maximal factors of 18 are 9 and 6,
+    # The maximal factors of 18 are 9 and 6,
     # and the maximal factor of 5 is 1.
     assert maximal_factors(18, SPF) == {9, 6}
     assert maximal_factors(5, SPF) == {1}
@@ -69,7 +69,7 @@ def test_peel_shared_core_is_infeasible():
 
 
 def test_optimize_mini_takes_highest_prime():
-    # From the wiki: optimize_mini({2,3,5,7}, {1}) returns {7}.
+    # optimize_mini({2,3,5,7}, {1}) returns {7}.
     mf = mf_table([2, 3, 5, 7])
     opt_c, r_f = optimize_mini({2, 3, 5, 7}, {1}, mf)
     assert opt_c == {7}
@@ -85,7 +85,7 @@ def test_upper_half_game_n21():
 
 
 def test_upper_half_n21_matches_walkthrough():
-    # The wiki walkthrough's optimal solution for N=21 is
+    # The optimal solution for N=21 is
     # 19, 9, 15, 21, 14, 18, 12, 20, 16.  Its numbers greater than 21/2 are
     # 19, 15, 21, 14, 18, 12, 20, 16 (9 is a promoted factor, not upper-half).
     sequence, tax_pool = solve_upper_half(21, SPF)
@@ -123,9 +123,9 @@ def test_strategies_are_legal_and_sane():
         assert solvent_score >= cascade_score
         assert one_tax(n, divs) > 0
 
-    # solvent finds the known optimal for the wiki's walkthrough game...
+    # solvent finds the known optimal for game 21...
     assert check_sequence(21, solvent(21, mf)) == 144
-    # ...and reproduces the N=5 example from the wiki's game introduction.
+    # ...and the optimal score of game 5, 9.
     assert check_sequence(5, solvent(5, mf)) == 9
 
 
@@ -307,8 +307,7 @@ def test_solvent_b_fork_matches_full_rerun():
 
 
 def test_prime_sacrifice_identity():
-    # Wiki "Reusing a previous solution", sections "If N is prime" and
-    # "Generalizing": for prime N, opt(N) = N + opt(N-1) - p_hat, where
+    # The chain page of the website, "prime": for prime N, opt(N) = N + opt(N-1) - p_hat, where
     # p_hat is the largest prime below N. Pure data check against the
     # committed games (results/optimal.jsonl.gz) -- no solver runs -- for
     # every prime N in 3..1000 (validated 167/167 in the original measurement).

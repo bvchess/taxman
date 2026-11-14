@@ -200,7 +200,7 @@ complete list of the optimal sets of n − 1, not by one of them
 
 ## The Java solver and the frame solver
 
-The frame solver uses the Java solver's strategy, which the [wiki](https://github.com/bvchess/taxman/wiki) describes:
+The frame solver uses the Java solver's strategy:
 split the game into frames of Taxman Mini, and search for the best promotion set.
 
 What must match the Java is the *results*.  The setup (frames, candidates, the greedy incumbent) defines the search
@@ -215,14 +215,6 @@ promotability checks of its candidate lists, and branching on the largest candid
 something measured to be faster, then removed.  The notebook has the rounds, and [which tactics earn their
 keep](https://github.com/bvchess/taxman-notebook/blob/main/search/which-tactics-earn-their-keep-2026-10/README.md) has
 the last measurements of what was removed.
-
-The wiki's words map onto this document's:
-
-| the wiki | here |
-|---|---|
-| *selection* | a move |
-| *front* and *back* | the same |
-| the upper bound N + opt(N − 1) | the ceiling |
 
 The port found one defect in the Java's bound: it can be too low.  Its runner-up replaces the
 failing number with the next candidate below the smallest bid member, but a skipped candidate from the failing number's

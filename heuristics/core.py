@@ -6,9 +6,9 @@
 The reduction is played with a set of potential selections C and a set of
 maximal factors F, where the maximal factor graph is bipartite: every
 number is either a selection or a factor, never both.
-(See https://github.com/bvchess/taxman/wiki/Taxman-Mini for the wiki's
-description of this reduction, "Taxman Mini", and the procedures
-implemented below.)
+(The website describes the procedures implemented below: peel at
+https://vantuyl.com/taxman/sets.html#peel and descending greedy at
+https://vantuyl.com/taxman/top-half.html#greedy-section.)
 
 For a regular Taxman game N, the numbers greater than N/2 are exactly the
 source nodes of the maximal factor graph (no number in the game is a multiple
@@ -95,7 +95,7 @@ def peel(
 ) -> Tuple[List[int], Dict[int, int]]:
     """Order the selections of a factor game so every one can be taken.
 
-    Implements the recursive procedure from the wiki iteratively:
+    Implements this recursive procedure iteratively:
 
         peel(C, F):
             if C is empty: return []
@@ -196,7 +196,7 @@ def optimize_mini(
 ) -> Tuple[Set[int], Set[int]]:
     """The optimal subset of selections, taken greedily from largest to smallest.
 
-    Implements optimize_mini from the wiki.  Returns (optC, rF): the optimal
+    Implements optimize_mini, descending greedy over the candidates.  Returns (optC, rF): the optimal
     selections and the factors they will use as tax.
     """
     f_set = set(factors)
@@ -224,7 +224,7 @@ def order_for_real_game(matching: Dict[int, int]) -> List[int]:
     pot.  The order must therefore ensure that whenever a's assigned factor
     divides b, a is played before b: a consumes its factor before b would
     sweep it, and conversely b cannot rob a of its factor.  (This is the
-    role of solving frames front-to-back in the wiki's walkthrough.)
+    role of solving frames front-to-back in game 21's frames.)
 
     Any topological order of that precedence works, and one always
     exists: by the schedulability theorem (the soundness half of the peel

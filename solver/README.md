@@ -40,7 +40,7 @@ file your task needs.
 | [taxman-notebook/README.md](https://github.com/bvchess/taxman-notebook/blob/main/README.md) | record | the lab notebook: its rules, and the register of everything tried, kept or not, a file a subject in [taxman-notebook/register](https://github.com/bvchess/taxman-notebook/tree/main/register) (read your subject's before proposing an experiment); each entry is a folder beside it or in [taxman-notebook/search](https://github.com/bvchess/taxman-notebook/tree/main/search) |
 | [the cost curve](https://github.com/bvchess/taxman-notebook/blob/main/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md) | record | how the cost of a game grew with n around 1231, in the search before the GF(2) bound, with projections for a larger machine |
 | [../docs/WRITING.md](../docs/WRITING.md) | guide | how the docs are written |
-| the [wiki](https://github.com/bvchess/taxman/wiki) | explanation | the game and the algorithm, with a walkthrough of game 21 |
+| the [website](https://vantuyl.com/taxman/) | explanation | the game and the algorithm, with a walkthrough of game 21 |
 
 ## The tools
 

@@ -2,7 +2,7 @@
 # Copyright (c) Brian Chess 2026
 # SPDX-License-Identifier: MIT
 
-"""The two open questions of the wiki's Questions page, measured on the committed games and by exhaustive search.
+"""Two open questions, measured on the committed games and by exhaustive search.
 
 https://github.com/bvchess/taxman-notebook/blob/main/the-wikis-open-questions-2026-10/README.md has the method, the results and the proofs; this
 module computes every number there.  The games read are the committed games results/optimal.jsonl.gz (its games
@@ -12,10 +12,10 @@ module computes every number there.  The games read are the committed games resu
   pay three, the shapes a tax can have (a check of the entry's theorem), a reordering of every game that has a
   move paying three into one that pays at most two, and, by exhaustive search over every optimal game of the
   boards 2..--exhaustive, the least and the greatest largest tax an optimal game can have.
-* `adapt`: the wiki's procedure for reusing the game of n - 1 (Reusing-a-previous-solution: play the game of n - 1,
+* `adapt`: the procedure for reusing the game of n - 1 (play the game of n - 1,
   select n just before the move that would leave it no divisor, then the rest of the moves that are still legal),
   applied to the committed games; delta(n) = n + opt(n - 1) - opt(n) and what it decides; the Java's set-level reuse
-  (keep the previous moves up to n/2, take the upper half of n's game) that the wiki's 70% counts; the patterns
+  (keep the previous moves up to n/2, take the upper half of n's game); the patterns
   by n's factorization; and, by exhaustive search over every optimal game of n - 1 for n up to --exhaustive, how
   much the outcome depends on which game of n - 1 is adapted.
 
@@ -222,7 +222,7 @@ def cmd_tax(args: argparse.Namespace) -> None:
 
 
 def adapt(n: int, prev: Sequence[int], divs: Sequence[List[int]]) -> Tuple[List[int], int, Optional[int]]:
-    """The wiki's procedure on a game of n - 1: (the game of n, the move it had to skip or 0, the move n was played
+    """The procedure on a game of n - 1: (the game of n, the move it had to skip or 0, the move n was played
     before, or None if n came last)."""
     pot = bytearray([1]) * (n + 1)
     out, skipped, before = [], 0, None
@@ -269,7 +269,7 @@ def kind(n: int, spf: Sequence[int]) -> str:
 
 
 def adaptation_counts(solver: Exact, n: int, delta: int) -> Tuple[int, int]:
-    """Over every optimal game of n - 1 (solver is the board n - 1): how many, and on how many the wiki's procedure
+    """Over every optimal game of n - 1 (solver is the board n - 1): how many, and on how many the procedure
     is optimal for n (it is when the move it skips is worth delta, or it skips none and delta is 0)."""
     divn = mask_of(d for d in range(1, n) if n % d == 0)
     games: Dict[int, int] = {}
@@ -321,7 +321,7 @@ def cmd_adapt(args: argparse.Namespace) -> None:
             moves, skipped, _ = adapt(n, lines[n - 1]["moves"], divs)
             ok = sum(moves) == opt[n]
             how["fails" if not ok else "lucky" if not skipped else "prime" if spf[n] == n else "general"] += 1
-        print(f"wiki's procedure on the committed games, n = 2..{top}: optimal {top - 1 - how['fails']} of {top - 1} "
+        print(f"the procedure on the committed games, n = 2..{top}: optimal {top - 1 - how['fails']} of {top - 1} "
               f"({100 * (top - 1 - how['fails']) / (top - 1):.1f}%): {dict(how)}")
 
     rows = []
@@ -395,7 +395,7 @@ def cmd_adapt(args: argparse.Namespace) -> None:
             tab[name][(value, "java")] += r["java"] or r["kind"] == "prime"
             tab[name][(value, "delta 0")] += r["delta"] == 0
     for name, c in tab.items():
-        print(f"by {name} (games: wiki's procedure, Java's reuse, delta = 0):")
+        print(f"by {name} (games: the procedure, Java's reuse, delta = 0):")
         for value in sorted({v for v, _ in c}, key=str):
             print(f"  {value}: {c[value, 'games']}: {c[value, 'wiki']}, {c[value, 'java']}, {c[value, 'delta 0']}")
 

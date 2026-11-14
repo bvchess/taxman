@@ -43,9 +43,7 @@ without re-solving game n from scratch:
   * "exact" -- the incumbent (or final) score equals n + prev_score, i.e.
     prepending n to the previous game's own solution is already optimal
     (opt(n) <= n + opt(n-1) always; equality closes the gap).
-  * "prime" -- the "prime sacrifice" identity from the wiki page "Reusing a
-    previous solution" (https://github.com/bvchess/taxman/wiki/Reusing-a-
-    previous-solution, sections "If N is prime" and "Generalizing"),
+  * "prime" -- the "prime sacrifice" identity (https://vantuyl.com/taxman/chain.html#prime),
     validated 167/167 against the optimal games: for prime N,
     opt(N) = N + opt(N-1) - p_hat, where p_hat is the largest prime < N.
     Sketch: 1 divides every number, so it is consumed by any game's first

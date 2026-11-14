@@ -89,8 +89,8 @@ to its glossary entry.
    (`solver`)"](../docs/design/engine.md#per-game-pipeline-solver)).
 
 **An example: game 21.**  The board 1 to 21 has four frames.  Two of them are closed, so they have no number.
-`testdata/golden/n0021.json` has the frames, and the wiki's
-[walkthrough of game 21](https://github.com/bvchess/taxman/wiki/Walkthrough-for-N=21) shows them in pictures:
+`testdata/golden/n0021.json` has the frames, and the website's
+[walkthrough of game 21](https://vantuyl.com/taxman/frames.html#frames-section) shows them in pictures:
 
 ```
 closed    sources 19 11 13 17   factors 1           11, 13 and 17 are impossible (the 1 pays for 19)

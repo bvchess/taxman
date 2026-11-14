@@ -18,7 +18,8 @@ and ES modules, and need no build step.  [OUTLINE.md](OUTLINE.md) is the plan of
   promotions of games 1 to 100, and `bounds.json`, the two root bounds of every game, from the prover's files.
 * `tools/` holds `export.mjs`, `results.mjs`, `test.mjs`, `serve.mjs`, `publish.sh` and `icon.mjs`, which writes
   `icon.svg`, the favicon, from `js/icon.js`; run it after changing the icon.
-* `img/` holds the pictures that the repository's README and the wiki link to.  Leave it as it is.
+* `img/` holds the picture that the repository's README shows (`10.3.png`) and seven pictures of game 21
+  (`n=21 step *.png`), whose layout the site's figures of game 21 follow.  Leave it as it is.
 
 ## Serve it
 

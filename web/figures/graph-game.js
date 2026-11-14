@@ -3,7 +3,7 @@
 // controls and its caption are js/play.js's; this file draws its board: the graph, and below it the two trays of
 // js/trays.js.
 //
-// The layout is the wiki's walkthrough of game 21: one column a layer, Ω(x), the highest layer at the left and layer
+// The layout is game 21's: one column a layer, Ω(x), the highest layer at the left and layer
 // 0, the number 1, at the right; in each column the numbers ascend from the bottom.  The rules, the same for every n
 // and width:
 // * the columns stand evenly spaced, at the pitch that fits the deepest layer of the largest game across the width,

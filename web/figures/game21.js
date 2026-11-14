@@ -8,7 +8,7 @@
 // Every fact comes from js/model.js and the recorded game of data/small.json: the layers (omega), the
 // lines (maximalFactors), the sources, the frames (frameModel), what descending greedy keeps, the freedoms, the
 // candidates, the promotion and the game with its taxes (replay).  Only the places are written by hand, in the layout
-// of the wiki's walkthrough of game 21, and they are checked against the model, so a change the layout does not fit
+// of game 21, and they are checked against the model, so a change the layout does not fit
 // fails loudly.
 //
 // URL parameter (fig21 unless the page names another): k opens the page's state k, from 1; where the page plays the
@@ -36,9 +36,9 @@ const TITLES = {
 const stopLabel = (name) => (name === 'layered' ? 'layers' : name);
 
 // ---------------------------------------------------------------------------------------------------------------
-// Places, by hand, in the wiki's layout: the layers are columns, layer 0 at the right and the last layer at the
-// left, so every line runs rightward from a number to its maximal factors, toward the front; and the frames stand
-// side by side in the same order, each with its sources in a column at its left and its factors at its right.
+// Places, by hand: the layers are columns, layer 0 at the right and the last layer at the left, so every line runs
+// rightward from a number to its maximal factors, toward the front; and the frames stand side by side in the same
+// order, each with its sources in a column at its left and its factors at its right.
 // ---------------------------------------------------------------------------------------------------------------
 
 // The pot: the numbers in order, seven a row.

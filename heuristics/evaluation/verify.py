@@ -5,7 +5,7 @@
 
 Theory: for every game N there is a polynomial-time algorithm (optimize_mini
 followed by peel on the upper-half factor game, see
-https://github.com/bvchess/taxman/wiki/Taxman-Mini) that produces exactly
+https://vantuyl.com/taxman/sets.html#peel) that produces exactly
 the numbers greater than N/2 in the optimal solution, along with an order
 in which those numbers can all be selected.
 

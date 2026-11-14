@@ -46,7 +46,7 @@ notion the whole project needs.
 For the upper half alone, the lifting argument gives a hard ceiling: every legal game's upper picks use distinct maximal
 factors from outside, so **no legal game's upper half can outscore M\*, the maximum-weight matchable upper set**, a
 pure matching quantity that needs no theory.  The set the strategies compute, U\* from `solve_upper_half`, is
-different: `optimize_mini` admits greedily with `peel` (the procedure the wiki calls `solve_mini`), a *playability*
+different: `optimize_mini` admits greedily with `peel` (the procedure `solve_mini` implements), a *playability*
 test, stricter than matching.  So U\* ≤ M\*, and the inequality can be strict: at n=1000, M\* ≥ 291,515 (the F–M
 bound's own matching witnesses it) while U\* = 291,258.  The 257-point difference is matchable-but-unplayable weight,
 upper-half siblings of the n=21 set.
@@ -64,14 +64,14 @@ What is proven, measured or conjectured:
 
 | claim | status |
 |---|---|
-| opt(n) ≤ n + opt(n−1) | proven (wiki) |
+| opt(n) ≤ n + opt(n−1) | proven ([the ceiling](https://vantuyl.com/taxman/chain.html#ceiling)) |
 | no upper half beats M\*, the max-weight *matchable* upper set | proven (lifting: every game's picks pair with distinct factors) |
 | U\* (`solve_upper_half`) equals the optimal game's upper half | measured, 1000/1000 |
 | U\* is the *unique* heaviest playable upper set (every other playable upper set is termwise below it) | theorem given (★) ([the uniqueness theorem (Q1)](../docs/theory/uniqueness-and-longest-games.md#the-uniqueness-theorem)), so certified for every n ≤ 100,000 |
 | *every* optimal game, not just the recorded one, has upper part U\* | measured: the prover ([`solver/noframe/docs/uniqueness.md`](../solver/noframe/docs/uniqueness.md)) enumerated every optimal set in every completely enumerated game; open in general.  **Theorem** for the members of U\* with one or two prime factors ([the bottom-layers theorem (F4)](../docs/theory/frame-model.md#the-bottom-layers-theorem)); the frame solver's answers rest on the weaker statement that *some* optimal game plays the rest, [statement U](../docs/theory/exactness.md#statement-u), which holds wherever the prover has proven the game ([results/README.md](../results/README.md)) |
 | the optimal set (not just its upper half) is unique | measured for every n ≤ 424; **false** from 425 on, where some games have two or three optimal sets, differing by equal-sum exchanges below n/2 |
 | optimal sets of n from those of n−1: T ∪ {n} at a game at its ceiling (opt(n) = n + opt(n−1)), T − p + n (a bijection) at a prime | theorem ([the step theorem (N6)](../docs/theory/neighbors.md#the-step-theorem)) |
-| an optimal game plays the most moves any game of the board can (the wiki's open question) | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; the heaviest 363-move game of 833 scores 29 less than opt(833) ([the length proposition (Q4)](../docs/theory/uniqueness-and-longest-games.md#the-length-proposition)).  True of every other game to 1300, the gap never above one ([`solver/noframe/docs/longest-games.md`](../solver/noframe/docs/longest-games.md)).  The bounds ℓ(n) ≤ ν(n) (a matching certificate) and ℓ(n−1) ≤ ℓ(n) ≤ ℓ(n−1) + 1, with ℓ(n) the most moves of a game of n, are theorems ([the length lemma (Q3)](../docs/theory/uniqueness-and-longest-games.md#the-length-lemma)) |
+| an optimal game plays the most moves any game of the board can | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; the heaviest 363-move game of 833 scores 29 less than opt(833) ([the length proposition (Q4)](../docs/theory/uniqueness-and-longest-games.md#the-length-proposition)).  True of every other game to 1300, the gap never above one ([`solver/noframe/docs/longest-games.md`](../solver/noframe/docs/longest-games.md)).  The bounds ℓ(n) ≤ ν(n) (a matching certificate) and ℓ(n−1) ≤ ℓ(n) ≤ ℓ(n−1) + 1, with ℓ(n) the most moves of a game of n, are theorems ([the length lemma (Q3)](../docs/theory/uniqueness-and-longest-games.md#the-length-lemma)) |
 | no *playable* upper set outweighs U\* | conjecture — proven wherever the jam is hyperedge-free ([the frontier theorem (S3)](../docs/theory/sources.md#the-frontier-theorem)); the single-sacrifice route is **false** in general (n=9170 witness).  It is **equivalent to a pure cardinality claim** — descending greedy is maximum-cardinality on every component of the upper-half instance's incidence graph ([the cardinality conjecture (★, S4)](../docs/theory/sources.md#the-cardinality-conjecture)) — and **implied by a linear-algebra one**, (♦): every greedy rejection is a GF(2) dependency of the members kept above it ([the span conjecture (♦, S5)](../docs/theory/sources.md#the-span-conjecture) and [the span theorem (S6)](../docs/theory/sources.md#the-span-theorem)).  **Certified for every game n = 2..100,000** and 902 sampled games to 2,000,000 by checking (♦) exactly (`solver/noframe`), zero counterexamples; the five components the earlier campaign left undecided are settled.  The full 3-prime padded-jam census (428 shapes, 22,909 trap orderings) closes with **zero unprotected traps**: every trap dies by monomial inversion or a window-forced guard ([what a proof must use](../docs/theory/sources.md#what-a-proof-must-use)) |
 | greedy weight-optimality when the frontier jam has only ≤2-prime members | theorem (unique minimal core: forest + one edge; [the frontier theorem (S3)](../docs/theory/sources.md#the-frontier-theorem)) |
 | on members with ≤ 2 distinct primes, playable = forest in the factor-value graph | theorem ([the two-factor proposition (P11)](../docs/theory/playability.md#the-two-factor-proposition), via [the core theorem (P7)](../docs/theory/playability.md#the-core-theorem); verified on 89,400 random subsets) |
@@ -203,8 +203,7 @@ its distance to opt(n) too.  The optimal games to compare them with are in `resu
 ### Certificates
 
 Three record-level labels recognize a score as optimal *given the
-previous game's score*, from the wiki's
-["Reusing a previous solution"](https://github.com/bvchess/taxman/wiki/Reusing-a-previous-solution):
+previous game's score*, from [the chain's page](https://vantuyl.com/taxman/chain.html) of the website:
 
 * **exact** (proven): score = n + score(n−1), the no-sacrifice upper
   bound met.
@@ -220,7 +219,7 @@ previous game's score*, from the wiki's
   but holds wherever it can be checked.
 
 Coverage: 688/999 cold-chain games (331 exact + 167 prime + 190
-upper-delta = 68.9%, matching the wiki's remembered "roughly 70%")
+upper-delta = 68.9%)
 and 633/1000 games in 1001..2000.
 
 What a certificate means depends on the anchor.  On an optimal
@@ -354,7 +353,7 @@ resumes with `--resume`, so an interruption costs at most a few games.
 | file | contents |
 |---|---|
 | [`../docs/THEORY.md`](../docs/THEORY.md) | the index of the theory's proofs: playability, peel, cores and the residual, [the sources conjecture](../docs/theory/sources.md#the-sources-conjecture) and [the frontier theorem](../docs/theory/sources.md#the-frontier-theorem), and the theorems behind the frame solver (the parity bound, independence in every frame, prime exchanges, the frame model's exactness) |
-| `core.py` | shared foundations: `maximal_factors`, the wiki's `peel` / `optimize_mini`, `order_for_real_game`, `solve_upper_half`, divisor tables, `check_sequence` replay validation |
+| `core.py` | shared foundations: `maximal_factors`, `peel` / `optimize_mini`, `order_for_real_game`, `solve_upper_half`, divisor tables, `check_sequence` replay validation |
 | `strategies/solvent.py` | the fast solvent implementation (incremental matching + complete fallback tier) |
 | `strategies/solvent_b.py` | solvent-b: solvent plus the dual-use audit (recovers ~52% of solvent's loss for one factor of n in cost) |
 | `strategies/onetax.py`, `strategies/maxturn.py`, `strategies/cascade.py` | the comparison strategies |
@@ -367,7 +366,7 @@ resumes with `--resume`, so an interruption costs at most a few games.
 | `evaluation/bound.py` | the Franklín–Moniot upper bound |
 | `evaluation/bornfree.py` | the Franklín–Moniot born-free matching: their constructive lower bound |
 | `evaluation/certify.py` | theory-free certification of `results/optimal.jsonl.gz` (uses `evaluation/bitpot.py` bitmask primitives) |
-| `evaluation/wiki_questions.py` | the wiki's two open questions, the tax of a move and reusing the moves for n − 1 (`tax`, `adapt`; the results are in [taxman-notebook/the-wikis-open-questions-2026-10/README.md](https://github.com/bvchess/taxman-notebook/blob/main/the-wikis-open-questions-2026-10/README.md)) |
+| `evaluation/wiki_questions.py` | two open questions, the tax of a move and reusing the moves for n − 1 (`tax`, `adapt`; the results are in [taxman-notebook/the-wikis-open-questions-2026-10/README.md](https://github.com/bvchess/taxman-notebook/blob/main/the-wikis-open-questions-2026-10/README.md)) |
 | `evaluation/bench.py` | timings and scaling exponents |
 | `evaluation/test_taxman.py` | the test suite |
 | `results/solvent_1000.json`, `results/strategies_1000.json` | per-game scores vs. optimal, n=1..1000 |
@@ -390,7 +389,7 @@ warm-start chain in the same readable register — with
 
 n=21 is the running example, cited wherever a concept needs a concrete case, because one small game shows every idea:
 
-* [the wiki walks it through move by move](https://github.com/bvchess/taxman/wiki/Walkthrough-for-N=21), and
+* [the website walks through it](https://vantuyl.com/taxman/frames.html#frames-section), and
   `python3 -m reference.solvent 21` solves it (144, the optimal score);
 * its optimal game opens with the highest prime and funds a one-for-two trade;
 * it has the matchable-but-unplayable set {10,12,14,15,16,18,19,20,21}, which sums to 145, one point more than any

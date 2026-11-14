@@ -2,11 +2,11 @@
 
 Part of [the prover's README](../README.md).
 
-No: at n = 833, 834 and 835 every optimal game is one move short of the longest game.  The wiki's "Questions" page asks
-it as its third question, left open, with the belief that the answer is yes: does an optimal game take as many moves as
-any game of the board can, or does some longer game score less?  If optimal games were always longest, a solver could
-stop searching every branch that cannot reach the most moves.  Neither the Java solver nor the frame solver does that
-(below), but the Java's revision of the freedoms rested on a local form of the claim.
+No: at n = 833, 834 and 835 every optimal game is one move short of the longest game.  The question was long left
+open, with the belief that the answer is yes: does an optimal game take as many moves as any game of the board can,
+or does some longer game score less?  If optimal games were always longest, a solver could stop searching every
+branch that cannot reach the most moves.  Neither the Java solver nor the frame solver does that (below), but the
+Java's revision of the freedoms rested on a local form of the claim.
 
 ## What is proven
 
@@ -102,7 +102,7 @@ What the data shows:
 * **ν(n) is a tight bound on moves.**  To 4949 it exceeds M(n) only at 51, 182 and 183, by one, where every maximum
   matching is precedence-cyclic.  The Franklín–Moniot bound, weighted by value, is off by hundreds of points.
 
-## The solvers and the wiki
+## The solvers
 
 * **Neither the Java solver nor the frame solver prunes a branch for having fewer moves than possible.**  Counts enter
   the search only as upper bounds.

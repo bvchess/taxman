@@ -627,7 +627,7 @@ fn urls_of_the_two_repositories_are_read_and_their_form_is_checked() {
     };
     assert_eq!(found, [Ok(notebook), Ok(main)]);
     for left_alone in [
-        "https://github.com/bvchess/taxman/wiki/Taxman-Mini",
+        "https://github.com/bvchess/taxman/wiki",
         "git clone https://github.com/bvchess/taxman.git",
         "https://github.com/bvchess/taxman-notebook",
         "https://github.com/bvchess/other/blob/main/x.md",
@@ -1217,8 +1217,9 @@ const RETIRED_EVERYWHERE: &[Retired] = &[
     retired("prime relation", "the prime formula"),
 ];
 
-/// Retired in the guides and comments of the solver (`solver/` but for the prover), which use the wiki's
-/// words.  The heuristics and the prover keep some of these for their own meanings (the theory's frontier theorem).
+/// Retired in the guides and comments of the solver (`solver/` but for the prover), which use the frame
+/// model's words.  The heuristics and the prover keep some of these for their own meanings (the theory's frontier
+/// theorem).
 const RETIRED_IN_THE_SOLVER: &[Retired] = &[
     retired("upstream", "behind"),
     retired("downstream", "in front of"),

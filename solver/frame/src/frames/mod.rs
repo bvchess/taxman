@@ -21,12 +21,11 @@
 //!   [`NumberedFrame`] with its number, the frames in front of it and the pairs `unzip` settled in it; it is for the
 //!   tests of this module, and the solver does not use it.
 //!
-//! The Java has several names for the one idea (solver/docs/design/frame-model.md, "The Java solver and the frame
-//! solver", maps them); this module calls it a frame throughout.  [`Frame`] has the name of [`crate::model::Frame`],
-//! the search's copy of it (a `Copy` set of moves and factors that every promotion changes), and the two do not meet:
-//! no signature has both, and this module writes the search's as `model::Frame`.  A second word (`FrameDraft`) would
-//! only be one more name for what the wiki calls a frame.  The names of `unzip` and `remove_impossible`, and of the
-//! fields `mandatory` and `claimed`, are the Java's.
+//! The Java has several names for the one idea; this module calls it a frame throughout.  [`Frame`] has the name of
+//! [`crate::model::Frame`], the search's copy of it (a `Copy` set of moves and factors that every promotion changes),
+//! and the two do not meet: no signature has both, and this module writes the search's as `model::Frame`.  A second
+//! word (`FrameDraft`) would only be one more name for a frame.  The names of `unzip` and `remove_impossible`, and of
+//! the fields `mandatory` and `claimed`, are the Java's.
 //!
 //! # Sources, factors and frames
 //!

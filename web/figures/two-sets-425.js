@@ -1,6 +1,6 @@
 // Along the way: game 425 has two optimal sets.  They play the same numbers above n/2, U*, and differ by an exchange
 // of three promotions of equal sum, one into each of frames 2, 1 and 0.  The promotions are drawn flat, as the player's
-// double circles, in the wiki's order of frames, the highest at the left.  The exchange is the theory's (docs/theory/
+// double circles, in the order of frames, the highest at the left.  The exchange is the theory's (docs/theory/
 // uniqueness-and-longest-games.md, "Optimal sets on the whole board"), written out here and checked: the two sides
 // have equal sums and pair off frame by frame; the score, U* and the count of promotions come from data/games.json.
 

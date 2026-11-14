@@ -2,7 +2,7 @@
 // box, a mark for each of its numbers, the sources at its left (a gray circle if descending greedy keeps it, a
 // square like the factors if not, since the taxman takes it) and its factors at its right; a closed frame is
 // drawn dashed and faded, its box, marks and label alike, as game 21 draws its closed frames.  The boxes stand in
-// the wiki's order, the
+// the order of game 21's frames, the
 // highest layer at the left and the frame in front at the right, and are named by their numbers (js/model.js,
 // frameModel), frame 0 being the one in front; a closed frame has no number and is named closed.  Under a box with
 // freedoms stand its number and its freedoms, the sum over the frames that make it up, in one of two forms: on a line

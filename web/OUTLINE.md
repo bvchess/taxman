@@ -134,7 +134,7 @@ check.
 in the language of matchings, the peel theorem (P4), the two-factor proposition (P11).
 
 **Asides.**  *Three factors of tax:* in game 40, one move of an optimal game pays 6, 10 and 15, yet no game to
-2175 needs one (its home in the repository is to be written; the wiki's Questions page has it).  *More moves, fewer
+2175 needs one (its home in the repository is to be written).  *More moves, fewer
 points:* in game 833 every optimal game makes 362 moves, but a game can make 363 (the length proposition, Q4).
 
 ### 2. Walking up the chain
