@@ -9,7 +9,7 @@ solver's scores rest, are defined in the theory, and the prover in [its README](
 A file of proven games has one JSON line per game, as `taxman solve --out` writes it.  The fields are described in
 `src/results.rs` and in [the frame solver's reference](../solver/docs/REFERENCE.md#a-results-line---out-schema-5).  The
 two files about the best-known games have lines of their own kind ([below](#best-knownjsonlgz)).  The counts on this
-page are a snapshot, dated 2026-11-06 (2026-11-12 for the best-known games), which no test pins: the commands in the
+page are a snapshot, dated 2026-11-06 (2026-11-13 for the best-known games), which no test pins: the commands in the
 section of each file print the current ones.
 
 ## The files
@@ -18,7 +18,7 @@ section of each file print the current ones.
 |---|---|---|---|
 | `optimal.jsonl.gz` | the committed chain: the moves of an optimal game for every n, each found from the moves for n − 1; the table of moves built into the frame solver | 1–5060 on 2026-11-06 | one run of `taxman solve` ([below](#optimaljsonlgz)) |
 | `beyond-the-chain.jsonl` | the proven games past the end of the chain, in blocks that each start with a standalone game | past the end of the chain | `taxman solve`, a standalone game and the games after it ([below](#beyond-the-chainjsonl)) |
-| `best-known.jsonl.gz` | the best-known game of each game past the chain, none of them proven, with the parity bound, the step and the rule that settles it from the game before | 5061–10000 but the proven games, on 2026-11-12 | `solver/tools/best_known_table.py` ([below](#best-knownjsonlgz)) |
+| `best-known.jsonl.gz` | the best-known game of each game past the chain, none of them proven, with the parity bound, the step and the rule that settles it from the game before | 5061–10000 but the proven games, on 2026-11-13 | `solver/tools/best_known_table.py` ([below](#best-knownjsonlgz)) |
 | `search-effort.jsonl` | what has been tried on those games: the dedicated plays and the passes of the finder | the same games | the same tool ([below](#search-effortjsonl)) |
 | `b019312.txt` | the scores of `optimal.jsonl.gz`, as a b-file of [A019312](https://oeis.org/A019312) in the OEIS | 1–5060 | the command [below](#b019312txt) |
 
@@ -352,18 +352,20 @@ It stops and writes nothing when a source does not fit: moves that do not make a
 game that does not open with the largest prime, a score above its bound, a bound that is not the prover's, a step that is
 none of the four, or a game or board with no line.
 
-**The snapshot of 2026-11-12**, from a copy taken at 13:43 PST of 6,985 lines of 4,940 games: 4,935 games, 5061 to 10000
-but 5260 to 5264, in ten gzip members of at most 500 lines, 1,236,707 bytes, decompressing to 80,806,018.  By step, 1,708
+**The snapshot of 2026-11-13**, from a copy taken at 18:34 PST of 7,190 lines of 4,940 games: 4,935 games, 5061 to 10000
+but 5260 to 5264, in ten gzip members of at most 500 lines, 1,249,156 bytes, decompressing to 80,806,017.  By step, 1,708
 are `exchange` (551 of them primes), 760 `added`, 1,350 `half-in` and 1,117 `half-out`.  By rule, 551 are `prime_formula`,
-1,702 `cap`, 89 `theorem_8p`, 947 `semiprime_formula`, 63 `theorem_12p`, 26 `same_search` and 1,557 have none.
+1,701 `cap`, 89 `theorem_8p`, 947 `semiprime_formula`, 63 `theorem_12p`, 26 `same_search` and 1,558 have none.
 
 To check the file, `tests/results.rs` replays the games (the quick check the first 100) and checks their order, parity
 bounds, steps and rules.  To refresh it, copy the best-known file and the lab's ledgers (`rootfirst/ledger.tsv`,
-`rootfirst/ledger2.tsv`, `hammer/ledger.tsv`, `transplant/driver/ledger.tsv`) into `COPY`, run the tool with the notebook
-entry's parity files as `PARITY1` and `PARITY2`, and name the time of the copies in the commit message:
+`rootfirst/ledger2.tsv`, `hammer/ledger.tsv`, `transplant/driver/ledger.tsv`, `transplant/driver/ledger-b23.tsv`) into
+`COPY`, run the tool with the notebook entry's parity files as `PARITY1` and `PARITY2`, and name the time of the
+copies in the commit message:
 
     python3 -I solver/tools/best_known_table.py --best-known COPY/best-known.jsonl --parity PARITY1 PARITY2 \
-        --plays COPY/ledger.tsv:3 --plays COPY/ledger2.tsv --plays COPY/hammer-ledger.tsv --finder COPY/finder-ledger.tsv:60
+        --plays COPY/ledger.tsv:3 --plays COPY/ledger2.tsv --plays COPY/hammer-ledger.tsv \
+        --finder COPY/finder-ledger.tsv:60 --finder COPY/ledger-b23.tsv:600
 
 ## search-effort.jsonl
 
@@ -388,11 +390,13 @@ search of the pass, and `outcome` is `none` if every search finished, so that no
 `stopped` if a limit ended a search and none found a better game, and `gain` if one was found.  The file leaves out the
 ledgers' times of day, CPU times and scores.
 
-**The snapshot of 2026-11-12**, from copies of the ledgers taken at 13:43 PST: 4,935 games, 4,243 plays and 9,870
-passes.  The plays are 53 at level 3, 3,591 at level 4 and 599 at level 5, on 1,572 games, and 49 raised their game.  The
+**The snapshot of 2026-11-13**, from copies of the ledgers taken at 18:34 PST: 4,935 games, 5,280 plays and 10,110
+passes.  The plays are 53 at level 3, 4,628 at level 4 and 599 at level 5, on 1,620 games, and 58 raised their game.  The
 passes are at B = 13 (4,806 `none`, 129 `stopped`) and B = 19 (569 `none`, 4,366 `stopped`), one of each for every game,
-all with a limit of 60 seconds.  None found a better game.  The finder's ledger does not record the limit, nor the pilot's
-ledger (level 3) its level, so the tool takes each after the path.  To check the file,
+all with a limit of 60 seconds, and at B = 23 (240 `stopped`), on 240 games between 9243 and 10000, with a limit of 600
+seconds.  The pass at B = 23 was stopped by hand; the searches it had under way are rows of its ledger with the status
+`error`, which are no pass, and the tool leaves them out.  None found a better game.  The finders' ledgers do not record
+the limit, nor the pilot's ledger (level 3) its level, so the tool takes each after the path.  To check the file,
 `tests/results.rs` checks that it names only games of the table, each once and in order, with these fields.  The command
 above refreshes it too.
 
