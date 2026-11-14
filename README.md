@@ -78,5 +78,3 @@ command.
 * Franklín and Moniot, [The difficulty of beating the Taxman](https://arxiv.org/abs/2211.00461), *Discrete Applied
   Mathematics* 339 (2023), 166–171: the upper bound the project's checks use, and the NP-hardness of a variant of the
   game.
-* Taxman can be played online at <http://davidbau.com/archives/2008/12/07/taxman_game.html> and
-  <https://www.cryptool.org/en/cto/taxman>.
