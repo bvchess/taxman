@@ -1,7 +1,8 @@
 # Taxman
 
-This project finds optimal games of Taxman, a number game.  It also has heuristic strategies, which play good games
-quickly but don't guarantee optimal results.
+This project finds optimal games of Taxman, a number game.  **[vantuyl.com/taxman](https://vantuyl.com/taxman/)**
+explains the game, how we find optimal games, and what we found.  This repository holds the programs and the results,
+and also heuristic strategies, which play good games quickly but don't guarantee optimal results.
 
 ![game 10 move 3](web/img/10.3.png)
 
@@ -14,9 +15,8 @@ An *optimal game* scores the most, and its score is opt(n).  For game 4, the pla
 (the taxman takes 2), and scores 7, the best possible: opt(4) = 7.
 
 The best scores for n = 1, 2, 3, ... are the Taxman sequence, [A019312](https://oeis.org/A019312) in the OEIS.  Finding
-an optimal game can turn into a search over an enormous tree of possibilities.  The [project
-wiki](https://github.com/bvchess/taxman/wiki) explains the game and the algorithm, with a walkthrough of game 21.  The
-[glossary](docs/GLOSSARY.md) defines the project's vocabulary.
+an optimal game can turn into a search over an enormous tree of possibilities.  The [glossary](docs/GLOSSARY.md)
+defines the project's vocabulary.
 
 ## The results
 
