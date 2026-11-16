@@ -11,17 +11,20 @@
 //!
 //! Several runs share one file.  A holder takes an exclusive lock (`flock`) only to read what the others appended and
 //! to append, and lets it go at once, so that a run never waits for another's life.  A holder that stopped in the
-//! middle of a line leaves a torn last line, which the next holder cuts off.  Nothing here is proven: every reader of
-//! proven lines refuses a best-known file, as it refuses any file of unsound lines.
+//! middle of a line leaves a torn last line, which the next holder cuts off.  The holders append whole lines, and that
+//! cut changes nothing before the last newline, so a run that opens the file reads its lines up to the last newline
+//! without the lock and takes the lock only to read the rest: runs that open a large file at once do not wait in turn
+//! for each other's read of it.  Nothing here is proven: every reader of proven lines refuses a best-known file, as it
+//! refuses any file of unsound lines.
 
 use super::{read_line, Stored};
 use crate::game::Optimal;
 use crate::json::Json;
-use crate::results::{each_line, mend, Fields};
+use crate::results::{each_line, mend, Fields, Kept};
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 /// The key that a line of the best-known file has besides a run's: `{"file": the name of the run's file the line came
@@ -43,15 +46,29 @@ impl<'a> BestKnownFile<'a> {
     /// Opens the file at `path` (creating it if it is missing) and reads it, checking every line as a run's file is
     /// checked ([`read_line`]) and that it is a line of the best-known file: it carries [`BEST_KNOWN`], is not a game
     /// of `table`, does not score above its `bound`, scores more than the line of its game before it, and says that
-    /// score in `best_known.was`.  Holds the lock only while it reads.
+    /// score in `best_known.was`.  Reads the lines up to the last newline without the lock (the module documentation
+    /// says why that is safe), and holds the lock only while it reads the rest.
+    ///
+    /// A read without the lock that passes a torn last line as another holder cuts it may go on into the lines
+    /// appended after the cut, and so see a line that the file never held.  So a line that this read refuses is not
+    /// taken as the file's: the run forgets what it read and reads the whole file again under the lock, which refuses
+    /// the line if the file holds it.
     ///
     /// # Errors
     ///
     /// A file that cannot be read, or holds a line that fails a check; the message names the line.
     pub fn open(path: &Path, table: &'a Optimal) -> Result<BestKnownFile<'a>, String> {
-        let mut best_known = BestKnownFile { path: path.to_owned(), table, games: BTreeMap::new(), read_to: 0 };
+        let mut best_known = Self::unread(path, table);
+        if best_known.read_unlocked().is_err() {
+            best_known = Self::unread(path, table);
+        }
         best_known.locked()?;
         Ok(best_known)
+    }
+
+    /// The file at `path` before the run has read any of it.
+    fn unread(path: &Path, table: &'a Optimal) -> BestKnownFile<'a> {
+        BestKnownFile { path: path.to_owned(), table, games: BTreeMap::new(), read_to: 0 }
     }
 
     /// The moves of the game `n`'s best-known line and its score, as the run last read them.
@@ -140,6 +157,22 @@ impl<'a> BestKnownFile<'a> {
         Ok(file)
     }
 
+    /// Reads, with no lock, the lines of the unread file up to its last newline, and checks them as
+    /// [`catch_up`](Self::catch_up) does; a missing file has none.  Writes nothing: what lies past the last newline, a
+    /// torn last line or a last line with no newline, is left to `catch_up`, under the lock.  An error goes no further
+    /// than [`open`](Self::open), which then reads the whole file under the lock.
+    fn read_unlocked(&mut self) -> Result<(), String> {
+        let mut bytes = match fs::read(&self.path) {
+            Err(e) if e.kind() == ErrorKind::NotFound => Vec::new(),
+            read => read.map_err(|e| e.to_string())?,
+        };
+        bytes.truncate(bytes.iter().rposition(|&byte| byte == b'\n').map_or(0, |last| last + 1));
+        let text = String::from_utf8(bytes).map_err(|e| e.to_string())?;
+        let kept = self.check(&text)?;
+        self.read_to = kept.valid_len as u64;
+        Ok(())
+    }
+
     /// Reads the lines `file` gained after the byte `read_to`, checks them (the documentation of [`open`](Self::open))
     /// and cuts a torn last line off.  The caller holds the lock, so no holder is in the middle of a line.
     fn catch_up(&mut self, file: &mut File) -> Result<(), String> {
@@ -158,12 +191,21 @@ impl<'a> BestKnownFile<'a> {
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes).map_err(io)?;
         let text = String::from_utf8(bytes).map_err(|e| e.to_string())?;
+        let kept = self.check(&text)?;
+        mend(file, &text, kept, self.read_to).map_err(io)?;
+        self.read_to = file.metadata().map_err(io)?.len();
+        Ok(())
+    }
+
+    /// Checks the lines of `text`, the file's bytes from the byte `read_to` on (the documentation of
+    /// [`open`](Self::open)), and keeps the last line of each game.  Returns how far the lines are kept.
+    fn check(&mut self, text: &str) -> Result<Kept, String> {
         let (table, games, start) = (self.table, &mut self.games, self.read_to);
         let place = |number: usize| match start {
             0 => format!("line {number}"),
             _ => format!("line {number} after byte {start}"),
         };
-        let kept = each_line(&text, |number, json| {
+        each_line(text, |number, json| {
             let (n, stored, was) = read_best_known_line(json, table).map_err(|e| format!("{}: {e}", place(number)))?;
             let before = games.get(&n).map(|game| game.score);
             if let Some(before) = before.filter(|&before| stored.score <= before) {
@@ -181,10 +223,7 @@ impl<'a> BestKnownFile<'a> {
             }
             games.insert(n, stored);
             Ok(())
-        })?;
-        mend(file, &text, kept, start).map_err(io)?;
-        self.read_to = file.metadata().map_err(io)?.len();
-        Ok(())
+        })
     }
 }
 
@@ -221,4 +260,66 @@ fn with_best_known(json: Json, file: Option<&str>, was: Option<u64>) -> Result<J
         None => pairs.push((BEST_KNOWN.to_owned(), value)),
     }
     Ok(Json::Obj(pairs))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::UNSOUND;
+    use crate::test_support::TempDir;
+
+    /// A best-known file's first line of the game `n`, with the built-in table's moves: a line for a table cut below n.
+    fn line(n: u32) -> String {
+        let table = Optimal::built_in();
+        let run = Json::object([
+            (UNSOUND, Json::from(true)),
+            ("n", Json::from(n)),
+            ("score", Json::from(table.score(n).unwrap())),
+            ("moves", Json::array(table.moves(n).unwrap().iter().copied())),
+            ("promotions", Json::array::<u32>([])),
+            ("in_the_bag", Json::Null),
+            ("method", Json::from("trivial")),
+            ("setup", Json::Null),
+            ("repaired", Json::Null),
+        ]);
+        with_best_known(run, None, None).unwrap().to_string()
+    }
+
+    /// The last line of each game, as `best_known` has read them.
+    fn games(best_known: &BestKnownFile) -> Vec<(u32, String)> {
+        best_known.games.iter().map(|(&n, game)| (n, game.text.clone())).collect()
+    }
+
+    #[test]
+    fn a_run_opens_the_file_by_reading_its_complete_lines_without_the_lock_and_the_rest_under_it() {
+        let (dir, table) = (TempDir::new("best-known-unlocked"), Optimal::built_in().up_to(9));
+        let complete: String = (10..=12).map(|n| line(n) + "\n").collect();
+        let last = line(13);
+        // The tail past the last newline is a line with no newline, which the read under the lock takes and ends with
+        // one, or a torn line, which it cuts off.
+        let tails = [(last.as_str(), format!("{complete}{last}\n"), 13), (&last[..20], complete.clone(), 12)];
+        for (tail, mended, top) in tails {
+            let (path, once) = (dir.join("open.jsonl"), dir.join("once.jsonl"));
+            let text = format!("{complete}{tail}");
+            fs::write(&path, &text).unwrap();
+            fs::write(&once, &text).unwrap();
+            // The read without the lock stops at the last newline, and writes nothing.
+            let mut unlocked = BestKnownFile::unread(&path, &table);
+            unlocked.read_unlocked().unwrap();
+            assert_eq!(unlocked.read_to, complete.len() as u64);
+            assert_eq!(unlocked.games.keys().copied().collect::<Vec<_>>(), [10, 11, 12]);
+            assert_eq!(fs::read_to_string(&path).unwrap(), text);
+            // Opened, the file is read as one read under the lock reads it, and mended as that read mends it.
+            let opened = BestKnownFile::open(&path, &table).unwrap();
+            let mut locked = BestKnownFile::unread(&once, &table);
+            drop(locked.locked().unwrap());
+            assert_eq!(games(&opened), games(&locked));
+            assert_eq!(opened.games.keys().copied().collect::<Vec<_>>(), (10..=top).collect::<Vec<_>>());
+            assert_eq!((opened.read_to, locked.read_to), (mended.len() as u64, mended.len() as u64));
+            assert_eq!(
+                (fs::read_to_string(&path).unwrap(), fs::read_to_string(&once).unwrap()),
+                (mended.clone(), mended)
+            );
+        }
+    }
 }

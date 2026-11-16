@@ -54,7 +54,9 @@ game of the built-in table or scores above its `bound`, and that the lines of a 
 
 Several runs may use one file at once.  A run locks it only to read what is new and to append, never for its life, so
 none waits for another's game.  A run that stops in the middle of a line leaves a torn last line, which the next run to
-use the file cuts off.
+use the file cuts off.  The runs append whole lines, and that cut changes nothing before the last newline, so a run that
+opens the file reads the lines up to the last newline without the lock: runs that start at once do not wait in turn for
+each other's read of a large file.
 
 ## A rehearsal on proven games
 
