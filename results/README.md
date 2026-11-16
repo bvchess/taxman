@@ -352,10 +352,11 @@ It stops and writes nothing when a source does not fit: moves that do not make a
 game that does not open with the largest prime, a score above its bound, a bound that is not the prover's, a step that is
 none of the four, or a game or board with no line.
 
-**The snapshot of 2026-11-16**, from a copy taken at 06:34 PST of 7,336 lines of 4,940 games: 4,935 games, 5061 to 10000
-but 5260 to 5264, in ten gzip members of at most 500 lines, 1,340,083 bytes, decompressing to 80,806,016.  By step, 1,708
-are `exchange` (551 of them primes), 760 `added`, 1,350 `half-in` and 1,117 `half-out`.  By rule, 551 are `prime_formula`,
-1,700 `cap`, 89 `theorem_8p`, 947 `semiprime_formula`, 63 `theorem_12p`, 26 `same_search` and 1,559 have none.
+**The snapshot of 2026-11-16**, taken at 14:00 PST, when the mining stopped, from a copy of 7,336 lines of 4,940 games:
+4,935 games, 5061 to 10000 but 5260 to 5264, in ten gzip members of at most 500 lines, 1,340,083 bytes, decompressing to
+80,806,016.  By step, 1,708 are `exchange` (551 of them primes), 760 `added`, 1,350 `half-in` and 1,117 `half-out`.  By
+rule, 551 are `prime_formula`, 1,700 `cap`, 89 `theorem_8p`, 947 `semiprime_formula`, 63 `theorem_12p`, 26 `same_search`
+and 1,559 have none.
 
 To check the file, `tests/results.rs` replays the games (the quick check the first 100) and checks their order, parity
 bounds, steps and rules.  To refresh it, copy the best-known file and the lab's ledgers (`rootfirst/ledger.tsv`,
@@ -390,15 +391,15 @@ search of the pass, and `outcome` is `none` if every search finished, so that no
 `stopped` if a limit ended a search and none found a better game, and `gain` if one was found.  The file leaves out the
 ledgers' times of day, CPU times and scores.
 
-**The snapshot of 2026-11-16**, from copies of the ledgers taken at 06:34 PST: 4,935 games, 10,874 plays and 10,110
-passes.  The plays are 53 at level 3, 10,222 at level 4 and 599 at level 5, on 1,620 games, and 75 raised their game.  The
-passes are at B = 13 (4,806 `none`, 129 `stopped`) and B = 19 (569 `none`, 4,366 `stopped`), one of each for every game,
-all with a limit of 60 seconds, and at B = 23 (240 `stopped`), on 240 games between 9243 and 10000, with a limit of 600
-seconds.  The pass at B = 23 was stopped by hand; the searches it had under way are rows of its ledger with the status
-`error`, which are no pass, and the tool leaves them out.  None found a better game.  The finders' ledgers do not record
-the limit, nor the pilot's ledger (level 3) its level, so the tool takes each after the path.  To check the file,
-`tests/results.rs` checks that it names only games of the table, each once and in order, with these fields.  The command
-above refreshes it too.
+**The snapshot of 2026-11-16**, from copies of the ledgers taken at 14:00 PST, when the mining stopped: 4,935 games,
+11,797 plays and 10,110 passes.  The plays are 53 at level 3, 11,145 at level 4 and 599 at level 5, on 1,620 games, and
+75 raised their game.  The passes are at B = 13 (4,806 `none`, 129 `stopped`) and B = 19 (569 `none`, 4,366 `stopped`),
+one of each for every game, all with a limit of 60 seconds, and at B = 23 (240 `stopped`), on 240 games between 9243 and
+10000, with a limit of 600 seconds.  The pass at B = 23 was stopped by hand; the searches it had under way are rows of
+its ledger with the status `error`, which are no pass, and the tool leaves them out.  None found a better game.  The
+finders' ledgers do not record the limit, nor the pilot's ledger (level 3) its level, so the tool takes each after the
+path.  To check the file, `tests/results.rs` checks that it names only games of the table, each once and in order, with
+these fields.  The command above refreshes it too.
 
 ## b019312.txt
 
