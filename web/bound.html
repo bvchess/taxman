@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The parity bound · Taxman</title>
-<meta name="description" content="A bound limits how high a score can go, and the sharper it is, the less a search has to explore.  Taxman's comes from a quick test of even and odd, applied to the frames of a search or to the whole board.">
+<meta name="description" content="A bound limits how high a score could possibly go, and the more precise it is, the less a search has to explore.  Taxman's comes from a quick test of even and odd.">
 <meta name="author" content="Brian Chess">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <script src="js/tone.js"></script>
@@ -20,49 +20,40 @@
 <header class="essay-head para">
   <p class="kicker">Chapter 6</p>
   <h1>The parity bound</h1>
-  <p class="lede">A bound limits how high a score can go.  The sharper it is, the less a search has to explore.</p>
+  <p class="lede">A bound limits how high a score could possibly go.  The more precise it is, the less a search
+  has to explore.  The parity bound provides a good combination of speed and precision.</p>
 </header>
 
 <section class="chapter" id="the-test" data-toc="the-test" aria-labelledby="h-test">
   <h2 id="h-test">The test</h2>
   <div class="para">
-    <aside class="note card" aria-label="The signed frame theorem, proved">
-      <div class="note-head"><span class="note-name">The signed frame theorem<span class="note-label">Theorem B1</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-bounds.md#the-signed-frame-theorem">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">Promotions the player can make together pass the test in every frame.</p>
-      <p class="precise">Give each move of a <a class="gloss" href="glossary.html#frame">frame</a>,
-      and each number promoted into it, the vector of its <a class="gloss" href="glossary.html#maximal-factor">maximal
-      factors</a> there, and each number promoted out of it its unit vector.  A promotion set makes them linearly
-      independent in every frame, over every field.</p>
-    </aside>
-    <p>A <a class="gloss" href="glossary.html#search">search</a> drops a branch when its <a class="gloss"
-    href="glossary.html#bound">bound</a> cannot beat the best game found (<a href="search.html#the-bound">chapter
-    5</a>).  The <a class="gloss" href="glossary.html#frame-solver">frame solver</a>'s bound is the heaviest set of <a
-    class="gloss" href="glossary.html#candidate">candidates</a> that passes a test, one that every set of legal
-    promotions will pass, though some sets of promotions the player cannot make pass it too.  It grows from the <a
-    class="gloss" href="glossary.html#loop">loop</a> of chapter 1.  List, for each number of a set, the maximal factors
-    outside the set that could pay for it.  If some of the numbers, together, list every factor an even number of times,
-    the set is not playable.  For example, the loop 10, 14, 15 and 21 lists each of 2, 3, 5 and 7 twice, therefore it is
-    not playable.</p>
+    <p>A <a class="gloss" href="glossary.html#search">search</a> can stop exploring a branch as soon as it
+    determines the branch cannot do better than the best game found so far (<a href="search.html#the-bound">chapter
+    5</a>).  To decide that, it uses a <a class="gloss" href="glossary.html#bound">bound</a>, a number that no game in
+    the branch can beat.  A bound is never below the best the branch can reach, and the closer it comes to the true
+    maximum, the more the search can skip.</p>
+    <p>Our bound uses a test inspired by the <a
+    href="sets.html#cycle-section">cycle</a> trouble from chapter 1.  Here's how it works: for each number of a set,
+    list the maximal factors outside the set that could pay for it.  If some of the numbers together list every
+    factor an even number of times, the set is not playable.  For example, 10, 14, 15 and 21 list each of 2, 3, 5 and 7
+    twice, so they cannot all be played together.  Every playable set passes this test, though some sets that are not
+    playable pass it too.</p>
   </div>
 
   <div class="para">
-    <aside class="note card" aria-label="The frame bound, proved">
-      <div class="note-head"><span class="note-name">The frame bound<span class="note-label">Corollary B2</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-bounds.md#the-frame-bound">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">The heaviest set of candidates that passes the test in every frame bounds what a node can
-      add.</p>
-      <p class="precise">At a node with the promotions P and the candidates C, every
-      completion P ∪ X has ΣX at most the heaviest ΣI, I ⊆ C independent in every frame together with P, within the
-      node's promotion limit.  The solver calls it the GF(2) bound.  The only sets it lets through that the player
-      cannot promote contain an odd core in some frame.</p>
+    <aside class="note tech" aria-label="Even and odd">
+      <div class="note-head"><span class="note-name">Even and odd</span></div>
+      <p>Give each number of a set a vector with a 1 for each maximal factor outside the set that it lists, and add the
+      vectors in GF(2), the arithmetic of even and odd, where 1 + 1 = 0.  A group of numbers that lists every factor an
+      even number of times is a group whose vectors sum to zero.  So a set passes the parity test exactly when its
+      vectors are linearly independent over GF(2), which Gaussian elimination can check quickly.</p>
     </aside>
-    <p>We call it the <a class="gloss" href="glossary.html#parity-test">parity test</a>.  It allows no group of a set's
-    numbers to list every factor an even number of times.  This is linear algebra over GF(2), the arithmetic of even and
-    odd, so it is quick to check, and a classical algorithm, weighted matroid intersection, finds the heaviest set that
-    passes it.  That set's sum bounds what a branch can still add, so we call it the
-    <a class="gloss" href="glossary.html#parity-bound">parity bound</a>.  The solver applies the bound to the promotions
-    frame by frame, at every <a class="gloss" href="glossary.html#node">node</a>.</p>
+    <p>We call this the <a class="gloss" href="glossary.html#parity-test">parity test</a>.  It is quick to check, and a
+    classical algorithm, weighted matroid intersection, finds the heaviest set of numbers that passes it.  No playable
+    set is heavier, so that set's sum is a bound, which we call the <a class="gloss"
+    href="glossary.html#parity-bound">parity bound</a>.</p>
     <p>Some sets pass the test and still are not playable.  Such a set contains an <a href="#odd-cores">odd core</a>,
-    and odd cores are all that the bound misses.</p>
+    and odd cores are the only reason the bound ever exceeds the true maximum.</p>
   </div>
 </section>
 
@@ -78,12 +69,16 @@
       the test splits in two, one for the numbers of the odd layers and one for those of the even layers.  Weighted
       matroid intersection finds the heaviest set that passes both, and a weight split checks its value.</p>
     </aside>
-    <p>The parity bound needs no frames.  Apply it to the numbers of the whole <a class="gloss"
-    href="glossary.html#board">board</a>, rather than to the promotions of a frame, and it bounds <a class="gloss"
-    href="glossary.html#opt">opt(n)</a> itself, since no playable set is heavier than the heaviest that passes it.</p>
-    <p>A computation on every board from 2 to 8,191 shows that splitting the board into frames costs the bound nothing.
-    At the root of a search, the parity bound of the frames limits what the promotions can add, and that limit plus the
-    weight of <a class="gloss" href="glossary.html#u-star">U*</a> equals the parity bound of the whole board.</p>
+    <p>Apply the parity bound to the numbers of the whole <a class="gloss" href="glossary.html#board">board</a>, and
+    it bounds <a class="gloss" href="glossary.html#opt">opt(n)</a> itself, since no playable set is heavier than the
+    heaviest that passes the test.</p>
+    <p>The <a class="gloss" href="glossary.html#frame-solver">frame solver</a> applies the same bound inside its
+    search, at every <a class="gloss" href="glossary.html#node">node</a>, to the <a class="gloss"
+    href="glossary.html#promote">promotions</a> of each <a class="gloss" href="glossary.html#frame">frame</a>.  At the
+    root of a search, the parity bound of the frames limits what the promotions can add, and that limit plus the
+    weight of <a class="gloss" href="glossary.html#u-star">U*</a> is never above the parity bound of the whole board.
+    On every board measured, from 2 to 8,191, the two are equal, so splitting the board into frames costs the bound
+    nothing.</p>
   </div>
 </section>
 
@@ -94,28 +89,33 @@
       <div class="note-head"><span class="note-name">The first odd core<span class="note-label">Proposition C3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-first-odd-core">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Below game 45 every set that passes the parity test is playable.</p>
       <p class="precise">Every S ⊆ {2, …, 44} that passes the parity test is
-      playable, so the parity bound is opt(n) for n ≤ 44, and {12, 18, 20, 30, 45} is an odd core.</p>
+      playable, so the parity bound is opt(n) for n ≤ 44.  For n = 45, {12, 18, 20, 30, 45} is an odd core.</p>
     </aside>
     <p>The five numbers 12, 18, 20, 30 and 45 pass the parity test, yet they are not playable, because <a class="gloss"
-    href="glossary.html#peel">peel</a>, which decides whether a set is playable, cannot even begin. Every number has at
-    least two factors to pay with, and every factor at least two numbers that could use it, so peel has no safe first
-    step.  A set like this, which passes the test, is not playable, and contains no smaller such set, is an <a
+    href="glossary.html#peel">peel</a>, which decides whether a set is playable, cannot even begin.  Every number has at
+    least two factors to pay with, and every factor has at least two numbers that could use it, so peel has no safe
+    first step.  A set like this, which passes the test, is not playable, and contains no smaller such set, is an <a
     class="gloss" href="glossary.html#odd-core">odd core</a>.  Game 45 is the first board with one.</p>
   </div>
 
+  <figure class="fig core-fig" id="core-45">
+    <svg role="img" aria-label="The odd core of game 45."></svg>
+    <figcaption class="fig-caption"></figcaption>
+  </figure>
+
   <div class="para">
-    <p>What lets an odd core exist?  A number's maximal factors are the number divided by each of its primes, so a
-    number with two different primes has two, and a number with three has three.  The smallest is 30 = 2 · 3 · 5, with
-    15, 10 and 6.  Numbers that each list at most two factors are playable exactly when they pass the parity test (the
-    <a href="sets.html#loop-section">loop rule</a> of chapter 1), so a set of them is never an odd core.  One number
-    with three is enough.  In game 45's core, 12, 18, 20 and 45 each list two factors and make a chain, 10 – 20 – 4 – 12
-    – 6 – 18 – 9 – 45 – 15, and 30 joins it at 6, 10 and 15.</p>
+    <p>What allows an odd core to exist?  A number's maximal factors are the number divided by each of its primes, so a
+    number with two different primes has two, and a number with three has three.  The smallest with three is
+    30 = 2 · 3 · 5, with maximal factors 15, 10 and 6.  Numbers that each have at most two maximal factors are playable
+    exactly when they pass the parity test (the <a href="sets.html#cycle-section">cycle rule</a> of chapter 1), so a
+    set of them is never an odd core, and every odd core contains at least one number with three or more maximal
+    factors.</p>
   </div>
 
   <div class="para">
     <aside class="note card" aria-label="The exactness of the parity bound to game 77, measured">
       <div class="note-head"><span class="note-name">Exact to game 77</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#what-the-parity-bound-misses">measured<span class="sr-only">, evidence on GitHub</span></a></div>
-      <p class="plain">The parity bound equals opt(n) for every game up to 77, and exceeds it at game 78.</p>
+      <p class="plain">The parity bound is equal to opt(n) for every game up to 77, and exceeds it at game 78.</p>
       <p class="precise">The prover's run on games 2 to 2,531 records each bound and
       checks it by its weight split.  At game 78 it is 1,992 against opt(78) = 1,991 (<a
       href="https://github.com/bvchess/taxman/blob/master/docs/theory/evidence.md#observations">the evidence</a>). U*
@@ -123,35 +123,32 @@
       figure draws are what peel leaves of it.</p>
     </aside>
     <p>An odd core makes the bound miss only when no heaviest set that passes the test is playable.  Up to game 77 that
-    never happens, and the parity bound equals opt(n).  Below game 45 no board has an odd core, and in each of games
-    45 to 77 some heaviest set that passes the test is playable.  Game 78 is the first where it happens, and the bound
-    misses by one point, <span data-78="bound">1,992</span> against opt(78) = <span data-78="opt">1,991</span>.  Take an
-    optimal set of game 78 and put <span data-78="inn">28</span> in place of <span data-78="out">27</span>.  The set
-    gains a point and still passes the test, but these nine of its numbers are not playable.</p>
+    never happens, and the parity bound is equal to opt(n).  Game 78 is the first where it misses.</p>
   </div>
 
-  <figure class="fig exact-78-fig" id="exact-78">
+  <figure class="fig core-fig" id="exact-78">
     <svg role="img" aria-label="The odd core of game 78."></svg>
     <figcaption class="fig-caption"></figcaption>
   </figure>
 
   <p>Each of the nine numbers can pay with two or three of the nine factors, and each factor could pay for two or more
   of them, so again peel has no safe first step.  Yet no group of the nine lists every factor an even number of times,
-  so they pass the test.  They are the first odd core that raises the bound.</p>
+  so they pass the test.  They are the first odd core that raises the bound past opt(n).  For game 78 the parity
+  bound is <span data-78="bound">1,992</span> against opt(78) = <span data-78="opt">1,991</span>.</p>
 </section>
 
 <section class="chapter" id="comparing" data-toc="comparing" aria-labelledby="h-comparing">
   <h2 id="h-comparing">Comparing bounds</h2>
   <div class="para">
-    <p>Franklín and Moniot's paper gives a looser bound, the heaviest set whose numbers can each have a maximal factor
-    of their own, from outside the set, to pay with.  Every set that passes the parity test passes theirs, so their
-    bound is never below the parity bound.</p>
+    <p><a href="https://arxiv.org/abs/2211.00461">Franklín and Moniot's paper</a> gives a looser bound, the heaviest
+    set whose numbers can each have a maximal factor of their own, from outside the set, to pay with.  Every set that
+    passes the parity test passes theirs, so their bound is never below the parity bound.</p>
     <p>Each way of handing out factors is a <a class="gloss" href="glossary.html#payment-scheme">payment scheme</a>, and
     counting a set's schemes shows what each bound allows.  Group the schemes by the factors they pay with, and count
     the schemes in each group.  Franklín and Moniot's bound allows the set when some group has at least one scheme, and
     the parity bound allows it when some group has an odd number of schemes.  The set is playable exactly when some
-    group has a single scheme.  In the figure, each set's schemes all pay with the same factors, so each set has one
-    group.</p>
+    group has a single scheme, which is Franklín and Moniot's playability theorem, their Theorem 1, in other words.
+    In the figure, each set's schemes all pay with the same factors, so each set has one group.</p>
   </div>
 
   <figure class="fig wide ladder-fig" id="ladder">
@@ -165,8 +162,8 @@
     <p>The numbers 6, 10 and 15 have two schemes, so Franklín and Moniot's bound allows them.  Two is even, so the
     parity bound does not, and it is right.  Whichever of the three the player plays first takes both of its primes as
     tax, and that leaves one of the other two with nothing to pay with.  The two schemes differ around a
-    <a class="gloss" href="glossary.html#loop">loop</a>.  Turn the first once around the loop, and you get the second.
-    Swap 6 for 9 and there is no more loop; there's only one scheme, and the set plays, 9 first.</p>
+    <a class="gloss" href="glossary.html#cycle">cycle</a>.  Turn the first once around the cycle, and you get the second.
+    Swap 6 for 9 and there is no more cycle; there's only one scheme, and the set plays, 9 first.</p>
     <p>The numbers 12, 18, 20, 30 and 45 have three schemes, an odd number, so both bounds allow them.  Yet they are not
     playable.  They are the first <a href="#odd-cores">odd core</a>.</p>
   </div>
@@ -201,17 +198,15 @@
     takes a 1 in every row, no two in the same column, and is one payment scheme.  Choose rows to add them up; the
     bottom row says whether each column comes out even or odd.</figcaption>
   </figure>
+</section>
 
+<section class="chapter" id="empirical" data-toc="empirical" aria-labelledby="h-empirical">
+  <h2 id="h-empirical">Empirical results</h2>
   <div class="para">
-    <aside class="note card" aria-label="The two gaps, measured">
-      <div class="note-head"><span class="note-name">The two gaps</span><a class="standing is-measured" href="https://github.com/bvchess/taxman/blob/master/solver/noframe/docs/proofs.md">measured<span class="sr-only">, evidence on GitHub</span></a></div>
-      <p class="plain">The parity bound's gap above opt(n) is about a tenth of Franklín and Moniot's.</p>
-      <p class="precise">130 points against 1,200 in games 1,000 to 1,300.  Theirs is
-      the heaviest set with a payment scheme, a maximum-weight matching
-      (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#what-the-paper-proves">what
-      the paper proves</a>).</p>
-    </aside>
-    <p>How much lower is the parity bound?  Measured against opt(n), its gap is about a tenth of theirs.</p>
+    <p>How tight is the parity bound?  Measured against opt(n), it settles out near
+    <span data-bounds="parityRecent">0.026%</span> above opt(n), whereas Franklín and Moniot's bound hovers around
+    <span data-bounds="fmRecent">0.25%</span> above opt(n), about <span data-bounds="recentRatio">10</span> times
+    higher.</p>
   </div>
 
   <figure class="fig wide bounds-fig" id="bounds">
@@ -219,24 +214,18 @@
       <p class="chart-title">How far each bound sits above opt(n)</p>
       <div class="chart-box"></div>
     </div>
-    <figcaption class="fig-caption">Every game up to <span data-bounds="lastN">5,060</span>, as a share of opt(n).  The
-    axis stops at 0.5%, and triangles mark the games where a bound goes higher, <span data-bounds="fmOver">17</span> for
-    Franklín and Moniot's bound and <span data-bounds="parityOver">4</span> for the parity bound, none past game
-    <span data-bounds="overLast">186</span>.</figcaption>
+    <figcaption class="fig-caption">Every game up to <span data-bounds="lastN">5,060</span>, as a share of opt(n).
+    Triangles mark games where a bound goes higher than the axis.</figcaption>
   </figure>
 
   <div class="para">
-    <p>In each of the first <span data-bounds="exactTo">77</span> games, the parity bound is opt(n) itself.  Past game
-    <span data-bounds="overLast">186</span> it is never more than an eighth of a percent above opt(n), while Franklín
-    and Moniot's bound is typically a quarter of a percent above.  At game <span data-bounds="lastN">5,060</span> the
-    parity bound is <span data-bounds="parityGapLast">2,557</span> points above opt(n), and theirs is
-    <span data-bounds="fmGapLast">20,219</span>.</p>
-    <p>For a search, the gap is what matters.  A branch survives as long as its bound beats the best game found, so the
-    closer the bound, the sooner a branch dies.  We ran the <a class="gloss" href="glossary.html#prover">prover</a>'s
-    search on every game up to 1,000 twice, changing nothing but the bound.  With Franklín and Moniot's bound, 294 games
-    needed a search, and the searches took 9.4 million nodes in all.  With the parity bound, 241 did, and they took
-    67,000.  The difference grows with n.  Below game 500 the parity bound's searches are 16 times smaller, and from
-    game 900 to 1,000 they are 168 times smaller.</p>
+    <p>For a search, the size of the gap is what matters.  A branch survives as long as its bound beats the
+    best game found, so the tighter the bound, the sooner the search can stop.  We ran the
+    <a class="gloss" href="glossary.html#prover">prover</a>'s search on every game up to 1,000 twice, changing
+    nothing but the bound.  With Franklín and Moniot's bound, 294 games needed a search, and the searches explored
+    9.4 million nodes in all.  With the parity bound, 241 games needed a search, and they explored only 67,000
+    nodes.  The difference grows with n.  Below game 500 the parity bound's searches are 16 times
+    smaller, and from game 900 to 1,000 they are 168 times smaller.</p>
   </div>
 </section>
 
@@ -252,6 +241,7 @@ import { listWords, fmt } from './js/vocab.js';
 import { mountLadder } from './figures/ladder.js';
 import { mountParityTables } from './figures/parity-table.js';
 import { mountBoundsChart } from './figures/bounds-chart.js';
+import { mountCore45 } from './figures/core-45.js';
 import { mountExact78 } from './figures/exact-78.js';
 
 initEssay();
@@ -261,13 +251,22 @@ const fill = (attr, facts) => {
 };
 
 const boundFacts = mountBoundsChart(document.querySelector('#bounds .chart'), { games, bounds });
+// The median gaps of the last thousand games, to two significant figures, and how many times larger theirs is,
+// computed from the figures shown so that the page's arithmetic checks.
+const twoFigures = (x) => Number(x.toPrecision(2));
+const [parityShown, fmShown] = [twoFigures(boundFacts.parityRecentPct), twoFigures(boundFacts.fmRecentPct)];
+const boundWords = {
+  ...Object.fromEntries(Object.entries(boundFacts).map(([key, value]) => [key, fmt(value)])),
+  parityRecent: `${parityShown}%`, fmRecent: `${fmShown}%`, recentRatio: fmt(Math.round(fmShown / parityShown)),
+};
 for (const span of document.querySelectorAll('[data-bounds]')) {
-  const value = boundFacts[span.dataset.bounds];
+  const value = boundWords[span.dataset.bounds];
   if (value === undefined) throw new Error(`data-bounds="${span.dataset.bounds}" names no fact`);
-  span.textContent = fmt(value);
+  span.textContent = value;
 }
 registerFigure('ladder', mountLadder(document.getElementById('ladder')));
 mountParityTables(document.getElementById('parity-table'));
+registerFigure('core-45', mountCore45(document.getElementById('core-45')));
 const e78 = mountExact78(document.getElementById('exact-78'), { small });
 registerFigure('exact-78', e78);
 const f = e78.facts;

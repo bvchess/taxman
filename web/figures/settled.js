@@ -4,12 +4,14 @@
 //
 //   the ceiling        a game whose score is n + opt(n − 1), found with no search
 //   the prime formula  a prime n
+//   the semiprime formula  an odd n with two prime factors that closes a cycle with game n − 1's moves (blue)
 //   a repeat           a game that repeats an earlier game's search
 //   a search           every other game: a search of its own, or nothing to promote
 //
-// A game that the ceiling or the prime formula settles is counted there whatever its record says, since both prove it
-// from the game before; the record is in its tooltip.  The two rules that need a search wear the search's green, a
-// search dark and a repeat light, and the two that need none are gray (css/site.css).
+// A game that the ceiling, the prime formula or the semiprime formula settles is counted there whatever its record
+// says, since each proves it from the game before; the record is in its tooltip.  The two rules that need a search wear
+// the search's green, a search dark and a repeat light; the ceiling and the prime formula, which need none, are gray,
+// and the semiprime formula is blue (css/site.css).
 
 import { el, fmt } from '../js/vocab.js';
 import { freshSVG, keyboard, pct, responsive, tableView, tooltip } from '../js/chart.js';

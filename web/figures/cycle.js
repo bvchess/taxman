@@ -1,22 +1,22 @@
-// The loop: 10, 14, 15 and 21, each the product of two primes, make a square on 2, 5, 3 and 7.  The reader plays
+// The cycle: 10, 14, 15 and 21, each the product of two primes, make a square on 2, 5, 3 and 7.  The reader plays
 // them, with only the four primes as tax, by the rules of js/model.js, and finds that one is always stuck.  A product
 // is a circle, a raised coin the reader presses, while one of its primes is still in the pot; a product with none left
 // is stuck, and its circle turns into a square, flat.  The primes are squares.  A number taken lies flat in a tray: the
 // player's a blue circle, the taxman's an orange square (js/trays.js has the looks).  The claim behind the figure (the
 // four are not playable, any three are) is checked with the model's isPlayable when the figure is made.
 //
-// The figure has two forms of the same graph, and the switch of figures/layer-view.js ("Show: in layers / as a loop")
+// The figure has two forms of the same graph, and the switch of figures/layer-view.js ("Show: in layers / as a cycle")
 // moves between them.  In layers it is the maximal-factor graph of the game above it: the four products in a column
 // at the left, the four primes in a column at the right, level with them, each product joined by a line to its two
-// primes; the loop is there, but the lines cross.  In the loop each product stands between its two primes, on a side
+// primes; the cycle is there, but the lines cross.  In the cycle each product stands between its two primes, on a side
 // of the square its lines make.  The switch moves every number still on the table to its place in the other form in
 // one motion, each along a smooth curve that passes through its place in a midway pose, chosen so that no two numbers
 // touch on the way, either way (scene.js, through).  The reader may play in either form and switch at any time; the
-// trays and Start over do not depend on the form.  The "stuck" label stands by the stuck number in the loop, and in
+// trays and Start over do not depend on the form.  The "stuck" label stands by the stuck number in the cycle, and in
 // layers in the primes' column, which the game has emptied, level with the stuck numbers.
 //
-// URL parameter: loop=10,14 opens the figure with those moves played, in layers; loop=unfolded:10,14, or just
-// loop=unfolded, opens it as a loop.
+// URL parameter: cycle=10,14 opens the figure with those moves played, in layers; cycle=unfolded:10,14, or just
+// cycle=unfolded, opens it as a cycle.
 
 import * as M from '../js/model.js';
 import { TRAY_LOOK, potLook } from '../js/trays.js';
@@ -43,15 +43,15 @@ const TRAY = { y: 280, h: 86, w: 168, x: { player: 8, taxman: 184 } };
 const SCALE = 1.25;
 const CROSSING = 1500; // the switch of form, in milliseconds (two beats of 900 took 1800)
 
-export function mountLoop(host) {
+export function mountCycle(host) {
   const primes = Object.keys(CORNER).map(Number);
   for (const m of PRODUCTS) {
     const f = M.maximalFactors(m);
-    if (f.length !== 2 || !f.every((p) => CORNER[p])) throw new Error(`the loop: ${m} is not a side of the square`);
+    if (f.length !== 2 || !f.every((p) => CORNER[p])) throw new Error(`the cycle: ${m} is not a side of the square`);
   }
-  if (M.isPlayable(PRODUCTS)) throw new Error('the loop: the four numbers should not be playable');
+  if (M.isPlayable(PRODUCTS)) throw new Error('the cycle: the four numbers should not be playable');
   for (const m of PRODUCTS) {
-    if (!M.isPlayable(PRODUCTS.filter((x) => x !== m))) throw new Error('the loop: every three should be playable');
+    if (!M.isPlayable(PRODUCTS.filter((x) => x !== m))) throw new Error('the cycle: every three should be playable');
   }
 
   const byValue = (xs) => [...xs].sort((a, b) => a - b);
@@ -61,7 +61,7 @@ export function mountLoop(host) {
   };
   // Every number's place in each pose.
   const PLACE = {
-    loop: { ...CORNER, ...Object.fromEntries(PRODUCTS.map((m) => [m, mid(m)])) },
+    cycle: { ...CORNER, ...Object.fromEntries(PRODUCTS.map((m) => [m, mid(m)])) },
     layers: {
       ...Object.fromEntries(primes.map((p, i) => [p, [COLUMN.prime, rowY(i)]])),
       ...Object.fromEntries(byValue(PRODUCTS).map((m, i) => [m, [COLUMN.product, rowY(i)]])),
@@ -85,9 +85,9 @@ export function mountLoop(host) {
   s.text('stuck', (pos, look) => look.words ?? '', { anchor: 'middle' });
   const traySlot = (who, i) => ({ x: TRAY.x[who] + 28 + 37 * i, y: TRAY.y + 56, scale: 0.92 });
 
-  const status = host.querySelector('.loop-status');
+  const status = host.querySelector('.cycle-status');
   let state;
-  let form = 'layers'; // 'layers' or 'loop': the form the figure is in, or moving to
+  let form = 'layers'; // 'layers' or 'cycle': the form the figure is in, or moving to
 
   const pass = (x, crossing) => (crossing ? { through: { x: MIDWAY[x][0], y: MIDWAY[x][1] } } : {});
 
@@ -126,7 +126,7 @@ export function mountLoop(host) {
       } else if (stuck.length === 1) {
         // A lone stuck number is labeled just above it: inside the square, or over it for the top side, never down by
         // the trays.
-        const [x, y] = PLACE.loop[stuck[0]];
+        const [x, y] = PLACE.cycle[stuck[0]];
         [sx, sy] = [x, y - 32];
       }
       const gone = listWords(M.maximalFactors(stuck[0]).sort((a, b) => a - b));
@@ -187,7 +187,7 @@ export function mountLoop(host) {
   }
 
   // Move to the other form in one motion.
-  const switcher = viewSwitch({ layers: 'in layers', loop: 'as a loop' }, (to) => {
+  const switcher = viewSwitch({ layers: 'in layers', cycle: 'as a cycle' }, (to) => {
     if (to === form) return;
     form = to;
     switcher.show(form);
@@ -206,8 +206,8 @@ export function mountLoop(host) {
     });
   }
   host.querySelector('[data-act="reset"]').addEventListener('click', reset);
-  const asked = (new URLSearchParams(location.search).get('loop') ?? '').split(/[,:]/);
-  if (asked.includes('unfolded')) form = 'loop';
+  const asked = (new URLSearchParams(location.search).get('cycle') ?? '').split(/[,:]/);
+  if (asked.includes('unfolded')) form = 'cycle';
   switcher.show(form);
   reset();
   for (const m of asked.map(Number)) if (state.pot.has(m) && M.legalMoves(state).includes(m)) state = M.play(state, m);

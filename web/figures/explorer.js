@@ -15,7 +15,7 @@
 
 import * as M from '../js/model.js';
 import { NUMBER, duration, fmt, listWords, numberMark, setNumber } from '../js/vocab.js';
-import { PROOFS, PROVER_TO, foundationOf } from '../js/proof.js';
+import { PROOFS, PROVER_TO, foundationOf, ruleOf } from '../js/proof.js';
 
 // The game the explorer opens at, when the address names none.
 const FIRST_GAME = 21;
@@ -44,6 +44,7 @@ export function record(games, n) {
   const r = {
     n, score: c.score[i], proof: c.proof[i], method: c.method[i], nodes: c.nodes[i], seconds: c.seconds[i],
     moves: c.moves[i], promotions: c.promotions[i], candidates: c.candidates[i], inTheBag: c.inTheBag[i],
+    rule: ruleOf(c, i),
   };
   r.board = total(n);
   r.taxman = r.board - r.score;
@@ -55,6 +56,7 @@ export function record(games, n) {
 
 // How the game was settled: the proof kind's name, as the chain's chart gives it, and what it did, with its numbers.
 function settled(r) {
+  if (r.rule === 'semiprime') return semiprimeWords(r);
   const kind = PROOFS.find((p) => p.key === r.proof);
   if (!kind) throw new Error(`game ${r.n}: no proof kind ${r.proof}`);
   const lead = `${upper(kind.name)}.`;
@@ -87,6 +89,17 @@ function settled(r) {
     default:
       throw new Error(`game ${n}: no words for proof ${r.proof}`);
   }
+}
+
+// A game the semiprime formula settles (Theorem J3): its score is opt(n − 1) + n − x, where x is the smallest member
+// of the cycle that n closes with game n − 1's moves.  The record's proof, made before the theorem, does not say so.
+function semiprimeWords({ n, score, prev }) {
+  const x = n - (score - prev);
+  if (x <= 0 || x >= n) throw new Error(`game ${n}: the semiprime formula gives no x from ${score} and ${prev}`);
+  return ['The semiprime formula.',
+    `Since ${fmt(n)} is odd with two prime factors and closes a cycle with game ${fmt(n - 1)}’s moves, its score is `
+    + `opt(${fmt(n - 1)}) + ${fmt(n)} − x = ${fmt(prev)} + ${fmt(n)} − ${fmt(x)} = ${fmt(score)}, where x = ${fmt(x)} `
+    + 'is the smallest other member of that cycle.  The step from the game before needs no search and no statement U.'];
 }
 
 // What the score depends on.

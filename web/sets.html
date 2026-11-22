@@ -122,8 +122,9 @@
     </aside>
     <aside class="note tech" aria-label="Franklín and Moniot's Theorem 1">
       <div class="note-head"><span class="note-name">Franklín and Moniot</span></div>
-      <p>Their Theorem 1 says the same in the language of matchings: a set is playable iff it is the set of upper
-      ends of a matching of the maximal-factor graph with no flat alternating cycle
+      <p>Franklín and Moniot proved this first, as their Theorem 1, for every game on a set of things that sit in
+      levels (a graded poset), and in the language of matchings: a set is playable iff it is the set of upper ends of
+      a matching of the maximal-factor graph with no flat alternating cycle
       (<a href="https://arxiv.org/abs/2211.00461">the paper</a>;
       <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#what-the-paper-proves">how
       the theory relates to it</a>).</p>
@@ -175,36 +176,36 @@
       <a href="https://github.com/bvchess/taxman/blob/master/solver/frame/src/playable.rs">solver/frame/src/playable.rs</a>.</p>
     </aside>
     <p>In game 21, peel pairs <span class="n" data-n="19">19</span> with 1, the only factor it has, and
-    <span class="n" data-n="9">9</span> with 3 for the same reason.  Once 3 is gone, 15 has only 5 left and 21 only 7,
-    and the rest follow.  The game can use the pairs it finds as its payments.</p>
+    <span class="n" data-n="15">15</span> with 5, since no other number can use 5.  Then 9 has only 3 left, and once 3
+    is gone, 21 has only 7, and the rest follow.  The game can use the pairs it finds as its payments.</p>
     <p>A run of peel that pairs every number also reveals a legal order of play, in which each number comes before any
     move that would take it, or its payment, as tax.  So peel quickly turns a playable set into an ordered list of
     moves.</p>
   </div>
 </section>
 
-<section class="chapter" id="loop-section" data-toc="loop-section" aria-labelledby="h-loop">
-  <h2 id="h-loop">Loop trouble</h2>
+<section class="chapter" id="cycle-section" data-toc="cycle-section" aria-labelledby="h-cycle">
+  <h2 id="h-cycle">Cycle trouble</h2>
   <p>When <a class="gloss" href="glossary.html#peel">peel</a> gets stuck on numbers with two maximal factors, a
-  <a class="gloss" href="glossary.html#loop">loop</a> is to blame.  Take the numbers
+  <a class="gloss" href="glossary.html#cycle">cycle</a> is to blame.  Take the numbers
   <span class="n" data-n="10">10</span>, <span class="n" data-n="14">14</span>, <span class="n" data-n="15">15</span>
   and <span class="n" data-n="21">21</span>, with only the primes 2, 3, 5 and 7 left to pay with.  Each of the four is
   the product of two primes, which are its maximal factors, so in the maximal-factor graph it has a line to each of two
-  primes.  Unfold the graph, putting each number between its two primes, and the loop appears.  The four make a square,
+  primes.  Unfold the graph, putting each number between its two primes, and the cycle appears.  The four make a square,
   10 = 2 · 5, 15 = 5 · 3, 21 = 3 · 7 and 14 = 7 · 2.  Every number has two ways to pay, and every prime can pay for two
   numbers, so peel has no safe step.  Try to play all four.</p>
 
-  <figure class="fig fig-panel" id="loop" data-fig="loop">
-    <svg role="img" aria-label="The numbers 10, 14, 15 and 21 in a column, each joined by lines to its two prime factors among 2, 3, 5 and 7 in a column beside it. A switch shows them instead as a loop, a square with the primes at the corners and the numbers on its sides, 10 between 2 and 5, 15 between 5 and 3, 21 between 3 and 7, 14 between 7 and 2. Take the numbers one at a time, circles that turn into squares when their primes are gone; the primes are squares and go to the taxman."></svg>
+  <figure class="fig fig-panel" id="cycle" data-fig="cycle">
+    <svg role="img" aria-label="The numbers 10, 14, 15 and 21 in a column, each joined by lines to its two prime factors among 2, 3, 5 and 7 in a column beside it. A switch shows them instead as a cycle, a square with the primes at the corners and the numbers on its sides, 10 between 2 and 5, 15 between 5 and 3, 21 between 3 and 7, 14 between 7 and 2. Take the numbers one at a time, circles that turn into squares when their primes are gone; the primes are squares and go to the taxman."></svg>
     <div class="fig-controls"><button type="button" class="btn" data-act="reset">Start over</button></div>
-    <figcaption class="loop-status" aria-live="polite"></figcaption>
+    <figcaption class="cycle-status" aria-live="polite"></figcaption>
   </figure>
 
   <div class="para">
     <aside class="note card" aria-label="The two-factor proposition, proved">
-      <div class="note-head"><span class="note-name">The loop rule<span class="note-label">Proposition P11</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <div class="note-head"><span class="note-name">The cycle rule<span class="note-label">Proposition P11</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-two-factor-proposition">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">Numbers that each have two maximal factors outside their set make a playable set exactly when
-      they and those factors make no loop.</p>
+      they and those factors make no cycle.</p>
       <p class="precise">An instance whose members each list two factors is
       <a class="gloss" href="glossary.html#playable">playable</a> iff its lists are linearly independent over GF(2), iff
       its graph, which joins each member to the two factors it lists, is a forest.  With members that list one factor,
@@ -214,15 +215,15 @@
     <p>Whatever order you choose, the first number takes both of its primes as
     <a class="gloss" href="glossary.html#tax">tax</a>.  That leaves two primes for the other three numbers, and one of
     them is always stuck.</p>
-    <p>Every loop gets stuck the same way.  A loop of k numbers has k factors among them.  No matter which number you
+    <p>Every cycle gets stuck the same way.  A cycle of k numbers has k factors among them.  No matter which number you
     choose to play first, the taxman will take both of its factors, and that will leave at most k&nbsp;−&nbsp;2 factors
     for the other k&nbsp;−&nbsp;1 numbers.</p>
-    <p>A loop is also the only way peel gets stuck on sets of numbers with two maximal factors to pay with.  Peel is
+    <p>A cycle is also the only way peel gets stuck on sets of numbers with two maximal factors to pay with.  Peel is
     stuck when every number left still has two factors and every factor still has two numbers.  Then every point has a
     second line out, so a walk along the lines that never turns back must come around to a point it passed, closing a
-    loop.</p>
+    cycle.</p>
     <p>So for numbers with two maximal factors, whether they can all be played is something you can see.  Draw their
-    lines and look for a loop.  Above n/2 that picture helps settle which numbers with two prime factors
+    lines and look for a cycle.  Above n/2 that picture helps settle which numbers with two prime factors
     every optimal game must play (<a href="top-half.html#bottom-layers">chapter 3</a>).</p>
   </div>
 </section>
@@ -303,7 +304,7 @@ import { fmt } from './js/vocab.js';
 import { mountOrders } from './figures/orders.js';
 import { mountGraphGame } from './figures/graph-game.js';
 import { mountPeel } from './figures/peel.js';
-import { mountLoop } from './figures/loop.js';
+import { mountCycle } from './figures/cycle.js';
 import { mountGame40 } from './figures/game40.js';
 import { fill833, mountLonger833 } from './figures/longer-833.js';
 
@@ -315,7 +316,7 @@ registerFigure('orders', orders);
 document.querySelector('[data-orders-21]').textContent = fmt(orders.count);
 registerFigure('graph-game', mountGraphGame(document.getElementById('graph-game'), { small }));
 registerFigure('peel-fig', mountPeel(document.getElementById('peel-fig'), { small }));
-registerFigure('loop', mountLoop(document.getElementById('loop')));
+registerFigure('cycle', mountCycle(document.getElementById('cycle')));
 const g40 = mountGame40(document.getElementById('game-40-fig'), { small });
 document.querySelector('[data-g40-score]').textContent = fmt(g40.score);
 mountLonger833(document.getElementById('exchange-833'), { games });

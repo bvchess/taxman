@@ -37,29 +37,47 @@
     <p>To our knowledge, these are original to this work:</p>
   </div>
   <ul class="adds">
-    <li><p class="adds-head"><b>The chain</b></p>
+    <li><p class="adds-head"><b>Optimal scores</b></p>
     <p>For every game from game 1 to game <span data-last-n>n</span>, a sequence of moves that reaches the best score,
     which we find from the game before, and how we know, and under what assumption, that no sequence scores more.  Up to
     game 2,531 the <a class="gloss" href="glossary.html#prover">prover</a> proves the scores on the whole board too,
     without the frame model, so they assume no open statement (<a
     href="https://github.com/bvchess/taxman/blob/master/results/README.md#what-supports-the-scores">what supports the
-    scores</a>).</p></li>
-    <li><p class="adds-head"><b>The frame model and its exactness</b><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#the-exactness-theorem">proved<span class="sr-only">, proof on GitHub</span></a></p>
+    scores</a>; <a href="results.html">chapter 8</a>).</p></li>
+    <li><p class="adds-head"><b>From one game to the next</b><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-step-theorem">proved<span class="sr-only">, proof on GitHub</span></a></p>
+    <p>Three formulas take an optimal game of n − 1 to an optimal game of n with no search: the
+    <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-step-theorem">step theorem</a>,
+    where n fits into game n − 1's optimal set and the score reaches its ceiling, the
+    <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-prime-formula">prime
+    formula</a>, and the
+    <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/arrival.md#the-semiprime-formula">semiprime
+    formula</a>.  Each step assumes nothing.  Together they settle <span data-chain="beforeShare">65%</span> of games 2
+    to <span data-last-n>5,060</span>, a share that holds in every thousand games (<a href="chain.html">chapter
+    2</a>).</p></li>
+    <li><p class="adds-head"><b>The top half</b><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-bottom-layers-theorem">proved in layers 1 and 2<span class="sr-only">, proof on GitHub</span></a></p>
+    <p><a class="gloss" href="glossary.html#descending-greedy">Descending greedy</a>, one pass from the largest number
+    down, chooses the numbers above n/2 that an optimal game plays.  The bottom-layers theorem proves it in layers 1
+    and 2, where every optimal game plays one prime, the largest, and among the numbers above n/2 with two prime factors
+    exactly those that descending greedy keeps.  Above layer 2 it holds given
+    <a class="gloss" href="glossary.html#statement-u">statement U</a>, which the prover proves in every game up to
+    2,531 (<a href="top-half.html">chapter 3</a>).</p></li>
+    <li><p class="adds-head"><b>The frame model</b><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/exactness.md#the-exactness-theorem">proved<span class="sr-only">, proof on GitHub</span></a></p>
     <p>The <a class="gloss" href="glossary.html#frame-model">frame model</a> leaves only the promotions to choose,
     and the exactness theorem makes its best score the best score of a game that plays
     <a class="gloss" href="glossary.html#u-star">U*</a>, which is opt(n) when
-    <a class="gloss" href="glossary.html#statement-u">statement U</a> holds.</p></li>
+    <a class="gloss" href="glossary.html#statement-u">statement U</a> holds (<a href="frames.html">chapter 4</a>).</p></li>
+    <li><p class="adds-head"><b>The parity bound</b><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#the-parity-bound">proved<span class="sr-only">, proof on GitHub</span></a></p>
+    <p>An upper bound on opt(n) from linear algebra over GF(2).  Measured, it is much tighter than Franklín and
+    Moniot’s, and equals opt(n) in every game up to 77 (<a href="bound.html">chapter 6</a>).</p></li>
+  </ul>
+  <p>Other results:</p>
+  <ul class="adds">
     <li><p class="adds-head"><b>The peel theorem</b><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/playability.md#the-peel-theorem">proved<span class="sr-only">, proof on GitHub</span></a></p>
     <p><a class="gloss" href="glossary.html#peel">Peel</a> decides whether a set of moves is playable, and never
     has to guess.</p></li>
-    <li><p class="adds-head"><b>The bottom-layers theorem</b><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-bottom-layers-theorem">proved<span class="sr-only">, proof on GitHub</span></a></p>
-    <p>Every optimal game plays one prime, the largest, and among the numbers above n/2 with two prime factors exactly
-    those that <a class="gloss" href="glossary.html#descending-greedy">descending greedy</a> keeps.</p></li>
-    <li><p class="adds-head"><b>The parity bound and the counting theorem</b><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#the-parity-bound">proved<span class="sr-only">, proof on GitHub</span></a></p>
-    <p>An upper bound on opt(n) from linear algebra over GF(2), and a count of payment schemes that places it between
-    the playable sets and Franklín and Moniot’s bound
-    (<a href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-counting-theorem">the
-    counting theorem</a>).</p></li>
+    <li><p class="adds-head"><b>The counting theorem</b><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/franklin-moniot.md#the-counting-theorem">proved<span class="sr-only">, proof on GitHub</span></a></p>
+    <p>A count of payment schemes that places the parity bound between the playable sets and Franklín and Moniot’s
+    bound (<a href="bound.html#comparing">chapter 6</a>).</p></li>
     <li><p class="adds-head"><b>The findings along the way</b></p>
     <p>Two optimal sets at game 425, an optimal game one move short of the longest at game 833, and the others,
     <a href="index.html#along">a card each</a>.</p></li>
@@ -98,7 +116,9 @@
     levels.  Whether Taxman itself is that hard is open.</p>
     <p><b>Heuristic strategies.</b>  A heuristic strategy plays a good game quickly, with no proof.  Robert Moniot’s
     program plays seven, and the best of them, OneTax, wins 99.065% of the optimal points over games 2 to 1,000
-    (<a href="https://github.com/bvchess/taxman/blob/master/moniot/README.md">his strategies</a>).  The repository
+    (<a href="https://github.com/bvchess/taxman/blob/master/moniot/README.md">his strategies</a>, and
+    <a href="https://www.dsm.fordham.edu/~moniot/taxman-strategies-comparison.html">his published comparison of
+    them</a>).  The repository
     keeps the program as he sent it.  Its source cites three earlier articles on the game: by L. A. Carmony and R. L.
     Holliday, 1993; by J. Trono, 1994; and by R. Moniot, 2007.  The repository’s own strategies win 99.85% of the optimal points up
     to game 1,000, with no search (<a href="https://github.com/bvchess/taxman/blob/master/heuristics/README.md">how we
@@ -133,11 +153,13 @@
 <script type="module">
 import { initEssay } from './js/essay.js';
 import { loadGames } from './js/data.js';
+import { fillBeforeShare } from './js/proof.js';
 import { fmt } from './js/vocab.js';
 
 initEssay();
 const games = await loadGames();
 for (const s of document.querySelectorAll('[data-last-n]')) s.textContent = fmt(games.lastN);
+fillBeforeShare(games);
 document.querySelector('[data-source-file]').textContent = games.source.file;
 document.querySelector('[data-source-commit]').textContent = games.source.commit;
 </script>

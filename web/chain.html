@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Walking up the chain · Taxman</title>
-<meta name="description" content="Most games of Taxman are easy if you know an optimal game of the one before: n fits at the ceiling, a prime takes the place of the prime below it, and a repeat carries an earlier answer over.">
+<meta name="description" content="Most games of Taxman are easy if you know an optimal game of the one before: n fits at the ceiling, a prime takes the place of the prime below it, and an odd number with two prime factors takes the place of one move.">
 <meta name="author" content="Brian Chess">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <script src="js/tone.js"></script>
@@ -216,9 +216,9 @@
       <div class="note-head"><span class="note-name">The prime formula<span class="note-label">Lemma N5</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/neighbors.md#the-prime-formula">proved<span class="sr-only">, proof on GitHub</span></a></div>
       <p class="plain">At a prime p, the largest prime below p gives way to p, and the score rises by their
       difference.</p>
-      <p class="precise">Let p ≥ 3 be prime.  Exchanging the opening move
-      q(p − 1) for p turns a finished game of p − 1 into a finished game of p, and back, so
-      opt(p) = opt(p − 1) + p − q(p − 1).  The exchange maps the optimal sets of p − 1 one to one onto those of p
+      <p class="precise">Let p ≥ 3 be prime, and q the largest prime below p, which opens every optimal game of
+      p − 1 (the prime lemma).  Exchanging q for p turns a finished game of p − 1 that opens with q into a finished
+      game of p, and back, so opt(p) = opt(p − 1) + p − q.  The exchange maps the optimal sets of p − 1 one to one onto those of p
       (the step theorem).</p>
     </aside>
     <p>The swap works because neither prime divides any other number on the board, so the rest of the game cannot tell
@@ -235,6 +235,42 @@
   </figure>
 </section>
 
+<section class="chapter" id="two-primes" data-toc="two-primes" aria-labelledby="h-two-primes">
+  <h2 id="h-two-primes">With two prime factors</h2>
+  <div class="para">
+    <aside class="note card" aria-label="The semiprime formula, proved">
+      <div class="note-head"><span class="note-name">The semiprime formula<span class="note-label">Theorem J3</span>
+      </span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/arrival.md#the-semiprime-formula">proved<span class="sr-only">, proof on GitHub</span></a></div>
+      <p class="plain">At an odd n with two prime factors that closes a cycle with the moves of an optimal game of
+      n − 1, as every one from game 189 on does, n takes the place of one move with two prime factors, and the best
+      score rises by the difference.</p>
+      <p class="precise">Let n be odd with two prime factors, closing a cycle with
+      U*₂(n − 1), as every such n ≥ 189 does, and x the smallest other member of the cycle.  Then
+      opt(n) = opt(n − 1) + n − x, and exchanging x for n maps the optimal sets of n − 1 onto those of n.  In game 39,
+      x = 22.</p>
+    </aside>
+    <p>Game 39 is neither a prime nor at its ceiling, yet it needs no search either.  39 = 3 · 13, and like the
+    numbers of chapter 1's <a class="gloss" href="glossary.html#cycle">cycle</a>, it can pay with only its two primes
+    (3 and 13 are the maximal factors of 39).  An optimal game of 38 already joins 3 to 13, through 33, 22 and 26, so
+    39 closes a cycle, and as in chapter 1, the numbers of a cycle cannot all be played.  One of them has to give way.</p>
+  </div>
+
+  <figure class="fig" id="cycle-39">
+    <svg role="img" aria-label="Layer 2 of an optimal game of 38 as a graph on the primes, with 39 arriving on the line between 3 and 13, where it closes a cycle."></svg>
+    <div class="fig-timeline"></div>
+    <figcaption class="fig-caption"></figcaption>
+  </figure>
+
+  <div class="para">
+    <p>Giving up the smallest, 22, scores the most, and the semiprime formula proves that the smallest is always the
+    one to give up.</p>
+    <p>The formula needs the moves of game n − 1 to have already joined the two primes of n.  Early in the chain they do not
+    always.  From game 187 on, the moves of each optimal game join every prime up to n/2
+    (the square theorem of <a href="top-half.html">chapter 3</a>), so from game 189 on, every odd n with two prime
+    factors closes a cycle, and the formula settles it.  In the
+    chain it explains why <span data-settled="semiprimeCount">995</span> games are settled without a search.</p>  </div>
+</section>
+
 <section class="chapter" id="repeat" data-toc="repeat" aria-labelledby="h-repeat">
   <h2 id="h-repeat">A repeat</h2>
   <div class="para">
@@ -248,32 +284,15 @@
       of m makes an optimal game of n.  The first part does not need statement U.  The prover also proves the score of
       every game up to 2,531, without statement U.</p>
     </aside>
-    <p>About a third of the games in which n neither fits nor is prime still need no search.  Before the
-    <a class="gloss" href="glossary.html#frame-solver">frame solver</a> searches a game, rules settle most of it
-    (<a href="top-half.html">chapter 3</a> and <a href="frames.html">chapter 4</a>), and what remains is the game's
-    search problem, the choice of which few numbers up to n/2 to play as moves as well.  Often n does not change that
-    problem at all.  Then game n is a <a class="gloss" href="glossary.html#repeat"><em>repeat</em></a>, and the earlier
-    game's answer to the problem is game n's answer too.  The solver looks for one as soon as it sets the problem up,
-    before it searches (<a href="search.html#repeat-check">chapter 5</a>).</p>
-  </div>
-
-  <div class="para">
-    <aside class="note card" aria-label="The semiprime formula, proved">
-      <div class="note-head"><span class="note-name">The semiprime formula<span class="note-label">Theorem J3</span></span><a class="standing is-proved" href="https://github.com/bvchess/taxman/blob/master/docs/theory/arrival.md#the-semiprime-formula">proved<span class="sr-only">, proof on GitHub</span></a></div>
-      <p class="plain">At an odd n with two prime factors that closes a loop with the moves of an optimal game of
-      n − 1, as every one from game 189 on does, n takes the place of one move with two prime factors, and the best
-      score rises by the difference, with no search and no statement U.</p>
-      <p class="precise">Let n be odd with two prime factors, closing a cycle with
-      U*₂(n − 1), as every such n ≥ 189 does, and x the smallest other member of the cycle.  Then
-      opt(n) = opt(n − 1) + n − x, and exchanging x for n maps the optimal sets of n − 1 onto those of n.  In game 39,
-      x = 22.</p>
-    </aside>
-    <p>Game 39 is one.  It poses the search problem of game 38, and an optimal game of 39 is an optimal game of 38 with
-    one exchange, in which 39 takes the place of 22.  Game 39's best score is <span data-opt="38">486</span> + 39 − 22 =
-    <span data-opt="39">503</span>, <span data-gap="39">22</span> below its ceiling.  A repeat's answer assumes
-    statement U (<a href="statement-u.html">chapter 7</a>), but here a theorem, the semiprime formula, proves the same
-    exchange outright.  It needs an odd n with two prime factors, as 39 = 3 · 13 is, and from game 189 on it covers
-    every such n.</p>
+    <p>Before the <a class="gloss" href="glossary.html#frame-solver">frame solver</a> searches a game, rules settle
+    most of it (<a href="top-half.html">chapter 3</a> and <a href="frames.html">chapter 4</a>), and what remains is the
+    game's search problem, the choice of which few numbers up to n/2 to play as moves as well.  Often n does not change
+    that problem at all.  Then game n is a <a class="gloss" href="glossary.html#repeat"><em>repeat</em></a>, and the
+    earlier game's answer to the problem is game n's answer too.  The solver looks for one as soon as it sets the
+    problem up, before it searches (<a href="search.html#repeat-check">chapter 5</a>).  Game 39 is a repeat of game
+    38.  But a repeat's answer assumes statement U (<a href="statement-u.html">chapter 7</a>), and nearly every repeat
+    in the chain is also at its ceiling or settled by the semiprime formula, which assume nothing.  Only
+    <span data-settled="repeatCount">6</span> games rest on a repeat alone.</p>
   </div>
 
   <details class="aside" id="one-search" data-toc="one-search">
@@ -286,8 +305,8 @@
       <p>Games <span data-run="longestFirst">2,512</span> to <span data-run="longestLast">2,519</span> pose one and
       the same search problem.  The search of game <span data-run="longestFirst">2,512</span> explored
       <span data-run="longestNodes">8.7 million</span> nodes, and the next <span data-run="longestOthers">7</span> games
-      needed no search of their own, because each is a <a class="gloss" href="glossary.html#repeat">repeat</a>.  No
-      other search in the chain carries as many games.</p>
+      needed no search of their own, since each follows from the game before, at its ceiling or by the semiprime
+      formula.  No other run of games in the chain poses one search problem for as long.</p>
     </div>
   </details>
 </section>
@@ -297,14 +316,16 @@
   <div class="para">
     <aside class="note tech" aria-label="How the chart counts">
       <div class="note-head"><span class="note-name">How the chart counts</span></div>
-      <p>A game counts under the first rule that applies, in the order prime, ceiling, repeat, search.  So the ceiling
-      counts <span data-settled="recordRepeatAtCeiling">1,136</span> games the chain records as repeats, since the
-      ceiling proves them from game n − 1.  The searches include <span data-settled="searchNothing">5</span>
+      <p>A game counts under the first rule that applies, in the order prime, ceiling, semiprime formula, repeat,
+      search.  So the ceiling counts <span data-settled="recordRepeatAtCeiling">1,136</span> games the chain records as
+      repeats, and the semiprime formula <span data-settled="recordRepeatAtSemiprime">989</span> more, since both prove
+      them from game n − 1.  The searches include <span data-settled="searchNothing">5</span>
       small games with nothing to choose.</p>
     </aside>
     <aside class="note tech" aria-label="What each rule needs">
       <div class="note-head"><span class="note-name">What each rule needs</span></div>
-      <p>The ceiling and the prime formula prove the chain's game of n optimal if its game of n − 1 is.  A repeat
+      <p>The ceiling, the prime formula and the semiprime formula prove the chain's game of n optimal if its game of
+      n − 1 is.  A repeat
       also needs <a class="gloss" href="glossary.html#statement-u">statement U</a> at n, and a search uses the
       <a class="gloss" href="glossary.html#frame-model">frame model</a>, which is exact when statement U holds.  The
       <a class="gloss" href="glossary.html#prover">prover</a> also proves the score of every game up to 2,531, on the
@@ -315,7 +336,8 @@
     <p>The same rules carry the <a class="gloss" href="glossary.html#chain">chain</a> to its end.  Of its
     <span data-settled="total">5,060</span> games, <span data-settled="share">65.4%</span> needed no search of their
     own: <span data-settled="ceilingShare">32.4%</span> at the ceiling, <span data-settled="primeShare">13.4%</span> by
-    the prime formula and <span data-settled="repeatShare">19.7%</span> as repeats.  The other
+    the prime formula, <span data-settled="semiprimeShare">19.7%</span> by the semiprime formula, and
+    <span data-settled="repeatCount">6</span> games as repeats.  The other
     <span data-settled="searchShare">34.6%</span> needed a search.</p>
     <p>Each game we settle without a search of its own makes use of an earlier game, most often game n − 1, so we
     have to settle the games in order, from game 1 up.</p>
@@ -352,8 +374,9 @@
     <p>The number n usually tells, before any work, whether a game needs a
     <a class="gloss" href="glossary.html#search">search</a>.  Write n as its largest prime factor times what remains,
     the <em>cofactor</em> of n.  In game 3,002, n = 38 · 79 has the cofactor 38, and a prime has the cofactor 1.  From
-    game 188 to the end of the chain, no game whose cofactor is 1, a prime, twice a prime or 9 needed a search.  Why it
-    works for twice a prime and for 9 is still a mystery.</p>
+    game 188 to the end of the chain, no game whose cofactor is 1, a prime, twice a prime or 9 needed a search.  That
+    this holds is proved for a cofactor of 1 or a prime, explained in part for twice a prime, and only measured for
+    9.</p>
   </div>
 
   <figure class="chart" id="cofactor-fig">
@@ -376,7 +399,7 @@
       usually does.  That last part is measured, not proved.</p>
     </aside>
     <p>Group the games by the <a class="gloss" href="glossary.html#layer">layer</a> of n (its number of prime factors
-    counted with repeats.)  The higher the layer, the likelier a search.</p>
+    counted with repeats).  The higher the layer, the likelier a search.</p>
     <table class="counts">
       <thead><tr><th>layer of n</th><th>games from 188 on</th><th>needed a search</th></tr></thead>
       <tbody>
@@ -415,6 +438,7 @@ import { mountSlip } from './figures/slip.js';
 import { mountLinks } from './figures/links.js';
 import { mountSettled } from './figures/settled.js';
 import { mountCofactor, stripeFacts } from './figures/cofactor.js';
+import { mountSemiprime39 } from './figures/semiprime-39.js';
 
 initEssay();
 const [small, games] = await Promise.all([loadSmall(), loadGames()]);
@@ -434,14 +458,17 @@ for (const id of ['fits-10', 'fits-12']) registerFigure(id, mountFits(document.g
 registerFigure('arrival-prime', mountPrime(document.getElementById('arrival-prime'), data));
 registerFigure('slip', mountSlip(document.getElementById('slip'), data));
 mountLinks(document.getElementById('links'), data);
+registerFigure('cycle-39', mountSemiprime39(document.getElementById('cycle-39'), data));
 
 // The whole chain.
 const chain = mountSettled(document.getElementById('settled'), { games });
 const settledFacts = {
   total: fmt(chain.total), share: pct(chain.noSearch / chain.total, 1),
   ceilingShare: pct(chain.counts.ceiling / chain.total, 1), primeShare: pct(chain.counts.prime / chain.total, 1),
-  repeatShare: pct(chain.counts.repeat / chain.total, 1), searchShare: pct(chain.counts.search / chain.total, 1),
+  semiprimeShare: pct(chain.counts.semiprime / chain.total, 1), semiprimeCount: fmt(chain.counts.semiprime),
+  repeatCount: fmt(chain.counts.repeat), searchShare: pct(chain.counts.search / chain.total, 1),
   recordRepeatAtCeiling: fmt(chain.recordRepeatAtCeiling), searchNothing: fmt(chain.searchNothing),
+  recordRepeatAtSemiprime: fmt(chain.rules.filter((r, i) => r === 'semiprime' && c.proof[i] === 'same_search').length),
 };
 fill('settled', (key) => settledFacts[key]);
 

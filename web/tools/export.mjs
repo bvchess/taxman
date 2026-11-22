@@ -7,7 +7,8 @@
 // Run it again after the results file changes, and commit all three.
 //
 // The bounds come from the prover's two data files: its proofs of games 2 to 2531, and the root bounds of the later
-// games (solver/noframe/docs/reproducing.md).  Each file's score must be the results file's.
+// games (solver/noframe/docs/reproducing.md).  Each file's score must be the results file's.  The relation column of
+// games.json, each game's relation to the game before, comes from the same two files.
 //
 // The seconds column is seconds.active_all_runs: the time the game had at least one worker, over every invocation that
 // searched it (solver/frame/src/solver/window.rs, "The clock").
@@ -66,6 +67,17 @@ const columns = {
   inTheBag: records.map((r) => orNull(r.in_the_bag)),
 };
 
+// The prover's relation of each game to the game before (chain, prime, semiprime or none), as a column indexed by
+// n - 1; game 1 has none.  Every game from 2 to the last must have a line.
+const boundsByN = readBounds();
+const relation = records.map((r) => {
+  if (r.n === 1) return null;
+  const line = boundsByN.get(r.n);
+  if (line?.relation == null) throw new Error(`game ${r.n}: no relation in ${BOUNDS_FILES.join(' or ')}`);
+  return line.relation;
+});
+columns.relation = relation;
+
 const commit = execFileSync('git', ['log', '-1', '--format=%h', '--', resultsFile], { cwd: repoRoot })
   .toString()
   .trim();
@@ -91,7 +103,6 @@ const small = records.slice(0, SMALL_LAST_N).map((r) => ({
 const smallText = `[\n${small.map((game) => JSON.stringify(game)).join(',\n')}\n]`;
 
 // The bounds as parallel columns, indexed by n - 2.
-const boundsByN = readBounds();
 const bounds = { n: [], fm: [], parity: [] };
 for (const record of records.slice(1)) {
   const b = boundsByN.get(record.n);

@@ -77,15 +77,34 @@ function mountContents() {
     panel.innerHTML = own;
     top.after(panel);
     const btn = top.querySelector('.contents-btn');
-    btn.addEventListener('click', () => {
-      panel.hidden = !panel.hidden;
-      btn.setAttribute('aria-expanded', String(!panel.hidden));
-    });
+    const backdrop = document.createElement('div');
+    backdrop.className = 'toc-backdrop';
+    backdrop.hidden = true;
+    panel.after(backdrop);
+    const site = document.querySelector('.site');
+    const narrow = matchMedia('(max-width: 959px)');
+    // The one way the panel opens or closes, so that no path forgets part of its state.  Open, the panel is modal: the
+    // page behind it neither scrolls (the class on <html>) nor takes focus (inert).
+    const setOpen = (open) => {
+      panel.hidden = !open;
+      backdrop.hidden = !open;
+      btn.setAttribute('aria-expanded', String(open));
+      document.documentElement.classList.toggle('toc-open', open);
+      if (site) site.inert = open;
+      if (open) (panel.querySelector('[aria-current]') ?? panel.querySelector('a'))?.focus();
+    };
+    btn.addEventListener('click', () => setOpen(panel.hidden));
+    backdrop.addEventListener('click', () => setOpen(false));
     panel.addEventListener('click', (e) => {
-      if (e.target.closest('a')) {
-        panel.hidden = true;
-        btn.setAttribute('aria-expanded', 'false');
-      }
+      if (e.target.closest('a')) setOpen(false);
+    });
+    addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || panel.hidden) return;
+      setOpen(false);
+      btn.focus();
+    });
+    narrow.addEventListener('change', () => {
+      if (!narrow.matches) setOpen(false);
     });
   }
   // Where the reader is: the last section whose top has passed the upper third of the window.  A section's name is

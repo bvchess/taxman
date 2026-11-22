@@ -1,7 +1,7 @@
 // The two views of a figure whose numbers can be drawn as a graph or in their layers: the "Show: ..." switch, which
 // names its two views for each figure ("as a graph" or another shape, and "in layers"), and the layout of the layers.
-// Chapter 1's loop uses the switch alone; chapter 3's figures of game 100's layer 2 and game 2,873's six sources and
-// chapter 6's game 78 also use the layout.
+// Chapter 1's cycle uses the switch alone; chapter 3's figures of game 100's layer 2 and game 2,873's six sources and
+// chapter 6's odd cores of games 45 and 78 (figures/odd-core.js) also use the layout.
 //
 // The layers are columns, as chapter 2 draws them: the sources at the left, in the order the figure gives, their
 // maximal factors at the right, in the order of the mean place of their sources so that few lines cross, and a line

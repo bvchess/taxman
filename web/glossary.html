@@ -59,6 +59,12 @@
   <dd>A few <a class="gloss" href="#candidate">candidates</a> that the player cannot
   <a class="gloss" href="#promote">promote</a> all together at a <a class="gloss" href="#node">node</a>.  Any set the
   player can promote leaves at least one of them out, so the search splits on one of them.</dd>
+  <dt id="cycle">cycle</dt>
+  <dd>A ring of numbers and the <a class="gloss" href="#maximal-factor">maximal factors</a> they could pay with, with
+  a line from each to the next, that comes back to where it started.  10, 15, 21 and 14 make one with their primes:
+  2 – 10 – 5 – 15 – 3 – 21 – 7 – 14 – 2.  Numbers with two such factors each are not
+  <a class="gloss" href="#playable">playable</a> if they make a cycle.  Here the first one the player plays takes two
+  of the four primes as tax, which leaves two for the other three.</dd>
   <dt id="descending-greedy">descending greedy</dt>
   <dd>The pass that chooses the <a class="gloss" href="#source">sources</a>.  From the largest down, it keeps each
   source that is still <a class="gloss" href="#playable">playable</a> with the ones it has kept.</dd>
@@ -76,9 +82,9 @@
   11's.</dd>
   <dt id="forest">forest</dt>
   <dd>Numbers and the <a class="gloss" href="#maximal-factor">maximal factors</a> they could pay with, with lines
-  between them and no <a class="gloss" href="#loop">loop</a> among them.  Numbers with two such factors each are
+  between them and no <a class="gloss" href="#cycle">cycle</a> among them.  Numbers with two such factors each are
   <a class="gloss" href="#playable">playable</a> exactly when they form a forest with those factors.  10, 15 and 21
-  alone make 2 – 10 – 5 – 15 – 3 – 21 – 7, with no loop, and they are playable: 10, then 15, then 21.</dd>
+  alone make 2 – 10 – 5 – 15 – 3 – 21 – 7, with no cycle, and they are playable: 10, then 15, then 21.</dd>
   <dt id="frame">frame</dt>
   <dd>A group of <a class="gloss" href="#source">sources</a> with every factor that can
   <a class="gloss" href="#pays-for">pay for</a> them, a small game inside the big one.  Game 21 has four.  We
@@ -130,12 +136,6 @@
   <dt id="longest-game">longest game</dt>
   <dd>A game with the most moves its board allows.  An <a class="gloss" href="#optimal-game">optimal game</a> is
   usually one, but not in games 833 to 835.</dd>
-  <dt id="loop">loop</dt>
-  <dd>A ring of numbers and the <a class="gloss" href="#maximal-factor">maximal factors</a> they could pay with, with
-  a line from each to the next, that comes back to where it started.  10, 15, 21 and 14 make one with their primes:
-  2 – 10 – 5 – 15 – 3 – 21 – 7 – 14 – 2.  Numbers with two such factors each are not
-  <a class="gloss" href="#playable">playable</a> if they make a loop.  Here the first one the player plays takes two
-  of the four primes as tax, which leaves two for the other three.</dd>
   <dt id="maximal-factor">maximal factor</dt>
   <dd>A number divided by one of its primes.  12 has the maximal factors 6 and 4, 9 has only 3, and a prime has only
   1.  A move is legal exactly when one of its maximal factors is still in the pot.
@@ -174,9 +174,9 @@
   n.</p></aside></dd>
   <dt id="parity-bound">parity bound</dt>
   <dd>The <a class="gloss" href="#weight">weight</a> of the <a class="gloss" href="#heaviest">heaviest</a> set that
-  passes the <a class="gloss" href="#parity-test">parity test</a>.  Frame by frame, it limits what the promotions of
-  a node can add; on the whole board, it bounds opt(n), and it is the prover's bound.  In the games we measured, its
-  gap above opt(n) on the whole board is about a tenth of the gap of
+  passes the <a class="gloss" href="#parity-test">parity test</a>.  On the whole board, it bounds opt(n), and it is
+  the prover's bound; the frame solver applies it frame by frame, to what the promotions of a node can add.  In the
+  games we measured, its gap above opt(n) on the whole board is about a tenth of the gap of
   <a class="gloss" href="#fm-bound">Franklín and Moniot's bound</a>.</dd>
   <dt id="parity-test">parity test</dt>
   <dd>A quick test that every <a class="gloss" href="#playable">playable</a> set passes.  List, for each number of a
@@ -209,7 +209,7 @@
   place of the largest prime below n.  The result is an optimal game of n, and the score rises by the difference of
   the two primes.
   <aside class="note tech" aria-label="Technical note on the prime formula"><p>At a prime p,
-  opt(p) = opt(p − 1) + p − q(p − 1), where q(p − 1) is the largest prime below p.</p></aside></dd>
+  opt(p) = opt(p − 1) + p − q, where q is the largest prime below p.</p></aside></dd>
   <dt id="promote">promote</dt>
   <dd>To play one of a <a class="gloss" href="#frame">frame</a>'s factors as a move.  A promoted factor leaves its
   frame and becomes a move of the frame in front, where one of its maximal factors
@@ -241,6 +241,14 @@
   <a class="gloss" href="#candidate">candidates</a> and how many of them the player may
   <a class="gloss" href="#promote">promote</a>.  Two games that pose the same search problem have the same best
   promotions.</dd>
+  <dt id="semiprime-formula">semiprime formula</dt>
+  <dd>When n is odd with two prime factors and closes a <a class="gloss" href="#cycle">cycle</a> with the moves of an
+  <a class="gloss" href="#optimal-game">optimal game</a> of n − 1, play n in place of the smallest other number of
+  that cycle.  The result is an optimal game of n, and the score rises by the difference.  From game 189 on, every
+  such n closes a cycle.
+  <aside class="note tech" aria-label="Technical note on the semiprime formula"><p>opt(n) = opt(n − 1) + n − x, where
+  x is the smallest member of the cycle other than n.  It needs no search and no
+  <a class="gloss" href="#statement-u">statement U</a>.</p></aside></dd>
   <dt id="source">source</dt>
   <dd>A number above n/2.  It divides nothing else on the board, so no move takes it as tax.  Either the player plays
   it, or the taxman takes it at the end.  On the board of game 21 the sources are 11 to 21.

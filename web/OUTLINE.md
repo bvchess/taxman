@@ -48,14 +48,14 @@ The rules the owner's reviews have set, on top of [docs/WRITING.md](../docs/WRIT
 * **The prose never cites the site's own code.**  Notes point to the theory and to the Rust programs, never to the
   JavaScript that draws the figures.
 * **Say why a narrow case matters.**  A result stated for a narrow case says what part of the problem the case is, as
-  the loop rule's paragraph says that layer 2 is its case and chapter 3 relies on it.
+  the cycle rule's paragraph says that layer 2 is its case and chapter 3 relies on it.
 * **A note stands beside what it is about.**  A margin note on what a collapsed along-the-way shows appears only while
   it is open.
 * **Let the reader play the idea** wherever an idea can be played, as the game on the maximal-factor graph lets them
   play the lifting lemma.
 * **Link lightly.**  A glossary term links once a section, at its first use, with the quiet `gloss` style.
-* **Say what a fact means.**  A result comes with why it matters: "splitting the board into frames costs the bound
-  nothing" is what the equal bounds at the root mean.
+* **Say what a fact means.**  A result comes with why it matters: "splitting the board into frames does not change
+  the parity bound" is what the equal bounds at the root mean.
 * **One topic a paragraph.**  A sentence on another subject gets a paragraph of its own, or goes.
 * **Name the thing.**  "Weighted matroid intersection", not "a classical algorithm".  One idea has one name, given
   where the idea first appears, and the glossary defines every name a page relies on.
@@ -66,9 +66,10 @@ The rules the owner's reviews have set, on top of [docs/WRITING.md](../docs/WRIT
   takes a figure's examples in turn, the figure's heads say who decides, and its caption says what its marks are.
 * **Active voice.**  Say who does what: "descending greedy keeps the source", not "the source is kept".  The passive
   voice is unwelcome.
-* **A colon introduces, it does not join.**  A colon may open a list, a formula, a citation or a label such as "Along
-  the way: game 40", and in the glossary an example after a definition.  It never hangs an explanation, a reason or an
-  example on a sentence: write two sentences, or join them with "because", "since" or "so".
+* **A colon mostly introduces.**  A colon may open a list, a formula, a citation or a label such as "Along the way:
+  game 40", and in the glossary an example after a definition.  Use one sparingly to join two sentences, as in
+  "Here's how it works: for each number…"; most of the time, write two sentences, or join them with "because",
+  "since" or "so".
 * **No pet words.**  A word a page reaches for again and again becomes a tic, as "rests on", "Precisely." and "exactly"
   did.  Say what the dependence is ("assumes", "depends on", "follows from", "uses"), and keep "exactly when" for the
   statement of a result.
@@ -126,9 +127,9 @@ check.
 * A move needs only one of its maximal factors in the pot: tax as payment.
 * A set can be played exactly when each member can be paid for by its own factor, in an order with no circle.
 * Peel: two kinds of safe step decide it, and it never needs to guess.
-* The loop: 10, 14, 15 and 21 on the primes 2, 5, 3 and 7; try to play all four.
+* The cycle: 10, 14, 15 and 21 on the primes 2, 5, 3 and 7; try to play all four.
 
-**Figures.**  The orders of game 21.  Peel, step by step, on a small set.  The loop, played by hand.
+**Figures.**  The orders of game 21.  Peel, step by step, on a small set.  The cycle, played by hand.
 
 **Right column.**  The lifting lemma (P1), the playability theorem (P2), Franklín and Moniot's Theorem 1, which says P2
 in the language of matchings, the peel theorem (P4), the two-factor proposition (P11).
@@ -146,8 +147,14 @@ points:* in game 833 every optimal game makes 362 moves, but a game can make 363
   the games hang together like the links of a chain.
 * When an optimal set of n − 1 still plays with n added, game n is at its ceiling, and done.
 * At a prime n, swap the old largest prime for n: the prime formula.
+* At an odd n with two prime factors whose primes game n − 1's moves already join, n closes a cycle and takes the
+  place of the cycle's smallest other number: the semiprime formula.  Game 39 is the example.  Game 186 shows why it
+  waits: 11 and 13 join the other primes only at 187 = 11 · 17, and from game 187 on every prime up to n/2 is joined
+  (the square theorem, chapter 3), so the formula covers every such n from 189 on.
 * Often game n poses exactly the search problem of the game before it, and that game's answer carries over: a repeat.
-  The solver looks for one once the problem is set up, before it searches (chapter 5).
+  The solver looks for one once the problem is set up, before it searches (chapter 5).  A repeat assumes statement U,
+  and in the chain nearly every repeat is also settled by the ceiling or the semiprime formula; a handful rest on the
+  repeat alone.
 * Together these settle about 65% of the games with no search.  That is why the result is a chain: the games are settled in
   order, from game 1 up.  The chart of the whole chain, 120 to a row, has stripes, dark where 8, 12, 20 or 30 divides n
   and light where n is twice a number with no factor 2, 3 or 5, which leads to the next section.
@@ -157,7 +164,7 @@ points:* in game 833 every optimal game makes 362 moves, but a game can make 363
   get a start and a ceiling from game n − 1 (chapter 5).
 
 **Examples.**  Games 9 to 13, small enough to follow by hand: game 12 from game 11 in the opening, 10 fits, 12 does not,
-and 13 is a prime.  The repeat is game 39, which the semiprime formula also settles.
+and 13 is a prime.  Game 39 for the semiprime formula, which is also a repeat of game 38.
 
 **Figures.**  Game 12 built from game 11's optimal game, animated.  The chain of bounds, games 1 to 16.  Game n − 1's
 optimal game over game n's, where n fits (10) and where it does not (12), each after its paragraph.  The prime swap
@@ -180,7 +187,7 @@ greedy pass chooses them.
 * Layers: a number's count of prime factors.  A number's maximal factors sit one layer down.
 * Descending greedy: from n down, keep each source that can still be played with those kept.  What it keeps is U\*.
 * In layers 1 and 2 it is provably right.  A number with two prime factors is an edge between two primes; a set of them
-  can be played exactly when it has no loop, and greedy builds the heaviest forest.
+  can be played exactly when it has no cycle, and greedy builds the heaviest forest.
 * Above layer 2, why it might fail: at game 2873 the sources lack the property that makes greedy safe in general, and
   48 of the 720 orders of six of them trap greedy at four, though five fit.  Taken from the largest down, they do not.
   Yet U\* is certified best among the sources in every game to 100,000.
@@ -188,7 +195,7 @@ greedy pass chooses them.
   scores depend on past 2531.
 
 **Figures.**  Game 21 in layers (the game-21 figure, from the pot to the sources).  The layer-2 graph of a mid-size
-game, greedy adding edges from the largest down and refusing the ones that close a loop.  A chart of the top half's
+game, greedy adding edges from the largest down and refusing the ones that close a cycle.  A chart of the top half's
 share of the score in every searched game.
 
 **Right column.**  The bottom-layers theorem (F4), the square theorem (F10), the sources conjecture (S1) and its
@@ -216,7 +223,7 @@ to show the scale.
 
 ### 5. Search
 
-**Point.**  A search tries promotion sets until it proves that none beats the best one found.
+**Point.**  A search tries sets of promotions one candidate at a time until it proves that it's found the best game.
 
 * A repeat first: once the frames are set, a game whose search problem an earlier game posed takes that game's
   promotions (game 39, whose new number lands in a closed frame); game 45 changes frame 1 and needs a search.
@@ -242,30 +249,30 @@ the design (`solver/docs/DESIGN.md`, `search.md`, `gf2-bound.md`, `tactics.md`).
 
 ### 6. The parity bound
 
-**Point.**  A bound limits how high a score can go, and the sharper it is, the less a search has to explore.  Ours is
-a quick test of even and odd, on the frames of a search or on the whole board.
+**Point.**  A bound limits how high a score could possibly go, and the more precise it is, the less a search has to
+explore.  Ours is a quick test of even and odd, a test of sets of numbers that has nothing to do with frames.
 
 * The test: list, for each number of a set, the maximal factors outside the set that could pay for it; if some of the
-  numbers list every factor an even number of times, the set cannot be played (the loop of chapter 1).  It is linear
-  algebra over GF(2), quick to check, and the solver applies it to the promotions frame by frame, at every node.  Odd
-  cores are all it misses.
-* The whole board: the same test needs no frames, and on the whole board it bounds opt(n), the parity bound; at the
-  root, the frame bound plus ΣU* equals it on every board from 2 to 8191 (measured).  It is the prover's bound
-  (chapter 7).
+  numbers list every factor an even number of times, the set cannot be played (the cycle of chapter 1).  It is quick
+  to check, and weighted matroid intersection finds the heaviest set that passes it, the parity bound.  Odd cores are
+  all it misses.  The main text never mentions frames or GF(2) here; GF(2) is in a margin note.
+* The whole board: on the whole board the parity bound bounds opt(n).  The frame solver uses the same bound at every
+  node, on the promotions of each frame; at the root, the frames' bound plus ΣU* equals the whole board's on every
+  board from 2 to 8191 (measured).  It is the prover's bound (chapter 7).
 * Odd cores: game 45's is the first; the parity bound is exact to 77 and first misses at 78, where an odd core weighs
   in (measured).
-* Comparing bounds, last because its second half depends on measurements: first the theory, that Franklín and Moniot's
-  bound is looser, a set being allowed by theirs, by the parity bound, or playable when some set of factors gets at
-  least one, an odd number, or exactly one scheme; then the measurements, its gap about ten times the parity bound's
-  in every game to the end of the chain, and a search with it exploring far more (the prover's searches of every game
-  to 1,000 under each bound).
+* Comparing bounds: the theory, that Franklín and Moniot's bound is looser, a set being allowed by theirs, by the
+  parity bound, or playable when some set of factors gets at least one, an odd number, or exactly one scheme.
+* Empirical results, last because they are measurements: Franklín and Moniot's gap is about ten times the parity
+  bound's in every game to the end of the chain, and a search with their bound explores far more (the prover's
+  searches of every game to 1,000 under each bound).
 
 **Figures.**  Game 78's odd core, as a ring or in its layers.  The ladder of three conditions, at least one, an odd
 number, exactly one payment scheme, on small examples, and the tables of two of them.  Each bound's height above opt(n)
 in every game of the chain.
 
-**Right column.**  The signed frame theorem (B1) and the frame bound (B2) over GF(2), the parity bound (W1), the first
-odd core (C3), the parity bound exact to 77 (measured), the counting theorem (C2), the two gaps (measured).
+**Right column.**  The parity test over GF(2) (a note, no theorem), the parity bound (W1), the first odd core (C3), the parity bound
+exact to 77 (measured), the counting theorem (C2), the two gaps (measured).
 
 ### 7. Statement U
 

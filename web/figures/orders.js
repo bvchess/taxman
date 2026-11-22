@@ -1,6 +1,6 @@
 // Sets, not orders: the nine moves of game 21's recorded game, each above the factor that pays for it, in every
 // order that is a legal game.  A flat figure: the moves are the player's (blue circles), their tax the taxman's
-// (orange squares), joined by the thick line of a payment.  The orders are found with js/model.js (legalMoves,
+// (orange squares), joined by the thick line of a payment.  The two rows are labeled at the left, "moves" and "tax".  The orders are found with js/model.js (legalMoves,
 // play, isOver) by a search over the moves of the set, and each order's taxes come from replaying it.
 //
 // URL parameter: orders=K opens the figure at the K-th order.
@@ -10,9 +10,11 @@ import { fmt } from '../js/vocab.js';
 import { scene } from '../js/scene.js';
 
 const N = 21;
-const W = 400;
+const LABELS = 58; // room at the left for the rows' labels
+const W = 400 + LABELS;
 const H = 132;
-const X = (i) => 24 + 44 * i;
+const X = (i) => LABELS + 24 + 44 * i;
+const ROW = { moves: 32, tax: 100 };
 
 /** Every order of the set that plays a legal game of n to its end, the recorded order first. */
 export function legalOrders(n, set, recorded) {
@@ -46,12 +48,14 @@ export function mountOrders(host, { small }) {
     s.number(t, t);
     s.line(`${m}-${t}`, m, t, 'pay');
   }
+  s.text('labelMoves', 'moves', { kind: 'name', anchor: 'end' });
+  s.text('labelTax', 'tax', { kind: 'name', anchor: 'end' });
   const looks = (k) => {
-    const v = {};
+    const v = { labelMoves: { x: LABELS - 4, y: ROW.moves }, labelTax: { x: LABELS - 4, y: ROW.tax } };
     orders[k].forEach((m, i) => {
       const t = payOf.get(m)[0];
-      v[m] = { shape: 1, player: 1, x: X(i), y: 32, scale: 0.98 };
-      v[t] = { shape: 0, taxman: 1, x: X(i), y: 100, scale: 0.98 };
+      v[m] = { shape: 1, player: 1, x: X(i), y: ROW.moves, scale: 0.98 };
+      v[t] = { shape: 0, taxman: 1, x: X(i), y: ROW.tax, scale: 0.98 };
       v[`${m}-${t}`] = {};
     });
     return v;

@@ -3,8 +3,8 @@
 // point for every stretch.  All rows share the n axis, and the hover crosshair runs through all of them.
 //
 // The share is drawn as the range of its values within each pixel's games, so the zigzag between neighboring games
-// shows as a band that narrows.  The proof row stacks the stretch's games by the three groups of js/proof.js (search,
-// repeats an earlier search, derived from n − 1) on a 0 to 100% scale.  The time row is a line through the median of
+// shows as a band that narrows.  The proof row stacks the stretch's games by the two groups of js/proof.js (search,
+// with the few repeats, and derived from n − 1) on a 0 to 100% scale.  The time row is a line through the median of
 // each stretch's searches, at the middle of its games, on a log scale: a line, since a log scale has no zero for a
 // column to stand on, and so it does not read as a fourth group of the row above.  A search is a game whose method is
 // search (the chain's own searches, those that ended at the ceiling included); its time is the time the game had at
@@ -22,7 +22,7 @@ const TIME_TICKS = [[1e-3, '1 ms'], [1, '1 s'], [60, '1 min'], [3600, '1 h'], [D
 const TIME_LO = 1e-3;
 const TIME_HEADROOM = 1.6; // the scale runs this far above its top tick, as a factor
 // A group's color: those of chapter 2's grid (css/site.css), the search darkest.
-const TONE = { search: 'var(--rule-search)', repeat: 'var(--rule-repeat)', before: 'var(--rule-ceiling)' };
+const TONE = { search: 'var(--rule-search)', before: 'var(--rule-ceiling)' };
 
 const median = (xs) => {
   if (!xs.length) return null;

@@ -22,8 +22,28 @@
     <p class="subhead">Playing optimal games</p>
   </hgroup>
   <p class="byline">Brian Chess</p>
-  <p class="lede">Taxman began as a number game to teach kids about factors.  We play an optimal game, one with the best
-  possible score, in each of games 1 to <span data-last-n>5,060</span>.  This site explains how we did it.</p>
+  <aside class="note tech" aria-label="Contributions">
+    <div class="note-head"><span class="note-name">Contributions</span></div>
+    <ul>
+      <li><b>Optimal scores</b> for games 1 to <span data-last-n>5,060</span> (<a href="results.html">chapter
+      8</a>).</li>
+      <li><b>From one game to the next.</b>  In <span data-chain="beforeShare">65%</span> of the games, a proved
+      formula turns an optimal game of n − 1 into an optimal game of n with no search (<a href="chain.html">chapter
+      2</a>).</li>
+      <li><b>The top half.</b>  <a class="gloss" href="glossary.html#descending-greedy">Descending greedy</a>, a
+      polynomial-time pass, chooses the numbers above n/2 that an optimal game plays (<a
+      href="top-half.html">chapter 3</a>).</li>
+      <li><b>The frame model.</b>  Once the top half is fixed, we split the board into frames, localizing the
+      remaining decisions (<a href="frames.html">chapter 4</a>).</li>
+      <li><b>The parity bound.</b>  A novel upper bound computed in polynomial time speeds the search for
+      optimal scores (<a href="bound.html">chapter 6</a>).</li>
+    </ul>
+    <p>Past game 2,531, the scores and the top half assume
+    <a class="gloss" href="glossary.html#statement-u">statement U</a>.  Every result's standing is on
+    <a href="about.html#adds">the About page</a>.</p>
+  </aside>
+  <p class="lede">Taxman began as a number game to teach kids about factors.  This site shows how we got the best
+  possible score for each of the games from 1 to <span data-last-n>5,060</span>.</p>
   <p class="hurry">In a hurry? Go straight to <a href="summary.html">the summary</a>.</p>
 </header>
 
@@ -47,14 +67,14 @@
     <a class="gloss" href="glossary.html#move"><em>move</em></a>.</li>
     <li>The taxman then takes, as <a class="gloss" href="glossary.html#tax"><em>tax</em></a>, every divisor of your move
     still in the pot.</li>
-    <li>You may take only a number that has a divisor left in the pot, so the taxman always gets something.</li>
-    <li>When no number you could take remains, the taxman takes the rest.</li>
-    <li>You beat the taxman when your total is higher than the total he collects.</li>
+    <li>You may only take a number that has a divisor left in the pot, so the taxman always gets something.</li>
+    <li>When no number you can take remains, the taxman takes the rest.</li>
+    <li>You beat the taxman if your total is higher than the total he collects.</li>
   </ul>
-  <p>We write the best total you can reach in game n as <a class="gloss" href="glossary.html#opt">opt(n)</a>, and a game
-  that reaches it is an <a class="gloss" href="glossary.html#optimal-game"><em>optimal game</em></a>.  Try game 10.  Its
-  best score is 40, and you can find it by hand.  A circle is a number you can take, and a square one that can only go
-  to the taxman.  Your numbers are blue and his are orange.</p>
+  <p>We write the best possible score in game n as <a class="gloss" href="glossary.html#opt">opt(n)</a>, and a game
+  of n that reaches it is an <a class="gloss" href="glossary.html#optimal-game"><em>optimal game</em></a>.
+  Try game 10.  Its best score is 40, and you can find it by hand.  A circle is a number you can take, and a square one
+  that can only go to the taxman.  Your numbers are blue and his are orange.</p>
 
   <div class="game-host" id="game"></div>
 
@@ -67,9 +87,10 @@
       <a href="https://github.com/bvchess/taxman/blob/master/heuristics/README.md">our strategies and how we measured
       them</a>, and <a href="https://github.com/bvchess/taxman/tree/master/moniot">Robert Moniot's seven</a>.</p>
     </aside>
-    <p>The blue button plays an optimal game, the best you can do.  Playing well is easy.  In every game we tested it
-    on, the first thousand, a simple strategy with no search comes within a fraction of a percent of the best score.
-    But knowing that a game is optimal means showing that no game does better, and that is more challenging.</p>
+    <p>The blue button plays an optimal game, the best you can do.  Playing well isn't too hard.  A simple strategy with
+    no search comes within a fraction of a percent of the best score in every game we've tried it on
+    (the first thousand).  But knowing that a game is optimal means showing that there is no way to do better, and that
+    is more challenging.</p>
   </div>
 </section>
 
@@ -103,10 +124,11 @@
         <li><b>Follows from game n&nbsp;−&nbsp;1.</b>  n is prime, and the
         <a class="gloss" href="glossary.html#prime-formula">prime formula</a> gives its score from game
         n&nbsp;−&nbsp;1’s.  Or it is at its <a class="gloss" href="glossary.html#ceiling">ceiling</a>, where its score
-        is n&nbsp;+&nbsp;opt(n&nbsp;−&nbsp;1), the most it can be.</li>
-        <li><b>Repeats an earlier search.</b>  The game poses the same search problem as an earlier game, and that
-        game’s answer is its answer too.</li>
-        <li><b>Search.</b>  Every other game.  A search proved its score.</li>
+        is n&nbsp;+&nbsp;opt(n&nbsp;−&nbsp;1), the most it can be.  Or n is odd with two prime factors, and the
+        <a class="gloss" href="glossary.html#semiprime-formula">semiprime formula</a> gives its score from game
+        n&nbsp;−&nbsp;1’s.</li>
+        <li><b>Search.</b>  Every other game.  A search proved its score, its own or, for a few games, that of an
+        earlier game that posed the same search problem.</li>
       </ul>
       <p>The <span data-proof="searchNothing">…</span> small games with nothing left to choose count as searches of
       one node.</p>
@@ -180,7 +202,7 @@ import { fmt } from './js/vocab.js';
 import { mountGame } from './figures/game.js';
 import { mountShrink } from './figures/shrink.js';
 import { mountChainChart } from './figures/chain-chart.js';
-import { fillOneSearch, settled } from './js/proof.js';
+import { fillBeforeShare, fillOneSearch, settled } from './js/proof.js';
 import { fill833 } from './figures/longer-833.js';
 
 initEssay();
@@ -199,6 +221,7 @@ const proofFacts = {
 for (const s of document.querySelectorAll('[data-proof]')) s.textContent = fmt(proofFacts[s.dataset.proof]);
 fill833(games);
 fillOneSearch(games);
+fillBeforeShare(games);
 </script>
 </body>
 </html>

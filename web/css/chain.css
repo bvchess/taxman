@@ -3,6 +3,7 @@
 
 .rule-cell.is-ceiling { fill: var(--rule-ceiling); }
 .rule-cell.is-prime { fill: var(--rule-prime); }
+.rule-cell.is-semiprime { fill: var(--rule-semiprime); }
 .rule-cell.is-repeat { fill: var(--rule-repeat); }
 .rule-cell.is-search { fill: var(--rule-search); }
 .rule-cell.is-segment { transition: opacity var(--ui); }
@@ -12,6 +13,7 @@
 }
 .rule-swatch.is-ceiling { background: var(--rule-ceiling); }
 .rule-swatch.is-prime { background: var(--rule-prime); }
+.rule-swatch.is-semiprime { background: var(--rule-semiprime); }
 .rule-swatch.is-repeat { background: var(--rule-repeat); }
 .rule-swatch.is-search { background: var(--rule-search); }
 .rule-legend { margin: 10px 0 0; }
@@ -69,3 +71,7 @@
 }
 .aside .chart-table summary::-webkit-details-marker { display: revert; }
 .aside .chart-table summary:hover { background: none; }
+
+/* ---- the semiprime formula: game 39's cycle --------------------------------------------------------- */
+
+#cycle-39 svg { max-width: 30rem; margin: 0 auto; }

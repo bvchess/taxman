@@ -31,8 +31,10 @@
 
 /* ---- game 78's odd core ----------------------------------------------------------------------------------- */
 
-.exact-78-fig { margin: 12px 0 16px; }
-.exact-78-fig svg { max-width: 24rem; margin: 0 auto; }
+.core-fig { margin: 12px 0 16px; }
+/* Both odd cores draw a figure unit at the same size, so that their numbers match; --w is the figure's width in units,
+   set by figures/odd-core.js. */
+.core-fig svg { width: calc(var(--w) * 1.14px); max-width: 100%; margin: 0 auto; }
 
 /* ---- narrower ---------------------------------------------------------------------------------------------- */
 

@@ -4,14 +4,17 @@
 // The record of a game has a proof kind (PROOFS).  The story's classification is coarser and goes by the rule that the
 // chapter "Walking up the chain" meets, the first that applies (ruleOf):
 //
-//   prime    n is prime (the prime formula, from game n − 1)
-//   ceiling  n > 1 and opt(n) = n + opt(n − 1), the game's score is its ceiling (the ceiling lemma, from game n − 1)
-//   repeat   the record's proof is same_search
+//   prime      n is prime (the prime formula, from game n − 1)
+//   ceiling    n > 1 and opt(n) = n + opt(n − 1), the game's score is its ceiling (the ceiling lemma, from game n − 1)
+//   semiprime  the prover's relation of n to game n − 1 is semiprime (the semiprime formula, Theorem J3, from game
+//              n − 1); the record's proof, made before the theorem, calls such a game a repeat or a search
+//   repeat     the record's proof is same_search
 //   search   every other game: proof exhausted (its own search) and trivial (a game with nothing to promote, whose
 //            tree is a single node)
 //
-// and the front page shows three groups of them (GROUPS): search, repeats an earlier search, and derived from n − 1
-// (the rules prime and ceiling).
+// and the front page shows two groups of them (GROUPS): search, which takes the few repeats too, and derived from n − 1
+// (the rules prime, ceiling and semiprime).  The relation comes from the prover's files, by way of the column
+// relation of data/games.json (null for game 1).
 
 import { primeFactors } from './model.js';
 import { fmt } from './vocab.js';
@@ -35,20 +38,21 @@ export const PROOFS = [
 export const RULES = [
   { key: 'ceiling', name: 'at the ceiling', proof: 'cap' },
   { key: 'prime', name: 'the prime formula', proof: 'prime_formula' },
+  { key: 'semiprime', name: 'the semiprime formula', proof: null },
   { key: 'repeat', name: 'a repeat', proof: 'same_search' },
   { key: 'search', name: 'a search', proof: 'exhausted' },
 ];
 export const RULE = Object.fromEntries(RULES.map((r) => [r.key, r]));
 /** The rules that settle a game with no search. */
-export const NO_SEARCH = ['ceiling', 'prime', 'repeat'];
+export const NO_SEARCH = ['ceiling', 'prime', 'semiprime', 'repeat'];
 /** The rules that rest on the score of game n − 1. */
-const NO_MODEL = ['ceiling', 'prime'];
+const NO_MODEL = ['ceiling', 'prime', 'semiprime'];
 
-/** The front page's three groups of rules, in the order it shows them. */
+/** The front page's two groups of rules, in the order it shows them.  A repeat counts with the searches: it takes the
+ *  answer of an earlier game's search, and too few games are repeats alone to show as a group of their own. */
 export const GROUPS = [
-  { key: 'search', name: 'search', rules: ['search'] },
-  { key: 'repeat', name: 'repeats an earlier search', rules: ['repeat'] },
-  { key: 'before', name: 'follows from game n − 1', rules: ['prime', 'ceiling'] },
+  { key: 'search', name: 'search', rules: ['search', 'repeat'] },
+  { key: 'before', name: 'follows from game n − 1', rules: ['prime', 'ceiling', 'semiprime'] },
 ];
 export const GROUP = Object.fromEntries(GROUPS.map((g) => [g.key, g]));
 const GROUP_OF_RULE = Object.fromEntries(GROUPS.flatMap((g) => g.rules.map((r) => [r, g.key])));
@@ -64,6 +68,7 @@ export function ruleOf(c, i) {
   const proof = c.proof[i];
   if (isPrime(n)) return 'prime';
   if (n > 1 && c.score[i] === c.score[i - 1] + n) return 'ceiling';
+  if (c.relation[i] === 'semiprime') return 'semiprime';
   if (proof === 'same_search') return 'repeat';
   if (proof === 'exhausted' || proof === 'trivial') return 'search';
   throw new Error(`game ${n}: proof ${proof} fits no rule`);
@@ -89,8 +94,8 @@ function rootsOf(c) {
 export const searchOf = (c, i) => rootsOf(c)[i];
 
 // For each game, the game whose frame model its score rests on, its foundation: the game itself for a repeat and a
-// search, and the foundation of the game before for the ceiling and the prime formula.  Cached for the columns of one
-// games.json.
+// search, and the foundation of the game before for the ceiling, the prime formula and the semiprime formula.  Cached
+// for the columns of one games.json.
 const FOUNDATIONS = new WeakMap();
 function foundationsOf(c) {
   if (!FOUNDATIONS.has(c)) {
@@ -102,8 +107,8 @@ function foundationsOf(c) {
 }
 
 /** The game whose frame model the score of row i rests on, followed down through the games before: a game by the
- *  ceiling or the prime formula rests on the game before it.  Up to PROVER_TO the prover proves the score outright;
- *  past it, it rests on statement U. */
+ *  ceiling, the prime formula or the semiprime formula rests on the game before it.  Up to PROVER_TO the prover proves
+ *  the score outright; past it, it rests on statement U. */
 export const foundationOf = (c, i) => foundationsOf(c)[i];
 
 /**
@@ -151,6 +156,7 @@ export function ruleWords(c, i, rule = ruleOf(c, i)) {
   switch (rule) {
     case 'prime': return 'the prime formula';
     case 'ceiling': return 'the ceiling';
+    case 'semiprime': return 'the semiprime formula';
     case 'repeat': return recordWords(c, i);
     default:
       if (c.proof[i] === 'trivial') return 'a search of one node';
@@ -198,6 +204,17 @@ export function fillOneSearch(games, root = document) {
     longestNodes: nodesWords(longest.nodes), longestOthers: fmt(longest.count - 1),
   };
   for (const s of root.querySelectorAll('[data-run]')) s.textContent = facts[s.dataset.run];
+}
+
+/** The share of games 2 to the last whose group is "follows from game n − 1", as a whole percent. */
+export function beforeShare(games) {
+  const { groupCounts, total } = settled(games);
+  return Math.round((100 * groupCounts.before) / (total - 1));
+}
+
+/** Fill each span data-chain="beforeShare" with that share. */
+export function fillBeforeShare(games, root = document) {
+  for (const s of root.querySelectorAll('[data-chain="beforeShare"]')) s.textContent = `${beforeShare(games)}%`;
 }
 
 /** Every game's rule and group, and the count of each. */

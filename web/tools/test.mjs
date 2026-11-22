@@ -19,8 +19,11 @@ import { listWords, numberWord } from '../js/vocab.js';
 import { fitsFacts, fitsWords, primeFacts, primeWords } from '../figures/fits.js';
 import { slipFacts, slipOfRecord } from '../figures/slip.js';
 import { linkWords, linksFacts } from '../figures/links.js';
-import { GROUPS, PROVER_TO, RULES, foundationOf, oneSearchFacts, restsFacts, ruleOf, settled } from '../js/proof.js';
+import { GROUPS, PROVER_TO, RULES, beforeShare, foundationOf, oneSearchFacts, restsFacts, ruleOf, settled } from '../js/proof.js';
 import { boundFacts } from '../figures/bounds-chart.js';
+import { cycleFacts, ends, isSemiprimeOdd } from '../js/semiprime.js';
+import { core45Facts } from '../figures/core-45.js';
+import { semiprime39Facts } from '../figures/semiprime-39.js';
 import { readResults, repoRoot } from './results.mjs';
 
 // Descending greedy is checked against the results file's in_the_bag for every game up to GREEDY_ALL_UP_TO, then for
@@ -347,6 +350,11 @@ same('games.json is the export of the results file (run node web/tools/export.mj
   checks++;
   if (!(facts.overLast < 187)) failures.push(`a bound is over 0.5% above opt(n) at game ${facts.overLast}, past game 186`);
   same('the gaps at the last game', [facts.fmGapLast, facts.parityGapLast], [20219, 2557]);
+  checks++;
+  if (!(facts.parityRecentPct < 0.035 && facts.fmRecentPct > 0.2 && facts.fmRecentPct / facts.parityRecentPct > 8)) {
+    failures.push(`the median gaps of the last thousand games, ${facts.parityRecentPct}% and ${facts.fmRecentPct}%, `
+      + 'no longer fit the words of bound.html ("near", "hovers around", "about … times higher")');
+  }
 }
 same('every line of the results file assumes nothing',
   records.filter((r) => r.assumes.length > 0).map((r) => r.n).slice(0, 5), []);
@@ -428,8 +436,9 @@ same('the groups add up to every game', sum(Object.values(sorted.groupCounts)), 
     checks++;
     if (!bound.includes(words)) failures.push(`bound.html does not say "${words}"`);
   };
-  states(`With Franklín and Moniot's bound, ${searched(fmRun, 2, 1000).length} games needed a search, and the searches took ${million} million nodes in all`);
-  states(`With the parity bound, ${searched(parityRun, 2, 1000).length} did, and they took ${thousand},000`);
+  states(`With Franklín and Moniot's bound, ${searched(fmRun, 2, 1000).length} games needed a search, and the searches explored ${million} million nodes in all`);
+  states(`With the parity bound, ${searched(parityRun, 2, 1000).length} games needed a search, and they explored only `
+    + `${thousand},000 nodes`);
   states(`Below game 500 the parity bound's searches are ${ratio(2, 499)} times smaller, and from game 900 to 1,000 they are ${ratio(900, 1000)} times smaller`);
 }
 const badGroup = [];
@@ -437,11 +446,28 @@ const badSearch = [];
 sorted.rules.forEach((rule, i) => {
   const proof = cols.proof[i];
   if ((proof === 'cap' || proof === 'prime_formula') && sorted.groups[i] !== 'before') badGroup.push(cols.n[i]);
-  if (sorted.groups[i] === 'search' && proof !== 'exhausted' && proof !== 'trivial') badSearch.push(cols.n[i]);
-  if (sorted.groups[i] === 'repeat' && proof !== 'same_search') badSearch.push(cols.n[i]);
+  if (sorted.groups[i] === 'search' && !['exhausted', 'trivial', 'same_search'].includes(proof)) badSearch.push(cols.n[i]);
+  if (rule === 'repeat' && proof !== 'same_search') badSearch.push(cols.n[i]);
+  // A semiprime game's record, made before Theorem J3, calls it a repeat or a search; its relation says what it is.
+  if (rule === 'semiprime' && !['same_search', 'exhausted'].includes(proof)) badSearch.push(cols.n[i]);
+  if (cols.relation[i] === 'semiprime' && sorted.groups[i] !== 'before') badGroup.push(cols.n[i]);
 });
-same('every cap and prime formula record is derived from n − 1', badGroup.slice(0, 5), []);
-same('every game of the search group is exhausted or trivial, and of the repeat group a repeat',
+same('every cap, prime formula and semiprime relation is derived from n − 1', badGroup.slice(0, 5), []);
+same('every game of the groups is counted once', sum(Object.values(sorted.groupCounts)), cols.n.length);
+same('the rules and the groups count the same games', sum(Object.values(sorted.counts)), cols.n.length);
+{
+  const share = beforeShare(games);
+  checks++;
+  if (!(share >= 60 && share <= 70)) failures.push(`the share of games that follow from game n − 1 is ${share}%, not 60 to 70%`);
+  // The About page says the share holds in every thousand games: each block of 1,000, the last one shorter.
+  for (let lo = 1; lo <= cols.n.length; lo += 1000) {
+    const block = sorted.groups.slice(lo - 1, lo + 999).filter((g, k) => lo + k >= 2);
+    const blockShare = Math.round((100 * block.filter((g) => g === 'before').length) / block.length);
+    checks++;
+    if (!(blockShare >= 60 && blockShare <= 70)) failures.push(`games ${lo} to ${lo + 999}: ${blockShare}% follow from game n − 1, not 60 to 70%`);
+  }
+}
+same('every game of the search group is exhausted, trivial or a repeat, and every repeat is one in its record',
   badSearch.slice(0, 5), []);
 const groupLine = GROUPS.map((g) => `${g.name} ${sorted.groupCounts[g.key].toLocaleString('en-US')}`).join(', ');
 let runs = null;
@@ -502,6 +528,61 @@ same('linkWords(12)', linkWords(link12),
   "Game 12's link runs from its floor, opt(11) = 44, up to its ceiling, 44 + 12 = 56, and opt(12) = 50.");
 same('linkWords(10)', linkWords(link10),
   "Game 10's link runs from its floor, opt(9) = 30, up to its ceiling, 30 + 10 = 40, and opt(10) = 40 is at the top.");
+
+// --- Game 45's odd core (figures/core-45.js) ---------------------------------------------------------------------------
+
+const core45 = core45Facts();
+same('core45: the five numbers', core45.core.map(([x]) => x), [12, 18, 20, 30, 45]);
+same('core45: the five factors', core45.factors, [4, 6, 9, 10, 15]);
+same('core45: 30 is the one number that lists three', core45.threes, [30]);
+
+// --- The semiprime formula (js/semiprime.js, figures/semiprime-39.js) ------------------------------------------------
+
+// Game 39's cycle: U*₂(38), the number that gives way, and the three scores of the choice.
+const sp39 = semiprime39Facts(smallGames, games);
+same('semiprime39: U*₂(38)', sp39.moves, [21, 22, 25, 26, 33, 34, 35, 38]);
+same('semiprime39: the cycle, in order from 3 to 13', [sp39.vertices, sp39.order], [[3, 11, 2, 13], [33, 22, 26]]);
+same('semiprime39: x is the smallest other member', sp39.x, 22);
+same('semiprime39: the scores of giving up 33, 22 and 26', sp39.gives.map((g) => [g.x, g.score]),
+  [[33, 492], [22, 503], [26, 499]]);
+same('semiprime39: opt(38) and opt(39) from the record', sp39.opt, { 38: 486, 39: 503 });
+same('semiprime39: only giving up 22 reaches opt(39)',
+  sp39.gives.filter((g) => g.score === sp39.opt[39]).map((g) => g.x), [22]);
+same('semiprime39: every set is playable', sp39.gives.every((g) => isPlayable(g.set)), true);
+
+// Which odd numbers with two prime factors close a cycle.  The figure's rule takes descendingGreedy(n − 1) in layer 2;
+// the check below takes the same layer by the greedy in the bottom-layers theorem (F4, step 3), a union-find over the
+// sources of layer 2 from the largest down, which is fast enough for every game of the chain.
+const omegas = Array.from({ length: lastN + 1 }, (_, m) => (m > 1 ? omega(m) : 0));
+function closesByUnionFind(n) {
+  const parent = new Map();
+  const find = (v) => {
+    if (!parent.has(v)) parent.set(v, v);
+    while (parent.get(v) !== v) {
+      parent.set(v, parent.get(parent.get(v)));
+      v = parent.get(v);
+    }
+    return v;
+  };
+  for (let m = n - 1; m > (n - 1) / 2; m--) {
+    if (omegas[m] !== 2) continue;
+    const [a, b] = ends(m);
+    if (find(a) !== find(b)) parent.set(find(a), find(b));
+  }
+  const [a, b] = ends(n);
+  return find(a) === find(b);
+}
+const disagreeing = [];
+let semiprimes = 0;
+for (let n = 9; n <= lastN; n += 2) {
+  if (!isSemiprimeOdd(n)) continue;
+  semiprimes++;
+  const fast = closesByUnionFind(n);
+  if (fast !== (cols.relation[n - 1] === 'semiprime')) disagreeing.push(n);
+  if (n <= 800 && fast !== cycleFacts(n).closes) disagreeing.push(`${n} by greedy`);
+}
+same(`the cycle rule agrees with the relation column, for ${semiprimes} odd n with two prime factors up to ${lastN}`,
+  disagreeing.slice(0, 5), []);
 
 // --- The links at the foot of each page (js/site.js, js/essay.js) ---------------------------------------------------
 

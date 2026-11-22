@@ -29,10 +29,21 @@ export function boundRows(games, bounds) {
   return rows;
 }
 
-/** The numbers the page says of the chart. */
+/** The games whose median gaps the page gives: the last thousand. */
+const RECENT = 1000;
+
+const median = (xs) => {
+  const v = [...xs].sort((a, b) => a - b);
+  const mid = Math.floor(v.length / 2);
+  return v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2;
+};
+
+/** The numbers the page says of the chart.  parityRecentPct and fmRecentPct are each bound's median gap, in percent of
+ *  opt(n), over the last RECENT games, where the gaps have settled. */
 export function boundFacts(games, bounds) {
   const rows = boundRows(games, bounds);
   const last = rows[rows.length - 1];
+  const recent = rows.slice(-RECENT);
   const firstInexact = rows.find((r) => r.parity !== r.opt).n;
   const fmOver = rows.filter((r) => r.fmPct > TOP);
   const parityOver = rows.filter((r) => r.parityPct > TOP);
@@ -41,6 +52,7 @@ export function boundFacts(games, bounds) {
     lastN: last.n, exactTo: firstInexact - 1, fmOver: fmOver.length, parityOver: parityOver.length,
     overLast: Math.max(...over), fmGapLast: last.fm - last.opt, parityGapLast: last.parity - last.opt,
     fmPctLast: last.fmPct, parityPctLast: last.parityPct,
+    parityRecentPct: median(recent.map((r) => r.parityPct)), fmRecentPct: median(recent.map((r) => r.fmPct)),
   };
 }
 

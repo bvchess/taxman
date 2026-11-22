@@ -15,7 +15,8 @@ function load(name) {
 }
 
 /** games.json: { source, lastN, columns: { n, score, proof, method, nodes, seconds, moves, promotions,
- *  candidates, inTheBag } }. */
+ *  candidates, inTheBag, relation } }; relation is the prover's relation to game n − 1 (chain, prime, semiprime or
+ *  none), null for game 1. */
 export const loadGames = () => load('games.json');
 
 /** bounds.json: { files, lastN, columns: { n, fm, parity } } for games 2 to lastN: Franklín and Moniot's bound and the

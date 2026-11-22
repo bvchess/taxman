@@ -53,8 +53,10 @@
   </div>
 
   <div class="para">
-    <p>A score at the <a class="gloss" href="glossary.html#ceiling">ceiling</a> or by the
-    <a class="gloss" href="glossary.html#prime-formula">prime formula</a> follows from the score of the game before it.
+    <p>A score at the <a class="gloss" href="glossary.html#ceiling">ceiling</a>, by the
+    <a class="gloss" href="glossary.html#prime-formula">prime formula</a> or by the
+    <a class="gloss" href="glossary.html#semiprime-formula">semiprime formula</a> follows from the score of the game
+    before it.
     A score found by a <a class="gloss" href="glossary.html#search">search</a> depends on the frame model of its own
     game, and so does a <a class="gloss" href="glossary.html#repeat">repeat</a>, which takes the answer of an earlier
     game that posed the same search problem.  A search uses the game before only as a starting point and finds the frame
@@ -96,7 +98,7 @@
       <p>The lower layers: every optimal set contains U*<sub>1</sub> and U*<sub>2</sub>, by
       <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/frame-model.md#the-bottom-layers-theorem">the
       bottom-layers theorem (F4)</a>.  The sources: <a href="https://github.com/bvchess/taxman/blob/master/docs/theory/sources.md#the-sources-conjecture">the
-      sources conjecture (S1)</a>, which we have proven in every game up to 100,000.  The bounds that leave out one
+      sources conjecture (S1)</a>, which we have checked in every game up to 100,000.  The bounds that leave out one
       number of U*: <a
       href="https://github.com/bvchess/taxman/blob/master/docs/theory/parity-bound.md#the-barred-bound">W2</a>, and
       their counts by band in <a
@@ -109,7 +111,7 @@
       <li>For the numbers of U* with one or two prime factors, the theory proves that every optimal
       game plays that portion of U*.</li>
       <li>Among the <a class="gloss" href="glossary.html#source">sources</a> alone, U* is the heaviest playable set in
-      every game we've examined (up to 100,000).  In those games, giving up a number in U* never pays within the top
+      every game we've checked (up to 100,000).  In those games, giving up a number in U* never pays within the top
       half.</li>
       <li>For each game whose score comes from a search, the prover has tested the numbers in U* with three or more
       prime factors one at a time.  For each, it bounds the score of any optimal game that gives that number up.  When
@@ -163,18 +165,8 @@
 
 <script type="module">
 import { initEssay } from './js/essay.js';
-import { loadGames } from './js/data.js';
-import { fmt } from './js/vocab.js';
-import { restsFacts } from './js/proof.js';
 
 initEssay();
-const games = await loadGames();
-const rests = restsFacts(games);
-for (const span of document.querySelectorAll('[data-rests]')) {
-  const value = rests[span.dataset.rests];
-  if (value === undefined) throw new Error(`data-rests="${span.dataset.rests}" names no fact`);
-  span.textContent = fmt(value);
-}
 </script>
 </body>
 </html>

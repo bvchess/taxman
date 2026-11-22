@@ -20,8 +20,7 @@
 <header class="essay-head para">
   <p class="kicker">Chapter 5</p>
   <h1>Search</h1>
-  <p class="lede">A search tries sets of promotions one candidate at a time, until it proves that none beats the best
-    one found.</p>
+  <p class="lede">A search tries sets of promotions one candidate at a time until it proves that it's found the best game.</p>
 </header>
 
 <section class="chapter" id="repeat-check" data-toc="repeat-check" aria-label="A repeat">
@@ -29,17 +28,19 @@
   which <a class="gloss" href="glossary.html#candidate">candidates</a> to <a class="gloss"
   href="glossary.html#promote">promote</a>.  Before the <a class="gloss" href="glossary.html#frame-solver">frame
   solver</a> searches, it asks whether an earlier game has posed this search problem already.  When game n poses the <a
-  class="gloss" href="glossary.html#search-problem">search problem</a> of one of the games just before it, game n is a
-  <a class="gloss" href="glossary.html#repeat">repeat</a> (<a href="chain.html#repeat">chapter 2</a>), and that game's
-  promotions are the same as game n's.  That's what happens in game 39.  The new number (39) lands in a <a class="gloss"
-  href="glossary.html#closed">closed</a> frame, where descending greedy keeps 39 and drops 22, and the frames with
-  freedoms and their candidates stay as they were in game 38.  Because of that, using the same promotions game 38 chose
-  guarantees an optimal set of promotions in game 39. </p>
-  <p>Game 45 isn't so lucky.  The maximal factors of 45 are 15, in frame 1, and 9, which with 27 made a closed frame of its
-  own in game 44.  45 joins the two frames into one, so frame 1 changes, and game 45 poses a novel search problem.  It
-  has <span data-tree="candidates">8</span> candidates, so <span data-tree="sets">256</span> sets of them.
-    Game <span data-last-n>5,060</span> has
-  <span data-last="candidates">1,380</span> candidates, and far too many sets to try one by one.</p>
+  class="gloss" href="glossary.html#search-problem">search problem</a> of one of the games before it, game n is a
+  <a class="gloss" href="glossary.html#repeat">repeat</a> (<a href="chain.html#repeat">chapter 2</a>), and its
+  optimal promotions are the same as the earlier game's.  That's what happens in game 39, which <a
+  href="chain.html#two-primes">chapter 2</a> settled by the semiprime formula.  The frame solver doesn't use that
+  formula; it finds the same answer another way.  The new number (39) lands in a <a class="gloss"
+  href="glossary.html#closed">closed</a> frame, where descending greedy keeps 39 and drops 22, the same exchange the
+  formula makes, and the frames with freedoms and their candidates stay as they were in game 38.  So game 39 reuses the
+  promotions game 38 chose.</p>
+  <p>Game 45 isn't so lucky.  The maximal factors of 45 are 15 and 9, numbers that occupied different frames in game 44.
+  45 joins the two frames, so game 45 poses a novel search problem.  It
+  has <span data-tree="candidates">8</span> candidates, so <span data-tree="sets">256</span> potential sets of
+  candidates. Game <span data-last-n>5,060</span> has
+  <span data-last="candidates">1,380</span> candidates, far too many sets to try one by one.</p>
 </section>
 
 <section class="chapter" id="branch-and-bound" data-toc="branch-and-bound" aria-labelledby="h-branch">
@@ -51,13 +52,13 @@
       <p class="precise">P ∪ X is a promotion set exactly when each member of X is a
       factor of its home in state(P), and every frame of state(P) stays winnable when the player applies X.</p>
     </aside>
-    <p>A <a class="gloss" href="glossary.html#search">search</a> tries the sets one candidate at a time.  At each step
-    it takes one candidate and splits the search tree in two.  One branch promotes it, and the other goes on without it.
+    <p>A <a class="gloss" href="glossary.html#search">search</a> builds the sets one candidate at a time.  At each step
+    it takes one candidate and splits the search tree.  One branch promotes the candidate, and the other goes on without it.
     Each point the search reaches is a <a class="gloss" href="glossary.html#node">node</a>.  All the while the search
     keeps the best game it has found, and each node has a <a class="gloss" href="glossary.html#bound">bound</a>, a limit
-    on the sum of the promotions of any game in that branch, counting those already made.  Every game in the search
-    plays <a class="gloss" href="glossary.html#u-star">U*</a>, so its promotions decide its score.  A branch whose bound
-    cannot beat the best game found is a dead end, so the search stops exploring that path.  We call this way of
+    on the sum of the promotions of any game in that branch.  Every game in the search
+    plays <a class="gloss" href="glossary.html#u-star">U*</a>, so the promotions decide its score.  A branch whose bound
+    cannot beat the best game already found is a dead end, so the search stops exploring that path.  We call this way of
     searching branch and bound.</p>
   </div>
 

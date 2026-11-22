@@ -47,14 +47,17 @@
      number; darker than blue and orange, so a reader without red-green vision tells them apart by lightness
      (style.html, "The search's green"). */
   --search: #17654d;
-  /* How a game was settled, chapter 2's four rules.  The two that need a search wear the search's green, a search its
-     own green and a repeat, which rests on an earlier search, a lighter shade; the two that need none, the ceiling and
-     the prime formula, are gray.  Light to dark they alternate, gray and green (ceiling, repeat, prime, search), so
+  /* How a game was settled, chapter 2's five rules.  The two that need a search wear the search's green, a search its
+     own green and a repeat, which rests on an earlier search, a lighter shade; the three that need none are gray, the ceiling and
+     the prime formula, and blue, the semiprime formula.  Light to dark they alternate, gray and green (ceiling, repeat, prime, search), so
      neighbors differ in both, and a search is the darkest; every pair is 8 or more apart under both color-blind
      simulations (js/cvd.js), the lightest at 2.2:1 on white. */
   --rule-ceiling: #a9b0b9;
   --rule-repeat: #659989;
   --rule-prime: #6c737d;
+  /* The semiprime formula, which also needs no search, is blue, since a fifth gray or green is not told apart; the blue
+     differs by 11 or more from the others under both color-blind simulations. */
+  --rule-semiprime: #c9ced4;
   --rule-search: var(--search);
 
   /* The two renderings: the flat fill of a kept number; the parts of a raised token and its tray */
@@ -576,10 +579,10 @@ figure { margin: 30px 0 34px; }
 .fig-view { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
 .fig-view-word { font-size: 0.8rem; font-weight: 600; color: var(--ink-3); margin-right: 2px; }
 .fig-view .btn { padding: 6px 10px; font-size: 0.8rem; }
-.loop-status, .orders-status { font-size: 0.9rem; color: var(--ink-2); margin: 8px 2px 0; }
-.loop-status { min-height: 4.6em; }
-.loop-status strong, .orders-status strong { color: var(--ink); }
-#loop svg { max-width: 24rem; }
+.cycle-status, .orders-status { font-size: 0.9rem; color: var(--ink-2); margin: 8px 2px 0; }
+.cycle-status { min-height: 4.6em; }
+.cycle-status strong, .orders-status strong { color: var(--ink); }
+#cycle svg { max-width: 24rem; }
 #orders { max-width: var(--measure); }
 
 /* The exchange of game 833 */
@@ -743,6 +746,12 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
     font-size: 0.86rem;
   }
   .toc-panel[hidden] { display: none; }
+  /* The open contents panel is modal: the page behind it cannot scroll, the panel's own scroll does not chain to the
+     page, and a tinted layer between them takes any click outside the panel, which closes it. */
+  html.toc-open { overflow: hidden; }
+  .toc-panel { overscroll-behavior: contain; }
+  .toc-backdrop { position: fixed; inset: 52px 0 0 0; z-index: 18; background: rgba(30, 34, 39, 0.18); }
+  .toc-backdrop[hidden] { display: none; }
   .toc-panel nav { max-width: 30rem; margin: 0 auto; }
   .essay { padding: 40px 32px 100px; }
   html { scroll-padding-top: 64px; }
@@ -763,6 +772,8 @@ code { font-family: var(--font); font-weight: 700; background: rgba(30, 34, 39, 
     float: none; width: auto; margin: -0.35rem 0 1.15rem; padding: 0; border: 0; font-size: 0.86rem;
     background: var(--wash); border-left: 3px solid var(--ink); border-radius: 0 10px 10px 0;
   }
+  /* The front page's note under its lede follows the summary line, which has no bottom margin to tuck into. */
+  .essay-head > .note { margin-top: 0.9rem; }
   .note.links { border-left-style: dotted; }
   .note.tech { border-left-width: 2px; }
   .note-fold {

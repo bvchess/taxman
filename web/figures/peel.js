@@ -8,9 +8,10 @@
 // for a front move, from the factor to its number for a back move.  At the end every number is paired, in the
 // player's and the taxman's colors, as in the orders figure.
 //
-// The set and the game come from data/small.json, and the run is js/model.js's peel, choosing its steps: first the
-// four the text walks through, then back moves, then the rest.  The pairs are checked against the payments of the
-// recorded game, so a run that did not end in them would fail loudly.  Only the places are written by hand.
+// The set and the game come from data/small.json, and the run is js/model.js's peel, choosing its steps so that it
+// pairs the numbers in the column's order, top to bottom, as the text walks through them.  The pairs are checked
+// against the payments of the recorded game, so a run that did not end in them would fail loudly.  Only the places
+// and the order are written by hand.
 //
 // URL parameter: peel=k opens state k (1, the set, to 11, all paired).
 
@@ -27,23 +28,19 @@ const LABEL_GAP = 28;
 const HEAD_Y = [16, 36]; // the two lines of the heads
 const rowY = (i) => 72 + 36 * i;
 // The numbers top to bottom, by hand, so that no two lines cross; each factor stands level with the number it pays
-// for, so every payment is drawn straight across.
-const MEMBER_ORDER = [16, 20, 12, 18, 14, 21, 9, 15, 19];
-// The steps the text walks through first, each a front move: 19 with 1, 9 with 3, then 15 and 21.
-const TEXT_RUN = [19, 9, 15, 21];
+// for, so every payment is drawn straight across.  Peel pairs them in this order too: 19 with 1, the only factor it
+// has, 15 with 5, which no other number can use, 9 with 3, 21 with 7, and the rest.
+const MEMBER_ORDER = [19, 15, 9, 21, 14, 18, 12, 20, 16];
 const KIND = { front: 'one way to pay', back: 'one taker' };
 
-// A run of peel that opens as the text does, then takes the back moves that no front move could take, then the rest.
+// A run of peel that pairs the numbers in MEMBER_ORDER, each by a front move where it has one.
 function runOf(set) {
-  const paired = new Set();
+  let next = 0;
   const { playable, steps } = M.peel(set, {
     choose(options) {
-      const next = TEXT_RUN.find((m) => !paired.has(m));
-      let pick = next === undefined ? null : options.find((o) => o.kind === 'front' && o.member === next);
-      if (next !== undefined && !pick) throw new Error(`peel figure: ${next} is not a front move when the text takes it`);
-      pick ??= options.find((o) => o.kind === 'back' && !options.some((p) => p.kind === 'front' && p.member === o.member));
-      pick ??= options[0];
-      paired.add(pick.member);
+      const m = MEMBER_ORDER[next++];
+      const pick = options.find((o) => o.kind === 'front' && o.member === m) ?? options.find((o) => o.member === m);
+      if (!pick) throw new Error(`peel figure: peel cannot pair ${m} when the column takes it`);
       return pick;
     },
   });

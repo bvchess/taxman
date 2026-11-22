@@ -1,10 +1,10 @@
 // Layer 2 of game 100 as a graph on the primes: each source with two prime factors is the edge between them, and
-// descending greedy takes the edges from the largest down, refusing each one that would close a loop with those it
-// kept.  It is the loop of chapter 1 at work.  A flat figure, stepped: the edges, one state for each source greedy
+// descending greedy takes the edges from the largest down, refusing each one that would close a cycle with those it
+// kept.  It is the cycle of chapter 1 at work.  A flat figure, stepped: the edges, one state for each source greedy
 // decides, and the tree it leaves.
 //
-// What greedy keeps comes from js/model.js (descendingGreedy), and the figure checks it against the loop rule: every
-// source it refuses closes a loop with the ones it kept before, which the figure finds and names, and no source it
+// What greedy keeps comes from js/model.js (descendingGreedy), and the figure checks it against the cycle rule: every
+// source it refuses closes a cycle with the ones it kept before, which the figure finds and names, and no source it
 // keeps does.  Only the places are written by hand: the primes 2, 3, 5 and 7 in a row, the larger primes in diamonds
 // between them and in a fan to the left, each source at the middle of its edge.
 //
@@ -46,7 +46,7 @@ const product = (s) => {
 };
 
 /** The facts of the figure: the primes up to n/2, the sources of layer 2 in greedy's order, and for each whether
- *  greedy keeps it and, if not, the loop it would close. */
+ *  greedy keeps it and, if not, the cycle it would close. */
 export function forestFacts(n = N) {
   const primes = [];
   for (let p = 2; p <= n / 2; p++) if (M.omega(p) === 1) primes.push(p);
@@ -83,13 +83,13 @@ export function forestFacts(n = N) {
   };
   const steps = scan.map((s) => {
     const [p, q] = ends(s);
-    const loop = path(p, q);
+    const cycle = path(p, q);
     const keep = uStar.has(s);
-    if (keep === Boolean(loop)) {
-      throw new Error(`layer 2 of game ${n}: greedy ${keep ? 'keeps' : 'refuses'} ${s}, which ${loop ? 'closes' : 'closes no'} loop`);
+    if (keep === Boolean(cycle)) {
+      throw new Error(`layer 2 of game ${n}: greedy ${keep ? 'keeps' : 'refuses'} ${s}, which ${cycle ? 'closes' : 'closes no'} cycle`);
     }
     if (keep) kept.push(s);
-    return { s, keep, loop: loop ? { edges: [...loop.edges].reverse(), primes: [...loop.nodes].reverse() } : null };
+    return { s, keep, cycle: cycle ? { edges: [...cycle.edges].reverse(), primes: [...cycle.nodes].reverse() } : null };
   });
   const refused = steps.filter((st) => !st.keep).map((st) => st.s);
   const reached = new Set(kept.flatMap(ends));
@@ -140,15 +140,15 @@ function states(f, places) {
       st[done.s] = { ...st[done.s], ...(done.keep ? { kept: 1 } : { shape: SHAPE.square }) };
       if (!done.keep && done !== step) for (const p of M.primeFactors(done.s)) st[`e${done.s}-${p}`] = { faded: 1 };
     }
-    // The source greedy is deciding wears a halo, and so does the loop it would close.
+    // The source greedy is deciding wears a halo, and so does the cycle it would close.
     st[step.s].halo = 1;
     for (const p of M.primeFactors(step.s)) st[`e${step.s}-${p}`] = { halo: 1 };
-    if (step.loop) {
-      for (const e of step.loop.edges) {
+    if (step.cycle) {
+      for (const e of step.cycle.edges) {
         st[e].halo = 1;
         for (const p of M.primeFactors(e)) st[`e${e}-${p}`] = { halo: 1 };
       }
-      for (const p of step.loop.primes) st[p].halo = 1;
+      for (const p of step.cycle.primes) st[p].halo = 1;
     }
     st._duration = 650;
     list.push(st);
@@ -175,13 +175,13 @@ function captions(f) {
   for (const step of f.steps) {
     if (step.keep) {
       keptSoFar++;
-      words.push(`${step.s} = ${product(step.s)} closes no loop with the sources greedy has kept, so greedy keeps it: ${keptSoFar} so far.`);
+      words.push(`${step.s} = ${product(step.s)} closes no cycle with the sources greedy has kept, so greedy keeps it: ${keptSoFar} so far.`);
     } else {
-      const k = step.loop.primes.length;
-      words.push(`${step.s} = ${product(step.s)} would close a loop with ${listWords(step.loop.edges)}: ${COUNT[k] ?? k} numbers on ${COUNT[k] ?? k} primes, ${listWords(step.loop.primes)}, as in chapter 1's loop. Greedy refuses it.`);
+      const k = step.cycle.primes.length;
+      words.push(`${step.s} = ${product(step.s)} would close a cycle with ${listWords(step.cycle.edges)}: ${COUNT[k] ?? k} numbers on ${COUNT[k] ?? k} primes, ${listWords(step.cycle.primes)}, as in chapter 1's cycle. Greedy refuses it.`);
     }
   }
-  words.push(`Greedy keeps ${f.kept.length} of the ${f.scan.length} and refuses ${listWords(f.refused)}. What it keeps ${f.spans ? `joins all ${f.primes.length} primes with no loop: a tree` : 'has no loop: a forest'}.`);
+  words.push(`Greedy keeps ${f.kept.length} of the ${f.scan.length} and refuses ${listWords(f.refused)}. What it keeps ${f.spans ? `joins all ${f.primes.length} primes with no cycle: a tree` : 'has no cycle: a forest'}.`);
   return words;
 }
 

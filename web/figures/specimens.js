@@ -99,7 +99,8 @@ export const TOKENS = [
     ['--rule-search', 'A game settled by a search: the search’s green.'],
     ['--rule-repeat', 'A game that repeats an earlier search: a lighter shade of it.'],
     ['--rule-prime', 'A game settled by the prime formula: a mid gray.'],
-    ['--rule-ceiling', 'A game at its ceiling: a light gray, the lightest.'],
+    ['--rule-ceiling', 'A game at its ceiling: a light gray.'],
+    ['--rule-semiprime', 'A game settled by the semiprime formula: the lightest gray.'],
   ]],
 ];
 
@@ -159,7 +160,7 @@ export async function mountTones(host) {
   }
 }
 
-/** The four rules' colors, light to dark, and the search's green against the player and the taxman, worked out from
+/** The five rules' colors, and the search's green against the player and the taxman, worked out from
  *  the tokens themselves. */
 export function mountSearchColors(host) {
   const cs = getComputedStyle(document.documentElement);
@@ -168,7 +169,7 @@ export function mountSearchColors(host) {
   const worst = (a, b) => Math.min(separation(a, b, 'deutan'), separation(a, b, 'protan'));
   const sep = (a, b) =>
     `deutan ${separation(a, b, 'deutan').toFixed(1)}, protan ${separation(a, b, 'protan').toFixed(1)}`;
-  const rules = ['ceiling', 'repeat', 'prime', 'search']
+  const rules = ['ceiling', 'repeat', 'prime', 'semiprime', 'search']
     .map((key) => ({ name: RULE[key].name, color: hex(`--rule-${key}`) }));
   let closest = null;
   for (let i = 0; i < rules.length; i++) {
@@ -179,7 +180,7 @@ export function mountSearchColors(host) {
   }
   const green = hex('--search');
   host.innerHTML = `
-    <p>${rules.map((r) => swatch(r.color)).join('')}the four rules, light to dark:
+    <p>${rules.map((r) => swatch(r.color)).join('')}the five rules:
     ${rules.map((r) => `${r.name} ${r.color}`).join(', ')}; the closest pair, ${closest.a} and ${closest.b},
     ${closest.d.toFixed(1)} apart under the worse of deutan and protan</p>
     <p>${swatch(green)}the search’s ${green} against blue ${hex('--player')}: ${sep(green, hex('--player'))};
