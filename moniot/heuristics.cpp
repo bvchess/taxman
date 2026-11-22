@@ -12,9 +12,9 @@
 // they appear in the usage page.  Descriptions are lists of strings.
 std::vector<Heuristic> heuristicList = {
   { HeuristicID::BornFree, "BornFree", {
-      "This heuristic is called \"born free \" because it based on a",
+      "This heuristic is called \"born free\" because it is based on a",
       "matching on the Taxman graph that is free of flat alternating cycles",
-      "by construction, and therefore always yields a playable move",
+      "by construction, and therefore always yields a playable",
       "move sequence.  It has been mathematically proven to win for all",
       "game sizes greater than 13.",
     }
@@ -50,7 +50,7 @@ std::vector<Heuristic> heuristicList = {
   },
   {  HeuristicID::MaxTurnPlus, "MaxTurn+", {
       "Start with the move sequence obtained by MaxTurn, and then look",
-      "for \"freebies,\"  which  are picks that can be taken along the way",
+      "for \"freebies,\" which are picks that can be taken along the way",
       "that would otherwise go to the Taxman, and which do not prevent any",
       "other picks in the future move sequence from being taken.  There are two",
       "categories of freebies: (1) a number that will be taken as tax when",
@@ -66,7 +66,7 @@ std::vector<Heuristic> heuristicList = {
       "This heuristic has 3 stages:",
       "Stage 1: pick the largest prime.",
       "Stage 2: pick the available odd numbers from largest down, stopping at N/2.",
-      "Stage 3: pick the available even numbers from smalles up, starting after N/2.",
+      "Stage 3: pick the available even numbers from smallest up, starting after N/2.",
     }
   },
   {  HeuristicID::OneTax, "OneTax", {

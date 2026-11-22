@@ -40,7 +40,7 @@ void usage(const char *progname, int exit_status) {
     std::cout << std::endl;
   }
   std::cout << " Default output selection if none specified is score and moves." << std::endl;
-  std::cout << " Note that for upper bound, moves are not necessarily playable." << std::endl;
+  std::cout << " Note that for UpperBound, moves are not necessarily playable." << std::endl;
   std::cout << std::endl;
   std::cout << "To run, enter game size N or range minN-maxN or list N1,N2,.. or combination" << std::endl;
 

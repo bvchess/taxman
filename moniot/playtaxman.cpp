@@ -110,6 +110,10 @@ int main( int argc, char *argv[] ) {
     }
     else {
       opt_char = argv[iarg][1];	// the option letter
+      if ( strchr("?dfms",opt_char) != NULL && opt_char != '\0' && argv[iarg][2] != '\0' ) {
+	std::cerr << "Option " << argv[iarg] << " not recognized: options cannot be combined" << std::endl;
+	usage(progname,EXIT_FAILURE);
+      }
       switch( opt_char ) {
       case '\0':		// solitary "-"
 	usage(progname,EXIT_FAILURE);
@@ -142,7 +146,7 @@ int main( int argc, char *argv[] ) {
 	  }
 	}
 	if ( ! heuristicFound ) {    	// no heuristic matched to argument
-	  std::cout << "Heuristic " << argv[iarg]+pos << " unknown" << std::endl;
+	  std::cerr << "Heuristic " << argv[iarg]+pos << " unknown" << std::endl;
 	  usage( progname, EXIT_FAILURE );
 	}
 	break;

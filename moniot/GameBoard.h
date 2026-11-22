@@ -14,6 +14,7 @@
 
 #ifndef GAMEBOARD_H
 #define GAMEBOARD_H
+#include "defs.h"
 #include <vector>
 #include <algorithm>
 

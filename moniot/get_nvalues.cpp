@@ -15,7 +15,7 @@ const int MAX_SANE_N = 40000;  // change this if you wish, may cause crash
 // ints that is n <~ 46 340.
 void validate_n(int n) {
   if ( n < 1 || n > MAX_SANE_N ) {
-    std::cout << "Require 1 <= N <= " << MAX_SANE_N << std::endl;
+    std::cerr << "Require 1 <= N <= " << MAX_SANE_N << std::endl;
     exit(EXIT_FAILURE);
   }
 }
@@ -24,7 +24,7 @@ void validate_n(int n) {
 // This routine is called by get_nvalues if the
 // input is not valid.  It exits with failure status.
 void inputError( void ) {
-  std::cout << "Input error" << std::endl;
+  std::cerr << "Input error" << std::endl;
   exit(EXIT_FAILURE);
 }
 
