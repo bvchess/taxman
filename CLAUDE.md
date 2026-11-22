@@ -16,8 +16,8 @@ How-to lives in the docs listed at the end.
 * **Money.**  Anything that costs money or changes the AWS account needs the explicit approval of whoever owns the AWS
   account, with a cost estimate first, and nothing is left running
   ([solver/docs/runbook/launch.md](solver/docs/runbook/launch.md) has the rules for a launch).
-* **Other people's code** stays as they sent it: Robert Moniot's moniot/playtaxman.cpp is worked around in
-  moniot/Makefile, not edited.
+* **Other people's code** stays as they sent it: the files of Robert Moniot's moniot/ are his, not edited; our own
+  notes on them go in heuristics/README.md.
 * **Branch.**  Work on master; commit and push there.
 * **Notebook.**  The lab notebook and the research agenda are a repository of their own,
   [bvchess/taxman-notebook](https://github.com/bvchess/taxman-notebook).  Its checkout goes at `solver/notebook/` of

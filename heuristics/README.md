@@ -279,6 +279,43 @@ all-divisors matching bound, and chains of opt(n) ≤ n + opt(n−1).  The searc
 through n=62, and enumerates the whole optimal pick sets too, which `solver/noframe/tools/crosscheck_optsets.py`
 compares with the prover's enumeration of every optimal set: they agree, one set each, for every n ≤ 57.  No audit has found a contradiction.
 
+## Robert Moniot's program
+
+[`../moniot/`](../moniot) holds `playtaxman`, a C++ program by Robert K. Moniot that plays ten heuristic strategies and
+computes the Franklín–Moniot upper bound.  He provided it for inclusion here, under the MIT license, and its files are
+kept as he sent them; his [`README`](../moniot/README) says how to build and run it.  His published comparison of the
+strategies is at <https://www.dsm.fordham.edu/~moniot/taxman-strategies-comparison.html>, and its n ≤ 128 table is
+committed as `results/moniot_table.json`.
+
+Over n = 2..1000, against the optimal scores, his strategies score as follows:
+
+| strategy | point share | avg % of optimal | worst game | exact |
+|---|---|---|---|---|
+| Solvent | 99.851% | 99.855% | 99.08% | 214/999 |
+| OneTax (default) | 99.065% | 99.105% | 96.00% | 42/999 |
+| GreedyOneTax | 98.989% | 99.010% | 95.99% | 42/999 |
+| PureOneTax | 97.450% | 97.222% | 80.95% | 25/999 |
+| BreakCycles | 96.753% | 97.016% | 92.82% | 38/999 |
+| MaxTurn+ | 94.685% | 95.069% | 91.89% | 22/999 |
+| BornFree | 90.388% | 90.377% | 73.33% | 6/999 |
+| MaxTurn | 90.294% | 90.554% | 86.12% | 14/999 |
+| OddsEvens | 83.426% | 83.999% | 76.54% | 13/999 |
+| MaxPick | 61.952% | 62.030% | 40.00% | 3/999 |
+
+Its `UpperBound` is the bound, not a strategy: it equals the optimal score in 45 of the 999 games, and is never below
+it.  `BreakCycles` is the heuristic of the Franklín–Moniot paper: it takes a maximum-weight matching and removes edges
+until no alternating cycle is left.  A maximum-weight matching need not be unique, so its scores depend on the
+implementation, and the `CycleBreak` column of the published table, from a Mathematica implementation, differs.
+
+The Python implementations here agree with his program in every game of n = 2..2000:
+
+* `strategies/maxturn.py` matches `MaxTurn`.
+* `strategies/onetax.py` matches `PureOneTax` with `refined=False`, and `OneTax` with `refined=True`.
+* `strategies/solvent.py` matches `Solvent`, his C++ port of it, in scores, and in pick sets over n = 2..700, as far as
+  they were compared.
+* `evaluation/bornfree.py` matches `BornFree` in scores and pick sets.
+* `evaluation/bound.py` matches `UpperBound`.
+
 ## Performance
 
 Pure Python, one thread, best of 3 (`evaluation/bench.py`); k is the empirical
@@ -376,6 +413,7 @@ resumes with `--resume`, so an interruption costs at most a few games.
 | `results/solvent_2000.json`, `results/onetax_2000.json`, `results/maxturn_2000.json` | strategies extended to n=2000 |
 | `results/fm_bound_2000.json` | exact F–M bound, n=2..2000 |
 | `results/moniot_table.json` | Moniot's published n≤128 results (validation) |
+| [`../moniot/`](../moniot) | [Robert Moniot's program](#robert-moniots-program), ten strategies in C++ |
 | `results/pot_fraction.png`, `results/score_vs_bound.png` | the two summary charts |
 
 ## Reading guide

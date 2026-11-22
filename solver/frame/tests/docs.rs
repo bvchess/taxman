@@ -240,7 +240,7 @@ fn design_gives_the_defaults_of_the_code() {
 // Links
 
 /// The markdown files of the repository's docs: the README, `docs/`, `results/` and `solver/` (not the build
-/// directories), and the READMEs of `heuristics/` and `moniot/`; and all of the notebook's checkout, if there is one.
+/// directories), and the README of `heuristics/`; and all of the notebook's checkout, if there is one.
 fn markdown_files() -> Vec<PathBuf> {
     fn walk(dir: &Path, found: &mut Vec<PathBuf>) {
         let mut paths: Vec<PathBuf> = std::fs::read_dir(dir).expect("a directory").map(|e| e.unwrap().path()).collect();
@@ -261,7 +261,7 @@ fn markdown_files() -> Vec<PathBuf> {
     for dir in ["docs", "results", "solver"] {
         walk(&root.join(dir), &mut found);
     }
-    found.extend(["heuristics/README.md", "moniot/README.md"].iter().map(|name| root.join(name)));
+    found.push(root.join("heuristics/README.md"));
     if let Some(checkout) = notebook_checkout() {
         walk(checkout, &mut found);
     }
@@ -1629,7 +1629,7 @@ fn keeps_own_words(shown: &str) -> bool {
 }
 
 /// The files to check: the solver's directory and `results/` (which a Linux dry run has), and, in a full checkout, the
-/// repository's README and `docs/`, and the READMEs of `heuristics/` and `moniot/`; but for the files that list the old
+/// repository's README and `docs/`, and the README of `heuristics/`; but for the files that list the old
 /// words (`SKIPPED`, `TERMS_CHANGED`) and the notebook's entries.  The notebook's checkout, if there is one, is walked
 /// as the rest of the repository is.
 fn vocabulary_files() -> Vec<PathBuf> {
@@ -1661,7 +1661,7 @@ fn vocabulary_files() -> Vec<PathBuf> {
     found.extend(test_data.filter(|path| path.exists()));
     if root.join("README.md").exists() {
         walk(&root.join("docs"), &mut found);
-        found.extend(["README.md", "heuristics/README.md", "moniot/README.md"].iter().map(|name| root.join(name)));
+        found.extend(["README.md", "heuristics/README.md"].iter().map(|name| root.join(name)));
     }
     if let Some(notebook) = notebook_checkout() {
         walk(notebook, &mut found);
