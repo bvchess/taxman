@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Run playtaxman for each of the supported heuristics and print its score
+
+heuristics="BornFree BreakCycles GreedyOneTax MaxPick MaxTurn MaxTurn+ \
+ OddsEvens OneTax PureOneTax Solvent UpperBound"
+
+
+for h in $heuristics ; do
+    echo -n $h
+    echo 21 | ./playtaxman -h $h | sed -n -E 's/(Player score|Upper bound)://p' 
+done

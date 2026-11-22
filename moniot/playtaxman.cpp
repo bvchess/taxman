@@ -1,666 +1,60 @@
-// Program to play Taxman using the chosen strategy.
-//
 // Copyright (C) Robert K. Moniot
-// June 2026
+// November 2026
 // SPDX-License-Identifier: MIT
 //
-// Several heuristic strategies are implemented.  See HeuristicList below
-// for a list of strategies and their definitions.
+// Program to play Taxman using the chosen strategy.
+//
+// Several heuristic strategies are implemented.  Use the command
+//   playtaxman '-?'
+// for a list of the heuristic strategies.  To see the description
+// of a heuristic HEURISTIC, use
+//   playtaxman -d -h HEURISTIC
+
 //
 // References:
-// L. A. Carmony and R. L. Holliday, "An Example from Artificial Intelligence for
-// CS1," SIGCSE Bulletin vol. 25 iss. 1 (1993).
+// L. A. Carmony and R. L. Holliday, "An Example from Artificial
+// Intelligence for CS1," SIGCSE Bulletin vol. 25 iss. 1 (1993).
+//
 // R. Moniot, "The Taxman Game," Math Horizons 14, Feb. (2007).
 // J. Trono, "Taxman Revisited," SIGSCE Bulletin, vol. 26, no. 4 (Dec. 1994)/
+//
+// The heuristics UpperBound, BreakCycles, and BornFree are based
+// on the Taxman graph and described in the following reference:
+//
+// A. F. Franklin and R. K. Moniot. The difficulty of beating the
+// Taxman.  Discrete Applied Mathematics 339 (2023), 166-171.
+//
+// The Solvent heuristic is described in the documentation here:
+//
+// https://github.com/bvchess/taxman
+
+
+// To test correctness, you should obtain the following scores for n=21:
+// BornFree 123
+// BreakCycles 135
+// GreedyOneTax 144
+// MaxPick 75
+// MaxTurn 135
+// MaxTurn+ 135
+// OddsEvens 121
+// OneTax 144
+// PureOneTax 144
+// Solvent 144
+// UpperBound 145
+
+
+#include "defs.h"		// Shared local definitions
+#include "heuristics.h"		// Heuristic names and descriptions
+#include "printformats.h"	// Print format names & descriptions
+#include "gamedefs.h"		// Definitions for GameBoard heuristics
+#include "GameBoard.h"		// Definition of GameBoard class
+
+// Global variables declared here, declared extern in defs.h
+
+
+std::vector<int> omega;
+std::vector<int> primes;
 
-
-#include <iostream>
-#include <vector>
-#include <getopt.h>
-#include <sstream>
-#include <string>
-#include <algorithm>
-#include <cstdlib>
-#include <climits>
-#include <strings.h>
-using namespace std;
-
-#define MAX_SANE_N 40000  // prevent overflow in n(n+1) and excess alloc req
-
-// Supported heuristics for playing Taxman
-typedef enum {
-  OneTax,
-  PureOneTax,
-  GreedyOneTax,
-  MaxTurn,
-  MaxTurnPlus,
-  OddsEvens,
-  MaxPick,
-} HeuristicID;
-
-class Heuristic {
-public:
-  const HeuristicID id;
-  const char* name;
-  vector<const char*> desc;
-};
-
-// The order of heuristics in the below list need not match the enum
-// HeuristicID.  The order in which they are listed here is the order
-// they appear in the usage page.  Descriptions are NULL-terminated
-// lists of strings.
-vector<Heuristic> heuristicList = {
-  { OneTax, "OneTax", {
-      "Pick the largest number that has only one remaining divisor in",
-      "play.  Note that this automatically picks the largest prime as the",
-      "first pick, and often the largest square of a prime as the second,",
-      "which are commonly the optimal first two moves. One tweak is made:",
-      "If the chosen pick has a multiple that is going to be rendered",
-      "unpickable when this pick is taken (i.e., it has no other divisors",
-      "than this pick and its tax) and which is not a divisor of any other",
-      "active number, then take that multiple instead, despite the fact",
-      "that this gives the Taxman two numbers on that turn.  This always",
-      "does at least as well as PureOneTax, and usually does significantly",
-      "better.  It is the best-performing overall of the supported heuristics,",
-      "so it is the default strategy.",
-      NULL
-    }
-  },
-  { PureOneTax, "PureOneTax", {
-      "Pick the largest number that has only one remaining divisor in",
-      "play.  Note that this automatically picks the largest prime as the",
-      "first pick, and often the largest square of a prime as the second,",
-      "which are commonly the optimal first two moves.  The OneTax strategy",
-      "modifies this pure OneTax strategy for improved performance.",
-      NULL
-    }
-  },
-  { GreedyOneTax, "GreedyOneTax", {
-      "Like OneTax, pick a number that has only one divisor in play.  Differs",
-      "from OneTax in that if two or more numbers have only one remaining divisor,",
-      "instead of choosing the largest, choose the one with the largest",
-      "difference between the player's take and the Taxman's take, like MaxTurn.",
-      "Like OneTax, also include the tweak of taking a multiple of the pick",
-      "if it will become unpickable. The score is mostly the same as OneTax,",
-      "sometimes a little better, on average a little worse.",
-      NULL
-    }
-  },
-  { MaxTurn, "MaxTurn", {
-      "Choose the pick that maximizes the difference between the player's",
-      "take (the pick) and the taxman's take (the sum of the remaining",
-      "active proper divisors of the pick) on each turn.  If two picks are",
-      "tied for the maximum difference, take the larger one.",
-      NULL
-    }
-  },
-  { MaxTurnPlus, "MaxTurn+", {
-      "Start with the move sequence obtained by MaxTurn, and then look",
-      "for \"freebies,\"  which  are picks that can be taken along the way",
-      "that would otherwise go to the Taxman, and which do not prevent any",
-      "other picks in the future move sequence from being taken.  There are two",
-      "categories of freebies: (1) a number that will be taken as tax when",
-      "the next pick is taken, and whose divisors (including itself) are",
-      "a proper subset of the tax on that pick; and (2) a number that is",
-      "a multiple of a divisor of the next pick whose divisors are a proper",
-      "subset of the tax on that pick, and that will otherwise be left to the",
-      "Taxman at the end of the game.  If there are two or more such",
-      "freebies for a given pick, select the largest.",
-      NULL
-    }
-  },
-  { OddsEvens, "OddsEvens", {
-      "This heuristic has 3 stages:",
-      "Stage 1: pick the largest prime.",
-      "Stage 2: pick the available odd numbers from largest down, stopping before N/2.",
-      "Stage 3: pick the available even numbers from smalles up, starting after N/2.",
-      NULL
-    }
-  },
-  { MaxPick, "MaxPick", {
-      "On each turn, take the largest number that can legally be picked.",
-      "An example of a greedy strategy that usually loses.",
-      NULL
-    }
-  }
-};
-
-const HeuristicID defaultHeuristic = OneTax; // This is the default strategy
-
-// Note: Other heuristic strategies may be added in future.  To add
-// a new one, add an ID for it in the enum HeuristicID, add an entry in
-// heuristicList, write an implementation function, and add a case for
-// it in the switch ( heuristic ) in main.
-
-
-// Supported print formats
-typedef enum {
-  Human,			// Human-friendly
-  CSV,				// Comma-separated values for spreadsheet
-  Math,				// Mathematica list or C/C++ struct
-  JSON,				// JSON object
-} PrintFormatID;
-// Note: Human format implies prompting for N value(s); the other formats do
-// not prompt since they are intended for redirecting output to a file or app.
-
-class PrintFormat {
-public:
-  PrintFormatID id;
-  const char* name;
-  const char* desc;
-};
-
-vector<PrintFormat> printFormatList = {
-  {Human, "Human", "Descriptive format"},
-  {CSV, "CSV", "Comma-separated values for spreadsheet input"},
-  {Math, "Math", "Initialization expressions in Mathematica or C++"},
-  {JSON, "JSON", "JavaScript Object Notation"},
-};
-
-const PrintFormatID defaultPrintFormat = Human; // Default print format
-
-
-
-// GameBoard: class for maintaining and updating state of the game.
-
-typedef vector<bool> onBoard_t;  // Type for onBoard which tracks active status of numbers
-typedef vector<int> numList_t;	 // Type for lists of numbers e.g. picks or divisors
-
-class GameBoard {
-public:
-  int gameSize;			// Number of numbers on the board initially
-  onBoard_t onBoard;		// onBoard[x] is true if x is not taken yet
-  numList_t playerMoves;	// List of player's picks
-  long long playerScore;	// Sum of player's picks
-  long long taxmanScore;	// Sum of Taxman's takes
-
-  GameBoard( int n ) {		// constructor
-    // Initialize the game for a given n
-    gameSize = n;
-    onBoard = onBoard_t(n+1, true);	// indexing 1 to n, not using 0
-    playerMoves = {};
-    playerScore = 0;
-    taxmanScore = 0;
-  }
-
-  // Function that returns true if x is still on the board.
-  bool inPlay( int x ) {
-    return onBoard.at(x);
-  }
-  
-  // Function to take the player's pick and its taxes off the board.
-  // This is just to do the bookkeeping, not validate the pick or the
-  // taxes.
-
-  void takePickAndTaxes( int pick, numList_t taxes ) {
-    if ( pick != 0 ) {
-      onBoard.at(pick) = false;
-      playerMoves.push_back(pick);
-      playerScore += pick;
-
-      for (int tax : taxes ) {
-	onBoard.at(tax) = false;
-	taxmanScore += tax;
-      }
-    }
-  }
-
-  // This function is called at the end of the game to give the Taxman all
-  // the remaining numbers.
-  void takeLeftovers(void) {
-    for (int i = 1; i <= gameSize; ++i) {
-      if (inPlay(i)) {
-	onBoard.at(i) = false;
-	taxmanScore += i;
-      }
-    }
-  }
-};				// End of class GameBoard declaration
-
-
-// This function is called when program is invoked with incorrect
-// parameters or the -? | --help parameter.  It prints the help page
-// and exits.  The exit_status should be EXIT_FAILURE if the reason is
-// reporting an error, and EXIT_SUCCESS if requested to print the
-// help page.
-
-void usage(char *path, int exit_status) {
-  char *progname = rindex(path,'/'); // strip off leading path components
-  if (progname == NULL) progname = path; else ++progname;
-
-  cout << "Usage:" << endl;
-  cout << progname << " [args]" << endl;
-  cout << "   where args include:" << endl;
-  cout << "     -? | --help: print this usage page and exit" << endl;
-  cout << "     -d | --describe: describe the selected heuristic and exit" << endl;
-  cout << "     -f | --fraction: print fraction of pot won" << endl;
-  cout << "     -h | --heuristic=HEURISTIC: use given heuristic to play" << endl;
-  cout << "     -m | --moves: print move sequence" << endl;
-  cout << "     -p | --print=FORMAT: print output in given format" << endl;
-  cout << "     -s | --score: print score" << endl;
-  cout << " HEURISTIC can be one of: (case insensitive)" << endl;
-  for ( size_t h = 0; h < heuristicList.size(); h++ ) {
-    cout << "   " << heuristicList.at(h).name;
-    if ( h == defaultHeuristic ) cout << " (default)";
-    cout << endl;
-  }
-  cout << " FORMAT can be one of: (case insensitive)" << endl;
-  for ( size_t pf = 0; pf < printFormatList.size(); pf++ ) {
-    cout << "   " << printFormatList.at(pf).name << ": " << printFormatList.at(pf).desc;
-    if ( pf == defaultPrintFormat ) cout << " (default)";
-    cout << endl;
-  }
-  cout << " Default output selection if none specified is score and moves." << endl;
-  cout << endl;
-  cout << "To run, enter game size N or range minN-maxN or list N1,N2,.. or combination" << endl;
-
-  exit(exit_status);
-}
-
-// This routine is called by the section that inputs the values of N, if the
-// input is not valid.  It exits with failure status.
-void inputError(void) {
-  cout << "Input error" << endl;
-  exit(EXIT_FAILURE);
-}
-
-
-// This routine makes sure the input value of N is valid. MAX_SANE_N should
-// ensure that the calculation n*(n=1) is < max int.  For 32-bit signed
-// ints that is about 65000.
-void validate_n(int n) {
-  if ( n < 1 || n > MAX_SANE_N ) {
-    cout << "Require 1 <= N <= " << MAX_SANE_N << endl;
-    exit(EXIT_FAILURE);
-  }
-}
-
-// Functions used by several heuristics
-
-// Return a (possibly empty) list of divisors of x that are still on
-// the board, sorted in ascending order.
-
-numList_t getRemainingDivisors(int x, GameBoard& g) {
-    numList_t divisors;
-
-    for (int d = 1; d <= x/d; ++d) {
-        if (x % d == 0) {
-            int q = x / d;
-
-            if (d < x && g.inPlay(d)) {divisors.push_back(d);}
-            if (q != d && q < x && g.inPlay(q)) {divisors.push_back(q);}
-        }
-    }
-    sort(divisors.begin(), divisors.end());
-    return divisors;
-}
-
-// Return a (possibly empty) list of multiples of x that are still on
-// the board, in ascending order.
-numList_t getRemainingMultiples(int x, GameBoard& g) {
-  numList_t multiples;
-  for(int m = x+x; m <= g.gameSize; m += x) {
-    if( g.inPlay(m) ) multiples.push_back(m);
-  }
-  return multiples;
-}
-
-// Sum the elements of a vector of integers
-
-int sumVector( numList_t v ) {
-  int sum=0;
-  for (int x : v) sum += x;
-  return sum;
-}
-
-// Function returns true if setA is a subset of setB
-bool isSubset( numList_t setA, numList_t setB ) {
-  bool subsetQ = true;
-  for ( int y : setA ) {
-    bool y_in_setB = false;
-    for ( int x : setB ) {
-      if ( x == y ) {
-	y_in_setB = true;
-	break;
-      }
-    }
-    if ( ! y_in_setB ) {
-      subsetQ = false;
-      break;
-    }
-  }
-  return subsetQ;
-}
-
-// This routine is used by playOddsEvens to find the largest prime on the board.
-// It is not very efficient, but is used only by stage 1.  If another heuristic
-// is implemented that makes heavy use of this function, it should be implemented
-// in a more efficient way.
-
-bool isPrime(int x) {
-    if (x < 2) return false;
-    for (int i = 2; i <= x/i; ++i) {
-        if (x % i == 0) return false;
-    }
-    return true;
-}
-
-
-
-// Heuristic strategy implementations start here
-
-
-// MaxTurn
-
-// Described and named Maxturn by Carmony and Holliday.  Strategy #2 of Trono.
-
-// Play one move using MaxTurn heuristic.  Return true if a pick is found.
-
-bool takeMaxTurn(GameBoard& g) {
-  int pick = 0;
-  numList_t taxes;
-  int maxgain = INT_MIN;
-
-  for (int x = 2; x <= g.gameSize; x++) {
-    numList_t divisors = getRemainingDivisors(x, g);
-    if (divisors.size() > 0 ) {
-      int gain = x - sumVector(divisors);
-      if (gain >= maxgain) {
-	pick = x;
-	taxes = divisors;
-	maxgain = gain;
-      }
-    }
-  }
-  if (pick == 0) return false;  // nothing found (implies game over)
-
-  // Take the pick and give Taxman its divisors.
-  g.takePickAndTaxes(pick, taxes);
-
-  return true;
-}
-
-
-// MaxTurn+
-
-// Described by Moniot as an "improved greedy" heuristic.  Carmony & Holliday
-// give an example where MaxTurn misses out on a freebie, but they don't
-// pursue that as an improvement on the strategy.
-
-// Caller first plays the game using MaxTurn heuristic, then calls
-// insertFreebies to make it MaxTurn+.
-
-bool insertFreebies(GameBoard& g) {
-  
-  // Find numbers left over at the end of the game.  These will go to
-  // the taxman and are eligible to be freebies if pickable at the time
-  // the freebie is evaluated.
-
-  // At the time this function is called, the game is over but the
-  // leftovers are still on the board.
-
-  onBoard_t leftOver = g.onBoard;
-
-  numList_t origMoves = g.playerMoves; // save original play sequence and clear the board
-
-  g = GameBoard(g.gameSize);		       // Re-initialize the game
-
-  for (int pick : origMoves ) {
-
-    // Get the Taxman's take for this pick
-    numList_t taxes_on_pick = getRemainingDivisors(pick, g);
-
-    if (taxes_on_pick.size() == 0) return false;  // Can only happen if given invalid move sequence
-
-  // Look for freebies that can be taken before this pick.  It is
-  // possible that more than one freebie can be taken for a given
-  // pick, so a loop is used to find them all.
-
-    bool improvementQ = true;
-    while ( improvementQ ) {
-      improvementQ = false;	// will be set to true if a freebie is found
-
-      // Freebies are found among the numbers taken by Taxman on this turn,
-      // or multiples thereof that will no longer be pickable.  Put these
-      // into list of candidates.
-      numList_t candidates = {};
-      for (int t : taxes_on_pick ) {
-	// if t has active divisors, it is legally pickable.
-	if ( getRemainingDivisors(t, g).size() > 0 ) candidates.push_back(t);
-
-	for (int m : getRemainingMultiples(t, g)) { // loop through multiples of t
-	  if ( leftOver.at(m) &&		 // Only consider leftovers
-	       getRemainingDivisors(m, g).size() > 0 ) { // must be pickable
-	    candidates.push_back(m);
-	  }
-	}
-      }
-      if ( candidates.size() > 0 ) {
-	// sort and remove duplicates
-	sort(candidates.begin(), candidates.end());
-	auto new_end = unique(candidates.begin(), candidates.end());
-	candidates.erase(new_end, candidates.end());
-	
-	// Go through candidates, looking for freebies
-	int freebie = 0;
-	numList_t taxes_on_freebie = {};
-	for ( int c : candidates ) {
-	  numList_t taxes_on_candidate = getRemainingDivisors(c, g);
-	  // Include candidate in taxes if it is in pick taxes
-	  if( pick%c == 0 ) taxes_on_candidate.push_back(c);
-	  // If taxes are a proper subset of pick taxes, it is a freebie
-	  if ( taxes_on_candidate.size() < taxes_on_pick.size() &&
-	       isSubset(taxes_on_candidate, taxes_on_pick ) ) {
-	    freebie = c;
-	    taxes_on_freebie = taxes_on_candidate;
-	  }
-	  // Don't break when one is found; possibly a larger one will be found
-	}
-	if ( freebie != 0 ) {	// Freebie was found
-	  g.takePickAndTaxes(freebie, taxes_on_freebie);
-	  taxes_on_pick = getRemainingDivisors(pick, g); // update after taking freebie
-	  improvementQ = true;
-	}
-      }	// end processing candidates
-    }	// end loop while improvementQ
-
-    // Done taking freebies: take the original pick
-    g.takePickAndTaxes(pick, taxes_on_pick);
-
-  } // end loop on picks
-  
-  return true;
-}
-
-
-// OddsEvens
-
-// Strategy #7 of Trono.  Extremely simple but it wins reliably.
-// Note that this heuristic does not perform nearly as well as Trono
-// claims.  He credits Kevin Purcell and Robert Connelly for
-// discovering it, and claims it outperforms OneTax, which it does not.
-// It mostly scores quite a bit lower than OneTax or MaxTurn.
-
-// Play entire game using the OddsEvens strategy.
-
-bool playOddsEvens(GameBoard& g) {
-  int pick = 0;
-  numList_t taxes;
-  int n = g.gameSize;
-
-		// stage 1: pick largest prime.  Always pickable and tax = 1
-  for ( int x = n; x > 1; --x ) {
-    if ( isPrime(x) ) {
-      numList_t divisors = {1};
-      pick = x;
-      taxes = divisors;
-      break;
-    }
-  }
-  g.takePickAndTaxes(pick,taxes);
-
-		// stage 2: pick available odd numbers going down, >= n/2
-  int largestOdd = (n%2 == 1? n: n-1);
-  for ( int x = largestOdd; x >= n/2; x -= 2 ) {
-    numList_t divisors = getRemainingDivisors(x, g);
-    if ( divisors.size() > 0 ) { // legally pickable
-      pick = x;
-      taxes = divisors;
-      g.takePickAndTaxes(pick,taxes);
-    }
-  }
-  
-		// stage 3: pick available even numbers going up, > n/2
-  int smallestEven = n/2+1;
-  if ( smallestEven%2 == 1 ) ++smallestEven;
-  for ( int x = smallestEven; x <= n; x += 2 ) {
-    numList_t divisors = getRemainingDivisors(x, g);
-    if ( divisors.size() > 0 ) { // legally pickable
-      pick = x;
-      taxes = divisors;
-      g.takePickAndTaxes(pick,taxes);
-    }
-  }
-  
-  return (pick != 0);		// (result unused in implementation below)
-
-}
-
-
-
-// OneTax and PureOneTax
-
-// PureOneTax is the unmodified Strategy #3 of Trono.  It is a
-// rather simple strategy, and performs very well.  OneTax improves
-// on it by allowing the Taxman to take 2 numbers occasionally.
-
-// Trono adds a different tweak to produce his Strategy #4: when 5 or
-// fewer numbers are left that can be picked, switch to MaxTurn.
-// This does not improve it as much as the tweak used here.
-
-// Play one move of either the pure one-tax heuristic (no tweak) or
-// the tweaked version, depending on argument heuristic.
-
-bool takeOneTax(GameBoard& g, HeuristicID heuristic) {
-  int pick = 0;
-  numList_t taxes;
-
-  for (int x = 2; x <= g.gameSize; x++) {
-    numList_t divisors = getRemainingDivisors(x, g);
-    if (divisors.size() == 1) {
-      pick = x;  // this loop will choose pick as the largest with 1 divisor.
-      taxes = divisors;
-    }
-  }
-  if (pick == 0) return false;  // nothing found (implies game over)
-
-  if (heuristic == OneTax) { 	// Skip this for PureOneTax
-    // Check if this pick has only one active multiple that has no other divisors
-    // besides this pick and its single tax, and no active multiples
-    // of its own.  If so, take that instead, giving the Taxman the
-    // pick and its divisor.
-    numList_t multiples = getRemainingMultiples(pick, g);
-  
-    for ( int m : multiples ) {
-      numList_t mdivisors = getRemainingDivisors(m, g);
-      numList_t mmultiples = getRemainingMultiples(m, g);
-
-      if (mmultiples.size() == 0 && mdivisors.size() == 2) {
-	pick = m;
-	taxes = mdivisors;
-      }
-    }
-
-  }
-  
-  // Take the pick and give Taxman its divisor(s).
-  g.takePickAndTaxes( pick, taxes );
-
-  return true;
-}
-
-
-// GreedyOneTax
-
-// A variant of the OneTax heuristic.  For N = 1..1000, it does better
-// than OneTax 301 times, worse 505 times, and the same 194 times.
-// When it is not the same, the difference is always less than 1%.
-
-// Play one move of the GreedyOneTax heuristic.
-
-bool takeGreedyOneTax(GameBoard& g) {
-  int pick = 0;
-  numList_t taxes;
-  int maxgain = INT_MIN;
-
-  for (int x = 2; x <= g.gameSize; x++) {
-    numList_t divisors = getRemainingDivisors(x, g);
-    if (divisors.size() == 1) {
-      int gain = x - sumVector(divisors);
-      if (gain >= maxgain) {
-	pick = x;
-	taxes = divisors;
-	maxgain = gain;
-      }
-    }
-  }
-  if (pick == 0) return false;  // nothing found (implies game over)
-
-  // Now apply the tweak.
-  
-    // Check if this pick has only one active multiple that has no other divisors
-    // besides this pick and its single tax, and no active multiples
-    // of its own.  If so, take that instead, giving the Taxman the
-    // pick and its divisor.
-  numList_t multiples = getRemainingMultiples(pick, g);
-  
-  for ( int m : multiples ) {
-    numList_t mdivisors = getRemainingDivisors(m, g);
-    numList_t mmultiples = getRemainingMultiples(m, g);
-
-    if (mmultiples.size() == 0 && mdivisors.size() == 2) {
-      pick = m;
-      taxes = mdivisors;
-    }
-
-  }
-  
-  // Take the pick and give Taxman its divisor(s).
-  g.takePickAndTaxes( pick, taxes );
-
-  return true;
-}
-
-
-// Strategy #1 of Trono.  Carmony and Holliday discuss it as an example
-// of a greedy strategy that does not work well, since it usually
-// loses.  It wins only for N=2, 5, and 11, and ties for N=3.
-
-// Play one move of the MaxPick heuristic.
-
-bool takeMaxPick(GameBoard& g) {
-  int pick = 0;
-  numList_t taxes;
-
-  for (int x = g.gameSize; x > 0; --x) {
-    numList_t divisors = getRemainingDivisors(x, g);
-    if (divisors.size() > 0 ) {
-      pick = x;
-      taxes = divisors;
-      break;
-    }
-  }
-
-  if (pick == 0) return false;  // nothing found (implies game over)
-
-  g.takePickAndTaxes( pick, taxes );
-  
-  return true;
-}
-
-
-
-// Main program starts here
 
 int main( int argc, char *argv[] ) {
 
@@ -678,83 +72,126 @@ int main( int argc, char *argv[] ) {
 
   
   // Grab the command-line options
-  
-  static struct option options[] = {
-    {"help", no_argument, NULL, '?'},
-    {"describe", no_argument, NULL, 'd'},
-    {"fraction", no_argument, NULL, 'f'},
-    {"heuristic", required_argument, NULL, 'h'},
-    {"moves", no_argument, NULL, 'm'},
-    {"print", required_argument, NULL, 'p'},
-    {"score", no_argument, NULL, 's'},
-    {NULL,0,NULL,0},
+
+  // For the sake of portability, since MSVC does not support getopt,
+  // we use our own code to get the options.  This provides somewhat less
+  // functionality than getopt or getopt_long: no long --arguments
+  // and single-letter arguments cannot be bunched together.
+
+  // Define progname as bare name of program for usage calls.
+  // On non-*nix systems the path component separator is something other than
+  // '/': in that case use the full path as progname.
+  const char* progname = std::strrchr(argv[0],'/'); // strip off leading path components
+  if (progname == NULL) {		// '/' not found
+    progname = std::strrchr(argv[0],'\\'); // Try MS-style path
+  }
+  if (progname == NULL) 	// if still not found, use full path as name
+    progname = argv[0]; else ++progname;
+
+
+  // Case-insensitive string compare that is portable.
+  // Returns true if strings are equal, ignoring case.
+  auto stringequali = [] (std::string str1, std::string str2) {
+    if (str1.size() != str2.size()) {
+      return false;
+    }
+    return std::equal(str1.begin(), str1.end(), str2.begin(), 
+		      [](unsigned char a, unsigned char b) {
+			return std::tolower(a) == std::tolower(b);		      });
   };
 
   int opt_char;
-
-  while ((opt_char=getopt_long(argc, argv, "?dfh:mp:s", options, NULL)) != -1) {
+  for ( int iarg=1; iarg < argc; iarg++ ) {
     bool heuristicFound = false;   // for -h option error checking
     bool printFormatFound = false; // for -p option error checking
-
-    switch (opt_char) {
-    case '?':
-      usage( argv[0], EXIT_SUCCESS );
-      break;
-    case 'd':
-      describe_heuristic = 1;
-      break;
-    case 'f':
-      print_fraction = 1;
-      default_output = false;
-      break;
-    case 'm':
-      print_moves = 1;
-      default_output = false;
-      break;
-    case 's':
-      print_score = 1;
-      default_output = false;
-      break;
-    case 'h':
-      for ( size_t h = 0; h < heuristicList.size(); h++ ) {
-	if (strcasecmp(optarg,heuristicList.at(h).name) == 0) {
-	  heuristicFound = true;
-	  heuristic = heuristicList.at(h).id;
-	  break;
+    int pos;
+    if (argv[iarg][0] != '-') {
+      usage(progname,EXIT_FAILURE);
+    }
+    else {
+      opt_char = argv[iarg][1];	// the option letter
+      switch( opt_char ) {
+      case '\0':		// solitary "-"
+	usage(progname,EXIT_FAILURE);
+	break;
+      case '?':
+	usage(progname,EXIT_SUCCESS);
+	break;
+      case 'd':
+	describe_heuristic = 1;
+	break;
+      case 'f':
+	print_fraction = 1;
+	default_output = false;
+	break;
+      case 'h':
+	pos = 2;
+	if ( argv[iarg][pos] == '\0' ) { // -h option followed by space: value is in next arg
+	  ++iarg;
+	  pos = 0;
+	  if ( iarg >= argc ) {
+	    usage(progname,EXIT_FAILURE);
+	  }
 	}
-      }
-      if ( ! heuristicFound ) {		// no heuristic matched to argument
-	cout << "Heuristic " << optarg << " unknown" << endl;
-	usage( argv[0], EXIT_FAILURE );
-      }
-      break;
-    case 'p':
-      for ( size_t pf = 0; pf < printFormatList.size(); pf++ ) {
-	if (strcasecmp(optarg,printFormatList.at(pf).name) == 0) {
-	  printFormatFound = true;
-	  printFormat = printFormatList.at(pf).id;
-	  break;
+	for ( std::size_t h = 0; h < heuristicList.size(); h++ ) {
+	  // case-insensitive string compare
+	  if (stringequali(&argv[iarg][pos],heuristicList.at(h).name)) {
+	    heuristicFound = true;
+	    heuristic = heuristicList.at(h).id;
+	    break;
+	  }
 	}
+	if ( ! heuristicFound ) {    	// no heuristic matched to argument
+	  std::cout << "Heuristic " << argv[iarg]+pos << " unknown" << std::endl;
+	  usage( progname, EXIT_FAILURE );
+	}
+	break;
+      case 'm':
+	print_moves = 1;
+	default_output = false;
+	break;
+      case 's':
+	print_score = 1;
+	default_output = false;
+	break;
+      case 'p':
+	pos = 2;
+	if ( argv[iarg][pos] == '\0' ) { // -p option followed by space: value is in next arg
+	  ++iarg;
+	  pos = 0;
+	  if ( iarg >= argc ) {
+	    usage(progname,EXIT_FAILURE);
+	  }
+	}
+	
+	for ( std::size_t pf = 0; pf < printFormatList.size(); pf++ ) {
+	  // case-insensitive string compare
+	  if (stringequali(&argv[iarg][pos],printFormatList.at(pf).name)) {
+	    printFormatFound = true;
+	    printFormat = printFormatList.at(pf).id;
+	    break;
+	  }
+	}
+	if ( ! printFormatFound ) { // no print format matched to argument
+	  std::cerr << "Print format " << argv[iarg]+pos << " unknown" << std::endl;
+	  usage(progname,EXIT_FAILURE);
+	}
+	break;
+      default:
+	usage(progname,EXIT_FAILURE);
+	break;
       }
-      if ( ! printFormatFound ) { // no print format matched to argument
-	cout << "Print format " << optarg << " unknown" << endl;
-	usage( argv[0], EXIT_FAILURE );
-      }
-      break;
-    default:
-      usage( argv[0], EXIT_FAILURE );
-      break;
     }
   }
-
-  // If -d | --describe was given as an option, print the description of the
+ 
+  // If -d  was given as an option, print the description of the
   // selected heuristic and exit.
 
   if (describe_heuristic) {
-    Heuristic h = heuristicList.at(heuristic);
-    cout << "Heuristic: " << h.name << endl;
-    for (int line=0; h.desc[line] != NULL; ++line) { // Go thru lines of description
-      cout << h.desc[line] << endl;
+    Heuristic h = find_Heuristic(heuristic); // get list entry from ID
+    std::cout << "Heuristic: " << h.name << std::endl;
+    for (const char *line : h.desc) { // Go thru lines of description
+      std::cout << line << std::endl;
     }
     exit(0);
   }
@@ -768,133 +205,118 @@ int main( int argc, char *argv[] ) {
   }
   
   // Accept input of n or min_n-max_n or n1,n2,n3,...
-  
-  int min_n, max_n;
-  numList_t nvalues;
-  string input_line;
-  char sep;
-  
-  // Human format includes prompting for input
-  if (printFormat == Human) cout << "How many numbers on the board? ";
-  
-  getline( cin, input_line );
-  stringstream input_ss( input_line );
-  if ( !(input_ss >> min_n) ) {
-    inputError();
-    exit(1);
-  }
-  validate_n(min_n);
-  nvalues.push_back(min_n);
-  while ( input_ss >> sep ) {
-    if( !(input_ss >> max_n) ) {
-      inputError();
-    } 
-    validate_n(max_n);
-    switch( sep ) {
-    case '-':			// minN-maxN range
-      if ( max_n < min_n ) {
-	inputError();
-      }
-      for (int i = min_n+1; i <= max_n; i++) nvalues.push_back(i);
-      min_n = max_n;
-      break;
-    case ',':			// N1,N2,... list
-      nvalues.push_back( max_n );
-      min_n = max_n;  // in case next sep is '-'
-      break;
-    default:
-      inputError();
-      break;
-    }
-  }
 
-  sort(nvalues.begin(), nvalues.end()); // process n values in ascending order regardless of input order
+  // Human format includes prompting for input
+  if (printFormat == PrintFormatID::Human) std::cout << "How many numbers on the board? ";
+  
+  std::vector<int> nvalues;
+  get_nvalues( nvalues );
+
+  
+  //  Fill lists of primes and prime omegas.  If multiple n values will
+  //  be processed, lists are large enough for largest n.
+  calcOmega(nvalues.back());
+
   
   // Opening delimiter for JSON or mathematica print format
-  if ( printFormat == Math ) cout << "{" << endl;
-  else if ( printFormat == JSON ) cout << "[" << endl;
+  if ( printFormat == PrintFormatID::Math ) std::cout << "{" << std::endl;
+  else if ( printFormat == PrintFormatID::JSON ) std::cout << "[" << std::endl;
+
   // Human or CSV print format: give the name of the heuristic used
-  else cout << "Heuristic: " << heuristicList.at(heuristic).name << endl;
+  else {
+    Heuristic h = find_Heuristic(heuristic);
+    std::cout << "Heuristic: " << h.name << std::endl;
+  }
 
   // output header row for CSV print format
-  if ( printFormat == CSV ) {
-    cout << "n";
-    if ( print_score ) cout << ",score";
-    if ( print_fraction ) cout << ",fraction";
-    if ( print_moves ) cout << ",moves";
-    cout << endl;
+  if ( printFormat == PrintFormatID::CSV ) {
+    std::cout << "n";
+    if ( print_score ) std::cout << ",score";
+    if ( print_fraction ) std::cout << ",fraction";
+    if ( print_moves ) std::cout << ",moves";
+    std::cout << std::endl;
   }
   
   bool first_n = true; // to manage commas at end of multiple lines in json or math format
 
   for ( int n : nvalues ) {
     
-    // Initialize the game
-    GameBoard g(n);
+    // Initialize the game board
+    GameBoard b(n);
 
     // Play the game for this n using the chosen heuristic
     
     bool gameOn = true;
     switch ( heuristic ) {
-     case OneTax:
-     case PureOneTax:
+     case HeuristicID::OneTax:
+     case HeuristicID::PureOneTax:
        while ( gameOn ) {
-	 gameOn = takeOneTax(g, heuristic);
+	 gameOn = takeOneTax(b, heuristic);
        }
        break;
-     case GreedyOneTax:
+     case HeuristicID::GreedyOneTax:
        while ( gameOn ) {
-	 gameOn = takeGreedyOneTax(g);
+	 gameOn = takeGreedyOneTax(b);
        }
        break;
-     case MaxTurn:
-     case MaxTurnPlus:
+     case HeuristicID::MaxTurn:
+     case HeuristicID::MaxTurnPlus:
        while ( gameOn ) {
-	 gameOn = takeMaxTurn(g);
+	 gameOn = takeMaxTurn(b);
        }
-       if ( heuristic == MaxTurnPlus ) {
-	 gameOn = insertFreebies(g);
+       if ( heuristic == HeuristicID::MaxTurnPlus ) {
+	 gameOn = insertFreebies(b);
        }
        break;
-     case OddsEvens:
-       gameOn = playOddsEvens(g);
+     case HeuristicID::OddsEvens:
+       gameOn = playOddsEvens(b);
        break;
-     case MaxPick:
+    case  HeuristicID::MaxPick:
        while ( gameOn ) {
-	 gameOn = takeMaxPick(g);
+	 gameOn = takeMaxPick(b);
        }
        break;
-     default:		
-       cout << "Heuristic " << heuristicList.at(heuristic).name
-	    << " not supported at this time" << endl;
+
+       // Heuristics based on the Taxman graph
+    case HeuristicID::UpperBound:
+    case HeuristicID::BreakCycles:
+    case HeuristicID::BornFree:
+    case HeuristicID::Solvent:
+      gameOn = playGraphHeuristic(b,heuristic);
+      break;
+      
+     default:
+       // Can only get here when a new heuristic is being added but an
+       // implementation is not yet provided.
+       std::cout << "Heuristic " << find_Heuristic(heuristic).name << " not supported at this time" << std::endl;
        gameOn = false;
-       break;
+       exit(EXIT_FAILURE);
     }
 
 
     // Game over: Taxman takes all remaining numbers
-    g.takeLeftovers();
+    b.takeLeftovers();
 
     // Output results for this n
  
-    double fractOfPot = 2.0*g.playerScore/(n*(n+1)); // player's score as fraction of total
+    double fractOfPot = 2.0*(b.player_score())/((double)n*(n+1)); // player's score as fraction of total
 
-    if ( printFormat == CSV ) {
-      cout << n;
+    if ( printFormat == PrintFormatID::CSV ) {
+      std::cout << n;
       if ( print_score ) {
-	cout << "," << g.playerScore;
+	std::cout << "," << b.player_score();
       }
       if ( print_fraction ) {
-	cout << "," << fractOfPot;
+	std::cout << "," << fractOfPot;
       }
       if ( print_moves ) {
-	for ( int p : g.playerMoves ) {
-        cout << "," << p;
+	for ( int p : b.player_moves() ) {
+        std::cout << "," << p;
 	}
       }
-      cout << endl;
+      std::cout << std::endl;
     }
-    else if (printFormat == Math) {
+    else if (printFormat == PrintFormatID::Math) {
       // Mathematica format
       // score only: {n, score}
       // score only with fraction: {n, score, fraction}
@@ -903,35 +325,35 @@ int main( int argc, char *argv[] ) {
       // both with fraction: {n, {score, fraction, {pick, pick, ...}}
       // for multi-n output, add a comma at the end of output line except the last.
       if( !first_n && (nvalues.size() > 1) ) {
-	cout << "," << endl;
+	std::cout << "," << std::endl;
       }
       first_n = false;
 
-      cout << "  { " << n << ", ";
-      if( print_moves && (print_score || print_fraction) ) cout << "{";
+      std::cout << "  { " << n << ", ";
+      if( print_moves && (print_score || print_fraction) ) std::cout << "{";
       if ( print_score ) {
-	cout << g.playerScore;
+	std::cout << b.player_score();
       }
       if ( print_fraction ) {
-	if ( print_score ) cout << ", ";
-	cout << fractOfPot;
+	if ( print_score ) std::cout << ", ";
+	std::cout << fractOfPot;
       }
       if ( print_moves ) {
 	int comma = 0;
-	if ( print_score || print_fraction ) cout << ", ";
-	cout << "{";
-	for (int p : g.playerMoves ) {
-	  if( comma ) cout << ", ";
+	if ( print_score || print_fraction ) std::cout << ", ";
+	std::cout << "{";
+	for (int p : b.player_moves() ) {
+	  if( comma ) std::cout << ", ";
 	  comma = 1;
-	  cout << p;
+	  std::cout << p;
 	}
-	cout << "}";
+	std::cout << "}";
       }
-      if ( print_moves && (print_score || print_fraction) ) cout << "}";
-      cout << " }";	// no newline; it will be put in with comma before printing next line
+      if ( print_moves && (print_score || print_fraction) ) std::cout << "}";
+      std::cout << " }";	// no newline; it will be put in with comma before printing next line
     }
 
-    else if (printFormat == JSON) {
+    else if (printFormat == PrintFormatID::JSON) {
       // JSON format
       // score only: { "n": n, "score": score}
       // score only with fraction: { "n": n, "score": score, "fraction": fraction}
@@ -939,58 +361,71 @@ int main( int argc, char *argv[] ) {
       // both: {"n": n, "score": score, "moves": [pick, pick, ...]}
       // both with fraction: {"n": n, "score": score, "fraction": fraction, "moves": [pick, pick, ...]}
       if( !first_n && (nvalues.size() > 1) ) { // comma at end of line
-	cout << "," << endl;
+	std::cout << "," << std::endl;
       }
       first_n = false;
 
-      cout << "  { \"n\": " << n << ", ";
+      std::cout << "  { \"n\": " << n << ", ";
       if ( print_score ) {
-	cout << "\"score\": " << g.playerScore;
+	std::cout << "\"score\": " << b.player_score();
       }
       if ( print_fraction ) {
-	if (print_score) cout << ", ";
-	cout << "\"fraction\": " << fractOfPot;
+	if (print_score) std::cout << ", ";
+	std::cout << "\"fraction\": " << fractOfPot;
       }
       if ( print_moves ) { // format {n, {pick, pick, ...}}
 	int comma = 0;
-	if ( print_score || print_fraction ) cout << ", ";
-	cout << "\"moves\": [";
-	for (int p : g.playerMoves ) {
-	  if( comma ) cout << ", ";
+	if ( print_score || print_fraction ) std::cout << ", ";
+	std::cout << "\"moves\": [";
+	for (int p : b.player_moves() ) {
+	  if( comma ) std::cout << ", ";
 	  comma = 1;
-	  cout << p;
+	  std::cout << p;
 	}
-	cout << "]";
+	std::cout << "]";
       }
-      cout << " }";
+      std::cout << " }";
     }
     else {			// standard human-oriented format
 
-      cout << "N=" << n << endl;
+      std::cout << "N=" << n << std::endl;
       if ( print_moves ) {
-	cout << "Sequence:";
-	if (g.playerMoves.empty()) {
-	  cout << " none";
+	if ( heuristic == HeuristicID::UpperBound ) {
+	  std::cout << "Numbers used:";
+	}
+	else
+	  std::cout << "Sequence:";
+	if (b.player_moves().empty()) {
+	  std::cout << " none";
 	} else {
-	  for (int x : g.playerMoves) {
-	    cout << " " << x;
+	  for (int x : b.player_moves()) {
+	    std::cout << " " << x;
 	  }
 	}
-	cout << endl;
+	std::cout << std::endl;
       }
+      // Since upper bound is not necessarily achievable, tailor the wording.
       if ( print_score ) {
-	cout << "Player score: " << g.playerScore << endl;
-	cout << "Taxman score: " << g.taxmanScore << endl;
+	if ( heuristic == HeuristicID::UpperBound )
+	  std::cout << "Upper bound: ";
+	else 
+	  std::cout << "Player score: ";
+	std::cout << b.player_score() << std::endl;
+	if ( heuristic == HeuristicID::UpperBound )
+	  std::cout << "Points left: ";
+	else 
+	  std::cout << "Taxman score: ";
+	std::cout << b.taxman_score() << std::endl;
       }
       if (print_fraction) {
-	cout << "Fract of pot: " << fractOfPot << endl;
+	std::cout << "Fract of pot: " << fractOfPot << std::endl;
       }
     }
   }
 
   // Closing delimiter for JSON or mathematica output
-  if ( printFormat == Math ) cout << endl << "}" << endl;
-  else if ( printFormat == JSON ) cout << endl << "]" << endl;
+  if ( printFormat == PrintFormatID::Math ) std::cout << std::endl << "}" << std::endl;
+  else if ( printFormat == PrintFormatID::JSON ) std::cout << std::endl << "]" << std::endl;
 
   return 0;
 }

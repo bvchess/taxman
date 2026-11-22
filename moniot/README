@@ -1,0 +1,52 @@
+			      playtaxman
+
+				README
+
+This folder contains the C++ source code for a command-line program
+that plays the Taxman game using any of a variety of heuristic
+strategies.
+
+The rules of the Taxman game are as follows: initially the board
+contains the numbers from 1 to some chosen N.  The player takes one of
+the numbers, and the Taxman takes as tax all the numbers that evenly
+divide it.  Those numbers are removed from the board, and the player
+makes the next move.  The Taxman must get some tax on each move.  When
+there are no numbers left that can legally be taken by the player, the
+Taxman gets them all and the game ends.  The player's score is the sum
+of the numbers taken by the player, and the Taxman's score is the sum
+of the numbers taken by the Taxman.  The goal is to beat the Taxman.
+
+Optimal play, beating the Taxman by the largest amount possible, is
+probably NP-hard, which means it is not readily determined.
+Therefore, various heuristic strategies have been devised that attempt
+to do nearly as well as the optimal strategy.
+
+To build this program, you need a C++ compiler.
+
+If you have a Unix-like environment such as Linux or MacOS, you can
+build the program from the command line with the command "make".
+
+Otherwise, it should suffice simply to compile all of the *.cpp files
+into one program.  You should specify at least some optimization
+to ensure efficient operation.
+
+This folder includes a bash script "runheuristics" to run the program
+with game size N=21 for each of the heuristics.  The correct output is
+in the file "runheuristics.out".  You can use this as a simple test
+that the program works correctly.
+
+Invoke the program with the command-line option "-?" to see a help
+page listing all the options, including the supported heuristics.
+
+Use the "-d" option to read a description of a given heuristic.
+
+This code is released under the SPDX "MIT License".  Full details of the
+legal terms of this license can be found at https://spdx.org/licenses/MIT.html
+
+
+Have fun!
+
+
+Robert Moniot
+Fordham University
+New York City
