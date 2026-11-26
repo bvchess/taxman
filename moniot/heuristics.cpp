@@ -106,8 +106,7 @@ std::vector<Heuristic> heuristicList = {
       "Upper bound on the optimal score, equal to the weight of the",
       "maximum matching on the Taxman graph.  The sequence of picks",
       "is generally not playable, i.e., this heuristic does not",
-      "provide a strategy for playing the game. If the bound is",
-      "achievable, the BreakCycles heuristic will give the move sequence.",
+      "provide a strategy for playing the game.",
     }
   },
 };
